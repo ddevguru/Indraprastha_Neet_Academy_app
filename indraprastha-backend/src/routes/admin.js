@@ -66,13 +66,14 @@ router.post('/login', async (req, res) => {
 });
 
 router.get('/dashboard', adminAuth, async (_req, res) => {
-  const [bookCount, practiceCount, testCount, videoCount, userCount] =
+  const [bookCount, practiceCount, testCount, videoCount, userCount, packageCount] =
     await Promise.all([
       pool.query('SELECT COUNT(*)::int AS count FROM books'),
       pool.query('SELECT COUNT(*)::int AS count FROM practice_sets'),
       pool.query('SELECT COUNT(*)::int AS count FROM tests'),
       pool.query('SELECT COUNT(*)::int AS count FROM videos'),
       pool.query('SELECT COUNT(*)::int AS count FROM users'),
+      pool.query('SELECT COUNT(*)::int AS count FROM packages'),
     ]);
 
   return res.json({
@@ -83,6 +84,7 @@ router.get('/dashboard', adminAuth, async (_req, res) => {
       tests: testCount.rows[0].count,
       videos: videoCount.rows[0].count,
       users: userCount.rows[0].count,
+      packages: packageCount.rows[0].count,
     },
   });
 });
@@ -95,6 +97,76 @@ router.get('/batches', adminAuth, async (_req, res) => {
      ORDER BY b.id ASC`
   );
   res.json({ success: true, batches: result.rows });
+});
+
+router.post('/batches', adminAuth, async (req, res) => {
+  const { name, targetYear, classLabel } = req.body;
+  if (!name || !classLabel) {
+    return res.status(400).json({ error: 'name and classLabel are required' });
+  }
+  const course = await pool.query(
+    `INSERT INTO courses (name)
+     VALUES ('Neet Dropper Batch')
+     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id`
+  );
+  const result = await pool.query(
+    `INSERT INTO batches (course_id, name, target_year, class_label)
+     VALUES ($1,$2,$3,$4)
+     RETURNING *`,
+    [course.rows[0].id, name, targetYear || '', classLabel]
+  );
+  return res.json({ success: true, batch: result.rows[0] });
+});
+
+router.get('/classes', adminAuth, async (_req, res) => {
+  const result = await pool.query(
+    `SELECT id, name
+     FROM classes
+     ORDER BY name ASC`
+  );
+  return res.json({ success: true, classes: result.rows });
+});
+
+router.post('/classes', adminAuth, async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const result = await pool.query(
+    `INSERT INTO classes (name)
+     VALUES ($1)
+     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+     RETURNING *`,
+    [name]
+  );
+  return res.json({ success: true, classItem: result.rows[0] });
+});
+
+router.get('/subjects', adminAuth, async (req, res) => {
+  const classId = Number(req.query.classId || 0);
+  const result = await pool.query(
+    `SELECT s.id, s.name, s.class_id, c.name AS class_name
+     FROM subjects s
+     LEFT JOIN classes c ON c.id = s.class_id
+     WHERE ($1 = 0 OR s.class_id = $1)
+     ORDER BY s.name ASC`,
+    [classId]
+  );
+  return res.json({ success: true, subjects: result.rows });
+});
+
+router.post('/subjects', adminAuth, async (req, res) => {
+  const { classId, name } = req.body;
+  if (!classId || !name) {
+    return res.status(400).json({ error: 'classId and name are required' });
+  }
+  const result = await pool.query(
+    `INSERT INTO subjects (class_id, name)
+     VALUES ($1,$2)
+     ON CONFLICT (class_id, name) DO UPDATE SET name = EXCLUDED.name
+     RETURNING *`,
+    [classId, name]
+  );
+  return res.json({ success: true, subject: result.rows[0] });
 });
 
 router.get('/filters', adminAuth, async (_req, res) => {
@@ -130,6 +202,7 @@ router.get('/filters', adminAuth, async (_req, res) => {
     success: true,
     filters: {
       batches: batches.rows,
+      classes: [...new Set(batches.rows.map((r) => r.class_label).filter(Boolean))],
       subjects: subjects.rows.map((r) => r.subject),
       topics: topics.rows.map((r) => r.topic),
     },
@@ -193,6 +266,65 @@ router.post('/books/:bookId/chapters', adminAuth, async (req, res) => {
   );
   res.json({ success: true, chapter: result.rows[0] });
 });
+
+router.post(
+  '/books/upload-by-hierarchy',
+  adminAuth,
+  upload.single('pdf'),
+  async (req, res) => {
+    try {
+      const { batchId, classLabel, subject, chapterTitle } = req.body;
+      if (!batchId || !classLabel || !subject || !chapterTitle || !req.file) {
+        return res.status(400).json({
+          error: 'batchId, classLabel, subject, chapterTitle and pdf file are required',
+        });
+      }
+
+      const existingBook = await pool.query(
+        `SELECT id
+         FROM books
+         WHERE batch_id = $1 AND class_label = $2 AND subject = $3
+         LIMIT 1`,
+        [batchId, classLabel, subject]
+      );
+
+      let bookId = existingBook.rows[0]?.id;
+      if (!bookId) {
+        const createdBook = await pool.query(
+          `INSERT INTO books (batch_id, class_label, title, subject, topic, level, category)
+           VALUES ($1,$2,$3,$4,$5,'Core','NCERT books')
+           RETURNING id`,
+          [batchId, classLabel, `${subject} Master Book`, subject, chapterTitle]
+        );
+        bookId = createdBook.rows[0].id;
+      }
+
+      const uploaded = await uploadBufferToDrive({
+        fileBuffer: req.file.buffer,
+        fileName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        folderId: process.env.GDRIVE_FOLDER_ID,
+      });
+
+      const chapter = await pool.query(
+        `INSERT INTO book_chapters (
+          book_id, title, overview, note_summary, highlight, material_type, material_drive_link
+         ) VALUES ($1,$2,'','','','pdf',$3)
+         RETURNING *`,
+        [bookId, chapterTitle, uploaded.webViewLink || uploaded.webContentLink]
+      );
+
+      return res.json({
+        success: true,
+        bookId,
+        chapter: chapter.rows[0],
+        drive: uploaded,
+      });
+    } catch (error) {
+      return res.status(500).json({ error: error.message || 'Book upload failed' });
+    }
+  }
+);
 
 router.post(
   '/books/:bookId/chapters/upload-pdf',
@@ -531,6 +663,66 @@ router.put('/videos/:id', adminAuth, async (req, res) => {
 
 router.delete('/videos/:id', adminAuth, async (req, res) => {
   await pool.query('DELETE FROM videos WHERE id = $1', [req.params.id]);
+  res.json({ success: true });
+});
+
+router.get('/packages', adminAuth, async (_req, res) => {
+  const result = await pool.query(
+    `SELECT id, name, price_label, validity, highlight, features_json, is_active
+     FROM packages
+     ORDER BY id DESC`
+  );
+  res.json({ success: true, packages: result.rows });
+});
+
+router.post('/packages', adminAuth, async (req, res) => {
+  const { name, priceLabel, validity, highlight, features, isActive } = req.body;
+  if (!name || !priceLabel || !validity) {
+    return res.status(400).json({ error: 'name, priceLabel, validity are required' });
+  }
+  const result = await pool.query(
+    `INSERT INTO packages (name, price_label, validity, highlight, features_json, is_active)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6)
+     RETURNING *`,
+    [
+      name,
+      priceLabel,
+      validity,
+      highlight || '',
+      JSON.stringify(Array.isArray(features) ? features : []),
+      isActive ?? true,
+    ]
+  );
+  res.json({ success: true, package: result.rows[0] });
+});
+
+router.put('/packages/:id', adminAuth, async (req, res) => {
+  const { name, priceLabel, validity, highlight, features, isActive } = req.body;
+  const result = await pool.query(
+    `UPDATE packages
+     SET name = COALESCE($2, name),
+         price_label = COALESCE($3, price_label),
+         validity = COALESCE($4, validity),
+         highlight = COALESCE($5, highlight),
+         features_json = COALESCE($6::jsonb, features_json),
+         is_active = COALESCE($7, is_active)
+     WHERE id = $1
+     RETURNING *`,
+    [
+      req.params.id,
+      name,
+      priceLabel,
+      validity,
+      highlight,
+      features == null ? null : JSON.stringify(Array.isArray(features) ? features : []),
+      isActive,
+    ]
+  );
+  res.json({ success: true, package: result.rows[0] });
+});
+
+router.delete('/packages/:id', adminAuth, async (req, res) => {
+  await pool.query('DELETE FROM packages WHERE id = $1', [req.params.id]);
   res.json({ success: true });
 });
 

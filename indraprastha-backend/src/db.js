@@ -66,6 +66,24 @@ async function ensureDatabaseSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS classes (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(60) UNIQUE NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS subjects (
+      id SERIAL PRIMARY KEY,
+      class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL,
+      name VARCHAR(80) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (class_id, name)
+    );
+  `);
+
+  await pool.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS batch_id INTEGER REFERENCES batches(id);
   `);
@@ -288,6 +306,19 @@ async function ensureDatabaseSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS packages (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(120) UNIQUE NOT NULL,
+      price_label VARCHAR(60) NOT NULL,
+      validity VARCHAR(60) NOT NULL,
+      highlight TEXT DEFAULT '',
+      features_json JSONB DEFAULT '[]'::jsonb,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS exam_analytics (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -346,6 +377,28 @@ async function ensureDatabaseSchema() {
       ($1, 'Target Neet 2027 - Dropper Batch', '2027', 'Dropper')
      ON CONFLICT (name) DO NOTHING`,
     [courseId]
+  );
+
+  await pool.query(
+    `INSERT INTO classes (name)
+     VALUES ('Class 11'), ('Class 12'), ('Dropper')
+     ON CONFLICT (name) DO NOTHING`
+  );
+
+  await pool.query(
+    `INSERT INTO packages (name, price_label, validity, highlight, features_json, is_active)
+     VALUES
+      ('Starter', 'Rs 999', '1 month', 'Basic access for daily practice', '["Practice sets","Topic tests"]'::jsonb, TRUE),
+      ('Rank Pro', 'Rs 4999', '6 months', 'Advanced prep with tests and analytics', '["Full test series","Detailed analytics","Video lectures"]'::jsonb, TRUE)
+     ON CONFLICT (name) DO NOTHING`
+  );
+
+  await pool.query(
+    `INSERT INTO subjects (class_id, name)
+     SELECT c.id, s.name
+     FROM classes c
+     CROSS JOIN (VALUES ('Physics'), ('Chemistry'), ('Biology'), ('Botany'), ('Zoology')) AS s(name)
+     ON CONFLICT (class_id, name) DO NOTHING`
   );
 
   const adminUser = process.env.ADMIN_USERNAME || 'admin';
