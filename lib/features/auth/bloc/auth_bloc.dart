@@ -17,6 +17,7 @@ class AuthState {
     this.otpDebugCode,
     this.availableStates = const [],
     this.availableColleges = const [],
+    this.availableBatches = const [],
   });
 
   final AppUser? user;
@@ -31,6 +32,7 @@ class AuthState {
   final String? otpDebugCode;
   final List<String> availableStates;
   final List<String> availableColleges;
+  final List<BatchOption> availableBatches;
 
   bool get isLoggedIn => user != null && token != null;
 
@@ -48,6 +50,7 @@ class AuthState {
     String? otpDebugCode,
     List<String>? availableStates,
     List<String>? availableColleges,
+    List<BatchOption>? availableBatches,
     bool clearSession = false,
   }) {
     return AuthState(
@@ -63,6 +66,7 @@ class AuthState {
       otpDebugCode: otpDebugCode ?? this.otpDebugCode,
       availableStates: availableStates ?? this.availableStates,
       availableColleges: availableColleges ?? this.availableColleges,
+      availableBatches: availableBatches ?? this.availableBatches,
     );
   }
 }
@@ -76,8 +80,8 @@ class AuthBloc extends Cubit<AuthState> {
   Future<void> bootstrapSession() async {
     if (_bootstrapped) return;
     _bootstrapped = true;
-    final token = _repository.token;
-    final user = _repository.cachedUser;
+    final token = await _repository.readSecureToken();
+    final user = await _repository.readSecureUser();
     if (token == null || user == null) return;
 
     emit(state.copyWith(user: user, token: token));
@@ -174,6 +178,15 @@ class AuthBloc extends Cubit<AuthState> {
     }
   }
 
+  Future<void> loadBatches() async {
+    try {
+      final batches = await _repository.fetchBatches();
+      emit(state.copyWith(availableBatches: batches));
+    } catch (_) {
+      // no-op
+    }
+  }
+
   Future<void> loadColleges(String stateName) async {
     emit(state.copyWith(availableColleges: const []));
     try {
@@ -186,6 +199,7 @@ class AuthBloc extends Cubit<AuthState> {
 
   Future<bool> completeSignup({
     required String fullName,
+    required int batchId,
     required String courseCategory,
     required String collegeState,
     required String mbbsYear,
@@ -196,6 +210,7 @@ class AuthBloc extends Cubit<AuthState> {
       final data = await _repository.completeSignup(
         phone: state.phoneNumber,
         fullName: fullName,
+        batchId: batchId,
         courseCategory: courseCategory,
         collegeState: collegeState,
         mbbsYear: mbbsYear,

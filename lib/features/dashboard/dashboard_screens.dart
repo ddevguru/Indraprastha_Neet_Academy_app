@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/data/dummy_data.dart';
 import '../../core/providers/app_state.dart';
 import '../auth/bloc/auth_bloc.dart';
 import '../../theme/app_tokens.dart';
@@ -64,7 +63,10 @@ class DashboardHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = context.watch<AuthBloc>().state.user ?? DummyData.defaultUser;
+    final user = context.watch<AuthBloc>().state.user;
+    if (user == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final uiState = ref.watch(appUiControllerProvider);
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 720;
@@ -231,34 +233,10 @@ class DashboardHomeScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.md),
             LayoutBuilder(
               builder: (context, constraints) {
-                final crossAxisCount = constraints.maxWidth > 920
-                    ? 3
-                    : constraints.maxWidth > 580
-                        ? 2
-                        : 1;
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: DummyData.books.take(3).length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: AppSpacing.md,
-                    mainAxisSpacing: AppSpacing.md,
-                    childAspectRatio: 1.35,
-                  ),
-                  itemBuilder: (context, index) {
-                    final book = DummyData.books[index];
-                    return BookCard(
-                      book: book,
-                      isBookmarked: uiState.bookmarkedBookIds.contains(book.id),
-                      onBookmark: () => ref
-                          .read(appUiControllerProvider.notifier)
-                          .toggleBookBookmark(book.id),
-                      onTap: () => context.push(
-                        '/books/chapter/${book.chapters.first.id}',
-                      ),
-                    );
-                  },
+                return const EmptyStateWidget(
+                  title: 'Books list moved to Books tab',
+                  subtitle: 'Ab yahan dummy cards nahi dikhaye ja rahe. Real content Books tab se load hota hai.',
+                  icon: Icons.menu_book_rounded,
                 );
               },
             ),
@@ -272,24 +250,10 @@ class DashboardHomeScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.md),
             LayoutBuilder(
               builder: (context, constraints) {
-                final crossAxisCount = constraints.maxWidth > 1000
-                    ? 4
-                    : constraints.maxWidth > 620
-                        ? 2
-                        : 1;
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: DummyData.subjectProgress.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: AppSpacing.md,
-                    mainAxisSpacing: AppSpacing.md,
-                    childAspectRatio: 1.15,
-                  ),
-                  itemBuilder: (context, index) => SubjectCard(
-                    progress: DummyData.subjectProgress[index],
-                  ),
+                return const EmptyStateWidget(
+                  title: 'Analytics-driven progress',
+                  subtitle: 'Progress section backend analytics se bind ho raha hai. Dummy snapshot hata diya gaya hai.',
+                  icon: Icons.insights_rounded,
                 );
               },
             ),
@@ -434,14 +398,10 @@ class _RecentTestsPanel extends StatelessWidget {
             onAction: () => context.go('/dashboard/3'),
           ),
           const SizedBox(height: AppSpacing.md),
-          ...DummyData.tests.map(
-            (test) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: TestCard(
-                test: test,
-                onTap: () => context.push('/tests/detail/${test.id}'),
-              ),
-            ),
+          const EmptyStateWidget(
+            title: 'Recent tests from backend',
+            subtitle: 'Demo tests hide kar diye gaye hain. Real tests Tests tab me backend se fetch ho kar aa rahe hain.',
+            icon: Icons.assignment_outlined,
           ),
         ],
       ),

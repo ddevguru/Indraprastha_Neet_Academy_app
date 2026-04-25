@@ -4,12 +4,26 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/data/dummy_data.dart';
 import '../../core/providers/app_state.dart';
+import '../content/data/content_repository.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 
-class PracticeHomeScreen extends StatelessWidget {
+class PracticeHomeScreen extends StatefulWidget {
   const PracticeHomeScreen({super.key});
+
+  @override
+  State<PracticeHomeScreen> createState() => _PracticeHomeScreenState();
+}
+
+class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
+  late final Future<List<Map<String, dynamic>>> _practiceFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _practiceFuture = ContentRepository().fetchPracticeSets();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +55,7 @@ class PracticeHomeScreen extends StatelessWidget {
               children: categories
                   .map(
                     (category) => SizedBox(
-                      width: 210,
+                      width: 220,
                       child: SurfaceCard(
                         child: Row(
                           children: [
@@ -65,11 +79,42 @@ class PracticeHomeScreen extends StatelessWidget {
                   'Pick the next drill based on topic priority and previous accuracy.',
             ),
             const SizedBox(height: AppSpacing.md),
-            ...DummyData.practiceSets.map(
-              (set) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: _PracticeSetCard(set: set),
-              ),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _practiceFuture,
+              builder: (context, snapshot) {
+                final sets = snapshot.data ?? const [];
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (sets.isEmpty) {
+                  return const EmptyStateWidget(
+                    title: 'No practice sets yet',
+                    subtitle: 'Admin panel se practice sets add karne ke baad yahan dikhenge.',
+                    icon: Icons.bolt_rounded,
+                  );
+                }
+                return Column(
+                  children: sets
+                      .map(
+                        (set) => Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: _PracticeSetCard(
+                            set: PracticeSet(
+                              id: '${set['id']}',
+                              title: set['title']?.toString() ?? 'Practice Set',
+                              topic: set['topic']?.toString() ?? '',
+                              questionCount: 0,
+                              difficulty: set['difficulty']?.toString() ?? 'Moderate',
+                              estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
+                              accuracy: 0,
+                              tag: 'Batch-wise',
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
             ),
           ],
         ),
@@ -390,7 +435,9 @@ class _MetaPill extends StatelessWidget {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.surfaceMuted.withValues(alpha: 0.2)
+            : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(label),

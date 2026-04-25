@@ -42,7 +42,10 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = context.watch<AuthBloc>().state;
     final uiState = ref.watch(appUiControllerProvider);
-    final user = auth.user ?? DummyData.defaultUser;
+    final user = auth.user;
+    if (user == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -343,7 +346,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final user = context.read<AuthBloc>().state.user ?? DummyData.defaultUser;
+    final user = context.read<AuthBloc>().state.user;
+    if (user == null) {
+      _fullName = TextEditingController();
+      _mobileNumber = TextEditingController();
+      _email = TextEditingController();
+      _targetExamYear = TextEditingController();
+      return;
+    }
     _fullName = TextEditingController(text: user.fullName);
     _mobileNumber = TextEditingController(text: user.mobileNumber);
     _email = TextEditingController(text: user.email);
@@ -362,7 +372,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = context.watch<AuthBloc>().state.user ?? DummyData.defaultUser;
+    final currentUser = context.watch<AuthBloc>().state.user;
+    if (currentUser == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit profile')),

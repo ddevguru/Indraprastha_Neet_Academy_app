@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../core/data/dummy_data.dart';
 import '../core/providers/app_state.dart';
 import '../features/analytics/analytics_screen.dart';
+import '../features/admin/admin_screens.dart';
 import '../features/auth/auth_screens.dart';
 import '../features/books/books_screens.dart';
 import '../features/dashboard/dashboard_screens.dart';
@@ -32,8 +33,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       '/login',
       '/signup',
       '/forgot-password',
+      '/admin-app',
     };
     const purchasePaths = {'/paywall', '/subscriptions'};
+
+    if (loc.startsWith('/admin-app')) return null;
 
     if (!auth.isLoggedIn) {
       if (publicPaths.contains(loc)) return null;
@@ -81,6 +85,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/admin-app',
+        builder: (context, state) => const AdminPanelScreen(),
       ),
       GoRoute(
         path: '/paywall',

@@ -1,10 +1,33 @@
 import 'package:flutter/material.dart';
 
+import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 
-class AnalyticsScreen extends StatelessWidget {
+class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
+
+  @override
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  late final Future<Map<String, dynamic>> _analyticsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _analyticsFuture = _loadAnalytics();
+  }
+
+  Future<Map<String, dynamic>> _loadAnalytics() async {
+    final repo = ContentRepository();
+    try {
+      return await repo.fetchLatestAnalytics();
+    } catch (_) {
+      return const {};
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +38,16 @@ class AnalyticsScreen extends StatelessWidget {
       ('Zoology', 0.82),
     ];
 
-    return Scaffold(
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _analyticsFuture,
+      builder: (context, snapshot) {
+        final payload = snapshot.data ?? const {};
+        final donut = (payload['donut'] as Map<String, dynamic>?) ?? const {};
+        final insights = (payload['insights'] as List<dynamic>?) ?? const [];
+        final correct = (donut['correct'] ?? 0) as int;
+        final wrong = (donut['wrong'] ?? 0) as int;
+        final unattempted = (donut['unattempted'] ?? 0) as int;
+        return Scaffold(
       appBar: AppBar(title: const Text('Analytics')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
@@ -72,6 +104,44 @@ class AnalyticsScreen extends StatelessWidget {
                     ],
                   );
                 },
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              SurfaceCard(
+                child: Row(
+                  children: [
+                    _DonutChart(
+                      correct: correct,
+                      wrong: wrong,
+                      unattempted: unattempted,
+                    ),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'AI Exam Insights',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          if (insights.isEmpty)
+                            const Text(
+                              'Submit a test to generate AI insights.',
+                            )
+                          else
+                            ...insights.map(
+                              (item) => ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.auto_awesome_rounded),
+                                title: Text(item['insight_title']?.toString() ?? ''),
+                                subtitle: Text(item['insight_body']?.toString() ?? ''),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: AppSpacing.xl),
               LayoutBuilder(
@@ -178,7 +248,96 @@ class AnalyticsScreen extends StatelessWidget {
           ),
         ),
       ),
+        );
+      },
     );
+  }
+}
+
+class _DonutChart extends StatelessWidget {
+  const _DonutChart({
+    required this.correct,
+    required this.wrong,
+    required this.unattempted,
+  });
+
+  final int correct;
+  final int wrong;
+  final int unattempted;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = (correct + wrong + unattempted).toDouble();
+    final c = total == 0 ? 0.0 : correct / total;
+    final w = total == 0 ? 0.0 : wrong / total;
+    final u = total == 0 ? 0.0 : unattempted / total;
+    return SizedBox(
+      width: 180,
+      height: 180,
+      child: CustomPaint(
+        painter: _DonutPainter(
+          correctFraction: c,
+          wrongFraction: w,
+          unattemptedFraction: u,
+        ),
+        child: Center(
+          child: Text(
+            total == 0 ? 'No Test' : '${(c * 100).round()}%',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DonutPainter extends CustomPainter {
+  _DonutPainter({
+    required this.correctFraction,
+    required this.wrongFraction,
+    required this.unattemptedFraction,
+  });
+
+  final double correctFraction;
+  final double wrongFraction;
+  final double unattemptedFraction;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = 20.0;
+    final rect = Rect.fromLTWH(stroke, stroke, size.width - stroke * 2, size.height - stroke * 2);
+    final base = Paint()
+      ..color = AppColors.border
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+    canvas.drawArc(rect, 0, 6.28318, false, base);
+
+    final p1 = Paint()
+      ..color = AppColors.success
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+    final p2 = Paint()
+      ..color = AppColors.danger
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+    final p3 = Paint()
+      ..color = AppColors.warning
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+
+    var start = -1.5708;
+    canvas.drawArc(rect, start, 6.28318 * correctFraction, false, p1);
+    start += 6.28318 * correctFraction;
+    canvas.drawArc(rect, start, 6.28318 * wrongFraction, false, p2);
+    start += 6.28318 * wrongFraction;
+    canvas.drawArc(rect, start, 6.28318 * unattemptedFraction, false, p3);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DonutPainter oldDelegate) {
+    return oldDelegate.correctFraction != correctFraction ||
+        oldDelegate.wrongFraction != wrongFraction ||
+        oldDelegate.unattemptedFraction != unattemptedFraction;
   }
 }
 

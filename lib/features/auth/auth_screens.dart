@@ -250,6 +250,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Text(state.otpSent ? 'Verify OTP' : 'Send OTP'),
               ),
               TextButton(onPressed: () => context.go('/signup'), child: const Text('New user? Signup')),
+              TextButton(
+                onPressed: () => context.go('/admin-app'),
+                child: const Text('Admin login'),
+              ),
             ],
           ),
         );
@@ -268,7 +272,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final _phone = TextEditingController();
   final _otp = TextEditingController();
   final _name = TextEditingController();
-  String _course = 'NEET-SS Medicine';
+  final String _course = 'Neet Dropper Batch';
+  int? _batchId;
   String _state = '';
   String _year = '';
   String _college = '';
@@ -277,6 +282,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void initState() {
     super.initState();
     context.read<AuthBloc>().loadStates();
+    context.read<AuthBloc>().loadBatches();
   }
 
   @override
@@ -303,7 +309,25 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
             if (step == 2) ...[
               TextField(controller: _name, decoration: const InputDecoration(labelText: 'Full name')),
-              DropdownButtonFormField<String>(initialValue: _course, items: const ['NEET-SS Medicine', 'NEET-SS Surgery', 'NEET SS Paediatrics', 'Marrow Programme for OBS-GYN Residents', 'Marrow Programme for Anaesthesia Residents', 'CPC-FGI (Fetal & Gynecological Imaging)', 'CPCDM (Diabetes Management)', 'CPC - POCUS'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setState(() => _course = v ?? _course), decoration: const InputDecoration(labelText: 'Course')),
+              TextFormField(
+                initialValue: _course,
+                readOnly: true,
+                decoration: const InputDecoration(labelText: 'Course'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                initialValue: _batchId,
+                items: state.availableBatches
+                    .map(
+                      (b) => DropdownMenuItem(
+                        value: b.id,
+                        child: Text(b.name),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _batchId = v),
+                decoration: const InputDecoration(labelText: 'Batch'),
+              ),
               DropdownButtonFormField<String>(initialValue: _state.isEmpty ? null : _state, items: state.availableStates.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) {
                 if (v == null) return;
                 setState(() => _state = v);
@@ -312,13 +336,22 @@ class _SignupScreenState extends State<SignupScreen> {
               DropdownButtonFormField<String>(initialValue: _year.isEmpty ? null : _year, items: List.generate(16, (i) => (2010 + i).toString()).reversed.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setState(() => _year = v ?? ''), decoration: const InputDecoration(labelText: 'MBBS year')),
               DropdownButtonFormField<String>(initialValue: _college.isEmpty ? null : _college, items: state.availableColleges.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setState(() => _college = v ?? ''), decoration: const InputDecoration(labelText: 'College')),
               ElevatedButton(
-                onPressed: () => context.read<AuthBloc>().completeSignup(
-                      fullName: _name.text.trim(),
-                      courseCategory: _course,
-                      collegeState: _state,
-                      mbbsYear: _year,
-                      medicalCollege: _college,
-                    ),
+                onPressed: () {
+                  if (_batchId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please select your batch')),
+                    );
+                    return;
+                  }
+                  context.read<AuthBloc>().completeSignup(
+                        fullName: _name.text.trim(),
+                        batchId: _batchId!,
+                        courseCategory: _course,
+                        collegeState: _state,
+                        mbbsYear: _year,
+                        medicalCollege: _college,
+                      );
+                },
                 child: const Text('Complete Signup'),
               ),
             ],

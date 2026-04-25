@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,6 +17,7 @@ class AuthRepository {
   static const _tokenKey = 'auth_token';
   static const _userKey = 'auth_user';
   static const _onboardingSeenKey = 'onboarding_seen';
+  static const _secureStorage = FlutterSecureStorage();
 
   final SharedPreferences _prefs;
   final http.Client _client;
@@ -42,13 +44,13 @@ class AuthRepository {
     required String token,
     required AppUser user,
   }) async {
-    await _prefs.setString(_tokenKey, token);
-    await _prefs.setString(_userKey, jsonEncode(user.toJson()));
+    await _secureStorage.write(key: _tokenKey, value: token);
+    await _secureStorage.write(key: _userKey, value: jsonEncode(user.toJson()));
   }
 
   Future<void> clearSession() async {
-    await _prefs.remove(_tokenKey);
-    await _prefs.remove(_userKey);
+    await _secureStorage.delete(key: _tokenKey);
+    await _secureStorage.delete(key: _userKey);
   }
 
   Future<Map<String, dynamic>> sendOtp(String phone) async {
@@ -75,6 +77,7 @@ class AuthRepository {
   Future<Map<String, dynamic>> completeSignup({
     required String phone,
     required String fullName,
+    required int batchId,
     required String courseCategory,
     required String collegeState,
     required String mbbsYear,
@@ -89,6 +92,7 @@ class AuthRepository {
         'fullName': fullName,
         'targetExamYear': 'NEET',
         'preferredPlan': 'Starter',
+        'batchId': batchId,
         'preferredLanguage': preferredLanguage,
         'courseCategory': courseCategory,
         'collegeState': collegeState,
@@ -97,6 +101,27 @@ class AuthRepository {
       }),
     );
     return _decodeResponse(response);
+  }
+
+  Future<List<BatchOption>> fetchBatches() async {
+    final response = await _client.get(Uri.parse('$baseUrl/auth/batches'));
+    final data = _decodeResponse(response);
+    final batches = List<Map<String, dynamic>>.from(
+      data['batches'] as List<dynamic>,
+    );
+    return batches.map(BatchOption.fromJson).toList();
+  }
+
+  Future<String?> readSecureToken() => _secureStorage.read(key: _tokenKey);
+
+  Future<AppUser?> readSecureUser() async {
+    final raw = await _secureStorage.read(key: _userKey);
+    if (raw == null) return null;
+    try {
+      return AppUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<AppUser> fetchMe(String token) async {

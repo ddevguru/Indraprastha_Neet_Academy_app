@@ -1,19 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/data/dummy_data.dart';
+import '../content/data/content_repository.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 
-class TestsScreen extends StatelessWidget {
+class TestsScreen extends StatefulWidget {
   const TestsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final upcoming = DummyData.tests.where((test) => !test.completed).toList();
-    final completed = DummyData.tests.where((test) => test.completed).toList();
+  State<TestsScreen> createState() => _TestsScreenState();
+}
 
+class _TestsScreenState extends State<TestsScreen> {
+  late final Future<List<Map<String, dynamic>>> _testsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _testsFuture = ContentRepository().fetchTests();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: CenteredContent(
@@ -45,29 +55,45 @@ class TestsScreen extends StatelessWidget {
               subtitle: 'Prepare your next assessment windows with clarity.',
             ),
             const SizedBox(height: AppSpacing.md),
-            ...upcoming.map(
-              (test) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: TestCard(
-                  test: test,
-                  onTap: () => context.push('/tests/detail/${test.id}'),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            const SectionHeader(
-              title: 'Completed tests',
-              subtitle: 'Review finished attempts and improve from the result snapshot.',
-            ),
-            const SizedBox(height: AppSpacing.md),
-            ...completed.map(
-              (test) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: TestCard(
-                  test: test,
-                  onTap: () => context.push('/tests/result/${test.id}'),
-                ),
-              ),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _testsFuture,
+              builder: (context, snapshot) {
+                final tests = snapshot.data ?? const [];
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (tests.isEmpty) {
+                  return const EmptyStateWidget(
+                    title: 'No tests yet',
+                    subtitle: 'Admin panel se test series add hone ke baad yahan list dikhegi.',
+                    icon: Icons.assignment_rounded,
+                  );
+                }
+                return Column(
+                  children: tests
+                      .map(
+                        (t) => Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: TestCard(
+                            test: TestItem(
+                              id: '${t['id']}',
+                              title: t['title']?.toString() ?? 'Test',
+                              category: t['category']?.toString() ?? 'Grand test',
+                              durationMinutes: (t['duration_minutes'] as num?)?.toInt() ?? 180,
+                              marks: (t['marks'] as num?)?.toInt() ?? 720,
+                              questions: (t['question_count'] as num?)?.toInt() ?? 180,
+                              syllabusCoverage: t['syllabus_coverage']?.toString() ?? '',
+                              scheduleLabel: t['schedule_label']?.toString() ?? '',
+                              completed: false,
+                              scoreLabel: '--',
+                            ),
+                            onTap: () => context.push('/tests/detail/${t['id']}'),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
             ),
           ],
         ),
@@ -362,7 +388,9 @@ class _FilterChip extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.surfaceMuted.withValues(alpha: 0.22)
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(99),
         border: Border.all(color: AppColors.border),
       ),

@@ -2,14 +2,33 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const TEMP_OTP = "111111";
 const OTP_EXPIRY_MINUTES = 10;
 const DEFAULT_EXAM = 'NEET';
 const DEFAULT_PLAN = 'Starter';
+const COURSE_NAME = 'Neet Dropper Batch';
 
 function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '').slice(-10);
+}
+
+async function issueUserSession(user) {
+  const sessionId = crypto.randomUUID();
+  await pool.query(
+    `UPDATE users
+     SET active_session_id = $2
+     WHERE id = $1`,
+    [user.id, sessionId]
+  );
+
+  const token = jwt.sign(
+    { id: user.id, phone: user.phone, sessionId },
+    process.env.JWT_SECRET,
+    { expiresIn: '90d' }
+  );
+  return { token, sessionId };
 }
 
 async function saveOtp(phone, otp) {
@@ -42,7 +61,7 @@ async function verifyOtp(phone, otp) {
   return true;
 }
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const header = req.headers.authorization || '';
   if (!header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -50,7 +69,26 @@ function authMiddleware(req, res, next) {
 
   try {
     const token = header.replace('Bearer ', '').trim();
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const result = await pool.query(
+      `SELECT active_session_id
+       FROM users
+       WHERE id = $1`,
+      [payload.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid session' });
+    }
+
+    const activeSessionId = result.rows[0].active_session_id;
+    if (!activeSessionId || payload.sessionId !== activeSessionId) {
+      return res.status(401).json({
+        error: 'Session expired. Logged in on another device.',
+      });
+    }
+
+    req.user = payload;
     next();
   } catch (_) {
     return res.status(401).json({ error: 'Invalid token' });
@@ -98,7 +136,7 @@ router.post('/verify-otp', async (req, res) => {
 
     if (userResult.rows.length > 0) {
       const user = userResult.rows[0];
-      const token = jwt.sign({ id: user.id, phone }, process.env.JWT_SECRET, { expiresIn: '90d' });
+      const { token } = await issueUserSession(user);
       return res.json({
         success: true,
         token,
@@ -128,6 +166,7 @@ router.post('/complete-signup', async (req, res) => {
     preferredLanguage = 'English',
     targetExamYear = DEFAULT_EXAM,
     preferredPlan = DEFAULT_PLAN,
+    batchId,
     courseCategory,
     collegeState,
     mbbsYear,
@@ -141,11 +180,22 @@ router.post('/complete-signup', async (req, res) => {
   if (!fullName || String(fullName).trim().length < 2) {
     return res.status(400).json({ error: 'Full name is required' });
   }
-  if (!courseCategory || !collegeState || !mbbsYear || !medicalCollege) {
+  if (!batchId || !collegeState || !mbbsYear || !medicalCollege) {
     return res.status(400).json({ error: 'Please fill all onboarding fields' });
   }
 
   try {
+    const batchCheck = await pool.query(
+      `SELECT b.id
+       FROM batches b
+       JOIN courses c ON c.id = b.course_id
+       WHERE b.id = $1 AND c.name = $2`,
+      [batchId, COURSE_NAME]
+    );
+    if (batchCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid batch selected' });
+    }
+
     const existing = await pool.query('SELECT id FROM users WHERE phone = $1', [phone]);
     let result;
 
@@ -160,6 +210,7 @@ router.post('/complete-signup', async (req, res) => {
              college_state = $7,
              mbbs_admission_year = $8,
              medical_college = $9,
+             batch_id = $10,
              is_profile_complete = TRUE
          WHERE phone = $1
          RETURNING *`,
@@ -169,19 +220,20 @@ router.post('/complete-signup', async (req, res) => {
           preferredLanguage,
           targetExamYear,
           preferredPlan,
-          courseCategory,
+          courseCategory || COURSE_NAME,
           collegeState,
           mbbsYear,
-          medicalCollege
+          medicalCollege,
+          batchId
         ]
       );
     } else {
       result = await pool.query(
         `INSERT INTO users (
           phone, full_name, preferred_language, target_exam_year, preferred_plan,
-          course_category, college_state, mbbs_admission_year, medical_college, is_profile_complete
+          course_category, college_state, mbbs_admission_year, medical_college, batch_id, is_profile_complete
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE)
          RETURNING *`,
         [
           phone,
@@ -189,16 +241,17 @@ router.post('/complete-signup', async (req, res) => {
           preferredLanguage,
           targetExamYear,
           preferredPlan,
-          courseCategory,
+          courseCategory || COURSE_NAME,
           collegeState,
           mbbsYear,
-          medicalCollege
+          medicalCollege,
+          batchId
         ]
       );
     }
 
     const user = result.rows[0];
-    const token = jwt.sign({ id: user.id, phone }, process.env.JWT_SECRET, { expiresIn: '90d' });
+    const { token } = await issueUserSession(user);
 
     res.json({ success: true, token, user });
   } catch (err) {
@@ -209,7 +262,13 @@ router.post('/complete-signup', async (req, res) => {
 
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const result = await pool.query(
+      `SELECT u.*, b.name AS batch_name
+       FROM users u
+       LEFT JOIN batches b ON b.id = u.batch_id
+       WHERE u.id = $1`,
+      [req.user.id]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -224,6 +283,27 @@ router.get('/states', async (_req, res) => {
   try {
     const result = await pool.query('SELECT DISTINCT state FROM colleges ORDER BY state ASC');
     res.json({ success: true, states: result.rows.map((row) => row.state) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/batches', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT b.id, b.name, b.target_year, b.class_label
+       FROM batches b
+       JOIN courses c ON c.id = b.course_id
+       WHERE c.name = $1
+       ORDER BY b.id ASC`,
+      [COURSE_NAME]
+    );
+    res.json({
+      success: true,
+      course: COURSE_NAME,
+      batches: result.rows,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

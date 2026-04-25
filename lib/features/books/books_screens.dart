@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/data/dummy_data.dart';
 import '../../core/providers/app_state.dart';
@@ -30,6 +31,24 @@ class BooksScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(hint: 'Search books, notes, chapters, diagrams'),
+            const SizedBox(height: AppSpacing.lg),
+            SurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Course',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  const Text('Neet Dropper Batch'),
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(
+                    'Batches: Target Neet 2028 (Class 11), Target Neet 2027 (Class 12), Target Neet 2027 (Dropper)',
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: AppSpacing.lg),
             Wrap(
               spacing: AppSpacing.sm,
@@ -154,7 +173,7 @@ class ChapterDetailScreen extends ConsumerWidget {
           ],
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'Notes'),
+              Tab(text: 'Book'),
               Tab(text: 'PYQs'),
               Tab(text: 'Highlights'),
             ],
@@ -258,6 +277,35 @@ class ChapterDetailScreen extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(height: AppSpacing.lg),
+                if (chapter.materialType == 'pdf' &&
+                    chapter.materialDriveLink != null) ...[
+                  SurfaceCard(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.picture_as_pdf_rounded,
+                            color: AppColors.danger),
+                        const SizedBox(width: AppSpacing.md),
+                        const Expanded(
+                          child: Text(
+                            'Admin uploaded PDF material for this chapter.',
+                          ),
+                        ),
+                        PrimaryButton(
+                          label: 'Open PDF',
+                          onPressed: () async {
+                            final uri = Uri.tryParse(chapter.materialDriveLink!);
+                            if (uri == null) return;
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
                 SizedBox(
                   height: 420,
                   child: TabBarView(
@@ -315,7 +363,9 @@ class _CategoryChip extends StatelessWidget {
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.surfaceMuted.withValues(alpha: 0.22)
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(99),
         border: Border.all(color: AppColors.border),
       ),

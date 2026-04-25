@@ -30,6 +30,8 @@ class AppUser {
     this.collegeState,
     this.mbbsAdmissionYear,
     this.medicalCollege,
+    this.batchId,
+    this.batchName,
   });
 
   final String fullName;
@@ -42,6 +44,8 @@ class AppUser {
   final String? collegeState;
   final String? mbbsAdmissionYear;
   final String? medicalCollege;
+  final int? batchId;
+  final String? batchName;
 
   AppUser copyWith({
     String? fullName,
@@ -54,6 +58,8 @@ class AppUser {
     String? collegeState,
     String? mbbsAdmissionYear,
     String? medicalCollege,
+    int? batchId,
+    String? batchName,
   }) {
     return AppUser(
       fullName: fullName ?? this.fullName,
@@ -66,6 +72,8 @@ class AppUser {
       collegeState: collegeState ?? this.collegeState,
       mbbsAdmissionYear: mbbsAdmissionYear ?? this.mbbsAdmissionYear,
       medicalCollege: medicalCollege ?? this.medicalCollege,
+      batchId: batchId ?? this.batchId,
+      batchName: batchName ?? this.batchName,
     );
   }
 
@@ -90,6 +98,8 @@ class AppUser {
           (json['mbbs_admission_year'] ?? json['mbbsAdmissionYear']) as String?,
       medicalCollege:
           (json['medical_college'] ?? json['medicalCollege']) as String?,
+      batchId: (json['batch_id'] ?? json['batchId']) as int?,
+      batchName: (json['batch_name'] ?? json['batchName']) as String?,
     );
   }
 
@@ -105,7 +115,32 @@ class AppUser {
       'college_state': collegeState,
       'mbbs_admission_year': mbbsAdmissionYear,
       'medical_college': medicalCollege,
+      'batch_id': batchId,
+      'batch_name': batchName,
     };
+  }
+}
+
+class BatchOption {
+  const BatchOption({
+    required this.id,
+    required this.name,
+    required this.targetYear,
+    required this.classLabel,
+  });
+
+  final int id;
+  final String name;
+  final String targetYear;
+  final String classLabel;
+
+  factory BatchOption.fromJson(Map<String, dynamic> json) {
+    return BatchOption(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      targetYear: (json['target_year'] ?? '') as String,
+      classLabel: (json['class_label'] ?? '') as String,
+    );
   }
 }
 
@@ -146,6 +181,8 @@ class BookChapter {
     required this.pyqSummary,
     required this.highlight,
     required this.linkedPyqCount,
+    this.materialType = 'text',
+    this.materialDriveLink,
   });
 
   final String id;
@@ -155,6 +192,8 @@ class BookChapter {
   final String pyqSummary;
   final String highlight;
   final int linkedPyqCount;
+  final String materialType;
+  final String? materialDriveLink;
 }
 
 class BookItem {
