@@ -105,6 +105,17 @@ async function ensureDriveFolderPath({
 }) {
   const drive = createDriveClient();
   let current = rootFolderId || null;
+  if (current) {
+    try {
+      await drive.files.get({
+        fileId: current,
+        fields: 'id',
+      });
+    } catch (_) {
+      // If configured root folder is missing/inaccessible, gracefully fall back to drive root.
+      current = null;
+    }
+  }
   for (const segment of segments) {
     current = await ensureChildFolder(drive, current, segment);
   }

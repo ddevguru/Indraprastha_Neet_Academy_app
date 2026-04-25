@@ -222,6 +222,16 @@ router.get('/videos', userAuth, async (req, res) => {
   res.json({ success: true, videos: result.rows });
 });
 
+router.get('/packages', userAuth, async (_req, res) => {
+  const result = await pool.query(
+    `SELECT id, name, price_label, validity, highlight, features_json, is_active
+     FROM packages
+     WHERE is_active = true
+     ORDER BY id ASC`
+  );
+  res.json({ success: true, packages: result.rows });
+});
+
 router.post('/tests/:testId/submit', userAuth, async (req, res) => {
   const { score = 0, accuracy = 0, correctCount = 0, wrongCount = 0, unattemptedCount = 0 } = req.body;
   const attempt = await pool.query(

@@ -57,6 +57,11 @@ class ContentRepository {
     return List<Map<String, dynamic>>.from(data['videos'] as List<dynamic>);
   }
 
+  Future<List<Map<String, dynamic>>> fetchPackages() async {
+    final data = await _get('/content/packages');
+    return List<Map<String, dynamic>>.from(data['packages'] as List<dynamic>);
+  }
+
   Future<Map<String, dynamic>> _get(String path) async {
     final token = await _token;
     if (token == null) {

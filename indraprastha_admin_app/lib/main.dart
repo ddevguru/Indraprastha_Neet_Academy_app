@@ -134,6 +134,15 @@ class _AdminHomeState extends State<AdminHome> {
     'Videos',
     'Packages',
   ];
+  static const _navItems = [
+    (Icons.dashboard_outlined, 'Overview'),
+    (Icons.account_tree_outlined, 'Setup'),
+    (Icons.upload_file_outlined, 'Books'),
+    (Icons.flash_on_outlined, 'Practice'),
+    (Icons.fact_check_outlined, 'Tests'),
+    (Icons.smart_display_outlined, 'Videos'),
+    (Icons.workspace_premium_outlined, 'Packages'),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +156,60 @@ class _AdminHomeState extends State<AdminHome> {
       PackagesPage(api: _api),
     ];
     final title = _titles[_tab.clamp(0, _titles.length - 1)];
+    final isLoggedIn = _api.token != null;
     return Scaffold(
+      drawer: isLoggedIn
+          ? Drawer(
+              child: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.asset(
+                              'assets/images/app_icon.png',
+                              width: 42,
+                              height: 42,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Indraprastha Admin',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: _navItems.length,
+                        itemBuilder: (context, index) {
+                          final item = _navItems[index];
+                          return ListTile(
+                            leading: Icon(item.$1),
+                            title: Text(item.$2),
+                            selected: _tab == index,
+                            onTap: () {
+                              setState(() => _tab = index);
+                              Navigator.of(context).pop();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : null,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,30 +248,6 @@ class _AdminHomeState extends State<AdminHome> {
               )
             : pages[_tab],
       ),
-      bottomNavigationBar: _api.token == null
-          ? null
-          : NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: (i) => setState(() => _tab = i),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  label: 'Overview',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.account_tree_outlined),
-                  label: 'Setup',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.upload_file_outlined),
-                  label: 'Books',
-                ),
-                NavigationDestination(icon: Icon(Icons.flash_on_outlined), label: 'Practice'),
-                NavigationDestination(icon: Icon(Icons.fact_check_outlined), label: 'Tests'),
-                NavigationDestination(icon: Icon(Icons.smart_display_outlined), label: 'Videos'),
-                NavigationDestination(icon: Icon(Icons.workspace_premium_outlined), label: 'Packages'),
-              ],
-            ),
     );
   }
 }

@@ -289,6 +289,8 @@ router.post(
       );
 
       let bookId = existingBook.rows[0]?.id;
+      const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [batchId]);
+      const batchName = batchRes.rows[0]?.name || `Batch-${batchId}`;
       if (!bookId) {
         const createdBook = await pool.query(
           `INSERT INTO books (batch_id, class_label, title, subject, topic, level, category)
@@ -299,11 +301,15 @@ router.post(
         bookId = createdBook.rows[0].id;
       }
 
+      const resolvedFolderId = await ensureDriveFolderPath({
+        rootFolderId: process.env.GDRIVE_FOLDER_ID,
+        segments: [batchName, classLabel, subject, chapterTitle],
+      });
       const uploaded = await uploadBufferToDrive({
         fileBuffer: req.file.buffer,
         fileName: req.file.originalname,
         mimeType: req.file.mimetype,
-        folderId: process.env.GDRIVE_FOLDER_ID,
+        folderId: resolvedFolderId,
       });
 
       const chapter = await pool.query(
@@ -319,6 +325,10 @@ router.post(
         bookId,
         chapter: chapter.rows[0],
         drive: uploaded,
+        driveFolder: {
+          id: resolvedFolderId,
+          path: [batchName, classLabel, subject, chapterTitle],
+        },
       });
     } catch (error) {
       return res.status(500).json({ error: error.message || 'Book upload failed' });
@@ -336,14 +346,36 @@ router.post(
         return res.status(400).json({ error: 'PDF file is required' });
       }
 
+      const bookRes = await pool.query(
+        `SELECT b.batch_id, b.class_label, b.subject, bt.name AS batch_name
+         FROM books b
+         JOIN batches bt ON bt.id = b.batch_id
+         WHERE b.id = $1
+         LIMIT 1`,
+        [req.params.bookId]
+      );
+      if (bookRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+      const bookMeta = bookRes.rows[0];
+      const chapterTitle = req.body.title || req.file.originalname;
+      const resolvedFolderId = await ensureDriveFolderPath({
+        rootFolderId: process.env.GDRIVE_FOLDER_ID,
+        segments: [
+          bookMeta.batch_name || `Batch-${bookMeta.batch_id}`,
+          bookMeta.class_label || 'General',
+          bookMeta.subject || 'General',
+          chapterTitle,
+        ],
+      });
+
       const uploaded = await uploadBufferToDrive({
         fileBuffer: req.file.buffer,
         fileName: req.file.originalname,
         mimeType: req.file.mimetype,
-        folderId: process.env.GDRIVE_FOLDER_ID,
+        folderId: resolvedFolderId,
       });
 
-      const chapterTitle = req.body.title || req.file.originalname;
       const chapter = await pool.query(
         `INSERT INTO book_chapters (
           book_id, title, overview, note_summary, highlight, material_type, material_drive_link
@@ -359,7 +391,20 @@ router.post(
         ]
       );
 
-      return res.json({ success: true, chapter: chapter.rows[0], drive: uploaded });
+      return res.json({
+        success: true,
+        chapter: chapter.rows[0],
+        drive: uploaded,
+        driveFolder: {
+          id: resolvedFolderId,
+          path: [
+            bookMeta.batch_name || `Batch-${bookMeta.batch_id}`,
+            bookMeta.class_label || 'General',
+            bookMeta.subject || 'General',
+            chapterTitle,
+          ],
+        },
+      });
     } catch (error) {
       return res.status(500).json({ error: error.message || 'PDF upload failed' });
     }
