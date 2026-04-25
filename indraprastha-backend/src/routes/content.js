@@ -81,6 +81,22 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
   res.json({ success: true, chapters: chapters.rows });
 });
 
+router.get('/chapters/:chapterId', userAuth, async (req, res) => {
+  const chapter = await pool.query(
+    `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type, ch.material_drive_link,
+        (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS linked_pyq_count
+     FROM book_chapters ch
+     JOIN books b ON b.id = ch.book_id
+     WHERE ch.id = $1 AND b.batch_id = $2
+     LIMIT 1`,
+    [req.params.chapterId, req.user.batch_id]
+  );
+  if (chapter.rows.length === 0) {
+    return res.status(404).json({ error: 'Chapter not found' });
+  }
+  res.json({ success: true, chapter: chapter.rows[0] });
+});
+
 router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
   const pyqs = await pool.query(
     `SELECT p.id, p.question, p.option_a, p.option_b, p.option_c, p.option_d, p.correct_option, p.explanation, p.year_label
@@ -98,7 +114,8 @@ router.get('/practice-sets', userAuth, async (req, res) => {
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
   const result = await pool.query(
-    `SELECT ps.id, ps.title, ps.topic, ps.subject, ps.class_label, ps.difficulty, ps.estimated_minutes
+    `SELECT ps.id, ps.title, ps.topic, ps.subject, ps.class_label, ps.difficulty, ps.estimated_minutes,
+        (SELECT COUNT(*)::int FROM practice_questions pq WHERE pq.practice_set_id = ps.id) AS question_count
      FROM practice_sets ps
      JOIN batches ub ON ub.id = $1
      WHERE ps.batch_id = $1
@@ -109,6 +126,34 @@ router.get('/practice-sets', userAuth, async (req, res) => {
     [req.user.batch_id, subject, topic]
   );
   res.json({ success: true, practiceSets: result.rows });
+});
+
+router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
+  const setMeta = await pool.query(
+    `SELECT ps.id, ps.title, ps.topic, ps.subject, ps.difficulty, ps.estimated_minutes
+     FROM practice_sets ps
+     JOIN batches ub ON ub.id = $2
+     WHERE ps.id = $1
+       AND ps.batch_id = $2
+       AND (ps.class_label IS NULL OR ps.class_label = '' OR ps.class_label = ub.class_label)
+     LIMIT 1`,
+    [req.params.setId, req.user.batch_id]
+  );
+  if (setMeta.rows.length === 0) {
+    return res.status(404).json({ error: 'Practice set not found' });
+  }
+  const questions = await pool.query(
+    `SELECT id, question, option_a, option_b, option_c, option_d, correct_option, explanation
+     FROM practice_questions
+     WHERE practice_set_id = $1
+     ORDER BY id ASC`,
+    [req.params.setId]
+  );
+  res.json({
+    success: true,
+    practiceSet: setMeta.rows[0],
+    questions: questions.rows,
+  });
 });
 
 router.get('/tests', userAuth, async (req, res) => {

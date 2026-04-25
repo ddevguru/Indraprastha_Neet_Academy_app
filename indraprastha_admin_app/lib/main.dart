@@ -79,7 +79,12 @@ class _AdminHomeState extends State<AdminHome> {
           ),
         ],
       ),
-      body: _api.token == null ? LoginPage(api: _api) : pages[_tab],
+      body: _api.token == null
+          ? LoginPage(
+              api: _api,
+              onLoginSuccess: () => setState(() {}),
+            )
+          : pages[_tab],
       bottomNavigationBar: _api.token == null
           ? null
           : NavigationBar(
@@ -109,9 +114,14 @@ class _AdminHomeState extends State<AdminHome> {
 }
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, required this.api});
+  const LoginPage({
+    super.key,
+    required this.api,
+    required this.onLoginSuccess,
+  });
 
   final AdminApi api;
+  final VoidCallback onLoginSuccess;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -154,7 +164,9 @@ class _LoginPageState extends State<LoginPage> {
                               _username.text.trim(),
                               _password.text.trim(),
                             );
-                            if (mounted) setState(() => _message = 'Login success');
+                            if (!mounted) return;
+                            setState(() => _message = 'Login success');
+                            widget.onLoginSuccess();
                           } catch (e) {
                             setState(() => _message = '$e');
                           } finally {

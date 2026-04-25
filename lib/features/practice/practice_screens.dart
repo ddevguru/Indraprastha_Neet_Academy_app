@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/data/dummy_data.dart';
 import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
 import '../../models/app_models.dart';
@@ -49,28 +48,37 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(hint: 'Search topics, PYQ packs, and practice sets'),
             const SizedBox(height: AppSpacing.lg),
-            Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.md,
-              children: categories
-                  .map(
-                    (category) => SizedBox(
-                      width: 220,
-                      child: SurfaceCard(
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: AppColors.indigoSoft,
-                              child: Icon(category.$2, color: AppColors.indigo),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final twoColumnWidth = (constraints.maxWidth - AppSpacing.md) / 2;
+                final itemWidth = constraints.maxWidth >= 460
+                    ? twoColumnWidth
+                    : constraints.maxWidth;
+                return Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.md,
+                  children: categories
+                      .map(
+                        (category) => SizedBox(
+                          width: itemWidth,
+                          child: SurfaceCard(
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: AppColors.indigoSoft,
+                                  child:
+                                      Icon(category.$2, color: AppColors.indigo),
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(child: Text(category.$1)),
+                              ],
                             ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(child: Text(category.$1)),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  )
-                  .toList(),
+                      )
+                      .toList(),
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.xl),
             const SectionHeader(
@@ -103,7 +111,7 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
                               id: '${set['id']}',
                               title: set['title']?.toString() ?? 'Practice Set',
                               topic: set['topic']?.toString() ?? '',
-                              questionCount: 0,
+                              questionCount: (set['question_count'] as num?)?.toInt() ?? 0,
                               difficulty: set['difficulty']?.toString() ?? 'Moderate',
                               estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
                               accuracy: 0,
@@ -126,10 +134,10 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
 class PracticeAttemptScreen extends ConsumerStatefulWidget {
   const PracticeAttemptScreen({
     super.key,
-    required this.set,
+    required this.setId,
   });
 
-  final PracticeSet set;
+  final int setId;
 
   @override
   ConsumerState<PracticeAttemptScreen> createState() =>
@@ -140,231 +148,172 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   int _currentIndex = 0;
   int? _selectedOption;
   bool _submitted = false;
+  late final Future<Map<String, dynamic>> _attemptFuture;
 
-  PracticeQuestion get _question =>
-      DummyData.practiceQuestions[_currentIndex % DummyData.practiceQuestions.length];
+  @override
+  void initState() {
+    super.initState();
+    _attemptFuture = ContentRepository().fetchPracticeAttemptData(widget.setId);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final question = _question;
-    final uiState = ref.watch(appUiControllerProvider);
-    final isBookmarked = uiState.bookmarkedQuestionIds.contains(question.id);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.set.title),
-        actions: [
-          IconButton(
-            onPressed: () => ref
-                .read(appUiControllerProvider.notifier)
-                .toggleQuestionBookmark(question.id),
-            icon: Icon(
-              isBookmarked
-                  ? Icons.bookmark_rounded
-                  : Icons.bookmark_border_rounded,
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _attemptFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        final set = Map<String, dynamic>.from(snapshot.data?['practiceSet'] as Map? ?? {});
+        final questions = List<Map<String, dynamic>>.from(
+          snapshot.data?['questions'] as List<dynamic>? ?? const [],
+        );
+        if (questions.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: Text(set['title']?.toString() ?? 'Practice')),
+            body: const Center(
+              child: EmptyStateWidget(
+                title: 'No questions found',
+                subtitle: 'Is set ke liye abhi questions add nahi hue.',
+                icon: Icons.help_outline_rounded,
+              ),
             ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: CenteredContent(
-          maxWidth: 920,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      title: 'Set progress',
-                      value: '${_currentIndex + 1}/${DummyData.practiceQuestions.length}',
-                      subtitle: '${widget.set.estimatedMinutes} min estimated',
-                      icon: Icons.timelapse_rounded,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  const Expanded(
-                    child: StatCard(
-                      title: 'Mode',
-                      value: 'Practice',
-                      subtitle: 'Frontend interactive attempt',
-                      icon: Icons.edit_note_rounded,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              SurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: AppSpacing.xs,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.indigoSoft,
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Text(
-                            '${question.subject.label} . ${question.chapter}',
-                            style: const TextStyle(
-                              color: AppColors.indigo,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        TextButton.icon(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Question marked for review.'),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.flag_outlined),
-                          label: const Text('Mark for review'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      question.question,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    ...List.generate(question.options.length, (index) {
-                      final selected = _selectedOption == index;
-                      final correct = index == question.correctIndex;
-                      final revealState = _submitted &&
-                          (selected || correct);
+          );
+        }
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                        child: InkWell(
-                          onTap: _submitted
-                              ? null
-                              : () => setState(() => _selectedOption = index),
-                          borderRadius: BorderRadius.circular(AppRadii.md),
-                          child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              color: revealState
-                                  ? (correct
-                                      ? const Color(0xFFE7F8EF)
-                                      : const Color(0xFFFCEAEA))
-                                  : selected
-                                      ? AppColors.indigoSoft
-                                      : Theme.of(context).cardColor,
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                              border: Border.all(
-                                color: revealState
-                                    ? (correct
-                                        ? AppColors.success
-                                        : AppColors.danger)
-                                    : selected
-                                        ? AppColors.indigo
-                                        : AppColors.border,
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: Colors.white,
-                                  child: Text(String.fromCharCode(65 + index)),
-                                ),
-                                const SizedBox(width: AppSpacing.md),
-                                Expanded(child: Text(question.options[index])),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SecondaryButton(
-                            label: isBookmarked
-                                ? 'Bookmarked'
-                                : 'Bookmark question',
-                            icon: isBookmarked
-                                ? Icons.bookmark_rounded
-                                : Icons.bookmark_border_rounded,
-                            onPressed: () => ref
-                                .read(appUiControllerProvider.notifier)
-                                .toggleQuestionBookmark(question.id),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: PrimaryButton(
-                            label: _submitted ? 'Next question' : 'Submit answer',
-                            icon: Icons.arrow_forward_rounded,
-                            onPressed: () {
-                              if (!_submitted) {
-                                if (_selectedOption == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Select an option first.'),
-                                    ),
-                                  );
-                                  return;
-                                }
-                                setState(() => _submitted = true);
-                                return;
-                              }
+        final question = questions[_currentIndex.clamp(0, questions.length - 1)];
+        final options = [
+          question['option_a']?.toString() ?? '',
+          question['option_b']?.toString() ?? '',
+          question['option_c']?.toString() ?? '',
+          question['option_d']?.toString() ?? '',
+        ];
+        final correctOption = (question['correct_option']?.toString() ?? 'A').toUpperCase();
+        final correctIndex = ['A', 'B', 'C', 'D'].indexOf(correctOption).clamp(0, 3);
+        final uiState = ref.watch(appUiControllerProvider);
+        final qId = question['id'].toString();
+        final isBookmarked = uiState.bookmarkedQuestionIds.contains(qId);
 
-                              if (_currentIndex <
-                                  DummyData.practiceQuestions.length - 1) {
-                                setState(() {
-                                  _currentIndex++;
-                                  _selectedOption = null;
-                                  _submitted = false;
-                                });
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Practice set completed in demo mode.',
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(set['title']?.toString() ?? 'Practice'),
+            actions: [
+              IconButton(
+                onPressed: () => ref
+                    .read(appUiControllerProvider.notifier)
+                    .toggleQuestionBookmark(qId),
+                icon: Icon(
+                  isBookmarked
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
                 ),
               ),
-              if (_submitted) ...[
-                const SizedBox(height: AppSpacing.lg),
-                SurfaceCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Explanation',
-                          style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(question.explanation),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
-        ),
-      ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: CenteredContent(
+              maxWidth: 920,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  StatCard(
+                    title: 'Set progress',
+                    value: '${_currentIndex + 1}/${questions.length}',
+                    subtitle: '${set['estimated_minutes'] ?? 20} min estimated',
+                    icon: Icons.timelapse_rounded,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  SurfaceCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          question['question']?.toString() ?? '',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        ...List.generate(options.length, (index) {
+                          final selected = _selectedOption == index;
+                          final revealState = _submitted && (selected || index == correctIndex);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                            child: InkWell(
+                              onTap: _submitted ? null : () => setState(() => _selectedOption = index),
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                              child: Container(
+                                padding: const EdgeInsets.all(AppSpacing.md),
+                                decoration: BoxDecoration(
+                                  color: revealState
+                                      ? (index == correctIndex
+                                          ? const Color(0xFFE7F8EF)
+                                          : const Color(0xFFFCEAEA))
+                                      : selected
+                                          ? AppColors.indigoSoft
+                                          : Theme.of(context).cardColor,
+                                  borderRadius: BorderRadius.circular(AppRadii.md),
+                                  border: Border.all(
+                                    color: revealState
+                                        ? (index == correctIndex
+                                            ? AppColors.success
+                                            : AppColors.danger)
+                                        : selected
+                                            ? AppColors.indigo
+                                            : AppColors.border,
+                                  ),
+                                ),
+                                child: Text(options[index]),
+                              ),
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: AppSpacing.sm),
+                        PrimaryButton(
+                          label: _submitted ? 'Next question' : 'Submit answer',
+                          icon: Icons.arrow_forward_rounded,
+                          expanded: true,
+                          onPressed: () {
+                            if (!_submitted) {
+                              if (_selectedOption == null) return;
+                              setState(() => _submitted = true);
+                              return;
+                            }
+                            if (_currentIndex < questions.length - 1) {
+                              setState(() {
+                                _currentIndex++;
+                                _selectedOption = null;
+                                _submitted = false;
+                              });
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Practice set completed.')),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_submitted) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    SurfaceCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Explanation',
+                              style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(question['explanation']?.toString() ?? ''),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

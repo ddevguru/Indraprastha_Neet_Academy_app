@@ -249,11 +249,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                 child: Text(state.otpSent ? 'Verify OTP' : 'Send OTP'),
               ),
+              const SizedBox(height: 8),
               TextButton(onPressed: () => context.go('/signup'), child: const Text('New user? Signup')),
-              TextButton(
-                onPressed: () => context.go('/admin-app'),
-                child: const Text('Admin login'),
-              ),
             ],
           ),
         );
@@ -301,14 +298,17 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(children: [
             if (step == 0) ...[
               TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone number')),
+              const SizedBox(height: 12),
               ElevatedButton(onPressed: () => context.read<AuthBloc>().sendOtp(_phone.text.trim()), child: const Text('Send OTP')),
             ],
             if (step == 1) ...[
               TextField(controller: _otp, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'OTP')),
+              const SizedBox(height: 12),
               ElevatedButton(onPressed: () => context.read<AuthBloc>().verifyOtp(_otp.text.trim()), child: const Text('Verify OTP')),
             ],
             if (step == 2) ...[
               TextField(controller: _name, decoration: const InputDecoration(labelText: 'Full name')),
+              const SizedBox(height: 12),
               TextFormField(
                 initialValue: _course,
                 readOnly: true,
@@ -328,13 +328,17 @@ class _SignupScreenState extends State<SignupScreen> {
                 onChanged: (v) => setState(() => _batchId = v),
                 decoration: const InputDecoration(labelText: 'Batch'),
               ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(initialValue: _state.isEmpty ? null : _state, items: state.availableStates.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) {
                 if (v == null) return;
                 setState(() => _state = v);
                 context.read<AuthBloc>().loadColleges(v);
               }, decoration: const InputDecoration(labelText: 'State')),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(initialValue: _year.isEmpty ? null : _year, items: List.generate(16, (i) => (2010 + i).toString()).reversed.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setState(() => _year = v ?? ''), decoration: const InputDecoration(labelText: 'MBBS year')),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(initialValue: _college.isEmpty ? null : _college, items: state.availableColleges.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setState(() => _college = v ?? ''), decoration: const InputDecoration(labelText: 'College')),
+              const SizedBox(height: 14),
               ElevatedButton(
                 onPressed: () {
                   if (_batchId == null) {

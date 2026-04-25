@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../core/data/dummy_data.dart';
 import '../core/providers/app_state.dart';
 import '../features/analytics/analytics_screen.dart';
-import '../features/admin/admin_screens.dart';
 import '../features/auth/auth_screens.dart';
 import '../features/books/books_screens.dart';
 import '../features/dashboard/dashboard_screens.dart';
@@ -33,11 +32,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       '/login',
       '/signup',
       '/forgot-password',
-      '/admin-app',
     };
     const purchasePaths = {'/paywall', '/subscriptions'};
-
-    if (loc.startsWith('/admin-app')) return null;
 
     if (!auth.isLoggedIn) {
       if (publicPaths.contains(loc)) return null;
@@ -87,10 +83,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
-        path: '/admin-app',
-        builder: (context, state) => const AdminPanelScreen(),
-      ),
-      GoRoute(
         path: '/paywall',
         builder: (context, state) => const PaywallScreen(),
       ),
@@ -106,17 +98,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/books/chapter/:chapterId',
         builder: (context, state) {
-          final chapterId = state.pathParameters['chapterId']!;
-          return ChapterDetailScreen(chapter: DummyData.findChapter(chapterId));
+          final chapterId =
+              int.tryParse(state.pathParameters['chapterId'] ?? '') ?? 0;
+          return ChapterDetailScreen(chapterId: chapterId);
         },
       ),
       GoRoute(
         path: '/practice/attempt/:setId',
         builder: (context, state) {
-          final setId = state.pathParameters['setId']!;
-          return PracticeAttemptScreen(
-            set: DummyData.findPracticeSet(setId),
-          );
+          final setId = int.tryParse(state.pathParameters['setId'] ?? '') ?? 0;
+          return PracticeAttemptScreen(setId: setId);
         },
       ),
       GoRoute(

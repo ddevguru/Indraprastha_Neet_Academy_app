@@ -3,8 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/providers/app_state.dart';
 import '../auth/bloc/auth_bloc.dart';
+import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/adaptive_scaffold.dart';
 import '../../widgets/app_widgets.dart';
@@ -67,9 +67,12 @@ class DashboardHomeScreen extends ConsumerWidget {
     if (user == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    final uiState = ref.watch(appUiControllerProvider);
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 720;
+    final statsFuture = Future.wait([
+      ContentRepository().fetchTests(),
+      ContentRepository().fetchLatestAnalytics(),
+    ]);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -204,25 +207,71 @@ class DashboardHomeScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(),
             const SizedBox(height: AppSpacing.lg),
-            compact
-                ? Column(
+            FutureBuilder<List<dynamic>>(
+              future: statsFuture,
+              builder: (context, snapshot) {
+                final tests = snapshot.data != null
+                    ? List<Map<String, dynamic>>.from(snapshot.data![0] as List)
+                    : const <Map<String, dynamic>>[];
+                final analytics = snapshot.data != null
+                    ? Map<String, dynamic>.from(snapshot.data![1] as Map)
+                    : const <String, dynamic>{};
+                final donut = Map<String, dynamic>.from(
+                  analytics['donut'] as Map? ?? const {},
+                );
+                final attempted =
+                    (donut['correct'] ?? 0) + (donut['wrong'] ?? 0);
+                final total =
+                    attempted + (donut['unattempted'] ?? 0);
+                final coverage = total == 0 ? 0.0 : (attempted / total).clamp(0.0, 1.0);
+                final accuracy = attempted == 0
+                    ? 0.0
+                    : ((donut['correct'] ?? 0) / attempted).clamp(0.0, 1.0);
+                final streak = (analytics['analytics']?['overall_accuracy'] ?? 0)
+                    .toString();
+
+                if (compact) {
+                  return Column(
                     children: [
-                      _CurrentPlanCard(activePlan: uiState.selectedPlan),
-                      const SizedBox(height: AppSpacing.lg),
-                      const _DailyTargetCard(),
-                    ],
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: _CurrentPlanCard(activePlan: uiState.selectedPlan),
+                      _CurrentPlanCard(
+                        activePlan: user.preferredPlan,
+                        syllabus: '${(coverage * 100).round()}%',
+                        streak: '${streak == '0' ? '--' : '$streak%'}',
+                        testsTaken: '${tests.length}',
                       ),
-                      const SizedBox(width: AppSpacing.lg),
-                      const Expanded(child: _DailyTargetCard()),
+                      const SizedBox(height: AppSpacing.lg),
+                      _DailyTargetCard(
+                        coverage: coverage,
+                        accuracy: accuracy,
+                        testsTaken: tests.length,
+                      ),
                     ],
-                  ),
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: _CurrentPlanCard(
+                        activePlan: user.preferredPlan,
+                        syllabus: '${(coverage * 100).round()}%',
+                        streak: '${streak == '0' ? '--' : '$streak%'}',
+                        testsTaken: '${tests.length}',
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      child: _DailyTargetCard(
+                        coverage: coverage,
+                        accuracy: accuracy,
+                        testsTaken: tests.length,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: AppSpacing.xl),
             SectionHeader(
               title: 'Continue studying',
@@ -262,20 +311,30 @@ class DashboardHomeScreen extends ConsumerWidget {
               builder: (context, constraints) {
                 if (constraints.maxWidth < 820) {
                   return Column(
-                    children: const [
-                      _RecentTestsPanel(),
+                    children: [
+                      _RecentTestsPanel(testsFuture: ContentRepository().fetchTests()),
                       SizedBox(height: AppSpacing.lg),
-                      _WeakTopicsPanel(),
+                      _WeakTopicsPanel(analyticsFuture: ContentRepository().fetchLatestAnalytics()),
                     ],
                   );
                 }
 
-                return const Row(
+                return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(flex: 3, child: _RecentTestsPanel()),
+                    Expanded(
+                      flex: 3,
+                      child: _RecentTestsPanel(
+                        testsFuture: ContentRepository().fetchTests(),
+                      ),
+                    ),
                     SizedBox(width: AppSpacing.lg),
-                    Expanded(flex: 2, child: _WeakTopicsPanel()),
+                    Expanded(
+                      flex: 2,
+                      child: _WeakTopicsPanel(
+                        analyticsFuture: ContentRepository().fetchLatestAnalytics(),
+                      ),
+                    ),
                   ],
                 );
               },
@@ -290,9 +349,17 @@ class DashboardHomeScreen extends ConsumerWidget {
 }
 
 class _CurrentPlanCard extends StatelessWidget {
-  const _CurrentPlanCard({required this.activePlan});
+  const _CurrentPlanCard({
+    required this.activePlan,
+    required this.syllabus,
+    required this.streak,
+    required this.testsTaken,
+  });
 
   final String activePlan;
+  final String syllabus;
+  final String streak;
+  final String testsTaken;
 
   @override
   Widget build(BuildContext context) {
@@ -347,11 +414,11 @@ class _CurrentPlanCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
-              _PlanMiniStat(title: 'Syllabus', value: '74%'),
+              _PlanMiniStat(title: 'Syllabus', value: syllabus),
               const SizedBox(width: AppSpacing.lg),
-              _PlanMiniStat(title: 'Daily streak', value: '16 days'),
+              _PlanMiniStat(title: 'Accuracy', value: streak),
               const SizedBox(width: AppSpacing.lg),
-              _PlanMiniStat(title: 'Tests taken', value: '11'),
+              _PlanMiniStat(title: 'Tests taken', value: testsTaken),
             ],
           ),
         ],
@@ -361,21 +428,41 @@ class _CurrentPlanCard extends StatelessWidget {
 }
 
 class _DailyTargetCard extends StatelessWidget {
-  const _DailyTargetCard();
+  const _DailyTargetCard({
+    required this.coverage,
+    required this.accuracy,
+    required this.testsTaken,
+  });
+
+  final double coverage;
+  final double accuracy;
+  final int testsTaken;
 
   @override
   Widget build(BuildContext context) {
-    return const SurfaceCard(
+    return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Daily target', style: TextStyle(fontWeight: FontWeight.w700)),
-          SizedBox(height: AppSpacing.sm),
-          MetricBar(label: 'MCQs completed', value: 0.72, trailing: '72 / 100'),
-          SizedBox(height: AppSpacing.md),
-          MetricBar(label: 'Revision minutes', value: 0.58, trailing: '35 / 60'),
-          SizedBox(height: AppSpacing.md),
-          MetricBar(label: 'Tests reviewed', value: 0.5, trailing: '1 / 2'),
+          const Text('Daily target', style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: AppSpacing.sm),
+          MetricBar(
+            label: 'Syllabus coverage',
+            value: coverage,
+            trailing: '${(coverage * 100).round()}%',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          MetricBar(
+            label: 'Accuracy',
+            value: accuracy,
+            trailing: '${(accuracy * 100).round()}%',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          MetricBar(
+            label: 'Tests reviewed',
+            value: testsTaken == 0 ? 0 : 1,
+            trailing: '$testsTaken total',
+          ),
         ],
       ),
     );
@@ -383,7 +470,9 @@ class _DailyTargetCard extends StatelessWidget {
 }
 
 class _RecentTestsPanel extends StatelessWidget {
-  const _RecentTestsPanel();
+  const _RecentTestsPanel({required this.testsFuture});
+
+  final Future<List<Map<String, dynamic>>> testsFuture;
 
   @override
   Widget build(BuildContext context) {
@@ -398,10 +487,32 @@ class _RecentTestsPanel extends StatelessWidget {
             onAction: () => context.go('/dashboard/3'),
           ),
           const SizedBox(height: AppSpacing.md),
-          const EmptyStateWidget(
-            title: 'Recent tests from backend',
-            subtitle: 'Demo tests hide kar diye gaye hain. Real tests Tests tab me backend se fetch ho kar aa rahe hain.',
-            icon: Icons.assignment_outlined,
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: testsFuture,
+            builder: (context, snapshot) {
+              final tests = snapshot.data ?? const [];
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (tests.isEmpty) {
+                return const EmptyStateWidget(
+                  title: 'No tests yet',
+                  subtitle: 'Admin panel se test add hone ke baad yahan dikhेंगे.',
+                  icon: Icons.assignment_outlined,
+                );
+              }
+              return Column(
+                children: tests.take(3).map((t) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(t['title']?.toString() ?? ''),
+                    subtitle: Text(
+                      '${t['category'] ?? ''} . ${t['subject'] ?? ''}',
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
         ],
       ),
@@ -410,36 +521,50 @@ class _RecentTestsPanel extends StatelessWidget {
 }
 
 class _WeakTopicsPanel extends StatelessWidget {
-  const _WeakTopicsPanel();
+  const _WeakTopicsPanel({required this.analyticsFuture});
+
+  final Future<Map<String, dynamic>> analyticsFuture;
 
   @override
   Widget build(BuildContext context) {
-    const topics = [
-      ('Rotational Motion', 'Physics', 'Needs formula revision'),
-      ('Thermodynamics', 'Chemistry', 'Low accuracy in numericals'),
-      ('Morphology of Flowering Plants', 'Botany', 'Facts not stable'),
-      ('Breathing and Exchange of Gases', 'Zoology', 'Diagram recall pending'),
-    ];
-
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Weak topics', style: Theme.of(context).textTheme.titleLarge),
+          Text('AI insights', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: AppSpacing.xs),
-          const Text('Prioritize these areas over the next few sessions.'),
+          const Text('Latest performance suggestions from backend analytics.'),
           const SizedBox(height: AppSpacing.md),
-          ...topics.map(
-            (topic) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(
-                backgroundColor: AppColors.indigoSoft,
-                child: Icon(Icons.priority_high_rounded, color: AppColors.indigo),
-              ),
-              title: Text(topic.$1),
-              subtitle: Text('${topic.$2} . ${topic.$3}'),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-            ),
+          FutureBuilder<Map<String, dynamic>>(
+            future: analyticsFuture,
+            builder: (context, snapshot) {
+              final insights = List<Map<String, dynamic>>.from(
+                snapshot.data?['insights'] as List<dynamic>? ?? const [],
+              );
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (insights.isEmpty) {
+                return const EmptyStateWidget(
+                  title: 'No insights yet',
+                  subtitle: 'Test submit hone ke baad AI insights yahan आएंगे.',
+                  icon: Icons.lightbulb_outline,
+                );
+              }
+              return Column(
+                children: insights.take(3).map((insight) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const CircleAvatar(
+                      backgroundColor: AppColors.indigoSoft,
+                      child: Icon(Icons.lightbulb_rounded, color: AppColors.indigo),
+                    ),
+                    title: Text(insight['insight_title']?.toString() ?? ''),
+                    subtitle: Text(insight['insight_body']?.toString() ?? ''),
+                  );
+                }).toList(),
+              );
+            },
           ),
         ],
       ),

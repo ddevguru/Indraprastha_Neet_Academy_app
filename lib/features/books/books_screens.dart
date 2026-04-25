@@ -1,21 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/data/dummy_data.dart';
 import '../../core/providers/app_state.dart';
-import '../../core/providers/daily_mcqs_provider.dart';
-import '../../models/daily_mcq_item.dart';
-import '../../models/app_models.dart';
+import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 
-class BooksScreen extends ConsumerWidget {
+class BooksScreen extends ConsumerStatefulWidget {
   const BooksScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BooksScreen> createState() => _BooksScreenState();
+}
+
+class _BooksScreenState extends ConsumerState<BooksScreen> {
+  late final Future<Map<String, dynamic>> _dataFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _dataFuture = _loadData();
+  }
+
+  Future<Map<String, dynamic>> _loadData() async {
+    final repo = ContentRepository();
+    final course = await repo.fetchCourse();
+    final books = await repo.fetchBooks();
+    return {'course': course['course'], 'books': books};
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final uiState = ref.watch(appUiControllerProvider);
 
     return SingleChildScrollView(
@@ -32,22 +48,90 @@ class BooksScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(hint: 'Search books, notes, chapters, diagrams'),
             const SizedBox(height: AppSpacing.lg),
-            SurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Course',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  const Text('Neet Dropper Batch'),
-                  const SizedBox(height: AppSpacing.sm),
-                  const Text(
-                    'Batches: Target Neet 2028 (Class 11), Target Neet 2027 (Class 12), Target Neet 2027 (Dropper)',
-                  ),
-                ],
-              ),
+            FutureBuilder<Map<String, dynamic>>(
+              future: _dataFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final course =
+                    (snapshot.data?['course'] as Map<String, dynamic>?) ?? {};
+                final books = List<Map<String, dynamic>>.from(
+                  snapshot.data?['books'] as List<dynamic>? ?? const [],
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SurfaceCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Course',
+                              style: Theme.of(context).textTheme.titleMedium),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(course['name']?.toString() ?? 'Neet Dropper Batch'),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'Current batch: ${course['batch_name'] ?? '-'} (${course['class_label'] ?? '-'})',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    if (books.isEmpty)
+                      const EmptyStateWidget(
+                        title: 'No books available',
+                        subtitle: 'Admin panel se add karne par books yahan dikhengi.',
+                        icon: Icons.menu_book_outlined,
+                      )
+                    else
+                      ...books.map(
+                        (book) => Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: SurfaceCard(
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(book['title']?.toString() ?? ''),
+                              subtitle: Text(
+                                '${book['subject'] ?? ''} . ${book['topic'] ?? ''}',
+                              ),
+                              trailing: const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 16,
+                              ),
+                              onTap: () async {
+                                final bookId =
+                                    int.tryParse(book['id']?.toString() ?? '');
+                                if (bookId == null) return;
+                                final chapters =
+                                    await ContentRepository().fetchChapters(bookId);
+                                if (!mounted) return;
+                                if (chapters.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('No chapters available for this book.'),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                final chapterId = int.tryParse(
+                                  chapters.first['id']?.toString() ?? '',
+                                );
+                                if (chapterId == null) return;
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ChapterDetailScreen(chapterId: chapterId),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.lg),
             Wrap(
@@ -61,39 +145,6 @@ class BooksScreen extends ConsumerWidget {
                 _CategoryChip('Biology diagrams'),
                 _CategoryChip('Saved bookmarks'),
               ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final crossAxisCount = constraints.maxWidth > 1000
-                    ? 3
-                    : constraints.maxWidth > 620
-                        ? 2
-                        : 1;
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: DummyData.books.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: AppSpacing.md,
-                    mainAxisSpacing: AppSpacing.md,
-                    childAspectRatio: 1.22,
-                  ),
-                  itemBuilder: (context, index) {
-                    final book = DummyData.books[index];
-                    return BookCard(
-                      book: book,
-                      isBookmarked: uiState.bookmarkedBookIds.contains(book.id),
-                      onBookmark: () => ref
-                          .read(appUiControllerProvider.notifier)
-                          .toggleBookBookmark(book.id),
-                      onTap: () =>
-                          context.push('/books/chapter/${book.chapters.first.id}'),
-                    );
-                  },
-                );
-              },
             ),
             const SizedBox(height: AppSpacing.xl),
             SurfaceCard(
@@ -114,20 +165,7 @@ class BooksScreen extends ConsumerWidget {
                       icon: Icons.bookmark_border_rounded,
                     )
                   else
-                    ...DummyData.books
-                        .where(
-                          (book) => uiState.bookmarkedBookIds.contains(book.id),
-                        )
-                        .map(
-                          (book) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(book.title),
-                            subtitle: Text('${book.subject.label} . ${book.lastOpened}'),
-                            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                            onTap: () =>
-                                context.push('/books/chapter/${book.chapters.first.id}'),
-                          ),
-                        ),
+                    const Text('Bookmarked section backend integration in progress.'),
                 ],
               ),
             ),
@@ -141,211 +179,156 @@ class BooksScreen extends ConsumerWidget {
 class ChapterDetailScreen extends ConsumerWidget {
   const ChapterDetailScreen({
     super.key,
-    required this.chapter,
+    required this.chapterId,
   });
 
-  final BookChapter chapter;
+  final int chapterId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isSaved = ref.watch(appUiControllerProvider).savedChapterIds.contains(
-          chapter.id,
+    final chapterFuture = ContentRepository().fetchChapterDetail(chapterId);
+    final pyqFuture = ContentRepository().fetchPyqs(chapterId);
+    return FutureBuilder<Map<String, dynamic>>(
+      future: Future.wait([chapterFuture, pyqFuture]).then((v) => {
+        'chapter': (v[0] as Map<String, dynamic>)['chapter'],
+        'pyqs': v[1] as List<Map<String, dynamic>>,
+      }),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        final chapter = Map<String, dynamic>.from(
+          snapshot.data?['chapter'] as Map? ?? const {},
         );
-    final movedMcqs =
-        ref.watch(dailyMcqsProvider).archivedForChapter(chapter.id);
-
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(chapter.title),
-          actions: [
-            IconButton(
-              onPressed: () {
-                ref
-                    .read(appUiControllerProvider.notifier)
-                    .toggleSavedChapter(chapter.id);
-              },
-              icon: Icon(
-                isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-              ),
-            ),
-          ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Book'),
-              Tab(text: 'PYQs'),
-              Tab(text: 'Highlights'),
-            ],
-          ),
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: CenteredContent(
-            maxWidth: 1100,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SurfaceCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const CircleAvatar(
-                            backgroundColor: AppColors.indigoSoft,
-                            child: Icon(Icons.auto_stories_rounded, color: AppColors.indigo),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  chapter.title,
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text(chapter.overview),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: StatCard(
-                              title: 'Linked PYQs',
-                              value: '${chapter.linkedPyqCount}',
-                              subtitle: 'Exam-linked questions',
-                              icon: Icons.route_rounded,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          const Expanded(
-                            child: StatCard(
-                              title: 'Revision status',
-                              value: '2 passes',
-                              subtitle: 'Last revised 3 days ago',
-                              icon: Icons.refresh_rounded,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                if (movedMcqs.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  SurfaceCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SectionHeader(
-                          title: 'From daily MCQs (now in this chapter)',
-                          subtitle:
-                              "After 24 hours these leave Today's MCQs and stay linked here for PYQ-style review.",
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        ...movedMcqs.map(
-                          (q) => Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  q.subject.icon,
-                                  size: 20,
-                                  color: AppColors.indigo,
-                                ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(
-                                  child: Text(
-                                    q.preview,
-                                    style:
-                                        Theme.of(context).textTheme.bodyMedium,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.lg),
-                if (chapter.materialType == 'pdf' &&
-                    chapter.materialDriveLink != null) ...[
-                  SurfaceCard(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.picture_as_pdf_rounded,
-                            color: AppColors.danger),
-                        const SizedBox(width: AppSpacing.md),
-                        const Expanded(
-                          child: Text(
-                            'Admin uploaded PDF material for this chapter.',
-                          ),
-                        ),
-                        PrimaryButton(
-                          label: 'Open PDF',
-                          onPressed: () async {
-                            final uri = Uri.tryParse(chapter.materialDriveLink!);
-                            if (uri == null) return;
-                            await launchUrl(
-                              uri,
-                              mode: LaunchMode.externalApplication,
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                ],
-                SizedBox(
-                  height: 420,
-                  child: TabBarView(
-                    children: [
-                      _DetailPanel(
-                        title: 'Structured notes',
-                        content: chapter.noteSummary,
-                        bullets: const [
-                          'Concept overview cards',
-                          'Formula and memory anchors',
-                          'High-yield mistakes to avoid',
-                        ],
-                      ),
-                      _DetailPanel(
-                        title: 'PYQ links',
-                        content: chapter.pyqSummary,
-                        bullets: const [
-                          'Last 10-year NEET-style patterns',
-                          'Topic-weight hints',
-                          'Mark questions for revision',
-                        ],
-                      ),
-                      _DetailPanel(
-                        title: 'Important lines',
-                        content: chapter.highlight,
-                        bullets: const [
-                          'Highlighted lines for revision',
-                          'One-tap bookmark mock UI',
-                          'Inline note highlight style',
-                        ],
-                        highlight: true,
-                      ),
-                    ],
+        final pyqs = List<Map<String, dynamic>>.from(
+          snapshot.data?['pyqs'] as List<dynamic>? ?? const [],
+        );
+        final chapterIdString = chapter['id']?.toString() ?? '$chapterId';
+        final isSaved =
+            ref.watch(appUiControllerProvider).savedChapterIds.contains(chapterIdString);
+        return DefaultTabController(
+          length: 3,
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(chapter['title']?.toString() ?? 'Chapter'),
+              actions: [
+                IconButton(
+                  onPressed: () => ref
+                      .read(appUiControllerProvider.notifier)
+                      .toggleSavedChapter(chapterIdString),
+                  icon: Icon(
+                    isSaved
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
                   ),
                 ),
               ],
+              bottom: const TabBar(
+                tabs: [
+                  Tab(text: 'Book'),
+                  Tab(text: 'PYQs'),
+                  Tab(text: 'Highlights'),
+                ],
+              ),
+            ),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: CenteredContent(
+                maxWidth: 1100,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SurfaceCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            chapter['title']?.toString() ?? '',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(chapter['overview']?.toString() ?? ''),
+                          const SizedBox(height: AppSpacing.md),
+                          Text('Linked PYQs: ${chapter['linked_pyq_count'] ?? pyqs.length}'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    if ((chapter['material_type']?.toString() ?? '') == 'pdf' &&
+                        chapter['material_drive_link'] != null) ...[
+                      SurfaceCard(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.picture_as_pdf_rounded,
+                                color: AppColors.danger),
+                            const SizedBox(width: AppSpacing.md),
+                            const Expanded(
+                              child: Text(
+                                'Admin uploaded PDF material for this chapter.',
+                              ),
+                            ),
+                            PrimaryButton(
+                              label: 'Open PDF',
+                              onPressed: () async {
+                                final uri = Uri.tryParse(
+                                  chapter['material_drive_link'].toString(),
+                                );
+                                if (uri == null) return;
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                    SizedBox(
+                      height: 420,
+                      child: TabBarView(
+                        children: [
+                          _DetailPanel(
+                            title: 'Structured notes',
+                            content: chapter['note_summary']?.toString() ?? '',
+                            bullets: const [
+                              'Concept overview cards',
+                              'Formula and memory anchors',
+                              'High-yield mistakes to avoid',
+                            ],
+                          ),
+                          _DetailPanel(
+                            title: 'PYQ links',
+                            content: pyqs.isEmpty
+                                ? 'No PYQs added yet.'
+                                : pyqs.map((e) => e['question']).take(4).join('\n\n'),
+                            bullets: const [
+                              'Last 10-year NEET-style patterns',
+                              'Topic-weight hints',
+                              'Mark questions for revision',
+                            ],
+                          ),
+                          _DetailPanel(
+                            title: 'Important lines',
+                            content: chapter['highlight']?.toString() ?? '',
+                            bullets: const [
+                              'Highlighted lines for revision',
+                              'One-tap bookmark',
+                              'Inline note highlight style',
+                            ],
+                            highlight: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

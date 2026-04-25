@@ -38,6 +38,12 @@ class ContentRepository {
     );
   }
 
+  Future<Map<String, dynamic>> fetchChapterDetail(int chapterId) =>
+      _get('/content/chapters/$chapterId');
+
+  Future<Map<String, dynamic>> fetchPracticeAttemptData(int setId) =>
+      _get('/content/practice-sets/$setId/questions');
+
   Future<List<Map<String, dynamic>>> fetchTests() async {
     final data = await _get('/content/tests');
     return List<Map<String, dynamic>>.from(data['tests'] as List<dynamic>);
