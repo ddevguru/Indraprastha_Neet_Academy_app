@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const String baseUrl = 'https://indraprastha-backend.onrender.com/api';
 
@@ -20,8 +22,6 @@ class AdminApp extends StatefulWidget {
 
 class _AdminAppState extends State<AdminApp> {
   ThemeMode _themeMode = ThemeMode.light;
-
-  static const _seed = Color(0xFFE85A1C);
 
   @override
   Widget build(BuildContext context) {
@@ -43,9 +43,23 @@ class _AdminAppState extends State<AdminApp> {
       outline: Color(0xFFE8D4C4),
       outlineVariant: Color(0xFFD4B8A4),
     );
-    final darkScheme = ColorScheme.fromSeed(
-      seedColor: _seed,
+    const darkScheme = ColorScheme(
       brightness: Brightness.dark,
+      primary: Color(0xFFE85A1C),
+      onPrimary: Colors.white,
+      secondary: Color(0xFFFFB86C),
+      onSecondary: Color(0xFF141414),
+      error: Color(0xFFD92D20),
+      onError: Colors.white,
+      surface: Color(0xFF171A22),
+      onSurface: Colors.white,
+      primaryContainer: Color(0xFF2A1F1A),
+      onPrimaryContainer: Color(0xFFFFE8D6),
+      secondaryContainer: Color(0xFF3A2D23),
+      onSecondaryContainer: Color(0xFFFFEAD6),
+      surfaceContainerHighest: Color(0xFF252A35),
+      outline: Color(0xFF343B49),
+      outlineVariant: Color(0xFF313744),
     );
     return MaterialApp(
       title: 'Indraprastha Admin',
@@ -113,6 +127,46 @@ class _AdminAppState extends State<AdminApp> {
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: darkScheme,
+        scaffoldBackgroundColor: const Color(0xFF11131A),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+        ),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          color: darkScheme.surface,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: darkScheme.outlineVariant),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF1D212B),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: darkScheme.outline),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: darkScheme.outline),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: darkScheme.primary, width: 1.4),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
       ),
       themeMode: _themeMode,
       home: AdminHome(
@@ -139,6 +193,7 @@ class AdminHome extends StatefulWidget {
 class _AdminHomeState extends State<AdminHome> {
   final _api = AdminApi();
   int _tab = 0;
+  bool _restoringSession = true;
   static const _titles = [
     'Overview',
     'Setup',
@@ -159,7 +214,24 @@ class _AdminHomeState extends State<AdminHome> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    await _api.restoreSession();
+    if (!mounted) return;
+    setState(() => _restoringSession = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_restoringSession) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     final pages = [
       OverviewPage(api: _api),
       SetupPage(api: _api),
@@ -241,6 +313,16 @@ class _AdminHomeState extends State<AdminHome> {
             icon: const Icon(Icons.dark_mode_outlined, size: 22),
             tooltip: 'Dark/Light',
           ),
+          if (isLoggedIn)
+            IconButton(
+              onPressed: () async {
+                await _api.clearSession();
+                if (!mounted) return;
+                setState(() => _tab = 0);
+              },
+              icon: const Icon(Icons.logout_rounded, size: 22),
+              tooltip: 'Logout',
+            ),
           const SizedBox(width: 4),
         ],
       ),
@@ -464,14 +546,18 @@ class _SetupPageState extends State<SetupPage> {
   final _batchClass = TextEditingController(text: 'Class 11');
   final _className = TextEditingController();
   final _subjectName = TextEditingController();
+  final _oauthCode = TextEditingController();
   int? _classId;
   String? _status;
+  String? _oauthUrl;
+  bool? _driveConnected;
   List<dynamic> _classes = const [];
 
   @override
   void initState() {
     super.initState();
     _loadClasses();
+    _loadDriveStatus();
   }
 
   Future<void> _loadClasses() async {
@@ -482,6 +568,13 @@ class _SetupPageState extends State<SetupPage> {
         _classId = (_classes.first as Map<String, dynamic>)['id'] as int;
       }
     });
+  }
+
+  Future<void> _loadDriveStatus() async {
+    try {
+      final status = await widget.api.driveOAuthStatus();
+      setState(() => _driveConnected = status['hasRefreshToken'] == true);
+    } catch (_) {}
   }
 
   @override
@@ -596,6 +689,83 @@ class _SetupPageState extends State<SetupPage> {
                           setState(() => _status = 'Subject created');
                         },
                   child: const Text('Create Subject'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Connect Google Drive (one-time)'),
+                const SizedBox(height: 8),
+                Text(
+                  _driveConnected == true
+                      ? 'Status: Connected'
+                      : 'Status: Not connected',
+                ),
+                const SizedBox(height: 8),
+                FilledButton.tonal(
+                  onPressed: () async {
+                    try {
+                      final start = await widget.api.driveOAuthStart();
+                      final authUrl = start['authUrl']?.toString() ?? '';
+                      if (authUrl.isEmpty) throw Exception('Auth URL not found');
+                      setState(() => _oauthUrl = authUrl);
+                      final launched = await launchUrl(
+                        Uri.parse(authUrl),
+                        mode: LaunchMode.externalApplication,
+                      );
+                      if (!launched && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Could not open browser. Copy URL manually.')),
+                        );
+                      }
+                    } catch (e) {
+                      setState(() => _status = 'Drive auth URL failed: $e');
+                    }
+                  },
+                  child: const Text('1) Open Google consent'),
+                ),
+                if (_oauthUrl != null) ...[
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    _oauthUrl!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _oauthCode,
+                  decoration: const InputDecoration(
+                    labelText: '2) Paste code from callback URL',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () async {
+                    try {
+                      final code = _oauthCode.text.trim();
+                      if (code.isEmpty) {
+                        setState(() => _status = 'Please paste OAuth code');
+                        return;
+                      }
+                      await widget.api.driveOAuthExchange(code);
+                      await _loadDriveStatus();
+                      _oauthCode.clear();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Drive connected successfully')),
+                        );
+                      }
+                    } catch (e) {
+                      setState(() => _status = 'Drive code exchange failed: $e');
+                    }
+                  },
+                  child: const Text('3) Save connection'),
                 ),
               ],
             ),
@@ -1715,8 +1885,14 @@ class _PackagesPageState extends State<PackagesPage> {
 }
 
 class AdminApi {
+  static const _tokenKey = 'admin_auth_token';
   String? token;
   final http.Client _client = http.Client();
+
+  Future<void> restoreSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    token = prefs.getString(_tokenKey);
+  }
 
   Future<void> login(String username, String password) async {
     final response = await _client.post(
@@ -1729,6 +1905,14 @@ class AdminApi {
       throw Exception(body['error'] ?? 'login failed');
     }
     token = body['token']?.toString();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, token ?? '');
+  }
+
+  Future<void> clearSession() async {
+    token = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
   }
 
   Future<Map<String, dynamic>> dashboard() => _get('/admin/dashboard');
@@ -1738,6 +1922,8 @@ class AdminApi {
   Future<Map<String, dynamic>> tests() => _get('/admin/tests');
   Future<Map<String, dynamic>> videos() => _get('/admin/videos');
   Future<Map<String, dynamic>> packages() => _get('/admin/packages');
+  Future<Map<String, dynamic>> driveOAuthStart() => _get('/admin/drive/oauth/start');
+  Future<Map<String, dynamic>> driveOAuthStatus() => _get('/admin/drive/oauth/status');
 
   Future<void> createBatch({
     required String name,
@@ -1762,6 +1948,10 @@ class AdminApi {
     required String name,
   }) async {
     await _post('/admin/subjects', {'classId': classId, 'name': name});
+  }
+
+  Future<void> driveOAuthExchange(String code) async {
+    await _post('/admin/drive/oauth/exchange', {'code': code});
   }
 
   Future<void> uploadBookByHierarchyChunked({

@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
-const { ensureDatabaseSchema } = require('./db');
+const { ensureDatabaseSchema, loadRuntimeConfigFromDb } = require('./db');
 
 const authRoutes = require('./routes/auth');
 const contentRoutes = require('./routes/content');
@@ -51,6 +51,7 @@ const PORT = process.env.PORT || 3000;
 async function startServer() {
   try {
     await ensureDatabaseSchema();
+    await loadRuntimeConfigFromDb();
     app.listen(PORT, () => {
       console.log(`🚀 Backend running on http://localhost:${PORT}`);
     });

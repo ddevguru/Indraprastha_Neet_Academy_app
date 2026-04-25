@@ -342,6 +342,14 @@ async function ensureDatabaseSchema() {
     );
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   const collegeCount = await pool.query('SELECT COUNT(*)::int AS count FROM colleges');
   if (collegeCount.rows[0].count === 0) {
     await pool.query(`
@@ -412,7 +420,19 @@ async function ensureDatabaseSchema() {
   );
 }
 
+async function loadRuntimeConfigFromDb() {
+  const rows = await pool.query(
+    `SELECT key, value
+     FROM app_config
+     WHERE key IN ('GDRIVE_OAUTH_REFRESH_TOKEN')`
+  );
+  for (const row of rows.rows) {
+    process.env[row.key] = row.value;
+  }
+}
+
 module.exports = {
   pool,
   ensureDatabaseSchema,
+  loadRuntimeConfigFromDb,
 };

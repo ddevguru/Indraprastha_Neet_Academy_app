@@ -9,7 +9,13 @@ const path = require('path');
 const crypto = require('crypto');
 
 const { pool } = require('../db');
-const { uploadBufferToDrive, uploadFilePathToDrive, ensureDriveFolderPath } = require('../services/drive');
+const {
+  uploadBufferToDrive,
+  uploadFilePathToDrive,
+  ensureDriveFolderPath,
+  getDriveOAuthConsentUrl,
+  exchangeDriveOAuthCode,
+} = require('../services/drive');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -101,6 +107,62 @@ router.post('/login', async (req, res) => {
     { expiresIn: '30d' }
   );
   return res.json({ success: true, token });
+});
+
+router.get('/drive/oauth/start', adminAuth, async (_req, res) => {
+  try {
+    const authUrl = getDriveOAuthConsentUrl();
+    return res.json({
+      success: true,
+      authUrl,
+      message:
+        'Open this URL, approve access, then use /admin/drive/oauth/exchange with returned code.',
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'OAuth init failed' });
+  }
+});
+
+router.get('/drive/oauth/status', adminAuth, async (_req, res) => {
+  const dbToken = await pool.query(
+    `SELECT value FROM app_config WHERE key = 'GDRIVE_OAUTH_REFRESH_TOKEN' LIMIT 1`
+  );
+  const hasDbToken = dbToken.rows.length > 0 && !!dbToken.rows[0].value;
+  const hasEnvToken = !!process.env.GDRIVE_OAUTH_REFRESH_TOKEN;
+  return res.json({
+    success: true,
+    hasRefreshToken: hasDbToken || hasEnvToken,
+    source: hasDbToken ? 'db' : hasEnvToken ? 'env' : 'none',
+  });
+});
+
+router.post('/drive/oauth/exchange', adminAuth, async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'code is required' });
+    }
+    const tokens = await exchangeDriveOAuthCode({ code });
+    if (tokens.refreshToken) {
+      await pool.query(
+        `INSERT INTO app_config (key, value, updated_at)
+         VALUES ('GDRIVE_OAUTH_REFRESH_TOKEN', $1, CURRENT_TIMESTAMP)
+         ON CONFLICT (key) DO UPDATE
+         SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+        [tokens.refreshToken]
+      );
+      process.env.GDRIVE_OAUTH_REFRESH_TOKEN = tokens.refreshToken;
+    }
+    return res.json({
+      success: true,
+      tokens,
+      message: tokens.refreshToken
+        ? 'Refresh token saved to database and activated.'
+        : 'No new refresh token returned. Existing token remains unchanged.',
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'OAuth exchange failed' });
+  }
 });
 
 router.get('/dashboard', adminAuth, async (_req, res) => {

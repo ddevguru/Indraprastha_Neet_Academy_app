@@ -1,12 +1,12 @@
 const { google } = require('googleapis');
 const fs = require('fs');
 
-function createDriveClient() {
+function createServiceAccountDriveClient() {
   const clientEmail = process.env.GDRIVE_CLIENT_EMAIL;
   const privateKeyRaw = process.env.GDRIVE_PRIVATE_KEY;
 
   if (!clientEmail || !privateKeyRaw) {
-    throw new Error('Google Drive credentials missing in environment');
+    throw new Error('Google Drive service-account credentials missing');
   }
 
   const privateKey = privateKeyRaw.replace(/\\n/g, '\n');
@@ -17,6 +17,36 @@ function createDriveClient() {
   });
 
   return google.drive({ version: 'v3', auth });
+}
+
+function createOAuthClient() {
+  const clientId = process.env.GDRIVE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GDRIVE_OAUTH_CLIENT_SECRET;
+  const redirectUri = process.env.GDRIVE_OAUTH_REDIRECT_URI;
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new Error('Google OAuth credentials missing');
+  }
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
+
+function createOAuthDriveClient() {
+  const refreshToken = process.env.GDRIVE_OAUTH_REFRESH_TOKEN;
+  if (!refreshToken) {
+    throw new Error('Google OAuth refresh token missing');
+  }
+  const oauth = createOAuthClient();
+  oauth.setCredentials({ refresh_token: refreshToken });
+  return google.drive({ version: 'v3', auth: oauth });
+}
+
+function createDriveClient() {
+  const hasOAuth =
+    !!process.env.GDRIVE_OAUTH_CLIENT_ID &&
+    !!process.env.GDRIVE_OAUTH_CLIENT_SECRET &&
+    !!process.env.GDRIVE_OAUTH_REDIRECT_URI &&
+    !!process.env.GDRIVE_OAUTH_REFRESH_TOKEN;
+  if (hasOAuth) return createOAuthDriveClient();
+  return createServiceAccountDriveClient();
 }
 
 async function uploadBufferToDrive({
@@ -36,17 +66,20 @@ async function uploadBufferToDrive({
       body: Buffer.from(fileBuffer),
     },
     fields: 'id,webViewLink,webContentLink',
+    supportsAllDrives: true,
   });
 
   const fileId = response.data.id;
   await drive.permissions.create({
     fileId,
     requestBody: { role: 'reader', type: 'anyone' },
+    supportsAllDrives: true,
   });
 
   const meta = await drive.files.get({
     fileId,
     fields: 'id,webViewLink,webContentLink',
+    supportsAllDrives: true,
   });
 
   return {
@@ -73,17 +106,20 @@ async function uploadFilePathToDrive({
       body: fs.createReadStream(filePath),
     },
     fields: 'id,webViewLink,webContentLink',
+    supportsAllDrives: true,
   });
 
   const fileId = response.data.id;
   await drive.permissions.create({
     fileId,
     requestBody: { role: 'reader', type: 'anyone' },
+    supportsAllDrives: true,
   });
 
   const meta = await drive.files.get({
     fileId,
     fields: 'id,webViewLink,webContentLink',
+    supportsAllDrives: true,
   });
 
   return {
@@ -119,6 +155,8 @@ async function ensureChildFolder(drive, parentId, folderName) {
     q: qParts.join(' and '),
     fields: 'files(id,name)',
     pageSize: 1,
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
   });
 
   if (existing.data.files && existing.data.files.length > 0) {
@@ -132,6 +170,7 @@ async function ensureChildFolder(drive, parentId, folderName) {
       parents: parentId ? [parentId] : undefined,
     },
     fields: 'id',
+    supportsAllDrives: true,
   });
 
   return created.data.id;
@@ -148,6 +187,7 @@ async function ensureDriveFolderPath({
       await drive.files.get({
         fileId: current,
         fields: 'id',
+        supportsAllDrives: true,
       });
     } catch (_) {
       // If configured root folder is missing/inaccessible, gracefully fall back to drive root.
@@ -160,8 +200,31 @@ async function ensureDriveFolderPath({
   return current;
 }
 
+function getDriveOAuthConsentUrl() {
+  const oauth = createOAuthClient();
+  return oauth.generateAuthUrl({
+    access_type: 'offline',
+    prompt: 'consent',
+    scope: ['https://www.googleapis.com/auth/drive'],
+  });
+}
+
+async function exchangeDriveOAuthCode({ code }) {
+  const oauth = createOAuthClient();
+  const { tokens } = await oauth.getToken(code);
+  return {
+    accessToken: tokens.access_token || '',
+    refreshToken: tokens.refresh_token || '',
+    expiryDate: tokens.expiry_date || null,
+    tokenType: tokens.token_type || '',
+    scope: tokens.scope || '',
+  };
+}
+
 module.exports = {
   uploadBufferToDrive,
   uploadFilePathToDrive,
   ensureDriveFolderPath,
+  getDriveOAuthConsentUrl,
+  exchangeDriveOAuthCode,
 };
