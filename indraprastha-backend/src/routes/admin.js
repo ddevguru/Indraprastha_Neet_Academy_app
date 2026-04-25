@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
+const pdfParse = require('pdf-parse');
 
 const { pool } = require('../db');
 const { uploadBufferToDrive, ensureDriveFolderPath } = require('../services/drive');
@@ -35,6 +36,31 @@ function hierarchyFromBody(body = {}) {
     subject: body.subject || '',
     topic: body.topic || '',
   };
+}
+
+async function extractPdfBasics(fileBuffer) {
+  try {
+    const parsed = await pdfParse(Buffer.from(fileBuffer));
+    const raw = (parsed.text || '').replace(/\s+/g, ' ').trim();
+    if (!raw) {
+      return {
+        noteSummary: '',
+        highlight: '',
+      };
+    }
+    const noteSummary = raw.slice(0, 1200);
+    const firstSentence = raw.split(/[.?!]/).find((s) => s.trim().length > 20) || raw;
+    const highlight = firstSentence.trim().slice(0, 220);
+    return {
+      noteSummary,
+      highlight,
+    };
+  } catch (_) {
+    return {
+      noteSummary: '',
+      highlight: '',
+    };
+  }
 }
 
 router.post('/login', async (req, res) => {
@@ -231,6 +257,17 @@ router.get('/books', adminAuth, async (_req, res) => {
   return res.json({ success: true, books: result.rows });
 });
 
+router.get('/books/:bookId/chapters', adminAuth, async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, book_id, title, overview, note_summary, highlight, material_type, material_drive_link
+     FROM book_chapters
+     WHERE book_id = $1
+     ORDER BY id ASC`,
+    [req.params.bookId]
+  );
+  return res.json({ success: true, chapters: result.rows });
+});
+
 router.put('/books/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
   const { title, level, category } = req.body;
@@ -311,13 +348,21 @@ router.post(
         mimeType: req.file.mimetype,
         folderId: resolvedFolderId,
       });
+      const extracted = await extractPdfBasics(req.file.buffer);
 
       const chapter = await pool.query(
         `INSERT INTO book_chapters (
           book_id, title, overview, note_summary, highlight, material_type, material_drive_link
-         ) VALUES ($1,$2,'','','','pdf',$3)
+         ) VALUES ($1,$2,$3,$4,$5,'pdf',$6)
          RETURNING *`,
-        [bookId, chapterTitle, uploaded.webViewLink || uploaded.webContentLink]
+        [
+          bookId,
+          chapterTitle,
+          req.body.overview || 'Imported from PDF',
+          extracted.noteSummary,
+          extracted.highlight,
+          uploaded.webViewLink || uploaded.webContentLink,
+        ]
       );
 
       return res.json({
@@ -329,6 +374,7 @@ router.post(
           id: resolvedFolderId,
           path: [batchName, classLabel, subject, chapterTitle],
         },
+        extracted,
       });
     } catch (error) {
       return res.status(500).json({ error: error.message || 'Book upload failed' });
@@ -375,6 +421,7 @@ router.post(
         mimeType: req.file.mimetype,
         folderId: resolvedFolderId,
       });
+      const extracted = await extractPdfBasics(req.file.buffer);
 
       const chapter = await pool.query(
         `INSERT INTO book_chapters (
@@ -384,9 +431,9 @@ router.post(
         [
           req.params.bookId,
           chapterTitle,
-          req.body.overview || '',
-          '',
-          '',
+          req.body.overview || 'Imported from PDF',
+          extracted.noteSummary,
+          extracted.highlight,
           uploaded.webViewLink || uploaded.webContentLink,
         ]
       );
@@ -404,6 +451,7 @@ router.post(
             chapterTitle,
           ],
         },
+        extracted,
       });
     } catch (error) {
       return res.status(500).json({ error: error.message || 'PDF upload failed' });
@@ -432,6 +480,17 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
     ]
   );
   res.json({ success: true, pyq: result.rows[0] });
+});
+
+router.get('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label
+     FROM pyqs
+     WHERE chapter_id = $1
+     ORDER BY id DESC`,
+    [req.params.chapterId]
+  );
+  res.json({ success: true, pyqs: result.rows });
 });
 
 router.post('/practice-sets', adminAuth, async (req, res) => {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -105,39 +107,42 @@ class _TestsScreenState extends State<TestsScreen> {
 class TestDetailScreen extends StatelessWidget {
   const TestDetailScreen({
     super.key,
-    required this.test,
+    required this.testId,
   });
 
-  final TestItem test;
+  final int testId;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(test.title)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: CenteredContent(
-          maxWidth: 960,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SurfaceCard(
+    final future = ContentRepository().fetchTestQuestions(testId);
+    return FutureBuilder<Map<String, dynamic>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        final test = Map<String, dynamic>.from(snapshot.data?['test'] as Map? ?? const {});
+        return Scaffold(
+          appBar: AppBar(title: Text(test['title']?.toString() ?? 'Test')),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: CenteredContent(
+              maxWidth: 960,
+              child: SurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(test.category, style: Theme.of(context).textTheme.labelLarge),
+                    Text(test['subject']?.toString() ?? '', style: Theme.of(context).textTheme.labelLarge),
                     const SizedBox(height: AppSpacing.sm),
-                    Text(test.title, style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(test.syllabusCoverage),
+                    Text(test['title']?.toString() ?? '', style: Theme.of(context).textTheme.headlineSmall),
                     const SizedBox(height: AppSpacing.lg),
                     Row(
                       children: [
                         Expanded(
                           child: StatCard(
                             title: 'Duration',
-                            value: '${test.durationMinutes} min',
-                            subtitle: test.scheduleLabel,
+                            value: '${test['duration_minutes'] ?? 180} min',
+                            subtitle: 'Set by admin',
                             icon: Icons.schedule_rounded,
                           ),
                         ),
@@ -145,21 +150,11 @@ class TestDetailScreen extends StatelessWidget {
                         Expanded(
                           child: StatCard(
                             title: 'Questions',
-                            value: '${test.questions}',
-                            subtitle: '${test.marks} marks',
+                            value: '${test['question_count'] ?? 0}',
+                            subtitle: '${test['marks'] ?? 0} marks',
                             icon: Icons.help_outline_rounded,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        _FilterChip(test.syllabusCoverage),
-                        const _FilterChip('Negative marking enabled'),
-                        const _FilterChip('Result review included'),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.xl),
@@ -167,210 +162,202 @@ class TestDetailScreen extends StatelessWidget {
                       label: 'Start test',
                       expanded: true,
                       icon: Icons.play_arrow_rounded,
-                      onPressed: () => context.push('/tests/result/${test.id}'),
+                      onPressed: () => context.push('/tests/result/$testId'),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-class TestResultScreen extends StatelessWidget {
+class TestResultScreen extends StatefulWidget {
   const TestResultScreen({
     super.key,
-    required this.test,
+    required this.testId,
   });
 
-  final TestItem test;
+  final int testId;
+
+  @override
+  State<TestResultScreen> createState() => _TestResultScreenState();
+}
+
+class _TestResultScreenState extends State<TestResultScreen> {
+  int _index = 0;
+  int _timeLeft = 0;
+  bool _submitted = false;
+  final Map<int, String> _answers = {};
+  late final Future<Map<String, dynamic>> _attemptFuture;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _attemptFuture = ContentRepository().fetchTestQuestions(widget.testId);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    const breakdown = [
-      ('Physics', 0.64),
-      ('Chemistry', 0.76),
-      ('Botany', 0.88),
-      ('Zoology', 0.81),
-    ];
-
-    return Scaffold(
-      appBar: AppBar(title: Text('${test.title} Result')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: CenteredContent(
-          maxWidth: 1100,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 760;
-                  return compact
-                      ? Column(
-                          children: const [
-                            _ResultOverview(),
-                            SizedBox(height: AppSpacing.md),
-                            _CorrectWrongPanel(),
-                          ],
-                        )
-                      : const Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(flex: 3, child: _ResultOverview()),
-                            SizedBox(width: AppSpacing.md),
-                            Expanded(flex: 2, child: _CorrectWrongPanel()),
-                          ],
-                        );
-                },
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _attemptFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        final test = Map<String, dynamic>.from(snapshot.data?['test'] as Map? ?? const {});
+        final questions = List<Map<String, dynamic>>.from(
+          snapshot.data?['questions'] as List<dynamic>? ?? const [],
+        );
+        if (_timeLeft == 0 && !_submitted) {
+          _timeLeft = ((test['duration_minutes'] as num?)?.toInt() ?? 180) * 60;
+          _timer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+            if (!mounted || _submitted) {
+              timer.cancel();
+              return;
+            }
+            if (_timeLeft <= 0) {
+              timer.cancel();
+              setState(() => _submitted = true);
+              return;
+            }
+            setState(() => _timeLeft--);
+          });
+        }
+        if (questions.isEmpty) {
+          return const Scaffold(
+            body: Center(
+              child: EmptyStateWidget(
+                title: 'No questions in this test',
+                subtitle: 'Admin panel me test questions add karein.',
+                icon: Icons.help_outline_rounded,
               ),
-              const SizedBox(height: AppSpacing.xl),
-              SurfaceCard(
+            ),
+          );
+        }
+        final q = questions[_index.clamp(0, questions.length - 1)];
+        final options = <String, String>{
+          'A': q['option_a']?.toString() ?? '',
+          'B': q['option_b']?.toString() ?? '',
+          'C': q['option_c']?.toString() ?? '',
+          'D': q['option_d']?.toString() ?? '',
+        };
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(test['title']?.toString() ?? 'Test Attempt'),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 14, top: 14),
+                child: Text(
+                  '${(_timeLeft ~/ 60).toString().padLeft(2, '0')}:${(_timeLeft % 60).toString().padLeft(2, '0')}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: CenteredContent(
+              maxWidth: 980,
+              child: SurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SectionHeader(
-                      title: 'Subject-wise breakdown',
-                      subtitle: 'Accuracy and score balance across subjects.',
+                    Text(
+                      'Q ${_index + 1}/${questions.length}',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    ...breakdown.map(
-                      (item) => Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                        child: MetricBar(
-                          label: item.$1,
-                          value: item.$2,
+                    Text(q['question']?.toString() ?? ''),
+                    const SizedBox(height: AppSpacing.lg),
+                    ...options.entries.map(
+                      (e) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: OutlinedButton(
+                          onPressed: _submitted
+                              ? null
+                              : () => setState(() => _answers[_index] = e.key),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text('${e.key}) ${e.value}'),
+                          ),
                         ),
                       ),
                     ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SecondaryButton(
+                            label: 'Previous',
+                            onPressed: _index == 0 ? null : () => setState(() => _index--),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: PrimaryButton(
+                            label: _index == questions.length - 1 ? 'Submit test' : 'Next',
+                            onPressed: () async {
+                              if (_index < questions.length - 1) {
+                                setState(() => _index++);
+                                return;
+                              }
+                              int correct = 0;
+                              for (var i = 0; i < questions.length; i++) {
+                                final marked = _answers[i];
+                                final actual =
+                                    questions[i]['correct_option']?.toString().toUpperCase() ?? '';
+                                if (marked == actual) correct++;
+                              }
+                              final wrong = _answers.length - correct;
+                              final unattempted = questions.length - _answers.length;
+                              final marks = (test['marks'] as num?)?.toInt() ?? 720;
+                              final score = questions.isEmpty
+                                  ? 0
+                                  : ((correct / questions.length) * marks).round();
+                              final accuracy = _answers.isEmpty
+                                  ? 0.0
+                                  : (correct / _answers.length) * 100;
+                              await ContentRepository().submitTestAttempt(
+                                testId: widget.testId,
+                                score: score,
+                                accuracy: accuracy,
+                                correctCount: correct,
+                                wrongCount: wrong,
+                                unattemptedCount: unattempted,
+                              );
+                              if (!mounted) return;
+                              setState(() => _submitted = true);
+                              final messenger = ScaffoldMessenger.of(context);
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Submitted: Score $score/$marks | Correct $correct',
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              SurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    SectionHeader(
-                      title: 'Attempt summary',
-                      subtitle:
-                          'Track rank, speed, and consistency trends from the latest result.',
-                    ),
-                    SizedBox(height: AppSpacing.md),
-                    MiniBarChart(
-                      values: [0.55, 0.62, 0.68, 0.74, 0.79],
-                      labels: ['T-4', 'T-3', 'T-2', 'T-1', 'Now'],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ResultOverview extends StatelessWidget {
-  const _ResultOverview();
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          SectionHeader(
-            title: 'Result snapshot',
-            subtitle: 'Your latest demo performance metrics.',
-          ),
-          SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: StatCard(
-                  title: 'Score',
-                  value: '612 / 720',
-                  subtitle: 'Mock rank 214',
-                  icon: Icons.emoji_events_outlined,
-                ),
-              ),
-              SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: StatCard(
-                  title: 'Accuracy',
-                  value: '79%',
-                  subtitle: '142 correct answers',
-                  icon: Icons.track_changes_rounded,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: StatCard(
-                  title: 'Time spent',
-                  value: '176 min',
-                  subtitle: '24 min saved',
-                  icon: Icons.timer_outlined,
-                ),
-              ),
-              SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: StatCard(
-                  title: 'Improvement',
-                  value: '+38',
-                  subtitle: 'Vs previous mock',
-                  icon: Icons.trending_up_rounded,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CorrectWrongPanel extends StatelessWidget {
-  const _CorrectWrongPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Correct vs wrong', style: TextStyle(fontWeight: FontWeight.w700)),
-          SizedBox(height: AppSpacing.lg),
-          StatCard(
-            title: 'Correct',
-            value: '142',
-            subtitle: 'Strong recall in Biology',
-            icon: Icons.check_circle_rounded,
-          ),
-          SizedBox(height: AppSpacing.md),
-          StatCard(
-            title: 'Wrong',
-            value: '31',
-            subtitle: 'Mostly Physics numericals',
-            icon: Icons.cancel_rounded,
-          ),
-          SizedBox(height: AppSpacing.md),
-          StatCard(
-            title: 'Unattempted',
-            value: '7',
-            subtitle: 'Time management opportunity',
-            icon: Icons.more_horiz_rounded,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

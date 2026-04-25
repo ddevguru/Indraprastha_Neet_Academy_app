@@ -205,6 +205,34 @@ router.get('/tests', userAuth, async (req, res) => {
   res.json({ success: true, tests: result.rows });
 });
 
+router.get('/tests/:testId/questions', userAuth, async (req, res) => {
+  const testMeta = await pool.query(
+    `SELECT t.id, t.title, t.subject, t.topic, t.duration_minutes, t.marks, t.question_count
+     FROM tests t
+     JOIN batches ub ON ub.id = $2
+     WHERE t.id = $1
+       AND t.batch_id = $2
+       AND (t.class_label IS NULL OR t.class_label = '' OR t.class_label = ub.class_label)
+     LIMIT 1`,
+    [req.params.testId, req.user.batch_id]
+  );
+  if (testMeta.rows.length === 0) {
+    return res.status(404).json({ error: 'Test not found' });
+  }
+  const questions = await pool.query(
+    `SELECT id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation
+     FROM test_questions
+     WHERE test_id = $1
+     ORDER BY id ASC`,
+    [req.params.testId]
+  );
+  res.json({
+    success: true,
+    test: testMeta.rows[0],
+    questions: questions.rows,
+  });
+});
+
 router.get('/videos', userAuth, async (req, res) => {
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';

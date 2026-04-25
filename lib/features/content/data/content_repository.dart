@@ -49,6 +49,42 @@ class ContentRepository {
     return List<Map<String, dynamic>>.from(data['tests'] as List<dynamic>);
   }
 
+  Future<Map<String, dynamic>> fetchTestQuestions(int testId) =>
+      _get('/content/tests/$testId/questions');
+
+  Future<Map<String, dynamic>> submitTestAttempt({
+    required int testId,
+    required int score,
+    required double accuracy,
+    required int correctCount,
+    required int wrongCount,
+    required int unattemptedCount,
+  }) async {
+    final token = await _token;
+    if (token == null) return {};
+    final response = await _client.post(
+      Uri.parse('$baseUrl/tests/$testId/submit'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'score': score,
+        'accuracy': accuracy,
+        'correctCount': correctCount,
+        'wrongCount': wrongCount,
+        'unattemptedCount': unattemptedCount,
+      }),
+    );
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return body;
+    }
+    throw Exception(body['error']?.toString() ?? 'Failed request');
+  }
+
   Future<Map<String, dynamic>> fetchLatestAnalytics() =>
       _get('/content/analytics/latest');
 

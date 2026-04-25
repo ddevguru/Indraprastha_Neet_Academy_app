@@ -21,13 +21,27 @@ class AdminApp extends StatefulWidget {
 class _AdminAppState extends State<AdminApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
-  static const _seed = Color(0xFF4F5DE4);
+  static const _seed = Color(0xFFE85A1C);
 
   @override
   Widget build(BuildContext context) {
-    final lightScheme = ColorScheme.fromSeed(
-      seedColor: _seed,
+    const lightScheme = ColorScheme(
       brightness: Brightness.light,
+      primary: Color(0xFFE85A1C),
+      onPrimary: Colors.white,
+      secondary: Color(0xFFFFB86C),
+      onSecondary: Color(0xFF141414),
+      error: Color(0xFFD92D20),
+      onError: Colors.white,
+      surface: Color(0xFFFFFFFF),
+      onSurface: Color(0xFF141414),
+      primaryContainer: Color(0xFFFFE8D6),
+      onPrimaryContainer: Color(0xFF141414),
+      secondaryContainer: Color(0xFFFFF1E6),
+      onSecondaryContainer: Color(0xFF141414),
+      surfaceContainerHighest: Color(0xFFFFF1E6),
+      outline: Color(0xFFE8D4C4),
+      outlineVariant: Color(0xFFD4B8A4),
     );
     final darkScheme = ColorScheme.fromSeed(
       seedColor: _seed,
@@ -39,7 +53,7 @@ class _AdminAppState extends State<AdminApp> {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: lightScheme,
-        scaffoldBackgroundColor: const Color(0xFFF5F7FF),
+        scaffoldBackgroundColor: const Color(0xFFFFF8F2),
         appBarTheme: AppBarTheme(
           backgroundColor: lightScheme.surface,
           foregroundColor: lightScheme.onSurface,
@@ -614,6 +628,19 @@ class _BooksPageState extends State<BooksPage> {
   final _subject = TextEditingController(text: 'Physics');
   final _bookTitle = TextEditingController();
   final _chapter = TextEditingController();
+  final _chapterOverview = TextEditingController();
+  final _chapterHighlight = TextEditingController();
+  final _pyqQuestion = TextEditingController();
+  final _pyqOptionA = TextEditingController();
+  final _pyqOptionB = TextEditingController();
+  final _pyqOptionC = TextEditingController();
+  final _pyqOptionD = TextEditingController();
+  final _pyqExplanation = TextEditingController();
+  String _pyqCorrect = 'A';
+  String _bookCategory = 'NCERT books';
+  int? _selectedBookId;
+  int? _selectedChapterId;
+  List<dynamic> _chapters = const [];
   File? _pdf;
   String? _status;
 
@@ -632,6 +659,23 @@ class _BooksPageState extends State<BooksPage> {
       if (_batches.isNotEmpty) {
         _batchId = (_batches.first as Map<String, dynamic>)['id'] as int;
       }
+      if (_books.isNotEmpty && _selectedBookId == null) {
+        _selectedBookId = (_books.first as Map<String, dynamic>)['id'] as int;
+      }
+    });
+    await _loadChaptersForSelectedBook();
+  }
+
+  Future<void> _loadChaptersForSelectedBook() async {
+    if (_selectedBookId == null) {
+      setState(() => _chapters = const []);
+      return;
+    }
+    final data = await widget.api.bookChapters(_selectedBookId!);
+    setState(() {
+      _chapters = data;
+      _selectedChapterId =
+          _chapters.isNotEmpty ? (_chapters.first as Map<String, dynamic>)['id'] as int : null;
     });
   }
 
@@ -667,6 +711,18 @@ class _BooksPageState extends State<BooksPage> {
                 TextField(
                   controller: _bookTitle,
                   decoration: const InputDecoration(labelText: 'Book title'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _bookCategory,
+                  items: const [
+                    DropdownMenuItem(value: 'NCERT books', child: Text('NCERT books')),
+                    DropdownMenuItem(value: 'Handwritten notes', child: Text('Handwritten notes')),
+                    DropdownMenuItem(value: 'Formula sheets', child: Text('Formula sheets')),
+                    DropdownMenuItem(value: 'Reference book', child: Text('Reference book')),
+                  ],
+                  onChanged: (v) => setState(() => _bookCategory = v ?? 'NCERT books'),
+                  decoration: const InputDecoration(labelText: 'Book category'),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -715,6 +771,7 @@ class _BooksPageState extends State<BooksPage> {
                                     : _bookTitle.text.trim(),
                                 subject: _subject.text.trim(),
                                 topic: chapterTitle,
+                                category: _bookCategory,
                               );
                               await widget.api.createBookChapter(
                                 bookId: bookId,
@@ -759,6 +816,139 @@ class _BooksPageState extends State<BooksPage> {
                           setState(() => _status = 'PDF uploaded');
                         },
                   child: const Text('Upload Chapter PDF'),
+                ),
+                const SizedBox(height: 10),
+                const Divider(),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Chapter / Highlight / PYQ tools',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  initialValue: _selectedBookId,
+                  items: _books
+                      .map(
+                        (b) => DropdownMenuItem<int>(
+                          value: (b as Map<String, dynamic>)['id'] as int,
+                          child: Text('${b['title']} (${b['subject'] ?? ''})'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) async {
+                    setState(() => _selectedBookId = v);
+                    await _loadChaptersForSelectedBook();
+                  },
+                  decoration: const InputDecoration(labelText: 'Select book'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _chapterOverview,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Chapter overview'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _chapterHighlight,
+                  decoration: const InputDecoration(labelText: 'Highlight (manual)'),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.tonal(
+                  onPressed: _selectedBookId == null
+                      ? null
+                      : () async {
+                          final selected = _books.firstWhere(
+                            (e) => (e as Map<String, dynamic>)['id'] == _selectedBookId,
+                            orElse: () => <String, dynamic>{},
+                          );
+                          final selectedSubject =
+                              (selected as Map<String, dynamic>)['subject']?.toString() ?? '';
+                          if (selectedSubject.isNotEmpty &&
+                              selectedSubject != _subject.text.trim()) {
+                            setState(() => _status = 'Selected subject mismatch with this book');
+                            return;
+                          }
+                          await widget.api.createBookChapter(
+                            bookId: _selectedBookId!,
+                            title: _chapter.text.trim().isEmpty
+                                ? 'Chapter ${_chapters.length + 1}'
+                                : _chapter.text.trim(),
+                            overview: _chapterOverview.text.trim(),
+                            noteSummary: '',
+                            highlight: _chapterHighlight.text.trim(),
+                          );
+                          await _loadChaptersForSelectedBook();
+                          setState(() => _status = 'Manual chapter/highlight added');
+                        },
+                  child: const Text('Add Chapter + Highlight'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  initialValue: _selectedChapterId,
+                  items: _chapters
+                      .map(
+                        (c) => DropdownMenuItem<int>(
+                          value: (c as Map<String, dynamic>)['id'] as int,
+                          child: Text(c['title']?.toString() ?? ''),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedChapterId = v),
+                  decoration: const InputDecoration(labelText: 'Select chapter for PYQ'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _pyqQuestion,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'PYQ question'),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: _pyqOptionA, decoration: const InputDecoration(labelText: 'Option A')),
+                const SizedBox(height: 8),
+                TextField(controller: _pyqOptionB, decoration: const InputDecoration(labelText: 'Option B')),
+                const SizedBox(height: 8),
+                TextField(controller: _pyqOptionC, decoration: const InputDecoration(labelText: 'Option C')),
+                const SizedBox(height: 8),
+                TextField(controller: _pyqOptionD, decoration: const InputDecoration(labelText: 'Option D')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _pyqCorrect,
+                  items: const [
+                    DropdownMenuItem(value: 'A', child: Text('Correct: A')),
+                    DropdownMenuItem(value: 'B', child: Text('Correct: B')),
+                    DropdownMenuItem(value: 'C', child: Text('Correct: C')),
+                    DropdownMenuItem(value: 'D', child: Text('Correct: D')),
+                  ],
+                  onChanged: (v) => setState(() => _pyqCorrect = v ?? 'A'),
+                  decoration: const InputDecoration(labelText: 'Correct option'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _pyqExplanation,
+                  decoration: const InputDecoration(labelText: 'Explanation'),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.tonal(
+                  onPressed: _selectedChapterId == null
+                      ? null
+                      : () async {
+                          await widget.api.addPyq(
+                            chapterId: _selectedChapterId!,
+                            question: _pyqQuestion.text.trim(),
+                            optionA: _pyqOptionA.text.trim(),
+                            optionB: _pyqOptionB.text.trim(),
+                            optionC: _pyqOptionC.text.trim(),
+                            optionD: _pyqOptionD.text.trim(),
+                            correctOption: _pyqCorrect,
+                            explanation: _pyqExplanation.text.trim(),
+                          );
+                          setState(() => _status = 'PYQ added manually');
+                        },
+                  child: const Text('Add PYQ'),
                 ),
               ],
             ),
@@ -942,8 +1132,20 @@ class _TestsPageState extends State<TestsPage> {
   final _classLabel = TextEditingController(text: 'Class 11');
   final _subject = TextEditingController(text: 'Biology');
   final _topic = TextEditingController();
+  final _duration = TextEditingController(text: '180');
+  final _marks = TextEditingController(text: '720');
+  final _questionCount = TextEditingController(text: '180');
+  final _schedule = TextEditingController(text: 'Upcoming');
+  final _testQuestion = TextEditingController();
+  final _testOptionA = TextEditingController();
+  final _testOptionB = TextEditingController();
+  final _testOptionC = TextEditingController();
+  final _testOptionD = TextEditingController();
+  final _testExplanation = TextEditingController();
+  String _testCorrect = 'A';
   int? _batchId;
   int? _editingId;
+  int? _selectedTestId;
   List<dynamic> _batches = const [];
   List<dynamic> _items = const [];
 
@@ -988,6 +1190,14 @@ class _TestsPageState extends State<TestsPage> {
                 const SizedBox(height: 8),
                 TextField(controller: _topic, decoration: const InputDecoration(labelText: 'Topic')),
                 const SizedBox(height: 8),
+                TextField(controller: _duration, decoration: const InputDecoration(labelText: 'Duration (minutes)')),
+                const SizedBox(height: 8),
+                TextField(controller: _marks, decoration: const InputDecoration(labelText: 'Total marks')),
+                const SizedBox(height: 8),
+                TextField(controller: _questionCount, decoration: const InputDecoration(labelText: 'Question count')),
+                const SizedBox(height: 8),
+                TextField(controller: _schedule, decoration: const InputDecoration(labelText: 'Schedule label')),
+                const SizedBox(height: 8),
                 FilledButton(
                   onPressed: _batchId == null
                       ? null
@@ -999,6 +1209,10 @@ class _TestsPageState extends State<TestsPage> {
                               title: _title.text.trim(),
                               subject: _subject.text.trim(),
                               topic: _topic.text.trim(),
+                              durationMinutes: int.tryParse(_duration.text.trim()) ?? 180,
+                              marks: int.tryParse(_marks.text.trim()) ?? 720,
+                              questionCount: int.tryParse(_questionCount.text.trim()) ?? 180,
+                              scheduleLabel: _schedule.text.trim(),
                             );
                           } else {
                             await widget.api.updateTest(
@@ -1013,6 +1227,74 @@ class _TestsPageState extends State<TestsPage> {
                           await _load();
                         },
                   child: Text(_editingId == null ? 'Add Test' : 'Update Test'),
+                ),
+                const SizedBox(height: 10),
+                const Divider(),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Add questions to test', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  initialValue: _selectedTestId,
+                  items: _items
+                      .map(
+                        (t) => DropdownMenuItem<int>(
+                          value: (t as Map<String, dynamic>)['id'] as int,
+                          child: Text(t['title']?.toString() ?? ''),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedTestId = v),
+                  decoration: const InputDecoration(labelText: 'Select test'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _testQuestion,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Question'),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: _testOptionA, decoration: const InputDecoration(labelText: 'Option A')),
+                const SizedBox(height: 8),
+                TextField(controller: _testOptionB, decoration: const InputDecoration(labelText: 'Option B')),
+                const SizedBox(height: 8),
+                TextField(controller: _testOptionC, decoration: const InputDecoration(labelText: 'Option C')),
+                const SizedBox(height: 8),
+                TextField(controller: _testOptionD, decoration: const InputDecoration(labelText: 'Option D')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _testCorrect,
+                  items: const [
+                    DropdownMenuItem(value: 'A', child: Text('Correct: A')),
+                    DropdownMenuItem(value: 'B', child: Text('Correct: B')),
+                    DropdownMenuItem(value: 'C', child: Text('Correct: C')),
+                    DropdownMenuItem(value: 'D', child: Text('Correct: D')),
+                  ],
+                  onChanged: (v) => setState(() => _testCorrect = v ?? 'A'),
+                  decoration: const InputDecoration(labelText: 'Correct option'),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: _testExplanation, decoration: const InputDecoration(labelText: 'Explanation')),
+                const SizedBox(height: 8),
+                FilledButton.tonal(
+                  onPressed: _selectedTestId == null
+                      ? null
+                      : () async {
+                          await widget.api.addTestQuestion(
+                            testId: _selectedTestId!,
+                            question: _testQuestion.text.trim(),
+                            optionA: _testOptionA.text.trim(),
+                            optionB: _testOptionB.text.trim(),
+                            optionC: _testOptionC.text.trim(),
+                            optionD: _testOptionD.text.trim(),
+                            correctOption: _testCorrect,
+                            explanation: _testExplanation.text.trim(),
+                            subject: _subject.text.trim(),
+                          );
+                        },
+                  child: const Text('Add Question'),
                 ),
               ],
             ),
@@ -1432,7 +1714,9 @@ class AdminApi {
     req.fields['classLabel'] = classLabel;
     req.fields['subject'] = subject;
     req.fields['chapterTitle'] = chapterTitle;
-    req.files.add(await http.MultipartFile.fromPath('pdf', pdfFile.path));
+    final pdfBytes = await pdfFile.readAsBytes();
+    final pdfName = pdfFile.path.split(Platform.pathSeparator).last;
+    req.files.add(http.MultipartFile.fromBytes('pdf', pdfBytes, filename: pdfName));
     final streamed = await req.send();
     if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
       final payload = await streamed.stream.bytesToString();
@@ -1446,6 +1730,7 @@ class AdminApi {
     required String title,
     required String subject,
     required String topic,
+    String category = 'NCERT books',
   }) async {
     final body = await _postMap('/admin/books', {
       'batchId': batchId,
@@ -1453,10 +1738,14 @@ class AdminApi {
       'title': title,
       'subject': subject,
       'topic': topic,
+      'category': category,
     });
     final book = Map<String, dynamic>.from(body['book'] as Map? ?? const {});
     return (book['id'] as num?)?.toInt() ?? 0;
   }
+
+  Future<List<dynamic>> bookChapters(int bookId) async =>
+      (await _get('/admin/books/$bookId/chapters'))['chapters'] as List<dynamic>;
 
   Future<void> createBookChapter({
     required int bookId,
@@ -1530,6 +1819,10 @@ class AdminApi {
     required String title,
     required String subject,
     required String topic,
+    int durationMinutes = 180,
+    int marks = 720,
+    int questionCount = 180,
+    String scheduleLabel = 'Upcoming',
   }) async {
     await _post('/admin/tests', {
       'batchId': batchId,
@@ -1537,6 +1830,10 @@ class AdminApi {
       'title': title,
       'subject': subject,
       'topic': topic,
+      'durationMinutes': durationMinutes,
+      'marks': marks,
+      'questionCount': questionCount,
+      'scheduleLabel': scheduleLabel,
     });
   }
 
@@ -1556,6 +1853,51 @@ class AdminApi {
   }
 
   Future<void> deleteTest(int id) => _delete('/admin/tests/$id');
+
+  Future<void> addTestQuestion({
+    required int testId,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    required String subject,
+  }) async {
+    await _post('/admin/tests/$testId/questions', {
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+      'subject': subject,
+    });
+  }
+
+  Future<void> addPyq({
+    required int chapterId,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+  }) async {
+    await _post('/admin/chapters/$chapterId/pyqs', {
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+      'yearLabel': 'NEET',
+    });
+  }
 
   Future<void> uploadVideo({
     required int batchId,
@@ -1582,7 +1924,9 @@ class AdminApi {
     req.fields['chapterHint'] = chapterHint ?? topic;
     req.fields['sectionLabel'] = sectionLabel ?? 'Concept explainers';
     req.fields['durationLabel'] = durationLabel ?? '15 min';
-    req.files.add(await http.MultipartFile.fromPath('video', file.path));
+    final videoBytes = await file.readAsBytes();
+    final videoName = file.path.split(Platform.pathSeparator).last;
+    req.files.add(http.MultipartFile.fromBytes('video', videoBytes, filename: videoName));
     final streamed = await req.send();
     if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
       throw Exception(await streamed.stream.bytesToString());

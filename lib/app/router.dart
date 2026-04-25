@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/data/dummy_data.dart';
 import '../core/providers/app_state.dart';
 import '../features/analytics/analytics_screen.dart';
 import '../features/auth/auth_screens.dart';
@@ -113,15 +112,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/tests/detail/:testId',
         builder: (context, state) {
-          final testId = state.pathParameters['testId']!;
-          return TestDetailScreen(test: DummyData.findTest(testId));
+          final testId = int.tryParse(state.pathParameters['testId'] ?? '') ?? 0;
+          return TestDetailScreen(testId: testId);
         },
       ),
       GoRoute(
         path: '/tests/result/:testId',
         builder: (context, state) {
-          final testId = state.pathParameters['testId']!;
-          return TestResultScreen(test: DummyData.findTest(testId));
+          final testId = int.tryParse(state.pathParameters['testId'] ?? '') ?? 0;
+          return TestResultScreen(testId: testId);
         },
       ),
       GoRoute(
