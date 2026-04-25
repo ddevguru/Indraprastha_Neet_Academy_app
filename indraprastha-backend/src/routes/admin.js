@@ -713,6 +713,18 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
   const { chapterId } = req.params;
   const { question, optionA, optionB, optionC, optionD, correctOption, explanation, yearLabel } =
     req.body;
+  const chapterCheck = await pool.query(
+    `SELECT id
+     FROM book_chapters
+     WHERE id = $1
+     LIMIT 1`,
+    [chapterId]
+  );
+  if (chapterCheck.rows.length === 0) {
+    return res.status(404).json({
+      error: 'Selected chapter does not exist. Refresh chapters and select again.',
+    });
+  }
   const result = await pool.query(
     `INSERT INTO pyqs (
       chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label
