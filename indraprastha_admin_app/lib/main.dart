@@ -9,6 +9,45 @@ import 'package:url_launcher/url_launcher.dart';
 
 const String baseUrl = 'https://indraprastha-backend.onrender.com/api';
 
+void _showActionSnackBar(
+  BuildContext context,
+  String message, {
+  bool isError = false,
+}) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
+    ),
+  );
+}
+
+Future<bool> _confirmDeleteDialog(
+  BuildContext context, {
+  required String title,
+  required String body,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  return result == true;
+}
+
 void main() {
   runApp(const AdminApp());
 }
@@ -609,12 +648,22 @@ class _SetupPageState extends State<SetupPage> {
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: () async {
-                    await widget.api.createBatch(
-                      name: _batchName.text.trim(),
-                      targetYear: _batchTarget.text.trim(),
-                      classLabel: _batchClass.text.trim(),
-                    );
-                    setState(() => _status = 'Batch created');
+                    try {
+                      await widget.api.createBatch(
+                        name: _batchName.text.trim(),
+                        targetYear: _batchTarget.text.trim(),
+                        classLabel: _batchClass.text.trim(),
+                      );
+                      setState(() => _status = 'Batch created');
+                      if (context.mounted) {
+                        _showActionSnackBar(context, 'Batch created successfully');
+                      }
+                    } catch (e) {
+                      setState(() => _status = 'Batch create failed: $e');
+                      if (context.mounted) {
+                        _showActionSnackBar(context, 'Batch create failed', isError: true);
+                      }
+                    }
                   },
                   child: const Text('Create Batch'),
                 ),
@@ -639,9 +688,19 @@ class _SetupPageState extends State<SetupPage> {
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: () async {
-                    await widget.api.createClass(_className.text.trim());
-                    await _loadClasses();
-                    setState(() => _status = 'Class created');
+                    try {
+                      await widget.api.createClass(_className.text.trim());
+                      await _loadClasses();
+                      setState(() => _status = 'Class created');
+                      if (context.mounted) {
+                        _showActionSnackBar(context, 'Class created successfully');
+                      }
+                    } catch (e) {
+                      setState(() => _status = 'Class create failed: $e');
+                      if (context.mounted) {
+                        _showActionSnackBar(context, 'Class create failed', isError: true);
+                      }
+                    }
                   },
                   child: const Text('Create Class'),
                 ),
@@ -682,11 +741,21 @@ class _SetupPageState extends State<SetupPage> {
                   onPressed: _classId == null
                       ? null
                       : () async {
-                          await widget.api.createSubject(
-                            classId: _classId!,
-                            name: _subjectName.text.trim(),
-                          );
-                          setState(() => _status = 'Subject created');
+                          try {
+                            await widget.api.createSubject(
+                              classId: _classId!,
+                              name: _subjectName.text.trim(),
+                            );
+                            setState(() => _status = 'Subject created');
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'Subject created successfully');
+                            }
+                          } catch (e) {
+                            setState(() => _status = 'Subject create failed: $e');
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'Subject create failed', isError: true);
+                            }
+                          }
                         },
                   child: const Text('Create Subject'),
                 ),
@@ -966,8 +1035,14 @@ class _BooksPageState extends State<BooksPage> {
                             }
                             await _loadBatches();
                             setState(() => _status = 'Book saved with chapter');
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'Book saved successfully');
+                            }
                           } catch (e) {
                             setState(() => _status = 'Failed: $e');
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'Book save failed', isError: true);
+                            }
                           }
                         },
                   child: Text(_editingId == null ? 'Add Book' : 'Update Book'),
@@ -997,8 +1072,14 @@ class _BooksPageState extends State<BooksPage> {
                             );
                             await _loadBatches();
                             setState(() => _status = 'PDF uploaded to Drive successfully');
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'PDF uploaded successfully');
+                            }
                           } catch (e) {
                             setState(() => _status = 'PDF upload failed: $e');
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'PDF upload failed', isError: true);
+                            }
                           } finally {
                             if (mounted) setState(() => _pdfUploading = false);
                           }
@@ -1074,6 +1155,9 @@ class _BooksPageState extends State<BooksPage> {
                           );
                           await _loadChaptersForSelectedBook();
                           setState(() => _status = 'Manual chapter/highlight added');
+                          if (context.mounted) {
+                            _showActionSnackBar(context, 'Chapter added successfully');
+                          }
                         },
                   child: const Text('Add Chapter + Highlight'),
                 ),
@@ -1139,6 +1223,9 @@ class _BooksPageState extends State<BooksPage> {
                             explanation: _pyqExplanation.text.trim(),
                           );
                           setState(() => _status = 'PYQ added manually');
+                          if (context.mounted) {
+                            _showActionSnackBar(context, 'PYQ added successfully');
+                          }
                         },
                   child: const Text('Add PYQ'),
                 ),
@@ -1171,8 +1258,23 @@ class _BooksPageState extends State<BooksPage> {
                   ),
                   IconButton(
                     onPressed: () async {
-                      await widget.api.deleteBook(book['id'] as int);
-                      await _loadBatches();
+                      final shouldDelete = await _confirmDeleteDialog(
+                        context,
+                        title: 'Delete Book?',
+                        body: 'This will permanently remove this book.',
+                      );
+                      if (!shouldDelete) return;
+                      try {
+                        await widget.api.deleteBook(book['id'] as int);
+                        await _loadBatches();
+                        if (context.mounted) {
+                          _showActionSnackBar(context, 'Book deleted successfully');
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          _showActionSnackBar(context, 'Book delete failed', isError: true);
+                        }
+                      }
                     },
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -1249,25 +1351,37 @@ class _PracticePageState extends State<PracticePage> {
                   onPressed: _batchId == null
                       ? null
                       : () async {
-                          if (_editingId == null) {
-                            await widget.api.addPractice(
-                              batchId: _batchId!,
-                              classLabel: _classLabel.text.trim(),
-                              title: _title.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _topic.text.trim(),
-                            );
-                          } else {
-                            await widget.api.updatePractice(
-                              id: _editingId!,
-                              classLabel: _classLabel.text.trim(),
-                              title: _title.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _topic.text.trim(),
-                            );
-                            _editingId = null;
+                          try {
+                            if (_editingId == null) {
+                              await widget.api.addPractice(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                title: _title.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _topic.text.trim(),
+                              );
+                              if (context.mounted) {
+                                _showActionSnackBar(context, 'Practice added successfully');
+                              }
+                            } else {
+                              await widget.api.updatePractice(
+                                id: _editingId!,
+                                classLabel: _classLabel.text.trim(),
+                                title: _title.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _topic.text.trim(),
+                              );
+                              _editingId = null;
+                              if (context.mounted) {
+                                _showActionSnackBar(context, 'Practice updated successfully');
+                              }
+                            }
+                            await _load();
+                          } catch (e) {
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'Practice save failed', isError: true);
+                            }
                           }
-                          await _load();
                         },
                   child: Text(_editingId == null ? 'Add Practice' : 'Update Practice'),
                 ),
@@ -1297,8 +1411,23 @@ class _PracticePageState extends State<PracticePage> {
                   ),
                   IconButton(
                     onPressed: () async {
-                      await widget.api.deletePractice(e['id'] as int);
-                      await _load();
+                      final shouldDelete = await _confirmDeleteDialog(
+                        context,
+                        title: 'Delete Practice?',
+                        body: 'This practice set will be removed permanently.',
+                      );
+                      if (!shouldDelete) return;
+                      try {
+                        await widget.api.deletePractice(e['id'] as int);
+                        await _load();
+                        if (context.mounted) {
+                          _showActionSnackBar(context, 'Practice deleted successfully');
+                        }
+                      } catch (err) {
+                        if (context.mounted) {
+                          _showActionSnackBar(context, 'Practice delete failed', isError: true);
+                        }
+                      }
                     },
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -1395,31 +1524,38 @@ class _TestsPageState extends State<TestsPage> {
                   onPressed: _batchId == null
                       ? null
                       : () async {
-                          if (_editingId == null) {
-                            await widget.api.addTest(
-                              batchId: _batchId!,
-                              classLabel: _classLabel.text.trim(),
-                              title: _title.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _topic.text.trim(),
-                              durationMinutes: int.tryParse(_duration.text.trim()) ?? 180,
-                              marks: int.tryParse(_marks.text.trim()) ?? 720,
-                              questionCount: int.tryParse(_questionCount.text.trim()) ?? 180,
-                              scheduleLabel: _schedule.text.trim(),
-                            );
-                            setState(() => _status = 'Test added successfully');
-                          } else {
-                            await widget.api.updateTest(
-                              id: _editingId!,
-                              classLabel: _classLabel.text.trim(),
-                              title: _title.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _topic.text.trim(),
-                            );
-                            _editingId = null;
-                            setState(() => _status = 'Test updated successfully');
+                          try {
+                            if (_editingId == null) {
+                              await widget.api.addTest(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                title: _title.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _topic.text.trim(),
+                                durationMinutes: int.tryParse(_duration.text.trim()) ?? 180,
+                                marks: int.tryParse(_marks.text.trim()) ?? 720,
+                                questionCount: int.tryParse(_questionCount.text.trim()) ?? 180,
+                                scheduleLabel: _schedule.text.trim(),
+                              );
+                              setState(() => _status = 'Test added successfully');
+                              if (context.mounted) _showActionSnackBar(context, 'Test added successfully');
+                            } else {
+                              await widget.api.updateTest(
+                                id: _editingId!,
+                                classLabel: _classLabel.text.trim(),
+                                title: _title.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _topic.text.trim(),
+                              );
+                              _editingId = null;
+                              setState(() => _status = 'Test updated successfully');
+                              if (context.mounted) _showActionSnackBar(context, 'Test updated successfully');
+                            }
+                            await _load();
+                          } catch (e) {
+                            setState(() => _status = 'Test save failed: $e');
+                            if (context.mounted) _showActionSnackBar(context, 'Test save failed', isError: true);
                           }
-                          await _load();
                         },
                   child: Text(_editingId == null ? 'Add Test' : 'Update Test'),
                 ),
@@ -1481,18 +1617,24 @@ class _TestsPageState extends State<TestsPage> {
                   onPressed: _selectedTestId == null
                       ? null
                       : () async {
-                          await widget.api.addTestQuestion(
-                            testId: _selectedTestId!,
-                            question: _testQuestion.text.trim(),
-                            optionA: _testOptionA.text.trim(),
-                            optionB: _testOptionB.text.trim(),
-                            optionC: _testOptionC.text.trim(),
-                            optionD: _testOptionD.text.trim(),
-                            correctOption: _testCorrect,
-                            explanation: _testExplanation.text.trim(),
-                            subject: _subject.text.trim(),
-                          );
-                          setState(() => _status = 'Question added');
+                          try {
+                            await widget.api.addTestQuestion(
+                              testId: _selectedTestId!,
+                              question: _testQuestion.text.trim(),
+                              optionA: _testOptionA.text.trim(),
+                              optionB: _testOptionB.text.trim(),
+                              optionC: _testOptionC.text.trim(),
+                              optionD: _testOptionD.text.trim(),
+                              correctOption: _testCorrect,
+                              explanation: _testExplanation.text.trim(),
+                              subject: _subject.text.trim(),
+                            );
+                            setState(() => _status = 'Question added');
+                            if (context.mounted) _showActionSnackBar(context, 'Question added successfully');
+                          } catch (e) {
+                            setState(() => _status = 'Question add failed: $e');
+                            if (context.mounted) _showActionSnackBar(context, 'Question add failed', isError: true);
+                          }
                         },
                   child: const Text('Add Question'),
                 ),
@@ -1553,8 +1695,19 @@ class _TestsPageState extends State<TestsPage> {
                   ),
                   IconButton(
                     onPressed: () async {
-                      await widget.api.deleteTest(e['id'] as int);
-                      await _load();
+                      final shouldDelete = await _confirmDeleteDialog(
+                        context,
+                        title: 'Delete Test?',
+                        body: 'This test and its questions will be removed permanently.',
+                      );
+                      if (!shouldDelete) return;
+                      try {
+                        await widget.api.deleteTest(e['id'] as int);
+                        await _load();
+                        if (context.mounted) _showActionSnackBar(context, 'Test deleted successfully');
+                      } catch (_) {
+                        if (context.mounted) _showActionSnackBar(context, 'Test delete failed', isError: true);
+                      }
                     },
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -1676,6 +1829,9 @@ class _VideosPageState extends State<VideosPage> {
                               _topic.clear();
                               setState(() => _progress = 0.0);
                               setState(() => _status = 'Video uploaded successfully');
+                              if (context.mounted) {
+                                _showActionSnackBar(context, 'Video uploaded successfully');
+                              }
                             } else {
                               await widget.api.updateVideo(
                                 id: _editingId!,
@@ -1686,10 +1842,16 @@ class _VideosPageState extends State<VideosPage> {
                               );
                               _editingId = null;
                               setState(() => _status = 'Video updated');
+                              if (context.mounted) {
+                                _showActionSnackBar(context, 'Video updated successfully');
+                              }
                             }
                             await _load();
                           } catch (e) {
                             setState(() => _status = 'Upload failed: $e');
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'Video action failed', isError: true);
+                            }
                           } finally {
                             if (mounted) {
                               setState(() => _uploading = false);
@@ -1736,8 +1898,23 @@ class _VideosPageState extends State<VideosPage> {
                   ),
                   IconButton(
                     onPressed: () async {
-                      await widget.api.deleteVideo(e['id'] as int);
-                      await _load();
+                      final shouldDelete = await _confirmDeleteDialog(
+                        context,
+                        title: 'Delete Video?',
+                        body: 'This video entry will be deleted.',
+                      );
+                      if (!shouldDelete) return;
+                      try {
+                        await widget.api.deleteVideo(e['id'] as int);
+                        await _load();
+                        if (context.mounted) {
+                          _showActionSnackBar(context, 'Video deleted successfully');
+                        }
+                      } catch (_) {
+                        if (context.mounted) {
+                          _showActionSnackBar(context, 'Video delete failed', isError: true);
+                        }
+                      }
                     },
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -1813,26 +1990,38 @@ class _PackagesPageState extends State<PackagesPage> {
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: () async {
-                    if (_editingId == null) {
-                      await widget.api.addPackage(
-                        name: _name.text.trim(),
-                        priceLabel: _price.text.trim(),
-                        validity: _validity.text.trim(),
-                        highlight: _highlight.text.trim(),
-                        features: _featureList,
-                      );
-                    } else {
-                      await widget.api.updatePackage(
-                        id: _editingId!,
-                        name: _name.text.trim(),
-                        priceLabel: _price.text.trim(),
-                        validity: _validity.text.trim(),
-                        highlight: _highlight.text.trim(),
-                        features: _featureList,
-                      );
-                      _editingId = null;
+                    try {
+                      if (_editingId == null) {
+                        await widget.api.addPackage(
+                          name: _name.text.trim(),
+                          priceLabel: _price.text.trim(),
+                          validity: _validity.text.trim(),
+                          highlight: _highlight.text.trim(),
+                          features: _featureList,
+                        );
+                        if (context.mounted) {
+                          _showActionSnackBar(context, 'Package added successfully');
+                        }
+                      } else {
+                        await widget.api.updatePackage(
+                          id: _editingId!,
+                          name: _name.text.trim(),
+                          priceLabel: _price.text.trim(),
+                          validity: _validity.text.trim(),
+                          highlight: _highlight.text.trim(),
+                          features: _featureList,
+                        );
+                        _editingId = null;
+                        if (context.mounted) {
+                          _showActionSnackBar(context, 'Package updated successfully');
+                        }
+                      }
+                      await _load();
+                    } catch (_) {
+                      if (context.mounted) {
+                        _showActionSnackBar(context, 'Package save failed', isError: true);
+                      }
                     }
-                    await _load();
                   },
                   child: Text(_editingId == null ? 'Add Package' : 'Update Package'),
                 ),
@@ -1868,8 +2057,23 @@ class _PackagesPageState extends State<PackagesPage> {
                     ),
                     IconButton(
                       onPressed: () async {
-                        await widget.api.deletePackage(item['id'] as int);
-                        await _load();
+                        final shouldDelete = await _confirmDeleteDialog(
+                          context,
+                          title: 'Delete Package?',
+                          body: 'This package will be removed permanently.',
+                        );
+                        if (!shouldDelete) return;
+                        try {
+                          await widget.api.deletePackage(item['id'] as int);
+                          await _load();
+                          if (context.mounted) {
+                            _showActionSnackBar(context, 'Package deleted successfully');
+                          }
+                        } catch (_) {
+                          if (context.mounted) {
+                            _showActionSnackBar(context, 'Package delete failed', isError: true);
+                          }
+                        }
                       },
                       icon: const Icon(Icons.delete_outline),
                     ),

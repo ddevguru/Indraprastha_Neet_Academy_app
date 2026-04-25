@@ -42,9 +42,27 @@ app.use(
 app.use(express.json());
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+app.use((req, _res, next) => {
+  req.reqStart = Date.now();
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/admin', adminRoutes);
+
+app.use((err, req, res, _next) => {
+  const elapsed = req.reqStart ? `${Date.now() - req.reqStart}ms` : 'n/a';
+  console.error('[API_ERROR]', {
+    method: req.method,
+    path: req.originalUrl,
+    elapsed,
+    message: err?.message || 'Unknown error',
+    stack: err?.stack,
+  });
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 const PORT = process.env.PORT || 3000;
 

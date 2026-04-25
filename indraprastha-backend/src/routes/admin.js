@@ -28,6 +28,15 @@ function ensureUploadRoot() {
 }
 ensureUploadRoot();
 
+function logAdminRouteError(route, error, extra = {}) {
+  console.error('[ADMIN_ROUTE_ERROR]', {
+    route,
+    message: error?.message || 'Unknown error',
+    stack: error?.stack,
+    ...extra,
+  });
+}
+
 function adminAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
   if (!authHeader.startsWith('Bearer ')) {
@@ -119,6 +128,7 @@ router.get('/drive/oauth/start', adminAuth, async (_req, res) => {
         'Open this URL, approve access, then use /admin/drive/oauth/exchange with returned code.',
     });
   } catch (e) {
+    logAdminRouteError('/drive/oauth/start', e);
     return res.status(500).json({ error: e.message || 'OAuth init failed' });
   }
 });
@@ -161,6 +171,7 @@ router.post('/drive/oauth/exchange', adminAuth, async (req, res) => {
         : 'No new refresh token returned. Existing token remains unchanged.',
     });
   } catch (e) {
+    logAdminRouteError('/drive/oauth/exchange', e);
     return res.status(500).json({ error: e.message || 'OAuth exchange failed' });
   }
 });
@@ -451,6 +462,7 @@ router.post(
         extracted,
       });
     } catch (error) {
+      logAdminRouteError('/books/upload-by-hierarchy', error);
       return res.status(500).json({ error: error.message || 'Book upload failed' });
     }
   }
@@ -488,6 +500,7 @@ router.post('/books/pdf-upload-init', adminAuth, async (req, res) => {
     );
     return res.json({ success: true, uploadId, chunkSize: 512 * 1024 });
   } catch (e) {
+    logAdminRouteError('/books/pdf-upload-init', e);
     return res.status(500).json({ error: e.message || 'init failed' });
   }
 });
@@ -512,6 +525,7 @@ router.post('/books/pdf-upload-chunk', adminAuth, upload.single('chunk'), async 
     }
     return res.json({ success: true });
   } catch (e) {
+    logAdminRouteError('/books/pdf-upload-chunk', e, { uploadId: req.body?.uploadId });
     return res.status(500).json({ error: e.message || 'chunk failed' });
   }
 });
@@ -612,6 +626,7 @@ router.post('/books/pdf-upload-complete', adminAuth, async (req, res) => {
       extracted,
     });
   } catch (e) {
+    logAdminRouteError('/books/pdf-upload-complete', e, { uploadId: req.body?.uploadId });
     return res.status(500).json({ error: e.message || 'complete failed' });
   }
 });
@@ -688,6 +703,7 @@ router.post(
         extracted,
       });
     } catch (error) {
+      logAdminRouteError('/books/:bookId/pdf', error, { bookId: req.params?.bookId });
       return res.status(500).json({ error: error.message || 'PDF upload failed' });
     }
   }
@@ -964,6 +980,7 @@ router.post('/videos/upload', adminAuth, upload.single('video'), async (req, res
       },
     });
   } catch (error) {
+    logAdminRouteError('/videos/upload', error);
     return res.status(500).json({
       error: error.message || 'Upload failed',
     });
@@ -1014,6 +1031,7 @@ router.post('/videos/upload-init', adminAuth, async (req, res) => {
     );
     return res.json({ success: true, uploadId, chunkSize: 2 * 1024 * 1024 });
   } catch (e) {
+    logAdminRouteError('/videos/upload-init', e);
     return res.status(500).json({ error: e.message || 'init failed' });
   }
 });
@@ -1038,6 +1056,7 @@ router.post('/videos/upload-chunk', adminAuth, upload.single('chunk'), async (re
     }
     return res.json({ success: true });
   } catch (e) {
+    logAdminRouteError('/videos/upload-chunk', e, { uploadId: req.body?.uploadId });
     return res.status(500).json({ error: e.message || 'chunk failed' });
   }
 });
@@ -1122,6 +1141,7 @@ router.post('/videos/upload-complete', adminAuth, async (req, res) => {
       driveFolder: { id: resolvedFolderId, path: folderSegments },
     });
   } catch (e) {
+    logAdminRouteError('/videos/upload-complete', e, { uploadId: req.body?.uploadId });
     return res.status(500).json({ error: e.message || 'complete failed' });
   }
 });
@@ -1162,6 +1182,7 @@ router.post('/videos', adminAuth, async (req, res) => {
     );
     return res.json({ success: true, video: dbResult.rows[0] });
   } catch (error) {
+    logAdminRouteError('/videos', error);
     return res.status(500).json({ error: error.message || 'Failed' });
   }
 });
