@@ -48,7 +48,7 @@ async function extractPdfBasics(fileBuffer) {
         highlight: '',
       };
     }
-    const noteSummary = raw.slice(0, 1200);
+    const noteSummary = raw.slice(0, 15000);
     const firstSentence = raw.split(/[.?!]/).find((s) => s.trim().length > 20) || raw;
     const highlight = firstSentence.trim().slice(0, 220);
     return {
@@ -733,6 +733,46 @@ router.post('/videos/upload', adminAuth, upload.single('video'), async (req, res
     return res.status(500).json({
       error: error.message || 'Upload failed',
     });
+  }
+});
+
+// Fallback for Render / large uploads:
+// allow admin to save a Drive link directly (upload can be done manually).
+router.post('/videos', adminAuth, async (req, res) => {
+  try {
+    const {
+      title,
+      subject,
+      topic,
+      classLabel,
+      chapterHint,
+      sectionLabel,
+      durationLabel,
+      driveLink,
+    } = req.body;
+    const { batchId } = hierarchyFromBody(req.body);
+    if (!batchId || !title || !driveLink) {
+      return res.status(400).json({ error: 'batchId, title and driveLink are required' });
+    }
+    const dbResult = await pool.query(
+      `INSERT INTO videos (
+        batch_id, class_label, title, subject, topic, chapter_hint, section_label, duration_label, drive_link
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [
+        batchId,
+        classLabel || null,
+        title,
+        subject || '',
+        topic || '',
+        chapterHint || '',
+        sectionLabel || 'Concept explainers',
+        durationLabel || '15 min',
+        driveLink,
+      ]
+    );
+    return res.json({ success: true, video: dbResult.rows[0] });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Failed' });
   }
 });
 

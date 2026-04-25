@@ -1148,6 +1148,7 @@ class _TestsPageState extends State<TestsPage> {
   int? _selectedTestId;
   List<dynamic> _batches = const [];
   List<dynamic> _items = const [];
+  String? _status;
 
   @override
   void initState() {
@@ -1214,6 +1215,7 @@ class _TestsPageState extends State<TestsPage> {
                               questionCount: int.tryParse(_questionCount.text.trim()) ?? 180,
                               scheduleLabel: _schedule.text.trim(),
                             );
+                            setState(() => _status = 'Test added successfully');
                           } else {
                             await widget.api.updateTest(
                               id: _editingId!,
@@ -1223,11 +1225,16 @@ class _TestsPageState extends State<TestsPage> {
                               topic: _topic.text.trim(),
                             );
                             _editingId = null;
+                            setState(() => _status = 'Test updated successfully');
                           }
                           await _load();
                         },
                   child: Text(_editingId == null ? 'Add Test' : 'Update Test'),
                 ),
+                if (_status != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_status!),
+                ],
                 const SizedBox(height: 10),
                 const Divider(),
                 const Align(
@@ -1293,6 +1300,7 @@ class _TestsPageState extends State<TestsPage> {
                             explanation: _testExplanation.text.trim(),
                             subject: _subject.text.trim(),
                           );
+                          setState(() => _status = 'Question added');
                         },
                   child: const Text('Add Question'),
                 ),
@@ -1308,6 +1316,37 @@ class _TestsPageState extends State<TestsPage> {
               trailing: Wrap(
                 spacing: 4,
                 children: [
+                  IconButton(
+                    tooltip: 'View questions',
+                    onPressed: () async {
+                      final id = e['id'] as int;
+                      final qs = await widget.api.testQuestions(id);
+                      if (!context.mounted) return;
+                      showModalBottomSheet(
+                        context: context,
+                        showDragHandle: true,
+                        builder: (_) => SafeArea(
+                          child: ListView(
+                            padding: const EdgeInsets.all(16),
+                            children: [
+                              Text('Questions', style: Theme.of(context).textTheme.titleLarge),
+                              const SizedBox(height: 12),
+                              if (qs.isEmpty)
+                                const Text('No questions yet')
+                              else
+                                ...qs.map(
+                                  (q) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Text('• ${q['question'] ?? ''}'),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.list_alt_outlined),
+                  ),
                   IconButton(
                     onPressed: () {
                       setState(() {
@@ -1350,6 +1389,7 @@ class _VideosPageState extends State<VideosPage> {
   final _subject = TextEditingController(text: 'Biology');
   final _topic = TextEditingController();
   File? _video;
+  final _driveLink = TextEditingController();
   int? _batchId;
   int? _editingId;
   List<dynamic> _batches = const [];
@@ -1398,6 +1438,13 @@ class _VideosPageState extends State<VideosPage> {
                 const SizedBox(height: 8),
                 TextField(controller: _topic, decoration: const InputDecoration(labelText: 'Topic')),
                 const SizedBox(height: 8),
+                TextField(
+                  controller: _driveLink,
+                  decoration: const InputDecoration(
+                    labelText: 'Or paste Google Drive video link (recommended)',
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(child: Text(_video == null ? 'No file selected' : _video!.path)),
@@ -1422,26 +1469,38 @@ class _VideosPageState extends State<VideosPage> {
                           });
                           try {
                             if (_editingId == null) {
-                              if (_video == null) {
-                                throw Exception('Please pick a video file first');
-                              }
                               if (_title.text.trim().isEmpty) {
                                 throw Exception('Video title is required');
                               }
-                              await widget.api.uploadVideo(
-                                batchId: _batchId!,
-                                classLabel: _classLabel.text.trim(),
-                                title: _title.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: _topic.text.trim(),
-                                file: _video!,
-                                chapterHint: _topic.text.trim(),
-                                sectionLabel: 'Concept explainers',
-                                durationLabel: '15 min',
-                              );
+                              if (_driveLink.text.trim().isNotEmpty) {
+                                await widget.api.addVideoByLink(
+                                  batchId: _batchId!,
+                                  classLabel: _classLabel.text.trim(),
+                                  title: _title.text.trim(),
+                                  subject: _subject.text.trim(),
+                                  topic: _topic.text.trim(),
+                                  driveLink: _driveLink.text.trim(),
+                                );
+                              } else {
+                                if (_video == null) {
+                                  throw Exception('Pick a video OR paste a Drive link');
+                                }
+                                await widget.api.uploadVideo(
+                                  batchId: _batchId!,
+                                  classLabel: _classLabel.text.trim(),
+                                  title: _title.text.trim(),
+                                  subject: _subject.text.trim(),
+                                  topic: _topic.text.trim(),
+                                  file: _video!,
+                                  chapterHint: _topic.text.trim(),
+                                  sectionLabel: 'Concept explainers',
+                                  durationLabel: '15 min',
+                                );
+                              }
                               _video = null;
                               _title.clear();
                               _topic.clear();
+                              _driveLink.clear();
                               setState(() => _status = 'Video uploaded successfully');
                             } else {
                               await widget.api.updateVideo(
@@ -1877,6 +1936,9 @@ class AdminApi {
     });
   }
 
+  Future<List<dynamic>> testQuestions(int testId) async =>
+      (await _get('/admin/tests/$testId/questions'))['questions'] as List<dynamic>;
+
   Future<void> addPyq({
     required int chapterId,
     required String question,
@@ -1931,6 +1993,27 @@ class AdminApi {
     if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
       throw Exception(await streamed.stream.bytesToString());
     }
+  }
+
+  Future<void> addVideoByLink({
+    required int batchId,
+    required String classLabel,
+    required String title,
+    required String subject,
+    required String topic,
+    required String driveLink,
+  }) async {
+    await _post('/admin/videos', {
+      'batchId': batchId,
+      'classLabel': classLabel,
+      'title': title,
+      'subject': subject,
+      'topic': topic,
+      'chapterHint': topic,
+      'sectionLabel': 'Concept explainers',
+      'durationLabel': '15 min',
+      'driveLink': driveLink,
+    });
   }
 
   Future<void> updateVideo({

@@ -105,9 +105,10 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                                 if (bookId == null) return;
                                 final chapters =
                                     await ContentRepository().fetchChapters(bookId);
-                                if (!mounted) return;
+                                if (!context.mounted) return;
+                                final messenger = ScaffoldMessenger.of(context);
                                 if (chapters.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  messenger.showSnackBar(
                                     const SnackBar(
                                       content: Text('No chapters available for this book.'),
                                     ),
@@ -118,6 +119,7 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                                   chapters.first['id']?.toString() ?? '',
                                 );
                                 if (chapterId == null) return;
+                                if (!context.mounted) return;
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) =>
@@ -298,17 +300,7 @@ class ChapterDetailScreen extends ConsumerWidget {
                               'High-yield mistakes to avoid',
                             ],
                           ),
-                          _DetailPanel(
-                            title: 'PYQ links',
-                            content: pyqs.isEmpty
-                                ? 'No PYQs added yet.'
-                                : pyqs.map((e) => e['question']).take(4).join('\n\n'),
-                            bullets: const [
-                              'Last 10-year NEET-style patterns',
-                              'Topic-weight hints',
-                              'Mark questions for revision',
-                            ],
-                          ),
+                          _PyqSolvePanel(pyqs: pyqs),
                           _DetailPanel(
                             title: 'Important lines',
                             content: chapter['highlight']?.toString() ?? '',
@@ -329,6 +321,118 @@ class ChapterDetailScreen extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _PyqSolvePanel extends StatefulWidget {
+  const _PyqSolvePanel({required this.pyqs});
+
+  final List<Map<String, dynamic>> pyqs;
+
+  @override
+  State<_PyqSolvePanel> createState() => _PyqSolvePanelState();
+}
+
+class _PyqSolvePanelState extends State<_PyqSolvePanel> {
+  final Map<int, String> _selected = {};
+  final Set<int> _revealed = {};
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.pyqs.isEmpty) {
+      return const _DetailPanel(
+        title: 'PYQs',
+        content: 'No PYQs added yet.',
+        bullets: ['Admin panel se PYQs add hone ke baad yahan solve kar sakte ho.'],
+      );
+    }
+    return SurfaceCard(
+      child: ListView.builder(
+        itemCount: widget.pyqs.length,
+        itemBuilder: (context, index) {
+          final q = widget.pyqs[index];
+          final correct = (q['correct_option']?.toString() ?? 'A').toUpperCase();
+          final opts = {
+            'A': q['option_a']?.toString() ?? '',
+            'B': q['option_b']?.toString() ?? '',
+            'C': q['option_c']?.toString() ?? '',
+            'D': q['option_d']?.toString() ?? '',
+          };
+          final selected = _selected[index];
+          final revealed = _revealed.contains(index);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Q${index + 1}. ${q['question'] ?? ''}',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: AppSpacing.sm),
+                ...opts.entries.map((e) {
+                  final isSel = selected == e.key;
+                  final isCorrect = revealed && e.key == correct;
+                  final isWrong = revealed && isSel && e.key != correct;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: InkWell(
+                      onTap: () => setState(() => _selected[index] = e.key),
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: isCorrect
+                              ? const Color(0xFFE7F8EF)
+                              : isWrong
+                                  ? const Color(0xFFFCEAEA)
+                                  : isSel
+                                      ? AppColors.indigoSoft
+                                      : Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                          border: Border.all(
+                            color: isCorrect
+                                ? AppColors.success
+                                : isWrong
+                                    ? AppColors.danger
+                                    : isSel
+                                        ? AppColors.indigo
+                                        : AppColors.border,
+                          ),
+                        ),
+                        child: Text('${e.key}) ${e.value}'),
+                      ),
+                    ),
+                  );
+                }),
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    Expanded(
+                      child: PrimaryButton(
+                        label: revealed ? 'Hide answer' : 'Check answer',
+                        onPressed: () => setState(() {
+                          if (revealed) {
+                            _revealed.remove(index);
+                          } else {
+                            _revealed.add(index);
+                          }
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
+                if (revealed) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Explanation: ${q['explanation'] ?? ''}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
