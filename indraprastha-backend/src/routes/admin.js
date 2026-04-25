@@ -4,7 +4,7 @@ const multer = require('multer');
 const bcrypt = require('bcryptjs');
 
 const { pool } = require('../db');
-const { uploadBufferToDrive } = require('../services/drive');
+const { uploadBufferToDrive, ensureDriveFolderPath } = require('../services/drive');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -438,13 +438,6 @@ router.post('/videos/upload', adminAuth, upload.single('video'), async (req, res
       return res.status(400).json({ error: 'Video file is required' });
     }
 
-    const uploaded = await uploadBufferToDrive({
-      fileBuffer: req.file.buffer,
-      fileName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      folderId: process.env.GDRIVE_FOLDER_ID,
-    });
-
     const {
       title,
       subject,
@@ -455,6 +448,25 @@ router.post('/videos/upload', adminAuth, upload.single('video'), async (req, res
       durationLabel,
     } = req.body;
     const { batchId } = hierarchyFromBody(req.body);
+    const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [batchId]);
+    const batchName = batchRes.rows[0]?.name || `Batch-${batchId}`;
+    const folderSegments = [
+      batchName,
+      classLabel || 'General',
+      subject || 'General',
+      topic || chapterHint || 'General',
+    ];
+    const resolvedFolderId = await ensureDriveFolderPath({
+      rootFolderId: process.env.GDRIVE_FOLDER_ID,
+      segments: folderSegments,
+    });
+
+    const uploaded = await uploadBufferToDrive({
+      fileBuffer: req.file.buffer,
+      fileName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      folderId: resolvedFolderId,
+    });
     const dbResult = await pool.query(
       `INSERT INTO videos (
         batch_id, class_label, title, subject, topic, chapter_hint, section_label, duration_label, drive_link
@@ -476,6 +488,10 @@ router.post('/videos/upload', adminAuth, upload.single('video'), async (req, res
       success: true,
       video: dbResult.rows[0],
       drive: uploaded,
+      driveFolder: {
+        id: resolvedFolderId,
+        path: folderSegments,
+      },
     });
   } catch (error) {
     return res.status(500).json({

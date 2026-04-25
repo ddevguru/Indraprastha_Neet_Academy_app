@@ -55,6 +55,63 @@ async function uploadBufferToDrive({
   };
 }
 
+function safeFolderName(value) {
+  return (value || 'Unknown')
+    .toString()
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/\s+/g, ' ');
+}
+
+async function ensureChildFolder(drive, parentId, folderName) {
+  const name = safeFolderName(folderName);
+  const escapedName = name.replace(/'/g, "\\'");
+  const qParts = [
+    "mimeType = 'application/vnd.google-apps.folder'",
+    `name = '${escapedName}'`,
+    'trashed = false',
+  ];
+  if (parentId) {
+    qParts.push(`'${parentId}' in parents`);
+  } else {
+    qParts.push("'root' in parents");
+  }
+
+  const existing = await drive.files.list({
+    q: qParts.join(' and '),
+    fields: 'files(id,name)',
+    pageSize: 1,
+  });
+
+  if (existing.data.files && existing.data.files.length > 0) {
+    return existing.data.files[0].id;
+  }
+
+  const created = await drive.files.create({
+    requestBody: {
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: parentId ? [parentId] : undefined,
+    },
+    fields: 'id',
+  });
+
+  return created.data.id;
+}
+
+async function ensureDriveFolderPath({
+  rootFolderId,
+  segments,
+}) {
+  const drive = createDriveClient();
+  let current = rootFolderId || null;
+  for (const segment of segments) {
+    current = await ensureChildFolder(drive, current, segment);
+  }
+  return current;
+}
+
 module.exports = {
   uploadBufferToDrive,
+  ensureDriveFolderPath,
 };
