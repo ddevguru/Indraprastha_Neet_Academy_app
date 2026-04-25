@@ -191,6 +191,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
   int _index = 0;
   int _timeLeft = 0;
   bool _submitted = false;
+  bool _submitting = false;
   final Map<int, String> _answers = {};
   late final Future<Map<String, dynamic>> _attemptFuture;
   Timer? _timer;
@@ -246,6 +247,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
           );
         }
         final q = questions[_index.clamp(0, questions.length - 1)];
+        final selected = _answers[_index];
         final options = <String, String>{
           'A': q['option_a']?.toString() ?? '',
           'B': q['option_b']?.toString() ?? '',
@@ -287,9 +289,31 @@ class _TestResultScreenState extends State<TestResultScreen> {
                           onPressed: _submitted
                               ? null
                               : () => setState(() => _answers[_index] = e.key),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(52),
+                            backgroundColor: selected == e.key
+                                ? AppColors.indigoSoft
+                                : Theme.of(context).cardColor,
+                            side: BorderSide(
+                              color: selected == e.key
+                                  ? AppColors.indigo
+                                  : AppColors.border,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                            ),
+                          ),
                           child: Align(
                             alignment: Alignment.centerLeft,
-                            child: Text('${e.key}) ${e.value}'),
+                            child: Text(
+                              '${e.key}) ${e.value}',
+                              style: TextStyle(
+                                fontWeight: selected == e.key
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -307,11 +331,14 @@ class _TestResultScreenState extends State<TestResultScreen> {
                         Expanded(
                           child: PrimaryButton(
                             label: _index == questions.length - 1 ? 'Submit test' : 'Next',
-                            onPressed: () async {
+                            onPressed: _submitting
+                                ? null
+                                : () async {
                               if (_index < questions.length - 1) {
                                 setState(() => _index++);
                                 return;
                               }
+                              setState(() => _submitting = true);
                               int correct = 0;
                               for (var i = 0; i < questions.length; i++) {
                                 final marked = _answers[i];
@@ -328,24 +355,36 @@ class _TestResultScreenState extends State<TestResultScreen> {
                               final accuracy = _answers.isEmpty
                                   ? 0.0
                                   : (correct / _answers.length) * 100;
-                              await ContentRepository().submitTestAttempt(
-                                testId: widget.testId,
-                                score: score,
-                                accuracy: accuracy,
-                                correctCount: correct,
-                                wrongCount: wrong,
-                                unattemptedCount: unattempted,
-                              );
-                              if (!mounted) return;
-                              setState(() => _submitted = true);
-                              final messenger = ScaffoldMessenger.of(context);
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Submitted: Score $score/$marks | Correct $correct',
+                              try {
+                                await ContentRepository().submitTestAttempt(
+                                  testId: widget.testId,
+                                  score: score,
+                                  accuracy: accuracy,
+                                  correctCount: correct,
+                                  wrongCount: wrong,
+                                  unattemptedCount: unattempted,
+                                );
+                                if (!mounted) return;
+                                final messenger = ScaffoldMessenger.of(context);
+                                setState(() => _submitted = true);
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Submitted: Score $score/$marks | Correct $correct',
+                                    ),
                                   ),
-                                ),
-                              );
+                                );
+                              } catch (e) {
+                                if (!mounted) return;
+                                final messenger = ScaffoldMessenger.of(context);
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text('Submit failed: $e'),
+                                  ),
+                                );
+                              } finally {
+                                if (mounted) setState(() => _submitting = false);
+                              }
                             },
                           ),
                         ),

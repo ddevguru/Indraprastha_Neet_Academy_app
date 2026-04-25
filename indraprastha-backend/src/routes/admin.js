@@ -3,12 +3,24 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const pdfParse = require('pdf-parse');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const crypto = require('crypto');
 
 const { pool } = require('../db');
-const { uploadBufferToDrive, ensureDriveFolderPath } = require('../services/drive');
+const { uploadBufferToDrive, uploadFilePathToDrive, ensureDriveFolderPath } = require('../services/drive');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+const UPLOAD_ROOT = path.join(os.tmpdir(), 'indra_uploads');
+function ensureUploadRoot() {
+  try {
+    fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
+  } catch (_) {}
+}
+ensureUploadRoot();
 
 function adminAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
@@ -382,6 +394,166 @@ router.post(
   }
 );
 
+// Chunked PDF upload (Render-safe) -> Drive + extract + book_chapters insert
+router.post('/books/pdf-upload-init', adminAuth, async (req, res) => {
+  try {
+    const { batchId, classLabel, subject, chapterTitle, fileName, mimeType } = req.body;
+    if (!batchId || !classLabel || !subject || !chapterTitle || !fileName) {
+      return res.status(400).json({
+        error: 'batchId, classLabel, subject, chapterTitle, fileName are required',
+      });
+    }
+    const uploadId = crypto.randomUUID();
+    const dir = path.join(UPLOAD_ROOT, uploadId);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'meta.json'),
+      JSON.stringify(
+        {
+          uploadId,
+          kind: 'pdf',
+          batchId,
+          classLabel,
+          subject,
+          chapterTitle,
+          fileName,
+          mimeType: mimeType || 'application/pdf',
+          createdAt: Date.now(),
+        },
+        null,
+        2
+      )
+    );
+    return res.json({ success: true, uploadId, chunkSize: 512 * 1024 });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'init failed' });
+  }
+});
+
+router.post('/books/pdf-upload-chunk', adminAuth, upload.single('chunk'), async (req, res) => {
+  try {
+    const { uploadId, index, totalChunks } = req.body;
+    if (!uploadId || index === undefined || !req.file) {
+      return res.status(400).json({ error: 'uploadId, index, chunk are required' });
+    }
+    const dir = path.join(UPLOAD_ROOT, uploadId);
+    if (!fs.existsSync(dir)) {
+      return res.status(404).json({ error: 'upload session not found' });
+    }
+    const idx = Number(index);
+    if (!Number.isFinite(idx) || idx < 0) {
+      return res.status(400).json({ error: 'invalid index' });
+    }
+    fs.writeFileSync(path.join(dir, `chunk_${idx}.bin`), req.file.buffer);
+    if (totalChunks !== undefined) {
+      fs.writeFileSync(path.join(dir, 'total.txt'), String(totalChunks));
+    }
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'chunk failed' });
+  }
+});
+
+router.post('/books/pdf-upload-complete', adminAuth, async (req, res) => {
+  try {
+    const { uploadId } = req.body;
+    if (!uploadId) {
+      return res.status(400).json({ error: 'uploadId is required' });
+    }
+    const dir = path.join(UPLOAD_ROOT, uploadId);
+    const metaPath = path.join(dir, 'meta.json');
+    if (!fs.existsSync(metaPath)) {
+      return res.status(404).json({ error: 'upload session not found' });
+    }
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    const chunks = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('chunk_') && f.endsWith('.bin'))
+      .sort((a, b) => {
+        const ai = Number(a.replace('chunk_', '').replace('.bin', ''));
+        const bi = Number(b.replace('chunk_', '').replace('.bin', ''));
+        return ai - bi;
+      });
+    if (chunks.length === 0) {
+      return res.status(400).json({ error: 'no chunks uploaded' });
+    }
+    const assembledPath = path.join(dir, meta.fileName);
+    const out = fs.createWriteStream(assembledPath);
+    for (const f of chunks) {
+      out.write(fs.readFileSync(path.join(dir, f)));
+    }
+    await new Promise((resolve) => out.end(resolve));
+
+    const existingBook = await pool.query(
+      `SELECT id
+       FROM books
+       WHERE batch_id = $1 AND class_label = $2 AND subject = $3
+       LIMIT 1`,
+      [meta.batchId, meta.classLabel, meta.subject]
+    );
+    let bookId = existingBook.rows[0]?.id;
+    if (!bookId) {
+      const createdBook = await pool.query(
+        `INSERT INTO books (batch_id, class_label, title, subject, topic, level, category)
+         VALUES ($1,$2,$3,$4,$5,'Core','NCERT books')
+         RETURNING id`,
+        [meta.batchId, meta.classLabel, `${meta.subject} Master Book`, meta.subject, meta.chapterTitle]
+      );
+      bookId = createdBook.rows[0].id;
+    }
+
+    const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [meta.batchId]);
+    const batchName = batchRes.rows[0]?.name || `Batch-${meta.batchId}`;
+    const resolvedFolderId = await ensureDriveFolderPath({
+      rootFolderId: process.env.GDRIVE_FOLDER_ID,
+      segments: [batchName, meta.classLabel, meta.subject, meta.chapterTitle],
+    });
+
+    const uploaded = await uploadFilePathToDrive({
+      filePath: assembledPath,
+      fileName: meta.fileName,
+      mimeType: meta.mimeType || 'application/pdf',
+      folderId: resolvedFolderId,
+    });
+
+    const pdfBuffer = fs.readFileSync(assembledPath);
+    const extracted = await extractPdfBasics(pdfBuffer);
+
+    const chapter = await pool.query(
+      `INSERT INTO book_chapters (
+        book_id, title, overview, note_summary, highlight, material_type, material_drive_link
+       ) VALUES ($1,$2,$3,$4,$5,'pdf',$6)
+       RETURNING *`,
+      [
+        bookId,
+        meta.chapterTitle,
+        'Imported from PDF',
+        extracted.noteSummary,
+        extracted.highlight,
+        uploaded.webViewLink || uploaded.webContentLink,
+      ]
+    );
+
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      bookId,
+      chapter: chapter.rows[0],
+      drive: uploaded,
+      driveFolder: {
+        id: resolvedFolderId,
+        path: [batchName, meta.classLabel, meta.subject, meta.chapterTitle],
+      },
+      extracted,
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'complete failed' });
+  }
+});
+
 router.post(
   '/books/:bookId/chapters/upload-pdf',
   adminAuth,
@@ -733,6 +905,162 @@ router.post('/videos/upload', adminAuth, upload.single('video'), async (req, res
     return res.status(500).json({
       error: error.message || 'Upload failed',
     });
+  }
+});
+
+// Chunked upload (Render-safe) for direct video upload
+router.post('/videos/upload-init', adminAuth, async (req, res) => {
+  try {
+    const {
+      title,
+      subject,
+      topic,
+      classLabel,
+      chapterHint,
+      sectionLabel,
+      durationLabel,
+      fileName,
+      mimeType,
+    } = req.body;
+    const { batchId } = hierarchyFromBody(req.body);
+    if (!batchId || !title || !fileName) {
+      return res.status(400).json({ error: 'batchId, title, fileName are required' });
+    }
+    const uploadId = crypto.randomUUID();
+    const dir = path.join(UPLOAD_ROOT, uploadId);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'meta.json'),
+      JSON.stringify(
+        {
+          uploadId,
+          batchId,
+          title,
+          subject: subject || '',
+          topic: topic || '',
+          classLabel: classLabel || '',
+          chapterHint: chapterHint || '',
+          sectionLabel: sectionLabel || 'Concept explainers',
+          durationLabel: durationLabel || '15 min',
+          fileName,
+          mimeType: mimeType || 'video/mp4',
+          createdAt: Date.now(),
+        },
+        null,
+        2
+      )
+    );
+    return res.json({ success: true, uploadId, chunkSize: 2 * 1024 * 1024 });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'init failed' });
+  }
+});
+
+router.post('/videos/upload-chunk', adminAuth, upload.single('chunk'), async (req, res) => {
+  try {
+    const { uploadId, index, totalChunks } = req.body;
+    if (!uploadId || index === undefined || !req.file) {
+      return res.status(400).json({ error: 'uploadId, index, chunk are required' });
+    }
+    const dir = path.join(UPLOAD_ROOT, uploadId);
+    if (!fs.existsSync(dir)) {
+      return res.status(404).json({ error: 'upload session not found' });
+    }
+    const idx = Number(index);
+    if (!Number.isFinite(idx) || idx < 0) {
+      return res.status(400).json({ error: 'invalid index' });
+    }
+    fs.writeFileSync(path.join(dir, `chunk_${idx}.bin`), req.file.buffer);
+    if (totalChunks !== undefined) {
+      fs.writeFileSync(path.join(dir, 'total.txt'), String(totalChunks));
+    }
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'chunk failed' });
+  }
+});
+
+router.post('/videos/upload-complete', adminAuth, async (req, res) => {
+  try {
+    const { uploadId } = req.body;
+    if (!uploadId) {
+      return res.status(400).json({ error: 'uploadId is required' });
+    }
+    const dir = path.join(UPLOAD_ROOT, uploadId);
+    const metaPath = path.join(dir, 'meta.json');
+    if (!fs.existsSync(metaPath)) {
+      return res.status(404).json({ error: 'upload session not found' });
+    }
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    const chunks = fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith('chunk_') && f.endsWith('.bin'))
+      .sort((a, b) => {
+        const ai = Number(a.replace('chunk_', '').replace('.bin', ''));
+        const bi = Number(b.replace('chunk_', '').replace('.bin', ''));
+        return ai - bi;
+      });
+    if (chunks.length === 0) {
+      return res.status(400).json({ error: 'no chunks uploaded' });
+    }
+    const assembledPath = path.join(dir, meta.fileName);
+    const out = fs.createWriteStream(assembledPath);
+    for (const f of chunks) {
+      const p = path.join(dir, f);
+      out.write(fs.readFileSync(p));
+    }
+    await new Promise((resolve) => out.end(resolve));
+
+    const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [meta.batchId]);
+    const batchName = batchRes.rows[0]?.name || `Batch-${meta.batchId}`;
+    const folderSegments = [
+      batchName,
+      meta.classLabel || 'General',
+      meta.subject || 'General',
+      meta.topic || meta.chapterHint || 'General',
+    ];
+    const resolvedFolderId = await ensureDriveFolderPath({
+      rootFolderId: process.env.GDRIVE_FOLDER_ID,
+      segments: folderSegments,
+    });
+
+    const uploaded = await uploadFilePathToDrive({
+      filePath: assembledPath,
+      fileName: meta.fileName,
+      mimeType: meta.mimeType || 'video/mp4',
+      folderId: resolvedFolderId,
+    });
+
+    const dbResult = await pool.query(
+      `INSERT INTO videos (
+        batch_id, class_label, title, subject, topic, chapter_hint, section_label, duration_label, drive_link
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [
+        meta.batchId,
+        meta.classLabel || null,
+        meta.title,
+        meta.subject || '',
+        meta.topic || '',
+        meta.chapterHint || '',
+        meta.sectionLabel || 'Concept explainers',
+        meta.durationLabel || '15 min',
+        uploaded.webViewLink || uploaded.webContentLink,
+      ]
+    );
+
+    // cleanup
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      video: dbResult.rows[0],
+      drive: uploaded,
+      driveFolder: { id: resolvedFolderId, path: folderSegments },
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'complete failed' });
   }
 });
 

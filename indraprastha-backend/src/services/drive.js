@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const fs = require('fs');
 
 function createDriveClient() {
   const clientEmail = process.env.GDRIVE_CLIENT_EMAIL;
@@ -33,6 +34,43 @@ async function uploadBufferToDrive({
     media: {
       mimeType,
       body: Buffer.from(fileBuffer),
+    },
+    fields: 'id,webViewLink,webContentLink',
+  });
+
+  const fileId = response.data.id;
+  await drive.permissions.create({
+    fileId,
+    requestBody: { role: 'reader', type: 'anyone' },
+  });
+
+  const meta = await drive.files.get({
+    fileId,
+    fields: 'id,webViewLink,webContentLink',
+  });
+
+  return {
+    fileId: meta.data.id,
+    webViewLink: meta.data.webViewLink,
+    webContentLink: meta.data.webContentLink,
+  };
+}
+
+async function uploadFilePathToDrive({
+  filePath,
+  fileName,
+  mimeType,
+  folderId,
+}) {
+  const drive = createDriveClient();
+  const response = await drive.files.create({
+    requestBody: {
+      name: fileName,
+      parents: folderId ? [folderId] : undefined,
+    },
+    media: {
+      mimeType,
+      body: fs.createReadStream(filePath),
     },
     fields: 'id,webViewLink,webContentLink',
   });
@@ -124,5 +162,6 @@ async function ensureDriveFolderPath({
 
 module.exports = {
   uploadBufferToDrive,
+  uploadFilePathToDrive,
   ensureDriveFolderPath,
 };

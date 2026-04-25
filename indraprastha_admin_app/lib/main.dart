@@ -643,6 +643,8 @@ class _BooksPageState extends State<BooksPage> {
   List<dynamic> _chapters = const [];
   File? _pdf;
   String? _status;
+  double _pdfProgress = 0.0;
+  bool _pdfUploading = false;
 
   @override
   void initState() {
@@ -802,21 +804,41 @@ class _BooksPageState extends State<BooksPage> {
                 ),
                 const SizedBox(height: 8),
                 FilledButton.tonal(
-                  onPressed: (_pdf == null || _batchId == null)
+                  onPressed: (_pdf == null || _batchId == null || _pdfUploading)
                       ? null
                       : () async {
-                          await widget.api.uploadBookByHierarchy(
-                            batchId: _batchId!,
-                            classLabel: _classLabel.text.trim(),
-                            subject: _subject.text.trim(),
-                            chapterTitle: _chapter.text.trim(),
-                            pdfFile: _pdf!,
-                          );
-                          await _loadBatches();
-                          setState(() => _status = 'PDF uploaded');
+                          try {
+                            setState(() {
+                              _pdfUploading = true;
+                              _pdfProgress = 0.0;
+                              _status = null;
+                            });
+                            await widget.api.uploadBookByHierarchyChunked(
+                              batchId: _batchId!,
+                              classLabel: _classLabel.text.trim(),
+                              subject: _subject.text.trim(),
+                              chapterTitle: _chapter.text.trim().isEmpty
+                                  ? 'Introduction'
+                                  : _chapter.text.trim(),
+                              pdfFile: _pdf!,
+                              onProgress: (p) {
+                                if (mounted) setState(() => _pdfProgress = p);
+                              },
+                            );
+                            await _loadBatches();
+                            setState(() => _status = 'PDF uploaded to Drive successfully');
+                          } catch (e) {
+                            setState(() => _status = 'PDF upload failed: $e');
+                          } finally {
+                            if (mounted) setState(() => _pdfUploading = false);
+                          }
                         },
                   child: const Text('Upload Chapter PDF'),
                 ),
+                if (_pdfUploading) ...[
+                  const SizedBox(height: 10),
+                  LinearProgressIndicator(value: _pdfProgress == 0 ? null : _pdfProgress),
+                ],
                 const SizedBox(height: 10),
                 const Divider(),
                 const Align(
@@ -1389,7 +1411,7 @@ class _VideosPageState extends State<VideosPage> {
   final _subject = TextEditingController(text: 'Biology');
   final _topic = TextEditingController();
   File? _video;
-  final _driveLink = TextEditingController();
+  double _progress = 0.0;
   int? _batchId;
   int? _editingId;
   List<dynamic> _batches = const [];
@@ -1438,13 +1460,6 @@ class _VideosPageState extends State<VideosPage> {
                 const SizedBox(height: 8),
                 TextField(controller: _topic, decoration: const InputDecoration(labelText: 'Topic')),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _driveLink,
-                  decoration: const InputDecoration(
-                    labelText: 'Or paste Google Drive video link (recommended)',
-                  ),
-                ),
-                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(child: Text(_video == null ? 'No file selected' : _video!.path)),
@@ -1472,35 +1487,24 @@ class _VideosPageState extends State<VideosPage> {
                               if (_title.text.trim().isEmpty) {
                                 throw Exception('Video title is required');
                               }
-                              if (_driveLink.text.trim().isNotEmpty) {
-                                await widget.api.addVideoByLink(
-                                  batchId: _batchId!,
-                                  classLabel: _classLabel.text.trim(),
-                                  title: _title.text.trim(),
-                                  subject: _subject.text.trim(),
-                                  topic: _topic.text.trim(),
-                                  driveLink: _driveLink.text.trim(),
-                                );
-                              } else {
-                                if (_video == null) {
-                                  throw Exception('Pick a video OR paste a Drive link');
-                                }
-                                await widget.api.uploadVideo(
-                                  batchId: _batchId!,
-                                  classLabel: _classLabel.text.trim(),
-                                  title: _title.text.trim(),
-                                  subject: _subject.text.trim(),
-                                  topic: _topic.text.trim(),
-                                  file: _video!,
-                                  chapterHint: _topic.text.trim(),
-                                  sectionLabel: 'Concept explainers',
-                                  durationLabel: '15 min',
-                                );
+                              if (_video == null) {
+                                throw Exception('Pick a video file first');
                               }
+                              await widget.api.uploadVideoChunked(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                title: _title.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _topic.text.trim(),
+                                file: _video!,
+                                onProgress: (p) {
+                                  if (mounted) setState(() => _progress = p);
+                                },
+                              );
                               _video = null;
                               _title.clear();
                               _topic.clear();
-                              _driveLink.clear();
+                              setState(() => _progress = 0.0);
                               setState(() => _status = 'Video uploaded successfully');
                             } else {
                               await widget.api.updateVideo(
@@ -1528,6 +1532,10 @@ class _VideosPageState extends State<VideosPage> {
                         : (_editingId == null ? 'Upload Video' : 'Update Video'),
                   ),
                 ),
+                if (_uploading) ...[
+                  const SizedBox(height: 10),
+                  LinearProgressIndicator(value: _progress == 0 ? null : _progress),
+                ],
                 if (_status != null) ...[
                   const SizedBox(height: 8),
                   Text(_status!),
@@ -1756,31 +1764,64 @@ class AdminApi {
     await _post('/admin/subjects', {'classId': classId, 'name': name});
   }
 
-  Future<void> uploadBookByHierarchy({
+  Future<void> uploadBookByHierarchyChunked({
     required int batchId,
     required String classLabel,
     required String subject,
     required String chapterTitle,
     required File pdfFile,
+    required void Function(double progress) onProgress,
   }) async {
     if (token == null) throw Exception('Login first');
-    final req = http.MultipartRequest(
-      'POST',
-      Uri.parse('$baseUrl/admin/books/upload-by-hierarchy'),
-    );
-    req.headers['Authorization'] = 'Bearer $token';
-    req.fields['batchId'] = '$batchId';
-    req.fields['classLabel'] = classLabel;
-    req.fields['subject'] = subject;
-    req.fields['chapterTitle'] = chapterTitle;
-    final pdfBytes = await pdfFile.readAsBytes();
-    final pdfName = pdfFile.path.split(Platform.pathSeparator).last;
-    req.files.add(http.MultipartFile.fromBytes('pdf', pdfBytes, filename: pdfName));
-    final streamed = await req.send();
-    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
-      final payload = await streamed.stream.bytesToString();
-      throw Exception('Upload failed: $payload');
+    final fileName = pdfFile.path.split(Platform.pathSeparator).last;
+    final init = await _postMap('/admin/books/pdf-upload-init', {
+      'batchId': batchId,
+      'classLabel': classLabel,
+      'subject': subject,
+      'chapterTitle': chapterTitle,
+      'fileName': fileName,
+      'mimeType': 'application/pdf',
+    });
+    final uploadId = init['uploadId']?.toString();
+    final chunkSize = (init['chunkSize'] as num?)?.toInt() ?? (512 * 1024);
+    if (uploadId == null || uploadId.isEmpty) {
+      throw Exception('PDF upload init failed');
     }
+
+    final totalBytes = await pdfFile.length();
+    final totalChunks = (totalBytes / chunkSize).ceil();
+    var sent = 0;
+
+    final raf = await pdfFile.open();
+    try {
+      for (var i = 0; i < totalChunks; i++) {
+        final remaining = totalBytes - (i * chunkSize);
+        final size = remaining >= chunkSize ? chunkSize : remaining;
+        final bytes = await raf.read(size);
+
+        final req = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/admin/books/pdf-upload-chunk'),
+        );
+        req.headers['Authorization'] = 'Bearer $token';
+        req.fields['uploadId'] = uploadId;
+        req.fields['index'] = '$i';
+        req.fields['totalChunks'] = '$totalChunks';
+        req.files.add(http.MultipartFile.fromBytes('chunk', bytes, filename: 'chunk_$i.bin'));
+        final streamed = await req.send();
+        if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+          final payload = await streamed.stream.bytesToString();
+          throw Exception('PDF chunk upload failed: $payload');
+        }
+
+        sent += bytes.length;
+        onProgress(sent / totalBytes);
+      }
+    } finally {
+      await raf.close();
+    }
+
+    await _post('/admin/books/pdf-upload-complete', {'uploadId': uploadId});
   }
 
   Future<int> addBook({
@@ -1995,15 +2036,19 @@ class AdminApi {
     }
   }
 
-  Future<void> addVideoByLink({
+  Future<void> uploadVideoChunked({
     required int batchId,
     required String classLabel,
     required String title,
     required String subject,
     required String topic,
-    required String driveLink,
+    required File file,
+    required void Function(double progress) onProgress,
   }) async {
-    await _post('/admin/videos', {
+    if (token == null) throw Exception('Login first');
+
+    final fileName = file.path.split(Platform.pathSeparator).last;
+    final init = await _postMap('/admin/videos/upload-init', {
       'batchId': batchId,
       'classLabel': classLabel,
       'title': title,
@@ -2012,8 +2057,50 @@ class AdminApi {
       'chapterHint': topic,
       'sectionLabel': 'Concept explainers',
       'durationLabel': '15 min',
-      'driveLink': driveLink,
+      'fileName': fileName,
+      'mimeType': 'video/mp4',
     });
+    final uploadId = init['uploadId']?.toString();
+    final chunkSize = (init['chunkSize'] as num?)?.toInt() ?? (2 * 1024 * 1024);
+    if (uploadId == null || uploadId.isEmpty) {
+      throw Exception('Upload init failed');
+    }
+
+    final totalBytes = await file.length();
+    final totalChunks = (totalBytes / chunkSize).ceil();
+    var sent = 0;
+
+    final raf = await file.open();
+    try {
+      for (var i = 0; i < totalChunks; i++) {
+        final remaining = totalBytes - (i * chunkSize);
+        final size = remaining >= chunkSize ? chunkSize : remaining;
+        final bytes = await raf.read(size);
+
+        final req = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/admin/videos/upload-chunk'),
+        );
+        req.headers['Authorization'] = 'Bearer $token';
+        req.fields['uploadId'] = uploadId;
+        req.fields['index'] = '$i';
+        req.fields['totalChunks'] = '$totalChunks';
+        req.files.add(http.MultipartFile.fromBytes('chunk', bytes, filename: 'chunk_$i.bin'));
+
+        final streamed = await req.send();
+        if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+          final payload = await streamed.stream.bytesToString();
+          throw Exception('Chunk upload failed: $payload');
+        }
+
+        sent += bytes.length;
+        onProgress(sent / totalBytes);
+      }
+    } finally {
+      await raf.close();
+    }
+
+    await _post('/admin/videos/upload-complete', {'uploadId': uploadId});
   }
 
   Future<void> updateVideo({
