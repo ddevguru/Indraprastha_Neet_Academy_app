@@ -40,6 +40,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);

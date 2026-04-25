@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: indraprastha-backend
+    runtime: node
+    rootDir: indraprastha-backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: indraprastha-db
+          property: connectionString
+      - key: DB_HOST
+        fromDatabase:
+          name: indraprastha-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: indraprastha-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: indraprastha-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: indraprastha-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: indraprastha-db
+          property: password
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: GDRIVE_CLIENT_EMAIL
+        sync: false
+      - key: GDRIVE_PRIVATE_KEY
+        sync: false
+      - key: GDRIVE_FOLDER_ID
+        sync: false
+
+databases:
+  - name: indraprastha-db
+    plan: free
