@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/data/dummy_data.dart';
 import '../../core/providers/app_state.dart';
-import '../../models/app_models.dart';
+import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import 'video_player_screen.dart';
@@ -14,17 +14,11 @@ class VideosScreen extends ConsumerWidget {
 
   static const _rankProPlan = 'Rank Pro';
 
-  static const _playableVideoUrls = [
-    'https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4',
-    'https://samplelib.com/lib/preview/mp4/sample-5s.mp4',
-    'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
-    'https://www.w3schools.com/html/mov_bbb.mp4',
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final plan = ref.watch(appUiControllerProvider).selectedPlan;
     final isRankPro = plan == _rankProPlan;
+    final videosFuture = ContentRepository().fetchVideos();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -76,89 +70,101 @@ class VideosScreen extends ConsumerWidget {
                 ),
               ),
             ] else ...[
-              // Video List for Rank Pro Users
-              ...DummyData.neetVideos.asMap().entries.map((entry) {
-                final index = entry.key;
-                final video = entry.value;
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: InkWell(
-                    onTap: () => _openPlayer(
-                      context,
-                      video: video,
-                      videoUrl: _playableVideoUrls[index % _playableVideoUrls.length],
-                    ),
-                    borderRadius: BorderRadius.circular(AppRadii.lg),
-                    child: SurfaceCard(
-                      child: Row(
-                        children: [
-                          // Instructor Photo (like your screenshot)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              video.instructorImage ?? 'https://via.placeholder.com/64x64/1e88e5/ffffff?text=Dr',
-                              width: 64,
-                              height: 64,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                width: 64,
-                                height: 64,
-                                color: Colors.grey[800],
-                                child: const Icon(Icons.person, color: Colors.white, size: 32),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.lg),
-
-                          // Video Info
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: videosFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final videos = snapshot.data ?? const [];
+                  if (videos.isEmpty) {
+                    return const EmptyStateWidget(
+                      title: 'No videos available',
+                      subtitle: 'Admin panel se videos upload karne ke baad yahan dikhenge.',
+                      icon: Icons.video_library_outlined,
+                    );
+                  }
+                  return Column(
+                    children: videos.map((video) {
+                      final subject = video['subject']?.toString() ?? 'Faculty';
+                      final chapterHint =
+                          (video['chapter_hint']?.toString().isNotEmpty ?? false)
+                              ? video['chapter_hint']?.toString() ?? ''
+                              : (video['topic']?.toString() ?? '');
+                      final duration = video['duration_label']?.toString() ?? '15 min';
+                      final section = video['section_label']?.toString() ?? 'Concept explainers';
+                      final driveLink = video['drive_link']?.toString() ?? '';
+                      final teacherAvatar =
+                          'https://ui-avatars.com/api/?name=${Uri.encodeComponent(subject)}&background=4F5DE4&color=ffffff&size=128';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: InkWell(
+                          onTap: () => _openVideo(context, video, driveLink),
+                          borderRadius: BorderRadius.circular(AppRadii.lg),
+                          child: SurfaceCard(
+                            child: Row(
                               children: [
-                                Text(
-                                  video.title,
-                                  style: Theme.of(context).textTheme.titleMedium,
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    teacherAvatar,
+                                    width: 64,
+                                    height: 64,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      width: 64,
+                                      height: 64,
+                                      color: AppColors.indigoSoft,
+                                      child: const Icon(
+                                        Icons.person_rounded,
+                                        color: AppColors.indigo,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${video.subject.label} • ${video.chapterHint} • ${video.durationLabel}',
-                                  style: Theme.of(context).textTheme.bodyMedium,
+                                const SizedBox(width: AppSpacing.lg),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        video['title']?.toString() ?? 'Video',
+                                        style: Theme.of(context).textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        '$subject • $chapterHint • $duration',
+                                        style: Theme.of(context).textTheme.bodyMedium,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        section,
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  video.sectionLabel,
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(
+                                      Icons.play_circle_fill_rounded,
+                                      size: 42,
+                                      color: AppColors.indigo,
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
-
-                          // Rating & Play Button
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
-                                  Text(' ${video.rating}', 
-                                       style: const TextStyle(fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              const Icon(
-                                Icons.play_circle_fill_rounded,
-                                size: 42,
-                                color: Colors.blue,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
             ],
 
             const SizedBox(height: AppSpacing.xl),
@@ -173,16 +179,38 @@ class VideosScreen extends ConsumerWidget {
     );
   }
 
-  void _openPlayer(BuildContext context, {required NeetVideoItem video, required String videoUrl}) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(
-          title: video.title,
-          subtitle: '${video.subject.label} • ${video.chapterHint}',
-          videoUrl: videoUrl,
+  Future<void> _openVideo(
+    BuildContext context,
+    Map<String, dynamic> video,
+    String url,
+  ) async {
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Video link missing for this item.')),
+      );
+      return;
+    }
+    final isDirectPlayable =
+        url.contains('.mp4') || url.contains('storage.googleapis.com');
+    if (isDirectPlayable) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VideoPlayerScreen(
+            title: video['title']?.toString() ?? 'Video',
+            subtitle:
+                '${video['subject'] ?? ''} • ${video['chapter_hint'] ?? video['topic'] ?? ''}',
+            videoUrl: url,
+          ),
         ),
-      ),
-    );
+      );
+      return;
+    }
+    final launched = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open video link')),
+      );
+    }
   }
 }

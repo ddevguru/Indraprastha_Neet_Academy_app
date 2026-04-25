@@ -60,36 +60,43 @@ class _Meta {
         return const _Meta(
           title: 'Learn more',
           body:
-              'Indraprastha NEET Academy brings NCERT reading, daily MCQs, practice, '
-              'tests, and revision into one calm workspace. This build is a frontend demo — '
-              'no live classes or payments are processed here.',
+              'Indraprastha NEET Academy app combines chapter-wise books, PYQs, practice sets, '
+              'test series, and analytics in one focused flow.\n\n'
+              'How students use it:\n'
+              '1) Read concept notes and chapter PDFs\n'
+              '2) Switch to PYQs from the same chapter\n'
+              '3) Attempt practice/test modules\n'
+              '4) Review AI insights and improve weak areas',
         );
       case 'faq':
         return const _Meta(
           title: 'FAQ',
           body:
-              'Q: Is this the full production app?\n'
-              'A: This is a UI prototype with local demo data.\n\n'
-              'Q: Where do daily MCQs go after 24 hours?\n'
-              'A: They are linked to the same chapter in Books / PYQs (demo behaviour).\n\n'
-              'Q: Which plan unlocks videos?\n'
-              'A: Rank Pro shows the full video list in the Videos tab.',
+              'Q: How is content assigned?\n'
+              'A: Content is filtered by your selected batch, class, and subject.\n\n'
+              'Q: Can I continue from another device?\n'
+              'A: Yes, but active session stays on one device at a time for account safety.\n\n'
+              'Q: Where can I find chapter PYQs?\n'
+              'A: Open a chapter in Books and switch to the PYQ section.',
         );
       case 'contact':
         return const _Meta(
           title: 'Contact us',
           body:
-              'Academic support (demo):\n'
-              'Email: support@indraprastha-neet.example\n'
-              'Hours: Mon–Sat, 10:00–18:00 IST\n\n'
-              'Replace these details with your production contacts.',
+              'Academic support:\n'
+              'Email: support@indraprasthaneetacademy.com\n'
+              'Phone/WhatsApp: +91-XXXXXXXXXX\n'
+              'Hours: Mon-Sat, 10:00 AM - 7:00 PM IST\n\n'
+              'For technical issues, include your registered mobile number and a screenshot.',
         );
       case 'about':
         return const _Meta(
           title: 'About us',
           body:
-              'Indraprastha NEET Academy focuses on disciplined syllabus coverage, '
-              'mistake-led revision, and exam-style pacing — designed for serious NEET aspirants.',
+              'Indraprastha NEET Academy focuses on disciplined preparation for NEET through '
+              'concept clarity, daily practice, and test-based improvement.\n\n'
+              'Our approach: structured study plans, chapter-wise testing, and revision loops '
+              'that turn mistakes into score growth.',
         );
       case 'rate-us':
         return _Meta(
@@ -117,9 +124,11 @@ class _Meta {
         return const _Meta(
           title: 'Terms & conditions',
           body:
-              'This demo app is provided as-is for evaluation. No warranty. '
-              'All timetable, pricing, and content copy are placeholders until your legal '
-              'team publishes final terms.',
+              '1) Course access is for the registered student account only.\n'
+              '2) Sharing app content, videos, or PDFs without permission is prohibited.\n'
+              '3) Test performance data is used to generate learning analytics inside the app.\n'
+              '4) Subscription and access policies may be updated by the academy.\n\n'
+              'Please read complete policy details from official support before purchase.',
         );
       case 'share':
         return _Meta(
@@ -144,9 +153,12 @@ class _Meta {
         return const _Meta(
           title: 'Report video piracy',
           body:
-              'If you find our videos re-uploaded without permission, email '
-              'piracy@indraprastha-neet.example with the URL and screenshot. '
-              'This form is a placeholder in the MVP.',
+              'If you find unauthorized sharing of academy videos, report immediately:\n'
+              'Email: piracy@indraprasthaneetacademy.com\n\n'
+              'Please share:\n'
+              '- Link where content is uploaded\n'
+              '- Screenshot with timestamp\n'
+              '- Your contact number for follow-up',
         );
       default:
         return const _Meta(

@@ -19,17 +19,86 @@ class AdminApp extends StatefulWidget {
 }
 
 class _AdminAppState extends State<AdminApp> {
-  ThemeMode _themeMode = ThemeMode.dark;
+  ThemeMode _themeMode = ThemeMode.light;
+
+  static const _seed = Color(0xFF4F5DE4);
 
   @override
   Widget build(BuildContext context) {
+    final lightScheme = ColorScheme.fromSeed(
+      seedColor: _seed,
+      brightness: Brightness.light,
+    );
+    final darkScheme = ColorScheme.fromSeed(
+      seedColor: _seed,
+      brightness: Brightness.dark,
+    );
     return MaterialApp(
       title: 'Indraprastha Admin',
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.deepOrange),
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: lightScheme,
+        scaffoldBackgroundColor: const Color(0xFFF5F7FF),
+        appBarTheme: AppBarTheme(
+          backgroundColor: lightScheme.surface,
+          foregroundColor: lightScheme.onSurface,
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          color: lightScheme.surface,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: lightScheme.outlineVariant),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: lightScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: lightScheme.outlineVariant),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: lightScheme.outlineVariant),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: lightScheme.primary, width: 1.4),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          elevation: 0,
+          backgroundColor: lightScheme.surface,
+          indicatorColor: lightScheme.secondaryContainer,
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            return TextStyle(
+              fontWeight: states.contains(WidgetState.selected)
+                  ? FontWeight.w700
+                  : FontWeight.w500,
+            );
+          }),
+        ),
+      ),
       darkTheme: ThemeData(
         useMaterial3: true,
-        brightness: Brightness.dark,
-        colorSchemeSeed: Colors.deepOrange,
+        colorScheme: darkScheme,
       ),
       themeMode: _themeMode,
       home: AdminHome(
@@ -56,6 +125,15 @@ class AdminHome extends StatefulWidget {
 class _AdminHomeState extends State<AdminHome> {
   final _api = AdminApi();
   int _tab = 0;
+  static const _titles = [
+    'Overview',
+    'Setup',
+    'Books',
+    'Practice',
+    'Tests',
+    'Videos',
+    'Packages',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -68,23 +146,46 @@ class _AdminHomeState extends State<AdminHome> {
       VideosPage(api: _api),
       PackagesPage(api: _api),
     ];
+    final title = _titles[_tab.clamp(0, _titles.length - 1)];
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Panel'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Indraprastha Admin'),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             onPressed: widget.onToggleTheme,
-            icon: const Icon(Icons.dark_mode_outlined),
+            icon: const Icon(Icons.dark_mode_outlined, size: 22),
             tooltip: 'Dark/Light',
           ),
+          const SizedBox(width: 4),
         ],
       ),
-      body: _api.token == null
-          ? LoginPage(
-              api: _api,
-              onLoginSuccess: () => setState(() {}),
-            )
-          : pages[_tab],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.28),
+              Theme.of(context).scaffoldBackgroundColor,
+            ],
+          ),
+        ),
+        child: _api.token == null
+            ? LoginPage(
+                api: _api,
+                onLoginSuccess: () => setState(() {}),
+              )
+            : pages[_tab],
+      ),
       bottomNavigationBar: _api.token == null
           ? null
           : NavigationBar(
@@ -135,15 +236,41 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
+        constraints: const BoxConstraints(maxWidth: 460),
         child: Card(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Container(
+                  width: 74,
+                  height: 74,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: scheme.outlineVariant),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset('assets/images/app_icon.png', fit: BoxFit.cover),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Welcome back',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Login to manage courses, books, tests, and videos',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 TextField(
                   controller: _username,
                   decoration: const InputDecoration(labelText: 'Username'),
@@ -152,6 +279,7 @@ class _LoginPageState extends State<LoginPage> {
                 TextField(
                   controller: _password,
                   decoration: const InputDecoration(labelText: 'Password'),
+                  obscureText: true,
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
@@ -177,7 +305,13 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 if (_message != null) ...[
                   const SizedBox(height: 8),
-                  Text(_message!),
+                  Text(
+                    _message!,
+                    style: TextStyle(
+                      color: _message == 'Login success' ? Colors.green : scheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -213,22 +347,50 @@ class OverviewPage extends StatelessWidget {
           ('Videos', stats['videos'] ?? 0),
           ('Packages', stats['packages'] ?? 0),
         ];
-        return GridView.count(
-          padding: const EdgeInsets.all(16),
-          crossAxisCount: 2,
-          childAspectRatio: 1.8,
-          children: items
-              .map(
-                (e) => Card(
-                  child: Center(
-                    child: ListTile(
-                      title: Text(e.$1),
-                      subtitle: Text('${e.$2}', style: Theme.of(context).textTheme.headlineSmall),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final crossAxisCount = width > 1100
+                ? 4
+                : width > 760
+                    ? 3
+                    : 2;
+            return GridView.count(
+              padding: const EdgeInsets.all(16),
+              crossAxisCount: crossAxisCount,
+              childAspectRatio: 1.45,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              children: items
+                  .map(
+                    (e) => Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              e.$1,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              '${e.$2}',
+                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              )
-              .toList(),
+                  )
+                  .toList(),
+            );
+          },
         );
       },
     );
@@ -502,28 +664,44 @@ class _BooksPageState extends State<BooksPage> {
                   onPressed: _batchId == null
                       ? null
                       : () async {
-                          if (_editingId == null) {
-                            await widget.api.addBook(
-                              batchId: _batchId!,
-                              classLabel: _classLabel.text.trim(),
-                              title: _bookTitle.text.trim().isEmpty
-                                  ? '${_subject.text.trim()} Book'
-                                  : _bookTitle.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _chapter.text.trim(),
-                            );
-                          } else {
-                            await widget.api.updateBook(
-                              id: _editingId!,
-                              classLabel: _classLabel.text.trim(),
-                              title: _bookTitle.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _chapter.text.trim(),
-                            );
-                            _editingId = null;
+                          try {
+                            final chapterTitle = _chapter.text.trim().isEmpty
+                                ? 'Introduction'
+                                : _chapter.text.trim();
+                            if (_editingId == null) {
+                              final bookId = await widget.api.addBook(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                title: _bookTitle.text.trim().isEmpty
+                                    ? '${_subject.text.trim()} Book'
+                                    : _bookTitle.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: chapterTitle,
+                              );
+                              await widget.api.createBookChapter(
+                                bookId: bookId,
+                                title: chapterTitle,
+                                overview:
+                                    'Chapter overview will be managed from admin panel.',
+                                noteSummary:
+                                    'Add notes/PDF content for this chapter.',
+                                highlight: 'Start with high-yield concepts first.',
+                              );
+                            } else {
+                              await widget.api.updateBook(
+                                id: _editingId!,
+                                classLabel: _classLabel.text.trim(),
+                                title: _bookTitle.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: chapterTitle,
+                              );
+                              _editingId = null;
+                            }
+                            await _loadBatches();
+                            setState(() => _status = 'Book saved with chapter');
+                          } catch (e) {
+                            setState(() => _status = 'Failed: $e');
                           }
-                          await _loadBatches();
-                          setState(() => _status = 'Book saved');
                         },
                   child: Text(_editingId == null ? 'Add Book' : 'Update Book'),
                 ),
@@ -856,6 +1034,8 @@ class _VideosPageState extends State<VideosPage> {
   int? _editingId;
   List<dynamic> _batches = const [];
   List<dynamic> _items = const [];
+  String? _status;
+  bool _uploading = false;
 
   @override
   void initState() {
@@ -913,33 +1093,66 @@ class _VideosPageState extends State<VideosPage> {
                 ),
                 const SizedBox(height: 8),
                 FilledButton(
-                  onPressed: _batchId == null
+                  onPressed: _batchId == null || _uploading
                       ? null
                       : () async {
-                          if (_editingId == null) {
-                            if (_video == null) return;
-                            await widget.api.uploadVideo(
-                              batchId: _batchId!,
-                              classLabel: _classLabel.text.trim(),
-                              title: _title.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _topic.text.trim(),
-                              file: _video!,
-                            );
-                          } else {
-                            await widget.api.updateVideo(
-                              id: _editingId!,
-                              classLabel: _classLabel.text.trim(),
-                              title: _title.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _topic.text.trim(),
-                            );
-                            _editingId = null;
+                          setState(() {
+                            _uploading = true;
+                            _status = null;
+                          });
+                          try {
+                            if (_editingId == null) {
+                              if (_video == null) {
+                                throw Exception('Please pick a video file first');
+                              }
+                              if (_title.text.trim().isEmpty) {
+                                throw Exception('Video title is required');
+                              }
+                              await widget.api.uploadVideo(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                title: _title.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _topic.text.trim(),
+                                file: _video!,
+                                chapterHint: _topic.text.trim(),
+                                sectionLabel: 'Concept explainers',
+                                durationLabel: '15 min',
+                              );
+                              _video = null;
+                              _title.clear();
+                              _topic.clear();
+                              setState(() => _status = 'Video uploaded successfully');
+                            } else {
+                              await widget.api.updateVideo(
+                                id: _editingId!,
+                                classLabel: _classLabel.text.trim(),
+                                title: _title.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _topic.text.trim(),
+                              );
+                              _editingId = null;
+                              setState(() => _status = 'Video updated');
+                            }
+                            await _load();
+                          } catch (e) {
+                            setState(() => _status = 'Upload failed: $e');
+                          } finally {
+                            if (mounted) {
+                              setState(() => _uploading = false);
+                            }
                           }
-                          await _load();
                         },
-                  child: Text(_editingId == null ? 'Upload Video' : 'Update Video'),
+                  child: Text(
+                    _uploading
+                        ? 'Please wait...'
+                        : (_editingId == null ? 'Upload Video' : 'Update Video'),
+                  ),
                 ),
+                if (_status != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_status!),
+                ],
               ],
             ),
           ),
@@ -1189,19 +1402,37 @@ class AdminApi {
     }
   }
 
-  Future<void> addBook({
+  Future<int> addBook({
     required int batchId,
     required String classLabel,
     required String title,
     required String subject,
     required String topic,
   }) async {
-    await _post('/admin/books', {
+    final body = await _postMap('/admin/books', {
       'batchId': batchId,
       'classLabel': classLabel,
       'title': title,
       'subject': subject,
       'topic': topic,
+    });
+    final book = Map<String, dynamic>.from(body['book'] as Map? ?? const {});
+    return (book['id'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> createBookChapter({
+    required int bookId,
+    required String title,
+    required String overview,
+    required String noteSummary,
+    required String highlight,
+  }) async {
+    if (bookId <= 0) return;
+    await _post('/admin/books/$bookId/chapters', {
+      'title': title,
+      'overview': overview,
+      'noteSummary': noteSummary,
+      'highlight': highlight,
     });
   }
 
@@ -1295,6 +1526,9 @@ class AdminApi {
     required String subject,
     required String topic,
     required File file,
+    String? chapterHint,
+    String? sectionLabel,
+    String? durationLabel,
   }) async {
     if (token == null) throw Exception('Login first');
     final req = http.MultipartRequest(
@@ -1307,6 +1541,9 @@ class AdminApi {
     req.fields['title'] = title;
     req.fields['subject'] = subject;
     req.fields['topic'] = topic;
+    req.fields['chapterHint'] = chapterHint ?? topic;
+    req.fields['sectionLabel'] = sectionLabel ?? 'Concept explainers';
+    req.fields['durationLabel'] = durationLabel ?? '15 min';
     req.files.add(await http.MultipartFile.fromPath('video', file.path));
     final streamed = await req.send();
     if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
@@ -1393,6 +1630,28 @@ class AdminApi {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(response.body);
     }
+  }
+
+  Future<Map<String, dynamic>> _postMap(
+    String path,
+    Map<String, dynamic> payload,
+  ) async {
+    if (token == null) throw Exception('Login first');
+    final response = await _client.post(
+      Uri.parse('$baseUrl$path'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(payload),
+    );
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(body['error'] ?? response.body);
+    }
+    return body;
   }
 
   Future<void> _put(String path, Map<String, dynamic> payload) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
@@ -198,6 +199,26 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
           appBar: AppBar(
             title: Text(set['title']?.toString() ?? 'Practice'),
             actions: [
+              IconButton(
+                onPressed: () {
+                  final shareText = StringBuffer()
+                    ..writeln('Question:')
+                    ..writeln(question['question']?.toString() ?? '')
+                    ..writeln()
+                    ..writeln('Options:')
+                    ..writeln('A) ${options[0]}')
+                    ..writeln('B) ${options[1]}')
+                    ..writeln('C) ${options[2]}')
+                    ..writeln('D) ${options[3]}')
+                    ..writeln()
+                    ..writeln('Shared from Indraprastha Practice');
+                  SharePlus.instance.share(
+                    ShareParams(text: shareText.toString()),
+                  );
+                },
+                icon: const Icon(Icons.share_outlined),
+                tooltip: 'Share question',
+              ),
               IconButton(
                 onPressed: () => ref
                     .read(appUiControllerProvider.notifier)

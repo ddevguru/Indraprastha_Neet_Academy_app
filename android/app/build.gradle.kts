@@ -36,7 +36,7 @@ android {
         create("student") {
             dimension = "app"
             applicationId = "com.indraprastha.student"
-            manifestPlaceholders["appLabel"] = "Indraprastha Student"
+            manifestPlaceholders["appLabel"] = "Indraprastha Neet Academy"
         }
         create("admin") {
             dimension = "app"

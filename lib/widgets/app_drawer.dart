@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/data/dummy_data.dart';
 import '../features/auth/bloc/auth_bloc.dart';
 import '../theme/app_tokens.dart';
 import 'app_widgets.dart';
@@ -16,8 +15,8 @@ class AppDrawer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = context.watch<AuthBloc>().state.user ?? DummyData.defaultUser;
-    final courseLabel = user.targetExamYear;
+    final user = context.watch<AuthBloc>().state.user;
+    final courseLabel = user?.targetExamYear ?? 'NEET';
 
     return Drawer(
       width: MediaQuery.sizeOf(context).width * 0.82,
@@ -44,7 +43,7 @@ class AppDrawer extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            user.fullName,
+                            user?.fullName ?? 'Student',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

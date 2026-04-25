@@ -78,7 +78,39 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
      ORDER BY ch.id ASC`,
     [req.params.bookId, req.user.batch_id]
   );
-  res.json({ success: true, chapters: chapters.rows });
+  if (chapters.rows.length > 0) {
+    return res.json({ success: true, chapters: chapters.rows });
+  }
+
+  // Backward-compatible fallback:
+  // if an old book exists without chapters, create one default chapter from book topic/title.
+  const bookResult = await pool.query(
+    `SELECT id, title, topic
+     FROM books
+     WHERE id = $1 AND batch_id = $2
+     LIMIT 1`,
+    [req.params.bookId, req.user.batch_id]
+  );
+  if (bookResult.rows.length === 0) {
+    return res.json({ success: true, chapters: [] });
+  }
+
+  const book = bookResult.rows[0];
+  const defaultChapterTitle =
+    (book.topic && String(book.topic).trim()) ||
+    `${book.title || 'Book'} Chapter 1`;
+  const created = await pool.query(
+    `INSERT INTO book_chapters (book_id, title, overview, note_summary, highlight, material_type)
+     VALUES ($1, $2, '', '', '', 'text')
+     RETURNING id, title, overview, note_summary, highlight, material_type, material_drive_link`,
+    [book.id, defaultChapterTitle]
+  );
+
+  const chapter = {
+    ...created.rows[0],
+    linked_pyq_count: 0,
+  };
+  return res.json({ success: true, chapters: [chapter] });
 });
 
 router.get('/chapters/:chapterId', userAuth, async (req, res) => {

@@ -31,22 +31,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const subjectAccuracy = [
-      ('Physics', 0.69),
-      ('Chemistry', 0.77),
-      ('Botany', 0.86),
-      ('Zoology', 0.82),
-    ];
-
     return FutureBuilder<Map<String, dynamic>>(
       future: _analyticsFuture,
       builder: (context, snapshot) {
         final payload = snapshot.data ?? const {};
         final donut = (payload['donut'] as Map<String, dynamic>?) ?? const {};
+        final overall = (payload['analytics'] as Map<String, dynamic>?) ?? const {};
         final insights = (payload['insights'] as List<dynamic>?) ?? const [];
         final correct = (donut['correct'] ?? 0) as int;
         final wrong = (donut['wrong'] ?? 0) as int;
         final unattempted = (donut['unattempted'] ?? 0) as int;
+        final total = correct + wrong + unattempted;
+        final attempted = correct + wrong;
+        final accuracy = attempted == 0 ? 0 : ((correct / attempted) * 100).round();
+        final attemptRate = total == 0 ? 0 : ((attempted / total) * 100).round();
         return Scaffold(
       appBar: AppBar(title: const Text('Analytics')),
       body: SingleChildScrollView(
@@ -76,29 +74,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     crossAxisSpacing: AppSpacing.md,
                     mainAxisSpacing: AppSpacing.md,
                     childAspectRatio: 1.2,
-                    children: const [
+                    children: [
                       StatCard(
                         title: 'Overall accuracy',
-                        value: '79%',
-                        subtitle: 'Up 4% over last 14 days',
+                        value: '$accuracy%',
+                        subtitle: 'Based on submitted test attempts',
                         icon: Icons.track_changes_rounded,
                       ),
                       StatCard(
-                        title: 'Weekly progress',
-                        value: '18.5 hrs',
-                        subtitle: '5.2 hrs revision, 7 tests reviewed',
+                        title: 'Questions attempted',
+                        value: '$attempted',
+                        subtitle: 'Correct: $correct . Wrong: $wrong',
                         icon: Icons.calendar_month_rounded,
                       ),
                       StatCard(
-                        title: 'Syllabus coverage',
-                        value: '74%',
-                        subtitle: '11 chapters left in high priority queue',
+                        title: 'Attempt rate',
+                        value: '$attemptRate%',
+                        subtitle: 'Attempted vs total served questions',
                         icon: Icons.menu_book_rounded,
                       ),
                       StatCard(
-                        title: 'Improvement trend',
-                        value: '+38',
-                        subtitle: 'Average mock score increase',
+                        title: 'Best score',
+                        value: '${overall['best_score'] ?? 0}',
+                        subtitle: 'Latest analytics snapshot',
                         icon: Icons.trending_up_rounded,
                       ),
                     ],
@@ -143,106 +141,47 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.xl),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 860;
-                  return compact
-                      ? Column(
-                          children: const [
-                            _TrendPanel(),
-                            SizedBox(height: AppSpacing.md),
-                            _WeeklyBarsPanel(),
-                          ],
-                        )
-                      : const Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(flex: 3, child: _TrendPanel()),
-                            SizedBox(width: AppSpacing.md),
-                            Expanded(flex: 2, child: _WeeklyBarsPanel()),
-                          ],
-                        );
-                },
-              ),
-              const SizedBox(height: AppSpacing.xl),
               SurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SectionHeader(
-                      title: 'Subject-wise accuracy',
-                      subtitle: 'Identify where concept depth is already strong and where revision is still needed.',
+                      title: 'Performance signals',
+                      subtitle: 'Live metrics pulled from your latest backend analytics.',
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    ...subjectAccuracy.map(
-                      (entry) => Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                        child: MetricBar(
-                          label: entry.$1,
-                          value: entry.$2,
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: MetricBar(
+                        label: 'Overall accuracy',
+                        value: ((overall['overall_accuracy'] as num?) ?? 0) / 100,
+                        trailing: '${overall['overall_accuracy'] ?? 0}%',
                       ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: MetricBar(
+                        label: 'Best score',
+                        value: ((overall['best_score'] as num?) ?? 0) / 720,
+                        trailing: '${overall['best_score'] ?? 0}/720',
+                      ),
+                    ),
+                    MetricBar(
+                      label: 'Average score',
+                      value: ((overall['average_score'] as num?) ?? 0) / 720,
+                      trailing: '${overall['average_score'] ?? 0}/720',
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 860;
-                  return compact
-                      ? Column(
-                          children: const [
-                            _TopicPanel(
-                              title: 'Weak topics',
-                              items: [
-                                'Rotational Motion',
-                                'Thermodynamics numericals',
-                                'Morphology of Flowering Plants',
-                                'Neural control diagrams',
-                              ],
-                            ),
-                            SizedBox(height: AppSpacing.md),
-                            _TopicPanel(
-                              title: 'Strong topics',
-                              items: [
-                                'Cell Structure',
-                                'Molecular Basis of Inheritance',
-                                'Chemical Bonding',
-                                'Human Physiology',
-                              ],
-                            ),
-                          ],
-                        )
-                      : const Row(
-                          children: [
-                            Expanded(
-                              child: _TopicPanel(
-                                title: 'Weak topics',
-                                items: [
-                                  'Rotational Motion',
-                                  'Thermodynamics numericals',
-                                  'Morphology of Flowering Plants',
-                                  'Neural control diagrams',
-                                ],
-                              ),
-                            ),
-                            SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: _TopicPanel(
-                                title: 'Strong topics',
-                                items: [
-                                  'Cell Structure',
-                                  'Molecular Basis of Inheritance',
-                                  'Chemical Bonding',
-                                  'Human Physiology',
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                },
+              const SurfaceCard(
+                child: EmptyStateWidget(
+                  title: 'Topic-level breakdown pending',
+                  subtitle:
+                      'Backend me per-subject / per-topic analytics add hote hi detailed weak-strong topics yahan live show honge.',
+                  icon: Icons.analytics_outlined,
+                ),
               ),
             ],
           ),
@@ -341,93 +280,3 @@ class _DonutPainter extends CustomPainter {
   }
 }
 
-class _TrendPanel extends StatelessWidget {
-  const _TrendPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeader(
-            title: 'Test improvement trend',
-            subtitle: 'Mock performance over recent attempts.',
-          ),
-          SizedBox(height: AppSpacing.md),
-          MiniTrendChart(values: [0.42, 0.49, 0.56, 0.61, 0.68, 0.74, 0.79]),
-        ],
-      ),
-    );
-  }
-}
-
-class _WeeklyBarsPanel extends StatelessWidget {
-  const _WeeklyBarsPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Weekly progress', style: TextStyle(fontWeight: FontWeight.w700)),
-          SizedBox(height: AppSpacing.sm),
-          Text('Study consistency for the last seven days.'),
-          SizedBox(height: AppSpacing.lg),
-          MiniBarChart(
-            values: [0.48, 0.72, 0.65, 0.82, 0.58, 0.76, 0.89],
-            labels: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TopicPanel extends StatelessWidget {
-  const _TopicPanel({
-    required this.title,
-    required this.items,
-  });
-
-  final String title;
-  final List<String> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.md),
-          ...items.map(
-            (item) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: title == 'Weak topics'
-                    ? const Color(0xFFFCEAEA)
-                    : const Color(0xFFE7F8EF),
-                child: Icon(
-                  title == 'Weak topics'
-                      ? Icons.north_east_rounded
-                      : Icons.check_rounded,
-                  color: title == 'Weak topics'
-                      ? AppColors.danger
-                      : AppColors.success,
-                ),
-              ),
-              title: Text(item),
-              subtitle: Text(
-                title == 'Weak topics'
-                    ? 'Add this to next revision cycle'
-                    : 'Maintain current performance',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

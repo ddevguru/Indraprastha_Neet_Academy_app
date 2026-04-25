@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/data/dummy_data.dart';
 import '../../core/providers/app_state.dart';
 import '../auth/bloc/auth_bloc.dart';
+import '../content/data/content_repository.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
@@ -184,17 +184,43 @@ class _ProfileIdentity extends StatelessWidget {
   }
 }
 
-class SavedRevisionScreen extends ConsumerWidget {
+class SavedRevisionScreen extends ConsumerStatefulWidget {
   const SavedRevisionScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final uiState = ref.watch(appUiControllerProvider);
-    final savedChapters = DummyData.books
-        .expand((book) => book.chapters)
-        .where((chapter) => uiState.savedChapterIds.contains(chapter.id))
-        .toList();
+  ConsumerState<SavedRevisionScreen> createState() => _SavedRevisionScreenState();
+}
 
+class _SavedRevisionScreenState extends ConsumerState<SavedRevisionScreen> {
+  late final Future<Map<String, dynamic>> _savedFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _savedFuture = _loadSaved();
+  }
+
+  Future<Map<String, dynamic>> _loadSaved() async {
+    final repo = ContentRepository();
+    final books = await repo.fetchBooks();
+    final tests = await repo.fetchTests();
+    final chapterFutures = books.map((book) async {
+      final id = int.tryParse(book['id']?.toString() ?? '');
+      if (id == null) return <Map<String, dynamic>>[];
+      return repo.fetchChapters(id);
+    }).toList();
+    final chapterLists = await Future.wait(chapterFutures);
+    final allChapters = chapterLists.expand((e) => e).toList();
+    return {
+      'books': books,
+      'tests': tests,
+      'chapters': allChapters,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uiState = ref.watch(appUiControllerProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Saved and Revision')),
       body: SingleChildScrollView(
@@ -210,51 +236,87 @@ class SavedRevisionScreen extends ConsumerWidget {
                     'Review saved notes, bookmarked questions, revision lists, important chapters, and recent materials.',
               ),
               const SizedBox(height: AppSpacing.lg),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 860;
-                  return compact
-                      ? Column(
-                          children: [
-                            _SavedChaptersPanel(savedChapters: savedChapters),
-                            const SizedBox(height: AppSpacing.md),
-                            const _RevisionListsPanel(),
-                          ],
-                        )
-                      : Row(
+              FutureBuilder<Map<String, dynamic>>(
+                future: _savedFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final books = List<Map<String, dynamic>>.from(
+                    snapshot.data?['books'] as List<dynamic>? ?? const [],
+                  );
+                  final tests = List<Map<String, dynamic>>.from(
+                    snapshot.data?['tests'] as List<dynamic>? ?? const [],
+                  );
+                  final allChapters = List<Map<String, dynamic>>.from(
+                    snapshot.data?['chapters'] as List<dynamic>? ?? const [],
+                  );
+                  final savedChapters = allChapters
+                      .where((ch) => uiState.savedChapterIds.contains(ch['id']?.toString()))
+                      .toList();
+
+                  return Column(
+                    children: [
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 860;
+                          final panel = _SavedChaptersPanel(savedChapters: savedChapters);
+                          final revision = _RevisionListsPanel(
+                            tests: tests,
+                            books: books,
+                          );
+                          return compact
+                              ? Column(
+                                  children: [
+                                    panel,
+                                    const SizedBox(height: AppSpacing.md),
+                                    revision,
+                                  ],
+                                )
+                              : Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(child: panel),
+                                    const SizedBox(width: AppSpacing.md),
+                                    Expanded(child: revision),
+                                  ],
+                                );
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      SurfaceCard(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: _SavedChaptersPanel(savedChapters: savedChapters),
+                            const SectionHeader(
+                              title: 'Recently opened materials',
+                              subtitle: 'Quick access to backend-loaded study items.',
                             ),
-                            const SizedBox(width: AppSpacing.md),
-                            const Expanded(child: _RevisionListsPanel()),
+                            const SizedBox(height: AppSpacing.md),
+                            if (books.isEmpty)
+                              const EmptyStateWidget(
+                                title: 'No recent material',
+                                subtitle: 'Books add hone ke baad recent materials yahan dikhenge.',
+                                icon: Icons.history_toggle_off_rounded,
+                              )
+                            else
+                              ...books.take(4).map(
+                                (book) => ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(book['title']?.toString() ?? ''),
+                                  subtitle: Text(
+                                    '${book['subject'] ?? ''} . ${book['topic'] ?? ''}',
+                                  ),
+                                  trailing:
+                                      const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                                ),
+                              ),
                           ],
-                        );
-                },
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              SurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SectionHeader(
-                      title: 'Recently opened materials',
-                      subtitle: 'Quick access to active study items.',
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    ...DummyData.books.take(4).map(
-                      (book) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(book.title),
-                        subtitle: Text(book.lastOpened),
-                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                        onTap: () =>
-                            context.push('/books/chapter/${book.chapters.first.id}'),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -275,56 +337,102 @@ class NotificationsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: CenteredContent(
           maxWidth: 900,
-          child: SurfaceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SectionHeader(
-                  title: 'Activity feed',
-                  subtitle:
-                      'Test reminders, new notes, plan updates, and daily study nudges.',
+          child: FutureBuilder<Map<String, dynamic>>(
+            future: Future.wait([
+              ContentRepository().fetchTests(),
+              ContentRepository().fetchLatestAnalytics(),
+            ]).then((v) => {'tests': v[0], 'analytics': v[1]}),
+            builder: (context, snapshot) {
+              final tests = List<Map<String, dynamic>>.from(
+                snapshot.data?['tests'] as List<dynamic>? ?? const [],
+              );
+              final analytics =
+                  Map<String, dynamic>.from(snapshot.data?['analytics'] as Map? ?? const {});
+              final insights = List<Map<String, dynamic>>.from(
+                analytics['insights'] as List<dynamic>? ?? const [],
+              );
+              final notifications = <Map<String, dynamic>>[
+                ...tests.take(3).map(
+                  (t) => {
+                    'title': 'Test available: ${t['title']}',
+                    'message':
+                        '${t['category'] ?? 'Test'} . ${t['subject'] ?? ''} . ${t['schedule_label'] ?? ''}',
+                    'time': 'Now',
+                    'unread': true,
+                  },
                 ),
-                const SizedBox(height: AppSpacing.md),
-                ...DummyData.notifications.map(
-                  (item) => Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: item.isUnread
-                          ? AppColors.indigoSoft
-                          : AppColors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(AppRadii.md),
+                ...insights.take(3).map(
+                  (i) => {
+                    'title': i['insight_title']?.toString() ?? 'AI insight',
+                    'message': i['insight_body']?.toString() ?? '',
+                    'time': 'Latest',
+                    'unread': false,
+                  },
+                ),
+              ];
+
+              return SurfaceCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SectionHeader(
+                      title: 'Activity feed',
+                      subtitle:
+                          'Backend-driven test reminders and AI performance updates.',
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.white,
-                          child: Icon(item.icon, color: AppColors.indigo),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
+                    const SizedBox(height: AppSpacing.md),
+                    if (notifications.isEmpty)
+                      const EmptyStateWidget(
+                        title: 'No notifications yet',
+                        subtitle: 'Tests ya analytics generate hone par updates yahan aayengi.',
+                        icon: Icons.notifications_off_outlined,
+                      )
+                    else
+                      ...notifications.map(
+                        (item) => Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: (item['unread'] as bool)
+                                ? AppColors.indigoSoft
+                                : AppColors.surfaceMuted,
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                          ),
+                          child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(item.title,
-                                  style: Theme.of(context).textTheme.titleMedium),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(item.message),
+                              const CircleAvatar(
+                                backgroundColor: Colors.white,
+                                child: Icon(Icons.notifications_active_rounded,
+                                    color: AppColors.indigo),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item['title']?.toString() ?? '',
+                                      style: Theme.of(context).textTheme.titleMedium,
+                                    ),
+                                    const SizedBox(height: AppSpacing.xs),
+                                    Text(item['message']?.toString() ?? ''),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Text(item['time']?.toString() ?? ''),
                             ],
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.md),
-                        Text(item.timeLabel),
-                      ],
-                    ),
-                  ),
+                      ),
+                  ],
                 ),
-              ],
+              );
+            },
             ),
           ),
         ),
-      ),
     );
   }
 }
@@ -575,7 +683,7 @@ class _SavedChaptersPanel extends StatelessWidget {
     required this.savedChapters,
   });
 
-  final List<BookChapter> savedChapters;
+  final List<Map<String, dynamic>> savedChapters;
 
   @override
   Widget build(BuildContext context) {
@@ -598,10 +706,10 @@ class _SavedChaptersPanel extends StatelessWidget {
             ...savedChapters.map(
               (chapter) => ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(chapter.title),
-                subtitle: Text(chapter.overview),
+                title: Text(chapter['title']?.toString() ?? ''),
+                subtitle: Text(chapter['overview']?.toString() ?? ''),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                onTap: () => context.push('/books/chapter/${chapter.id}'),
+                onTap: () => context.push('/books/chapter/${chapter['id']}'),
               ),
             ),
         ],
@@ -611,7 +719,13 @@ class _SavedChaptersPanel extends StatelessWidget {
 }
 
 class _RevisionListsPanel extends StatelessWidget {
-  const _RevisionListsPanel();
+  const _RevisionListsPanel({
+    required this.tests,
+    required this.books,
+  });
+
+  final List<Map<String, dynamic>> tests;
+  final List<Map<String, dynamic>> books;
 
   @override
   Widget build(BuildContext context) {
@@ -624,15 +738,32 @@ class _RevisionListsPanel extends StatelessWidget {
             subtitle: 'Saved notes, bookmarked questions, and incorrect sets.',
           ),
           const SizedBox(height: AppSpacing.md),
-          ...DummyData.revisionItems.map(
+          ...[
+            ...tests.take(2).map(
+              (test) => {
+                'title': test['title']?.toString() ?? '',
+                'subtitle':
+                    '${test['category'] ?? ''} . ${test['subject'] ?? ''} drill',
+                'type': 'Test revision',
+              },
+            ),
+            ...books.take(2).map(
+              (book) => {
+                'title': book['title']?.toString() ?? '',
+                'subtitle':
+                    '${book['subject'] ?? ''} . ${book['topic'] ?? ''}',
+                'type': 'Saved notes',
+              },
+            ),
+          ].map(
             (item) => ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const CircleAvatar(
                 backgroundColor: AppColors.indigoSoft,
                 child: Icon(Icons.checklist_rounded, color: AppColors.indigo),
               ),
-              title: Text(item.title),
-              subtitle: Text('${item.type} . ${item.subtitle}'),
+              title: Text(item['title']?.toString() ?? ''),
+              subtitle: Text('${item['type'] ?? ''} . ${item['subtitle'] ?? ''}'),
             ),
           ),
         ],
