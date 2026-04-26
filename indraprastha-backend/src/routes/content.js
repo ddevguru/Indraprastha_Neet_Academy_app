@@ -261,33 +261,78 @@ router.get('/packages', userAuth, async (_req, res) => {
 });
 
 router.post('/tests/:testId/submit', userAuth, async (req, res) => {
-  const { score = 0, accuracy = 0, correctCount = 0, wrongCount = 0, unattemptedCount = 0 } = req.body;
-  const attempt = await pool.query(
-    `INSERT INTO test_attempts (user_id, test_id, score, accuracy)
-     VALUES ($1,$2,$3,$4)
-     RETURNING *`,
-    [req.user.id, req.params.testId, score, accuracy]
-  );
-  const analytics = await pool.query(
-    `INSERT INTO exam_analytics (user_id, test_id, overall_accuracy, correct_count, wrong_count, unattempted_count)
-     VALUES ($1,$2,$3,$4,$5,$6)
-     RETURNING *`,
-    [req.user.id, req.params.testId, accuracy, correctCount, wrongCount, unattemptedCount]
-  );
-  const analyticsId = analytics.rows[0].id;
-  const insightRows = [
-    ['AI Exam Summary', 'Your biology score is stable but physics accuracy dropped. Revise mechanics and do 30 mixed MCQs.', 'high'],
-    ['Recommended Next Step', 'Do 1 full test after 48 hours and review incorrect questions section-wise.', 'medium'],
-  ];
-  for (const [title, body, priority] of insightRows) {
-    await pool.query(
-      `INSERT INTO ai_insights (analytics_id, insight_title, insight_body, priority)
-       VALUES ($1,$2,$3,$4)`,
-      [analyticsId, title, body, priority]
+  try {
+    const testId = Number(req.params.testId);
+    if (!Number.isFinite(testId) || testId <= 0) {
+      return res.status(400).json({ error: 'Invalid testId' });
+    }
+    // Ensure user is submitting only their batch's test.
+    const testExists = await pool.query(
+      `SELECT id
+       FROM tests
+       WHERE id = $1 AND batch_id = $2
+       LIMIT 1`,
+      [testId, req.user.batch_id]
     );
-  }
+    if (testExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Test not found for your batch' });
+    }
 
-  res.json({ success: true, attempt: attempt.rows[0], analytics: analytics.rows[0] });
+    const {
+      score = 0,
+      accuracy = 0,
+      correctCount = 0,
+      wrongCount = 0,
+      unattemptedCount = 0,
+    } = req.body || {};
+
+    const attempt = await pool.query(
+      `INSERT INTO test_attempts (user_id, test_id, score, accuracy)
+       VALUES ($1,$2,$3,$4)
+       RETURNING *`,
+      [req.user.id, testId, score, accuracy]
+    );
+    const analytics = await pool.query(
+      `INSERT INTO exam_analytics (user_id, test_id, overall_accuracy, correct_count, wrong_count, unattempted_count)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING *`,
+      [req.user.id, testId, accuracy, correctCount, wrongCount, unattemptedCount]
+    );
+    const analyticsId = analytics.rows[0].id;
+    const insightRows = [
+      [
+        'AI Exam Summary',
+        'Your biology score is stable but physics accuracy dropped. Revise mechanics and do 30 mixed MCQs.',
+        'high',
+      ],
+      [
+        'Recommended Next Step',
+        'Do 1 full test after 48 hours and review incorrect questions section-wise.',
+        'medium',
+      ],
+    ];
+    for (const [title, body, priority] of insightRows) {
+      await pool.query(
+        `INSERT INTO ai_insights (analytics_id, insight_title, insight_body, priority)
+         VALUES ($1,$2,$3,$4)`,
+        [analyticsId, title, body, priority]
+      );
+    }
+
+    return res.json({
+      success: true,
+      attempt: attempt.rows[0],
+      analytics: analytics.rows[0],
+    });
+  } catch (e) {
+    console.error('[CONTENT_SUBMIT_ERROR]', {
+      message: e?.message || 'Unknown error',
+      stack: e?.stack,
+      testId: req.params?.testId,
+      userId: req.user?.id,
+    });
+    return res.status(500).json({ error: e?.message || 'Submit failed' });
+  }
 });
 
 router.get('/analytics/latest', userAuth, async (req, res) => {

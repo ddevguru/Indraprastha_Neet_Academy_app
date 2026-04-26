@@ -278,7 +278,7 @@ class ChapterDetailScreen extends ConsumerWidget {
                                 if (uri == null) return;
                                 await launchUrl(
                                   uri,
-                                  mode: LaunchMode.externalApplication,
+                                  mode: LaunchMode.inAppBrowserView,
                                 );
                               },
                             ),
@@ -293,7 +293,11 @@ class ChapterDetailScreen extends ConsumerWidget {
                         children: [
                           _DetailPanel(
                             title: 'Structured notes',
-                            content: chapter['note_summary']?.toString() ?? '',
+                            content: (chapter['note_summary']?.toString().trim().isNotEmpty ?? false)
+                                ? chapter['note_summary']?.toString() ?? ''
+                                : ((chapter['material_type']?.toString() ?? '') == 'pdf'
+                                    ? 'PDF text extract is not available for this file (image/scanned PDF). Please use Open PDF to read.'
+                                    : ''),
                             bullets: const [
                               'Concept overview cards',
                               'Formula and memory anchors',
@@ -476,20 +480,28 @@ class _DetailPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formatted = _formatReadableContent(content);
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: AppSpacing.sm),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: highlight ? AppColors.indigoSoft : AppColors.surfaceMuted,
-              borderRadius: BorderRadius.circular(AppRadii.md),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: highlight ? AppColors.indigoSoft : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: SelectableText(
+                  formatted.isEmpty ? 'No content available yet.' : formatted,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
+                ),
+              ),
             ),
-            child: Text(content),
           ),
           const SizedBox(height: AppSpacing.lg),
           ...bullets.map(
@@ -512,5 +524,16 @@ class _DetailPanel extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatReadableContent(String raw) {
+    var text = raw.trim();
+    if (text.isEmpty) return '';
+    text = text
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(RegExp(r'([.?!])\s+'), r'$1\n\n')
+        .replaceAll(RegExp(r'(\d+\.)\s+'), r'\n$1 ')
+        .replaceAll(RegExp(r'([:;])\s+'), r'$1\n');
+    return text.trim();
   }
 }

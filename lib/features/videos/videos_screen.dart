@@ -190,8 +190,12 @@ class VideosScreen extends ConsumerWidget {
       );
       return;
     }
+    final playableUrl = _toPlayableVideoUrl(url);
     final isDirectPlayable =
-        url.contains('.mp4') || url.contains('storage.googleapis.com');
+        playableUrl.contains('.mp4') ||
+        playableUrl.contains('storage.googleapis.com') ||
+        playableUrl.contains('googleusercontent.com') ||
+        playableUrl.contains('drive.google.com/uc?');
     if (isDirectPlayable) {
       Navigator.push(
         context,
@@ -200,7 +204,8 @@ class VideosScreen extends ConsumerWidget {
             title: video['title']?.toString() ?? 'Video',
             subtitle:
                 '${video['subject'] ?? ''} • ${video['chapter_hint'] ?? video['topic'] ?? ''}',
-            videoUrl: url,
+            videoUrl: playableUrl,
+            fallbackUrl: url,
           ),
         ),
       );
@@ -212,5 +217,29 @@ class VideosScreen extends ConsumerWidget {
         const SnackBar(content: Text('Unable to open video link')),
       );
     }
+  }
+
+  String _toPlayableVideoUrl(String raw) {
+    final uri = Uri.tryParse(raw);
+    if (uri == null) return raw;
+    if (!raw.contains('drive.google.com')) return raw;
+    final id = _extractGoogleDriveFileId(uri);
+    if (id == null || id.isEmpty) return raw;
+    return 'https://drive.google.com/uc?export=download&id=$id';
+  }
+
+  String? _extractGoogleDriveFileId(Uri uri) {
+    final idFromQuery = uri.queryParameters['id'];
+    if (idFromQuery != null && idFromQuery.isNotEmpty) {
+      return idFromQuery;
+    }
+    final segments = uri.pathSegments;
+    final fileIndex = segments.indexOf('d');
+    if (fileIndex >= 0 && fileIndex + 1 < segments.length) {
+      return segments[fileIndex + 1];
+    }
+    final alt = RegExp(r'/file/d/([^/]+)').firstMatch(uri.toString());
+    if (alt != null) return alt.group(1);
+    return null;
   }
 }

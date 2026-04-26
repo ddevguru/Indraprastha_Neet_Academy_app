@@ -233,6 +233,8 @@ class _AdminHomeState extends State<AdminHome> {
   final _api = AdminApi();
   int _tab = 0;
   bool _restoringSession = true;
+  bool? _driveConnected;
+  bool _checkedDriveAfterLogin = false;
   static const _titles = [
     'Overview',
     'Setup',
@@ -260,8 +262,40 @@ class _AdminHomeState extends State<AdminHome> {
 
   Future<void> _restoreSession() async {
     await _api.restoreSession();
+    if (_api.token != null) {
+      await _checkDriveConnection(showPrompt: false);
+    }
     if (!mounted) return;
     setState(() => _restoringSession = false);
+  }
+
+  Future<void> _checkDriveConnection({required bool showPrompt}) async {
+    try {
+      final status = await _api.driveOAuthStatus();
+      final connected = status['hasRefreshToken'] == true;
+      if (!mounted) return;
+      setState(() => _driveConnected = connected);
+      if (!connected) {
+        setState(() => _tab = 1);
+        if (showPrompt) {
+          _showActionSnackBar(
+            context,
+            'Please connect Google Drive first to enable uploads.',
+            isError: true,
+          );
+        }
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _driveConnected = false);
+      if (showPrompt) {
+        _showActionSnackBar(
+          context,
+          'Could not verify Drive connection. Open Setup and connect Drive.',
+          isError: true,
+        );
+      }
+    }
   }
 
   @override
@@ -282,6 +316,16 @@ class _AdminHomeState extends State<AdminHome> {
     ];
     final title = _titles[_tab.clamp(0, _titles.length - 1)];
     final isLoggedIn = _api.token != null;
+    if (isLoggedIn && !_checkedDriveAfterLogin) {
+      _checkedDriveAfterLogin = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkDriveConnection(showPrompt: true);
+      });
+    }
+    if (!isLoggedIn) {
+      _checkedDriveAfterLogin = false;
+      _driveConnected = null;
+    }
     return Scaffold(
       drawer: isLoggedIn
           ? Drawer(
@@ -341,7 +385,9 @@ class _AdminHomeState extends State<AdminHome> {
           children: [
             const Text('Indraprastha Admin'),
             Text(
-              title,
+              isLoggedIn && _driveConnected == false
+                  ? '$title • Connect Drive required'
+                  : title,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -379,7 +425,13 @@ class _AdminHomeState extends State<AdminHome> {
         child: _api.token == null
             ? LoginPage(
                 api: _api,
-                onLoginSuccess: () => setState(() {}),
+                onLoginSuccess: () async {
+                  setState(() {
+                    _checkedDriveAfterLogin = false;
+                  });
+                  await _checkDriveConnection(showPrompt: true);
+                  if (mounted) setState(() {});
+                },
               )
             : pages[_tab],
       ),

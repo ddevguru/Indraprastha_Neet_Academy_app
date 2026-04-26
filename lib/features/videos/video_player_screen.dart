@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../theme/app_tokens.dart';
@@ -11,11 +12,13 @@ class VideoPlayerScreen extends StatefulWidget {
     required this.title,
     required this.subtitle,
     required this.videoUrl,
+    this.fallbackUrl,
   });
 
   final String title;
   final String subtitle;
   final String videoUrl;
+  final String? fallbackUrl;
 
   @override
   State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -185,6 +188,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         icon: const Icon(Icons.refresh_rounded),
                         label: const Text('Retry'),
                       ),
+                      if (widget.fallbackUrl != null &&
+                          widget.fallbackUrl!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final uri = Uri.tryParse(widget.fallbackUrl!);
+                            if (uri == null) return;
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          },
+                          icon: const Icon(Icons.open_in_new_rounded),
+                          label: const Text('Open externally'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
