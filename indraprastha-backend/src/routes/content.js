@@ -319,10 +319,24 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
       );
     }
 
+    const insights = await pool.query(
+      `SELECT insight_title, insight_body, priority
+       FROM ai_insights
+       WHERE analytics_id = $1
+       ORDER BY id ASC`,
+      [analyticsId]
+    );
+
     return res.json({
       success: true,
       attempt: attempt.rows[0],
       analytics: analytics.rows[0],
+      donut: {
+        correct: analytics.rows[0].correct_count,
+        wrong: analytics.rows[0].wrong_count,
+        unattempted: analytics.rows[0].unattempted_count,
+      },
+      insights: insights.rows,
     });
   } catch (e) {
     console.error('[CONTENT_SUBMIT_ERROR]', {

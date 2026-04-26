@@ -61,9 +61,11 @@ class ContentRepository {
     required int unattemptedCount,
   }) async {
     final token = await _token;
-    if (token == null) return {};
+    if (token == null) {
+      throw Exception('Not logged in. Please login again.');
+    }
     final response = await _client.post(
-      Uri.parse('$baseUrl/tests/$testId/submit'),
+      Uri.parse('$baseUrl/content/tests/$testId/submit'),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',

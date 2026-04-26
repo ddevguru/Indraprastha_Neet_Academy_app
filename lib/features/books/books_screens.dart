@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
@@ -326,19 +327,7 @@ class ChapterDetailScreen extends ConsumerWidget {
                       height: 420,
                       child: TabBarView(
                         children: [
-                          _DetailPanel(
-                            title: 'Structured notes',
-                            content: (chapter['note_summary']?.toString().trim().isNotEmpty ?? false)
-                                ? chapter['note_summary']?.toString() ?? ''
-                                : ((chapter['material_type']?.toString() ?? '') == 'pdf'
-                                    ? 'PDF text extract is not available for this file (image/scanned PDF). Please use Open PDF to read.'
-                                    : ''),
-                            bullets: const [
-                              'Concept overview cards',
-                              'Formula and memory anchors',
-                              'High-yield mistakes to avoid',
-                            ],
-                          ),
+                          _PdfOrNotesPanel(chapter: chapter),
                           _PyqSolvePanel(pyqs: pyqs),
                           _DetailPanel(
                             title: 'Important lines',
@@ -473,6 +462,122 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
         },
       ),
     );
+  }
+}
+
+class _PdfOrNotesPanel extends StatelessWidget {
+  const _PdfOrNotesPanel({required this.chapter});
+
+  final Map<String, dynamic> chapter;
+
+  @override
+  Widget build(BuildContext context) {
+    final materialType = (chapter['material_type']?.toString() ?? '').toLowerCase();
+    final driveLink = chapter['material_drive_link']?.toString() ?? '';
+    final note = _normalizeExtractedText(chapter['note_summary']?.toString() ?? '');
+    final previewUrl = _toDrivePreviewUrl(driveLink);
+
+    if (materialType == 'pdf' && previewUrl != null) {
+      return SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Structured notes', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.sm),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.md),
+                child: WebViewWidget(
+                  controller: WebViewController()
+                    ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                    ..setBackgroundColor(Colors.transparent)
+                    ..loadRequest(Uri.parse(previewUrl)),
+                ),
+              ),
+            ),
+            if (note.trim().isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Extracted text',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: SelectableText(
+                  note,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return _DetailPanel(
+      title: 'Structured notes',
+      content: note.trim().isNotEmpty
+          ? note
+          : (materialType == 'pdf'
+              ? 'PDF uploaded, but extracted text is not available (scan/image PDF). Use Open PDF.'
+              : ''),
+      bullets: const [
+        'Concept overview cards',
+        'Formula and memory anchors',
+        'High-yield mistakes to avoid',
+      ],
+    );
+  }
+
+  String? _toDrivePreviewUrl(String raw) {
+    if (raw.trim().isEmpty) return null;
+    final uri = Uri.tryParse(raw);
+    if (uri == null) return null;
+
+    // If we can extract Drive fileId, use /preview (best for embedded view).
+    final id = _extractGoogleDriveFileId(uri);
+    if (id != null && id.isNotEmpty) {
+      return 'https://drive.google.com/file/d/$id/preview';
+    }
+
+    // Fallback: just open the given URL in webview.
+    return raw;
+  }
+
+  String? _extractGoogleDriveFileId(Uri uri) {
+    final idFromQuery = uri.queryParameters['id'];
+    if (idFromQuery != null && idFromQuery.isNotEmpty) return idFromQuery;
+
+    final s = uri.toString();
+    final m1 = RegExp(r'/file/d/([^/]+)').firstMatch(s);
+    if (m1 != null) return m1.group(1);
+
+    final m2 = RegExp(r'drive\.google\.com\/open\?id=([^&]+)').firstMatch(s);
+    if (m2 != null) return m2.group(1);
+
+    return null;
+  }
+
+  String _normalizeExtractedText(String raw) {
+    var s = raw.replaceAll('\u0000', '').trim();
+    if (s.isEmpty) return '';
+    // If the text is char-per-line (vertical), join it.
+    final lines = s.split('\n');
+    final shortLines = lines.where((l) => l.trim().isNotEmpty && l.trim().length <= 2).length;
+    if (lines.length > 30 && (shortLines / lines.length) > 0.8) {
+      s = lines.map((l) => l.trim()).where((l) => l.isNotEmpty).join('');
+    }
+    // Light cleanup: normalize whitespace but preserve paragraphs.
+    s = s.replaceAll(RegExp(r'\r'), '\n');
+    s = s.replaceAll(RegExp(r'[ \t]+'), ' ');
+    s = s.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    return s.trim();
   }
 }
 

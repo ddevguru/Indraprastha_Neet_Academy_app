@@ -99,6 +99,13 @@ async function extractPdfBasics(fileBuffer) {
   }
 }
 
+function sanitizeForPostgresText(value) {
+  if (value == null) return '';
+  const s = String(value);
+  // Postgres TEXT cannot contain NUL (0x00)
+  return s.replace(/\u0000/g, '');
+}
+
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -604,6 +611,8 @@ router.post('/books/pdf-upload-complete', adminAuth, async (req, res) => {
     const pdfBuffer = fs.readFileSync(assembledPath);
     const extracted = await extractPdfBasics(pdfBuffer);
 
+    const safeNoteSummary = sanitizeForPostgresText(extracted.noteSummary);
+    const safeHighlight = sanitizeForPostgresText(extracted.highlight);
     const chapter = await pool.query(
       `INSERT INTO book_chapters (
         book_id, title, overview, note_summary, highlight, material_type, material_drive_link
@@ -613,8 +622,8 @@ router.post('/books/pdf-upload-complete', adminAuth, async (req, res) => {
         bookId,
         meta.chapterTitle,
         'Imported from PDF',
-        extracted.noteSummary,
-        extracted.highlight,
+        safeNoteSummary,
+        safeHighlight,
         uploaded.webViewLink || uploaded.webContentLink,
       ]
     );
@@ -681,6 +690,8 @@ router.post(
       });
       const extracted = await extractPdfBasics(req.file.buffer);
 
+      const safeNoteSummary = sanitizeForPostgresText(extracted.noteSummary);
+      const safeHighlight = sanitizeForPostgresText(extracted.highlight);
       const chapter = await pool.query(
         `INSERT INTO book_chapters (
           book_id, title, overview, note_summary, highlight, material_type, material_drive_link
@@ -690,8 +701,8 @@ router.post(
           req.params.bookId,
           chapterTitle,
           req.body.overview || 'Imported from PDF',
-          extracted.noteSummary,
-          extracted.highlight,
+          safeNoteSummary,
+          safeHighlight,
           uploaded.webViewLink || uploaded.webContentLink,
         ]
       );

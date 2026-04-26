@@ -192,6 +192,8 @@ class _TestResultScreenState extends State<TestResultScreen> {
   int _timeLeft = 0;
   bool _submitted = false;
   bool _submitting = false;
+  Map<String, dynamic>? _submitResponse;
+  bool _showReview = false;
   final Map<int, String> _answers = {};
   late final Future<Map<String, dynamic>> _attemptFuture;
   Timer? _timer;
@@ -254,6 +256,57 @@ class _TestResultScreenState extends State<TestResultScreen> {
           'C': q['option_c']?.toString() ?? '',
           'D': q['option_d']?.toString() ?? '',
         };
+        if (_submitted && _submitResponse != null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(test['title']?.toString() ?? 'Test Result'),
+            ),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: CenteredContent(
+                maxWidth: 980,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _ScoreSummaryCard(
+                      testTitle: test['title']?.toString() ?? 'Test',
+                      marks: (test['marks'] as num?)?.toInt() ?? 720,
+                      questions: questions.length,
+                      response: _submitResponse!,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    _AiInsightsPanel(
+                      insights: List<Map<String, dynamic>>.from(
+                        (_submitResponse?['insights'] as List<dynamic>?) ?? const [],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: PrimaryButton(
+                            label: _showReview ? 'Hide review' : 'Review answers',
+                            expanded: true,
+                            icon: Icons.fact_check_rounded,
+                            onPressed: () => setState(() => _showReview = !_showReview),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_showReview) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      _AnswerReviewPanel(
+                        questions: questions,
+                        answers: _answers,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         return Scaffold(
           appBar: AppBar(
             title: Text(test['title']?.toString() ?? 'Test Attempt'),
@@ -355,8 +408,9 @@ class _TestResultScreenState extends State<TestResultScreen> {
                               final accuracy = _answers.isEmpty
                                   ? 0.0
                                   : (correct / _answers.length) * 100;
+                              final messenger = ScaffoldMessenger.of(context);
                               try {
-                                await ContentRepository().submitTestAttempt(
+                                final res = await ContentRepository().submitTestAttempt(
                                   testId: widget.testId,
                                   score: score,
                                   accuracy: accuracy,
@@ -365,18 +419,12 @@ class _TestResultScreenState extends State<TestResultScreen> {
                                   unattemptedCount: unattempted,
                                 );
                                 if (!mounted) return;
-                                final messenger = ScaffoldMessenger.of(context);
-                                setState(() => _submitted = true);
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Submitted: Score $score/$marks | Correct $correct',
-                                    ),
-                                  ),
-                                );
+                                setState(() {
+                                  _submitted = true;
+                                  _submitResponse = res;
+                                });
                               } catch (e) {
                                 if (!mounted) return;
-                                final messenger = ScaffoldMessenger.of(context);
                                 messenger.showSnackBar(
                                   SnackBar(
                                     content: Text('Submit failed: $e'),
@@ -421,6 +469,301 @@ class _FilterChip extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: Text(label),
+    );
+  }
+}
+
+class _ScoreSummaryCard extends StatelessWidget {
+  const _ScoreSummaryCard({
+    required this.testTitle,
+    required this.marks,
+    required this.questions,
+    required this.response,
+  });
+
+  final String testTitle;
+  final int marks;
+  final int questions;
+  final Map<String, dynamic> response;
+
+  @override
+  Widget build(BuildContext context) {
+    final analytics = Map<String, dynamic>.from(response['analytics'] as Map? ?? const {});
+    final donut = Map<String, dynamic>.from(response['donut'] as Map? ?? const {});
+    final correct = (donut['correct'] as num?)?.toInt() ?? (analytics['correct_count'] as num?)?.toInt() ?? 0;
+    final wrong = (donut['wrong'] as num?)?.toInt() ?? (analytics['wrong_count'] as num?)?.toInt() ?? 0;
+    final unattempted = (donut['unattempted'] as num?)?.toInt() ?? (analytics['unattempted_count'] as num?)?.toInt() ?? 0;
+    final score = (analytics['score'] as num?)?.toInt() ?? 0;
+    final accuracy = (analytics['overall_accuracy'] as num?)?.toDouble() ?? 0.0;
+
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Result', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.sm),
+          Text(testTitle, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.indigoSoft,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Score', style: Theme.of(context).textTheme.labelLarge),
+                      const SizedBox(height: 6),
+                      Text(
+                        '$score / $marks',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.indigo,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('Accuracy: ${accuracy.toStringAsFixed(1)}%'),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              _DonutMini(correct: correct, wrong: wrong, unattempted: unattempted),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text('Correct: $correct  •  Wrong: $wrong  •  Unattempted: $unattempted'),
+        ],
+      ),
+    );
+  }
+}
+
+class _DonutMini extends StatelessWidget {
+  const _DonutMini({
+    required this.correct,
+    required this.wrong,
+    required this.unattempted,
+  });
+
+  final int correct;
+  final int wrong;
+  final int unattempted;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = (correct + wrong + unattempted).clamp(1, 1000000);
+    final correctPct = correct / total;
+    final wrongPct = wrong / total;
+    final unattemptedPct = unattempted / total;
+
+    return SizedBox(
+      width: 130,
+      height: 130,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CircularProgressIndicator(
+            value: 1,
+            strokeWidth: 12,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              AppColors.border,
+            ),
+          ),
+          CircularProgressIndicator(
+            value: correctPct,
+            strokeWidth: 12,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.success),
+            backgroundColor: Colors.transparent,
+          ),
+          CircularProgressIndicator(
+            value: correctPct + wrongPct,
+            strokeWidth: 12,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.danger),
+            backgroundColor: Colors.transparent,
+          ),
+          CircularProgressIndicator(
+            value: correctPct + wrongPct + unattemptedPct,
+            strokeWidth: 12,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.indigo),
+            backgroundColor: Colors.transparent,
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Done', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text('$total Qs'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiInsightsPanel extends StatelessWidget {
+  const _AiInsightsPanel({required this.insights});
+
+  final List<Map<String, dynamic>> insights;
+
+  @override
+  Widget build(BuildContext context) {
+    if (insights.isEmpty) {
+      return const EmptyStateWidget(
+        title: 'AI insights will appear here',
+        subtitle: 'Submit a test to generate performance recommendations.',
+        icon: Icons.auto_awesome_rounded,
+      );
+    }
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('AI Insights', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.sm),
+          ...insights.map((i) {
+            final title = i['insight_title']?.toString() ?? 'Insight';
+            final body = i['insight_body']?.toString() ?? '';
+            final priority = (i['priority']?.toString() ?? 'medium').toLowerCase();
+            final color = priority == 'high'
+                ? AppColors.danger
+                : priority == 'low'
+                    ? AppColors.textSecondary
+                    : AppColors.indigo;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.surfaceMuted.withValues(alpha: 0.25)
+                      : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.bolt_rounded, color: color),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(body),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnswerReviewPanel extends StatelessWidget {
+  const _AnswerReviewPanel({
+    required this.questions,
+    required this.answers,
+  });
+
+  final List<Map<String, dynamic>> questions;
+  final Map<int, String> answers;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Answer review', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.sm),
+          ...List.generate(questions.length, (i) {
+            final q = questions[i];
+            final selected = answers[i]?.toUpperCase();
+            final correct = q['correct_option']?.toString().toUpperCase() ?? '';
+            final options = <String, String>{
+              'A': q['option_a']?.toString() ?? '',
+              'B': q['option_b']?.toString() ?? '',
+              'C': q['option_c']?.toString() ?? '',
+              'D': q['option_d']?.toString() ?? '',
+            };
+            final isCorrect = selected != null && selected == correct;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Q${i + 1}. ${q['question'] ?? ''}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: options.entries.map((e) {
+                      final key = e.key;
+                      final val = e.value;
+                      final isSel = selected == key;
+                      final isRight = key == correct;
+                      Color bg = Theme.of(context).cardColor;
+                      Color border = AppColors.border;
+                      if (isRight) {
+                        bg = const Color(0xFFE7F8EF);
+                        border = AppColors.success;
+                      } else if (isSel && !isRight) {
+                        bg = const Color(0xFFFCEAEA);
+                        border = AppColors.danger;
+                      }
+                      return Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: bg,
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                          border: Border.all(color: border),
+                        ),
+                        child: Text('$key) $val'),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    selected == null
+                        ? 'Your answer: Not attempted'
+                        : 'Your answer: $selected  •  ${isCorrect ? "Correct" : "Wrong"}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: selected == null
+                          ? AppColors.textSecondary
+                          : (isCorrect ? AppColors.success : AppColors.danger),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('Explanation: ${q['explanation'] ?? ''}'),
+                  const Divider(height: 24),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 }
