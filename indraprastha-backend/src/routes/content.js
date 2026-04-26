@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
+const { normalizeDriveLink } = require('../services/drive');
 
 const router = express.Router();
 
@@ -37,6 +38,20 @@ async function userAuth(req, res, next) {
   } catch (_) {
     return res.status(401).json({ error: 'Invalid token' });
   }
+}
+
+function mapChapterLinks(chapter) {
+  return {
+    ...chapter,
+    material_drive_link: normalizeDriveLink(chapter.material_drive_link, 'preview'),
+  };
+}
+
+function mapQuestionImageLink(question) {
+  return {
+    ...question,
+    question_image_link: normalizeDriveLink(question.question_image_link, 'image'),
+  };
 }
 
 router.get('/course', userAuth, async (req, res) => {
@@ -79,7 +94,7 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
     [req.params.bookId, req.user.batch_id]
   );
   if (chapters.rows.length > 0) {
-    return res.json({ success: true, chapters: chapters.rows });
+    return res.json({ success: true, chapters: chapters.rows.map(mapChapterLinks) });
   }
 
   // Backward-compatible fallback:
@@ -107,7 +122,7 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
   );
 
   const chapter = {
-    ...created.rows[0],
+    ...mapChapterLinks(created.rows[0]),
     linked_pyq_count: 0,
   };
   return res.json({ success: true, chapters: [chapter] });
@@ -126,7 +141,7 @@ router.get('/chapters/:chapterId', userAuth, async (req, res) => {
   if (chapter.rows.length === 0) {
     return res.status(404).json({ error: 'Chapter not found' });
   }
-  res.json({ success: true, chapter: chapter.rows[0] });
+  res.json({ success: true, chapter: mapChapterLinks(chapter.rows[0]) });
 });
 
 router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
@@ -139,7 +154,7 @@ router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
      ORDER BY p.id ASC`,
     [req.params.chapterId, req.user.batch_id]
   );
-  res.json({ success: true, pyqs: pyqs.rows });
+  res.json({ success: true, pyqs: pyqs.rows.map(mapQuestionImageLink) });
 });
 
 router.get('/practice-sets', userAuth, async (req, res) => {
@@ -184,7 +199,7 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
   res.json({
     success: true,
     practiceSet: setMeta.rows[0],
-    questions: questions.rows,
+    questions: questions.rows.map(mapQuestionImageLink),
   });
 });
 
@@ -229,7 +244,7 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
   res.json({
     success: true,
     test: testMeta.rows[0],
-    questions: questions.rows,
+    questions: questions.rows.map(mapQuestionImageLink),
   });
 });
 
@@ -311,21 +326,36 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
         'medium',
       ],
     ];
-    for (const [title, body, priority] of insightRows) {
-      await pool.query(
-        `INSERT INTO ai_insights (analytics_id, insight_title, insight_body, priority)
-         VALUES ($1,$2,$3,$4)`,
-        [analyticsId, title, body, priority]
-      );
-    }
+    let insightsRows = [];
+    try {
+      for (const [title, body, priority] of insightRows) {
+        await pool.query(
+          `INSERT INTO ai_insights (analytics_id, insight_title, insight_body, priority)
+           VALUES ($1,$2,$3,$4)`,
+          [analyticsId, title, body, priority]
+        );
+      }
 
-    const insights = await pool.query(
-      `SELECT insight_title, insight_body, priority
-       FROM ai_insights
-       WHERE analytics_id = $1
-       ORDER BY id ASC`,
-      [analyticsId]
-    );
+      const insights = await pool.query(
+        `SELECT insight_title, insight_body, priority
+         FROM ai_insights
+         WHERE analytics_id = $1
+         ORDER BY id ASC`,
+        [analyticsId]
+      );
+      insightsRows = insights.rows;
+    } catch (insightError) {
+      console.error('[CONTENT_SUBMIT_INSIGHTS_ERROR]', {
+        message: insightError?.message || 'Insight insert failed',
+        stack: insightError?.stack,
+        analyticsId,
+      });
+      insightsRows = insightRows.map(([insight_title, insight_body, priority]) => ({
+        insight_title,
+        insight_body,
+        priority,
+      }));
+    }
 
     return res.json({
       success: true,
@@ -336,7 +366,7 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
         wrong: analytics.rows[0].wrong_count,
         unattempted: analytics.rows[0].unattempted_count,
       },
-      insights: insights.rows,
+      insights: insightsRows,
     });
   } catch (e) {
     console.error('[CONTENT_SUBMIT_ERROR]', {

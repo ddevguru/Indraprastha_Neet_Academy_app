@@ -12,6 +12,7 @@ const { pool } = require('../db');
 const {
   uploadBufferToDrive,
   uploadFilePathToDrive,
+  normalizeDriveLink,
   ensureDriveFolderPath,
   getDriveOAuthConsentUrl,
   exchangeDriveOAuthCode,
@@ -104,6 +105,20 @@ function sanitizeForPostgresText(value) {
   return s.replace(/\u0000/g, '');
 }
 
+function mapChapterLinks(chapter) {
+  return {
+    ...chapter,
+    material_drive_link: normalizeDriveLink(chapter.material_drive_link, 'preview'),
+  };
+}
+
+function mapQuestionImageLink(question) {
+  return {
+    ...question,
+    question_image_link: normalizeDriveLink(question.question_image_link, 'image'),
+  };
+}
+
 async function uploadQuestionImageByHierarchy({ file, batchId, classLabel, subject, topic }) {
   const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [batchId]);
   const batchName = batchRes.rows[0]?.name || `Batch-${batchId}`;
@@ -118,7 +133,7 @@ async function uploadQuestionImageByHierarchy({ file, batchId, classLabel, subje
     folderId: resolvedFolderId,
   });
   return {
-    driveLink: uploaded.webViewLink || uploaded.webContentLink || '',
+    driveLink: uploaded.imageLink || normalizeDriveLink(uploaded.webViewLink, 'image') || '',
     drive: uploaded,
     driveFolderId: resolvedFolderId,
   };
@@ -225,6 +240,7 @@ router.post('/question-images/upload', adminAuth, upload.single('image'), async 
     return res.json({
       success: true,
       driveLink: uploaded.driveLink,
+      imageLink: uploaded.driveLink,
       drive: uploaded.drive,
       driveFolderId: uploaded.driveFolderId,
     });
@@ -408,7 +424,7 @@ router.get('/books/:bookId/chapters', adminAuth, async (req, res) => {
      ORDER BY id ASC`,
     [req.params.bookId]
   );
-  return res.json({ success: true, chapters: result.rows });
+  return res.json({ success: true, chapters: result.rows.map(mapChapterLinks) });
 });
 
 router.put('/books/:id', adminAuth, async (req, res) => {
@@ -520,7 +536,7 @@ router.post(
           req.body.overview || 'Imported from PDF',
           extracted.noteSummary,
           extracted.highlight,
-          uploaded.webViewLink || uploaded.webContentLink,
+          uploaded.previewLink || normalizeDriveLink(uploaded.webViewLink, 'preview'),
         ]
       );
 
@@ -682,7 +698,7 @@ router.post('/books/pdf-upload-complete', adminAuth, async (req, res) => {
         'Imported from PDF',
         safeNoteSummary,
         safeHighlight,
-        uploaded.webViewLink || uploaded.webContentLink,
+        uploaded.previewLink || normalizeDriveLink(uploaded.webViewLink, 'preview'),
       ]
     );
 
@@ -761,7 +777,7 @@ router.post(
           req.body.overview || 'Imported from PDF',
           safeNoteSummary,
           safeHighlight,
-          uploaded.webViewLink || uploaded.webContentLink,
+          uploaded.previewLink || normalizeDriveLink(uploaded.webViewLink, 'preview'),
         ]
       );
 
@@ -827,10 +843,10 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
       correctOption,
       explanation || '',
       yearLabel || 'NEET',
-      questionImageLink || '',
+      normalizeDriveLink(questionImageLink || '', 'image'),
     ]
   );
-  res.json({ success: true, pyq: result.rows[0] });
+  res.json({ success: true, pyq: mapQuestionImageLink(result.rows[0]) });
 });
 
 router.get('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
@@ -841,7 +857,7 @@ router.get('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
      ORDER BY id DESC`,
     [req.params.chapterId]
   );
-  res.json({ success: true, pyqs: result.rows });
+  res.json({ success: true, pyqs: result.rows.map(mapQuestionImageLink) });
 });
 
 router.put('/pyqs/:id', adminAuth, async (req, res) => {
@@ -869,9 +885,23 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
          question_image_link = COALESCE($10, question_image_link)
      WHERE id = $1
      RETURNING *`,
-    [req.params.id, question, optionA, optionB, optionC, optionD, correctOption, explanation, yearLabel, questionImageLink]
+    [
+      req.params.id,
+      question,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
+      correctOption,
+      explanation,
+      yearLabel,
+      questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
+    ]
   );
-  return res.json({ success: true, pyq: result.rows[0] || null });
+  return res.json({
+    success: true,
+    pyq: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
+  });
 });
 
 router.delete('/pyqs/:id', adminAuth, async (req, res) => {
@@ -933,7 +963,7 @@ router.get('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
      ORDER BY id ASC`,
     [req.params.setId]
   );
-  return res.json({ success: true, questions: result.rows });
+  return res.json({ success: true, questions: result.rows.map(mapQuestionImageLink) });
 });
 
 router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
@@ -952,10 +982,10 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
       optionD,
       correctOption,
       explanation || '',
-      questionImageLink || '',
+      normalizeDriveLink(questionImageLink || '', 'image'),
     ]
   );
-  return res.json({ success: true, question: result.rows[0] });
+  return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
 });
 
 router.put('/practice-questions/:id', adminAuth, async (req, res) => {
@@ -973,9 +1003,22 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
          question_image_link = COALESCE($9, question_image_link)
      WHERE id = $1
      RETURNING *`,
-    [req.params.id, question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink]
+    [
+      req.params.id,
+      question,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
+      correctOption,
+      explanation,
+      questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
+    ]
   );
-  return res.json({ success: true, question: result.rows[0] || null });
+  return res.json({
+    success: true,
+    question: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
+  });
 });
 
 router.delete('/practice-questions/:id', adminAuth, async (req, res) => {
@@ -1062,7 +1105,7 @@ router.get('/tests/:testId/questions', adminAuth, async (req, res) => {
      ORDER BY id ASC`,
     [req.params.testId]
   );
-  res.json({ success: true, questions: result.rows });
+  res.json({ success: true, questions: result.rows.map(mapQuestionImageLink) });
 });
 
 router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
@@ -1092,10 +1135,10 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
       optionD,
       correctOption,
       explanation || '',
-      questionImageLink || '',
+      normalizeDriveLink(questionImageLink || '', 'image'),
     ]
   );
-  res.json({ success: true, question: result.rows[0] });
+  res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
 });
 
 router.put('/test-questions/:id', adminAuth, async (req, res) => {
@@ -1124,9 +1167,23 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
          question_image_link = COALESCE($10, question_image_link)
      WHERE id = $1
      RETURNING *`,
-    [req.params.id, subject, question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink]
+    [
+      req.params.id,
+      subject,
+      question,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
+      correctOption,
+      explanation,
+      questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
+    ]
   );
-  res.json({ success: true, question: result.rows[0] });
+  res.json({
+    success: true,
+    question: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
+  });
 });
 
 router.delete('/test-questions/:id', adminAuth, async (req, res) => {

@@ -8,6 +8,23 @@ import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 
+String _resolveDriveImageUrl(String raw) {
+  final value = raw.trim();
+  if (value.isEmpty) return value;
+  final uri = Uri.tryParse(value);
+  if (uri == null) return value;
+  String? id = uri.queryParameters['id'];
+  if (id == null || id.isEmpty) {
+    final parts = uri.pathSegments;
+    final fileIdx = parts.indexOf('file');
+    if (fileIdx >= 0 && fileIdx + 2 < parts.length && parts[fileIdx + 1] == 'd') {
+      id = parts[fileIdx + 2];
+    }
+  }
+  if (id == null || id.isEmpty) return value;
+  return 'https://drive.google.com/uc?export=view&id=$id';
+}
+
 class TestsScreen extends StatefulWidget {
   const TestsScreen({super.key});
 
@@ -198,6 +215,40 @@ class _TestResultScreenState extends State<TestResultScreen> {
   late final Future<Map<String, dynamic>> _attemptFuture;
   Timer? _timer;
 
+  Map<String, dynamic> _buildLocalSubmitResponse({
+    required List<Map<String, dynamic>> questions,
+    required Map<String, dynamic> test,
+  }) {
+    var correct = 0;
+    for (var i = 0; i < questions.length; i++) {
+      final marked = _answers[i];
+      final actual = questions[i]['correct_option']?.toString().toUpperCase() ?? '';
+      if (marked == actual) correct++;
+    }
+    final wrong = _answers.length - correct;
+    final unattempted = questions.length - _answers.length;
+    final marks = (test['marks'] as num?)?.toInt() ?? 720;
+    final score = questions.isEmpty ? 0 : ((correct / questions.length) * marks).round();
+    final accuracy = _answers.isEmpty ? 0.0 : (correct / _answers.length) * 100;
+    return {
+      'attempt': {
+        'score': score,
+      },
+      'analytics': {
+        'overall_accuracy': accuracy,
+        'correct_count': correct,
+        'wrong_count': wrong,
+        'unattempted_count': unattempted,
+      },
+      'donut': {
+        'correct': correct,
+        'wrong': wrong,
+        'unattempted': unattempted,
+      },
+      'insights': const <Map<String, dynamic>>[],
+    };
+  }
+
   @override
   void initState() {
     super.initState();
@@ -256,7 +307,12 @@ class _TestResultScreenState extends State<TestResultScreen> {
           'C': q['option_c']?.toString() ?? '',
           'D': q['option_d']?.toString() ?? '',
         };
-        if (_submitted && _submitResponse != null) {
+        if (_submitted) {
+          final response = _submitResponse ??
+              _buildLocalSubmitResponse(
+                questions: questions,
+                test: test,
+              );
           return Scaffold(
             appBar: AppBar(
               title: Text(test['title']?.toString() ?? 'Test Result'),
@@ -272,12 +328,12 @@ class _TestResultScreenState extends State<TestResultScreen> {
                       testTitle: test['title']?.toString() ?? 'Test',
                       marks: (test['marks'] as num?)?.toInt() ?? 720,
                       questions: questions.length,
-                      response: _submitResponse!,
+                      response: response,
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     _AiInsightsPanel(
                       insights: List<Map<String, dynamic>>.from(
-                        (_submitResponse?['insights'] as List<dynamic>?) ?? const [],
+                        (response['insights'] as List<dynamic>?) ?? const [],
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -339,7 +395,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(AppRadii.md),
                         child: Image.network(
-                          q['question_image_link'].toString(),
+                          _resolveDriveImageUrl(q['question_image_link'].toString()),
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                         ),

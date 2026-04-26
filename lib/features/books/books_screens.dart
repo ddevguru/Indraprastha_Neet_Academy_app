@@ -8,6 +8,23 @@ import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 
+String _resolveDriveImageUrl(String raw) {
+  final value = raw.trim();
+  if (value.isEmpty) return value;
+  final uri = Uri.tryParse(value);
+  if (uri == null) return value;
+  String? id = uri.queryParameters['id'];
+  if (id == null || id.isEmpty) {
+    final parts = uri.pathSegments;
+    final fileIdx = parts.indexOf('file');
+    if (fileIdx >= 0 && fileIdx + 2 < parts.length && parts[fileIdx + 1] == 'd') {
+      id = parts[fileIdx + 2];
+    }
+  }
+  if (id == null || id.isEmpty) return value;
+  return 'https://drive.google.com/uc?export=view&id=$id';
+}
+
 class BooksScreen extends ConsumerStatefulWidget {
   const BooksScreen({super.key});
 
@@ -407,7 +424,7 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadii.md),
                     child: Image.network(
-                      q['question_image_link'].toString(),
+                      _resolveDriveImageUrl(q['question_image_link'].toString()),
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),

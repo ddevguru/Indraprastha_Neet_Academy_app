@@ -52,6 +52,40 @@ function createDriveClient() {
   return createServiceAccountDriveClient();
 }
 
+function buildDrivePublicLinks(fileId) {
+  if (!fileId) {
+    return {
+      previewLink: '',
+      downloadLink: '',
+      imageLink: '',
+    };
+  }
+  return {
+    previewLink: `https://drive.google.com/file/d/${fileId}/preview`,
+    downloadLink: `https://drive.google.com/uc?export=download&id=${fileId}`,
+    imageLink: `https://drive.google.com/uc?export=view&id=${fileId}`,
+  };
+}
+
+function extractDriveFileId(rawUrl) {
+  if (!rawUrl) return '';
+  const value = String(rawUrl);
+  const fromQuery = /[?&]id=([^&]+)/.exec(value);
+  if (fromQuery && fromQuery[1]) return fromQuery[1];
+  const fromPath = /\/file\/d\/([^/]+)/.exec(value);
+  if (fromPath && fromPath[1]) return fromPath[1];
+  return '';
+}
+
+function normalizeDriveLink(rawUrl, mode = 'download') {
+  const fileId = extractDriveFileId(rawUrl);
+  if (!fileId) return rawUrl || '';
+  const links = buildDrivePublicLinks(fileId);
+  if (mode === 'preview') return links.previewLink;
+  if (mode === 'image') return links.imageLink;
+  return links.downloadLink;
+}
+
 async function uploadBufferToDrive({
   fileBuffer,
   fileName,
@@ -117,6 +151,7 @@ async function uploadBufferToDrive({
     fileId: meta.data.id,
     webViewLink: meta.data.webViewLink,
     webContentLink: meta.data.webContentLink,
+    ...buildDrivePublicLinks(meta.data.id),
   };
 }
 
@@ -167,6 +202,7 @@ async function uploadFilePathToDrive({
     fileId: meta.data.id,
     webViewLink: meta.data.webViewLink,
     webContentLink: meta.data.webContentLink,
+    ...buildDrivePublicLinks(meta.data.id),
   };
 }
 
@@ -265,6 +301,8 @@ async function exchangeDriveOAuthCode({ code }) {
 module.exports = {
   uploadBufferToDrive,
   uploadFilePathToDrive,
+  normalizeDriveLink,
+  extractDriveFileId,
   ensureDriveFolderPath,
   getDriveOAuthConsentUrl,
   exchangeDriveOAuthCode,
