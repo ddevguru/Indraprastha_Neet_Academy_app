@@ -68,24 +68,22 @@ function hierarchyFromBody(body = {}) {
 async function extractPdfBasics(fileBuffer) {
   try {
     const parsed = await pdfParse(Buffer.from(fileBuffer));
-    const text = (parsed.text || '').replace(/\r/g, '\n');
-    const lines = text
-      .split('\n')
-      .map((l) => l.replace(/[ \t]+/g, ' ').trim())
-      .filter(Boolean);
-    // Join with newlines so the app can render readable paragraphs.
-    const raw = lines.join('\n').trim();
-    if (!raw || raw.length < 30) {
+    const rawText = (parsed.text || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/\u0000/g, '');
+    if (!rawText || rawText.trim().length < 30) {
       return {
         noteSummary: '',
         highlight: '',
       };
     }
-    const noteSummary = raw.slice(0, 15000);
-    const firstSentence = raw
+    // Keep extraction as-is so student app can render original PDF text flow.
+    const noteSummary = rawText.slice(0, 120000).trim();
+    const firstSentence = rawText
       .replace(/\n+/g, ' ')
       .split(/[.?!]/)
-      .find((s) => s.trim().length > 20) || raw;
+      .find((s) => s.trim().length > 20) || rawText;
     const highlight = firstSentence.trim().slice(0, 220);
     return {
       noteSummary,

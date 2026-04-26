@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
 const fs = require('fs');
+const { Readable } = require('stream');
 
 function createServiceAccountDriveClient() {
   const clientEmail = process.env.GDRIVE_CLIENT_EMAIL;
@@ -56,6 +57,9 @@ async function uploadBufferToDrive({
   folderId,
 }) {
   const drive = createDriveClient();
+  const normalizedBuffer = Buffer.isBuffer(fileBuffer)
+    ? fileBuffer
+    : Buffer.from(fileBuffer);
   const response = await drive.files.create({
     requestBody: {
       name: fileName,
@@ -63,7 +67,8 @@ async function uploadBufferToDrive({
     },
     media: {
       mimeType,
-      body: Buffer.from(fileBuffer),
+      // googleapis multipart upload expects a stream with .pipe()
+      body: Readable.from(normalizedBuffer),
     },
     fields: 'id,webViewLink,webContentLink',
     supportsAllDrives: true,
