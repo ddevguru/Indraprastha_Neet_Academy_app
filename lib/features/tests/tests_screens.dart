@@ -334,6 +334,17 @@ class _TestResultScreenState extends State<TestResultScreen> {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Text(q['question']?.toString() ?? ''),
+                    if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        child: Image.network(
+                          q['question_image_link'].toString(),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.lg),
                     ...options.entries.map(
                       (e) => Padding(
@@ -489,11 +500,12 @@ class _ScoreSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final analytics = Map<String, dynamic>.from(response['analytics'] as Map? ?? const {});
+    final attempt = Map<String, dynamic>.from(response['attempt'] as Map? ?? const {});
     final donut = Map<String, dynamic>.from(response['donut'] as Map? ?? const {});
     final correct = (donut['correct'] as num?)?.toInt() ?? (analytics['correct_count'] as num?)?.toInt() ?? 0;
     final wrong = (donut['wrong'] as num?)?.toInt() ?? (analytics['wrong_count'] as num?)?.toInt() ?? 0;
     final unattempted = (donut['unattempted'] as num?)?.toInt() ?? (analytics['unattempted_count'] as num?)?.toInt() ?? 0;
-    final score = (analytics['score'] as num?)?.toInt() ?? 0;
+    final score = (attempt['score'] as num?)?.toInt() ?? 0;
     final accuracy = (analytics['overall_accuracy'] as num?)?.toDouble() ?? 0.0;
 
     return SurfaceCard(

@@ -172,6 +172,11 @@ async function ensureDatabaseSchema() {
   `);
 
   await pool.query(`
+    ALTER TABLE pyqs
+    ADD COLUMN IF NOT EXISTS question_image_link TEXT;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS practice_sets (
       id SERIAL PRIMARY KEY,
       batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
@@ -208,6 +213,11 @@ async function ensureDatabaseSchema() {
       explanation TEXT DEFAULT '',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS question_image_link TEXT;
   `);
 
   await pool.query(`
@@ -257,6 +267,11 @@ async function ensureDatabaseSchema() {
       explanation TEXT DEFAULT '',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS question_image_link TEXT;
   `);
 
   await pool.query(`

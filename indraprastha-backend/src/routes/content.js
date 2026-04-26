@@ -131,7 +131,7 @@ router.get('/chapters/:chapterId', userAuth, async (req, res) => {
 
 router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
   const pyqs = await pool.query(
-    `SELECT p.id, p.question, p.option_a, p.option_b, p.option_c, p.option_d, p.correct_option, p.explanation, p.year_label
+    `SELECT p.id, p.question, p.option_a, p.option_b, p.option_c, p.option_d, p.correct_option, p.explanation, p.year_label, p.question_image_link
      FROM pyqs p
      JOIN book_chapters ch ON ch.id = p.chapter_id
      JOIN books b ON b.id = ch.book_id
@@ -175,7 +175,7 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
     return res.status(404).json({ error: 'Practice set not found' });
   }
   const questions = await pool.query(
-    `SELECT id, question, option_a, option_b, option_c, option_d, correct_option, explanation
+    `SELECT id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
      FROM practice_questions
      WHERE practice_set_id = $1
      ORDER BY id ASC`,
@@ -220,7 +220,7 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
     return res.status(404).json({ error: 'Test not found' });
   }
   const questions = await pool.query(
-    `SELECT id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation
+    `SELECT id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
      FROM test_questions
      WHERE test_id = $1
      ORDER BY id ASC`,

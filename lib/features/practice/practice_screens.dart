@@ -253,6 +253,17 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           question['question']?.toString() ?? '',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
+                        if ((question['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            child: Image.network(
+                              question['question_image_link'].toString(),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: AppSpacing.lg),
                         ...List.generate(options.length, (index) {
                           final selected = _selectedOption == index;

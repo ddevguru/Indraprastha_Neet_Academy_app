@@ -928,6 +928,9 @@ class _BooksPageState extends State<BooksPage> {
   final _pyqOptionD = TextEditingController();
   final _pyqExplanation = TextEditingController();
   String _pyqCorrect = 'A';
+  int? _editingPyqId;
+  File? _pyqImage;
+  String _pyqImageLink = '';
   String _bookCategory = 'NCERT books';
   int? _selectedBookId;
   int? _selectedChapterId;
@@ -1260,10 +1263,56 @@ class _BooksPageState extends State<BooksPage> {
                   decoration: const InputDecoration(labelText: 'Explanation'),
                 ),
                 const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _pyqImage == null
+                            ? (_pyqImageLink.isEmpty ? 'No image selected' : 'Image uploaded')
+                            : _pyqImage!.path,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                        if (result?.files.single.path == null) return;
+                        setState(() => _pyqImage = File(result!.files.single.path!));
+                      },
+                      child: const Text('Pick image'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 FilledButton.tonal(
                   onPressed: _selectedChapterId == null
                       ? null
                       : () async {
+                          var imageLink = _pyqImageLink;
+                          if (_pyqImage != null && _batchId != null) {
+                            imageLink = await widget.api.uploadQuestionImage(
+                              batchId: _batchId!,
+                              classLabel: _classLabel.text.trim(),
+                              subject: _subject.text.trim(),
+                              topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                              file: _pyqImage!,
+                            );
+                          }
+                          if (_editingPyqId != null) {
+                            await widget.api.updatePyq(
+                              id: _editingPyqId!,
+                              question: _pyqQuestion.text.trim(),
+                              optionA: _pyqOptionA.text.trim(),
+                              optionB: _pyqOptionB.text.trim(),
+                              optionC: _pyqOptionC.text.trim(),
+                              optionD: _pyqOptionD.text.trim(),
+                              correctOption: _pyqCorrect,
+                              explanation: _pyqExplanation.text.trim(),
+                              questionImageLink: imageLink,
+                            );
+                            setState(() => _editingPyqId = null);
+                          } else {
                           await widget.api.addPyq(
                             chapterId: _selectedChapterId!,
                             question: _pyqQuestion.text.trim(),
@@ -1273,13 +1322,159 @@ class _BooksPageState extends State<BooksPage> {
                             optionD: _pyqOptionD.text.trim(),
                             correctOption: _pyqCorrect,
                             explanation: _pyqExplanation.text.trim(),
+                            questionImageLink: imageLink,
                           );
-                          setState(() => _status = 'PYQ added manually');
+                          }
+                          setState(() {
+                            _status = 'PYQ saved';
+                            _pyqImage = null;
+                            _pyqImageLink = imageLink;
+                          });
                           if (context.mounted) {
-                            _showActionSnackBar(context, 'PYQ added successfully');
+                            _showActionSnackBar(context, 'PYQ saved successfully');
                           }
                         },
-                  child: const Text('Add PYQ'),
+                  child: Text(_editingPyqId == null ? 'Add PYQ' : 'Update PYQ'),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.tonal(
+                  onPressed: _selectedChapterId == null
+                      ? null
+                      : () async {
+                          final pyqs = await widget.api.pyqs(_selectedChapterId!);
+                          if (!context.mounted) return;
+                          showModalBottomSheet(
+                            context: context,
+                            showDragHandle: true,
+                            builder: (_) => SafeArea(
+                              child: ListView(
+                                padding: const EdgeInsets.all(16),
+                                children: [
+                                  Text('Manage PYQs', style: Theme.of(context).textTheme.titleLarge),
+                                  const SizedBox(height: 10),
+                                  if (pyqs.isEmpty)
+                                    const Text('No PYQs found')
+                                  else
+                                    ...pyqs.map(
+                                      (q) => Card(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(10),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(q['question']?.toString() ?? ''),
+                                              const SizedBox(height: 4),
+                                              Text('Correct: ${q['correct_option'] ?? '-'}'),
+                                              if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                                                const SizedBox(height: 8),
+                                                ClipRRect(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  child: Image.network(
+                                                    q['question_image_link'].toString(),
+                                                    height: 120,
+                                                    width: double.infinity,
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                ),
+                                              ],
+                                              const SizedBox(height: 8),
+                                              Wrap(
+                                                spacing: 6,
+                                                runSpacing: 6,
+                                                children: [
+                                                  OutlinedButton.icon(
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _editingPyqId = q['id'] as int;
+                                                        _pyqQuestion.text = q['question']?.toString() ?? '';
+                                                        _pyqOptionA.text = q['option_a']?.toString() ?? '';
+                                                        _pyqOptionB.text = q['option_b']?.toString() ?? '';
+                                                        _pyqOptionC.text = q['option_c']?.toString() ?? '';
+                                                        _pyqOptionD.text = q['option_d']?.toString() ?? '';
+                                                        _pyqCorrect = q['correct_option']?.toString() ?? 'A';
+                                                        _pyqExplanation.text = q['explanation']?.toString() ?? '';
+                                                        _pyqImageLink = q['question_image_link']?.toString() ?? '';
+                                                        _pyqImage = null;
+                                                      });
+                                                      Navigator.of(context).pop();
+                                                    },
+                                                    icon: const Icon(Icons.edit_outlined),
+                                                    label: const Text('Edit'),
+                                                  ),
+                                                  OutlinedButton.icon(
+                                                    onPressed: () async {
+                                                      if (_batchId == null) return;
+                                                      final picked = await FilePicker.platform.pickFiles(
+                                                        type: FileType.image,
+                                                      );
+                                                      if (picked?.files.single.path == null) return;
+                                                      final link = await widget.api.uploadQuestionImage(
+                                                        batchId: _batchId!,
+                                                        classLabel: _classLabel.text.trim(),
+                                                        subject: _subject.text.trim(),
+                                                        topic: _chapter.text.trim().isEmpty
+                                                            ? 'PYQ'
+                                                            : _chapter.text.trim(),
+                                                        file: File(picked!.files.single.path!),
+                                                      );
+                                                      await widget.api.updatePyq(
+                                                        id: q['id'] as int,
+                                                        question: q['question']?.toString() ?? '',
+                                                        optionA: q['option_a']?.toString() ?? '',
+                                                        optionB: q['option_b']?.toString() ?? '',
+                                                        optionC: q['option_c']?.toString() ?? '',
+                                                        optionD: q['option_d']?.toString() ?? '',
+                                                        correctOption:
+                                                            q['correct_option']?.toString() ?? 'A',
+                                                        explanation: q['explanation']?.toString() ?? '',
+                                                        questionImageLink: link,
+                                                      );
+                                                      if (context.mounted) Navigator.of(context).pop();
+                                                    },
+                                                    icon: const Icon(Icons.image_outlined),
+                                                    label: const Text('Replace image'),
+                                                  ),
+                                                  OutlinedButton.icon(
+                                                    onPressed: () async {
+                                                      await widget.api.updatePyq(
+                                                        id: q['id'] as int,
+                                                        question: q['question']?.toString() ?? '',
+                                                        optionA: q['option_a']?.toString() ?? '',
+                                                        optionB: q['option_b']?.toString() ?? '',
+                                                        optionC: q['option_c']?.toString() ?? '',
+                                                        optionD: q['option_d']?.toString() ?? '',
+                                                        correctOption:
+                                                            q['correct_option']?.toString() ?? 'A',
+                                                        explanation: q['explanation']?.toString() ?? '',
+                                                        questionImageLink: '',
+                                                      );
+                                                      if (context.mounted) Navigator.of(context).pop();
+                                                    },
+                                                    icon: const Icon(Icons.image_not_supported_outlined),
+                                                    label: const Text('Remove image'),
+                                                  ),
+                                                  OutlinedButton.icon(
+                                                    onPressed: () async {
+                                                      await widget.api.deletePyq(q['id'] as int);
+                                                      if (context.mounted) Navigator.of(context).pop();
+                                                    },
+                                                    icon: const Icon(Icons.delete_outline),
+                                                    label: const Text('Delete'),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                  child: const Text('Manage PYQs (Edit/Delete)'),
                 ),
               ],
             ),
@@ -1355,6 +1550,17 @@ class _PracticePageState extends State<PracticePage> {
   final _topic = TextEditingController();
   int? _batchId;
   int? _editingId;
+  int? _selectedSetId;
+  int? _editingPracticeQuestionId;
+  final _pqQuestion = TextEditingController();
+  final _pqOptionA = TextEditingController();
+  final _pqOptionB = TextEditingController();
+  final _pqOptionC = TextEditingController();
+  final _pqOptionD = TextEditingController();
+  final _pqExplanation = TextEditingController();
+  String _pqCorrect = 'A';
+  File? _pqImage;
+  String _pqImageLink = '';
   List<dynamic> _batches = const [];
   List<dynamic> _items = const [];
 
@@ -1371,6 +1577,7 @@ class _PracticePageState extends State<PracticePage> {
       _batches = b['batches'] as List<dynamic>;
       _items = p['practiceSets'] as List<dynamic>;
       _batchId ??= _batches.isNotEmpty ? (_batches.first as Map<String, dynamic>)['id'] as int : null;
+      _selectedSetId ??= _items.isNotEmpty ? (_items.first as Map<String, dynamic>)['id'] as int : null;
     });
   }
 
@@ -1436,6 +1643,277 @@ class _PracticePageState extends State<PracticePage> {
                           }
                         },
                   child: Text(_editingId == null ? 'Add Practice' : 'Update Practice'),
+                ),
+                const SizedBox(height: 10),
+                const Divider(),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Add questions to practice', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  initialValue: _selectedSetId,
+                  items: _items
+                      .map(
+                        (t) => DropdownMenuItem<int>(
+                          value: (t as Map<String, dynamic>)['id'] as int,
+                          child: Text(t['title']?.toString() ?? ''),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedSetId = v),
+                  decoration: const InputDecoration(labelText: 'Select practice set'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _pqQuestion,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Question'),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: _pqOptionA, decoration: const InputDecoration(labelText: 'Option A')),
+                const SizedBox(height: 8),
+                TextField(controller: _pqOptionB, decoration: const InputDecoration(labelText: 'Option B')),
+                const SizedBox(height: 8),
+                TextField(controller: _pqOptionC, decoration: const InputDecoration(labelText: 'Option C')),
+                const SizedBox(height: 8),
+                TextField(controller: _pqOptionD, decoration: const InputDecoration(labelText: 'Option D')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _pqCorrect,
+                  items: const [
+                    DropdownMenuItem(value: 'A', child: Text('Correct: A')),
+                    DropdownMenuItem(value: 'B', child: Text('Correct: B')),
+                    DropdownMenuItem(value: 'C', child: Text('Correct: C')),
+                    DropdownMenuItem(value: 'D', child: Text('Correct: D')),
+                  ],
+                  onChanged: (v) => setState(() => _pqCorrect = v ?? 'A'),
+                  decoration: const InputDecoration(labelText: 'Correct option'),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: _pqExplanation, decoration: const InputDecoration(labelText: 'Explanation')),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _pqImage == null
+                            ? (_pqImageLink.isEmpty ? 'No image selected' : 'Image uploaded')
+                            : _pqImage!.path,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                        if (result?.files.single.path == null) return;
+                        setState(() => _pqImage = File(result!.files.single.path!));
+                      },
+                      child: const Text('Pick image'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                FilledButton.tonal(
+                  onPressed: _selectedSetId == null
+                      ? null
+                      : () async {
+                          try {
+                            var imageLink = _pqImageLink;
+                            if (_pqImage != null && _batchId != null) {
+                              imageLink = await widget.api.uploadQuestionImage(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _topic.text.trim().isEmpty ? 'Practice Questions' : _topic.text.trim(),
+                                file: _pqImage!,
+                              );
+                            }
+                            if (_editingPracticeQuestionId == null) {
+                              await widget.api.addPracticeQuestion(
+                                setId: _selectedSetId!,
+                                question: _pqQuestion.text.trim(),
+                                optionA: _pqOptionA.text.trim(),
+                                optionB: _pqOptionB.text.trim(),
+                                optionC: _pqOptionC.text.trim(),
+                                optionD: _pqOptionD.text.trim(),
+                                correctOption: _pqCorrect,
+                                explanation: _pqExplanation.text.trim(),
+                                questionImageLink: imageLink,
+                              );
+                            } else {
+                              await widget.api.updatePracticeQuestion(
+                                id: _editingPracticeQuestionId!,
+                                question: _pqQuestion.text.trim(),
+                                optionA: _pqOptionA.text.trim(),
+                                optionB: _pqOptionB.text.trim(),
+                                optionC: _pqOptionC.text.trim(),
+                                optionD: _pqOptionD.text.trim(),
+                                correctOption: _pqCorrect,
+                                explanation: _pqExplanation.text.trim(),
+                                questionImageLink: imageLink,
+                              );
+                            }
+                            setState(() {
+                              _editingPracticeQuestionId = null;
+                              _pqImage = null;
+                              _pqImageLink = imageLink;
+                            });
+                            if (context.mounted) _showActionSnackBar(context, 'Practice question saved');
+                          } catch (_) {
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'Practice question save failed', isError: true);
+                            }
+                          }
+                        },
+                  child: Text(
+                    _editingPracticeQuestionId == null ? 'Add Practice Question' : 'Update Practice Question',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.tonal(
+                  onPressed: _selectedSetId == null
+                      ? null
+                      : () async {
+                          final qs = await widget.api.practiceQuestions(_selectedSetId!);
+                          if (!context.mounted) return;
+                          showModalBottomSheet(
+                            context: context,
+                            showDragHandle: true,
+                            builder: (_) => SafeArea(
+                              child: ListView(
+                                padding: const EdgeInsets.all(16),
+                                children: [
+                                  Text('Practice Questions', style: Theme.of(context).textTheme.titleLarge),
+                                  const SizedBox(height: 10),
+                                  if (qs.isEmpty)
+                                    const Text('No questions yet')
+                                  else
+                                    ...qs.map(
+                                      (q) => Card(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(10),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(q['question']?.toString() ?? ''),
+                                              const SizedBox(height: 4),
+                                              Text('Correct: ${q['correct_option'] ?? '-'}'),
+                                              if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                                                const SizedBox(height: 8),
+                                                ClipRRect(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  child: Image.network(
+                                                    q['question_image_link'].toString(),
+                                                    height: 120,
+                                                    width: double.infinity,
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                ),
+                                              ],
+                                              const SizedBox(height: 8),
+                                              Wrap(
+                                                spacing: 6,
+                                                runSpacing: 6,
+                                                children: [
+                                                  OutlinedButton.icon(
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _editingPracticeQuestionId = q['id'] as int;
+                                                        _pqQuestion.text = q['question']?.toString() ?? '';
+                                                        _pqOptionA.text = q['option_a']?.toString() ?? '';
+                                                        _pqOptionB.text = q['option_b']?.toString() ?? '';
+                                                        _pqOptionC.text = q['option_c']?.toString() ?? '';
+                                                        _pqOptionD.text = q['option_d']?.toString() ?? '';
+                                                        _pqCorrect = q['correct_option']?.toString() ?? 'A';
+                                                        _pqExplanation.text = q['explanation']?.toString() ?? '';
+                                                        _pqImageLink =
+                                                            q['question_image_link']?.toString() ?? '';
+                                                        _pqImage = null;
+                                                      });
+                                                      Navigator.of(context).pop();
+                                                    },
+                                                    icon: const Icon(Icons.edit_outlined),
+                                                    label: const Text('Edit'),
+                                                  ),
+                                                  OutlinedButton.icon(
+                                                    onPressed: () async {
+                                                      if (_batchId == null) return;
+                                                      final picked = await FilePicker.platform.pickFiles(
+                                                        type: FileType.image,
+                                                      );
+                                                      if (picked?.files.single.path == null) return;
+                                                      final link = await widget.api.uploadQuestionImage(
+                                                        batchId: _batchId!,
+                                                        classLabel: _classLabel.text.trim(),
+                                                        subject: _subject.text.trim(),
+                                                        topic: _topic.text.trim().isEmpty
+                                                            ? 'Practice Questions'
+                                                            : _topic.text.trim(),
+                                                        file: File(picked!.files.single.path!),
+                                                      );
+                                                      await widget.api.updatePracticeQuestion(
+                                                        id: q['id'] as int,
+                                                        question: q['question']?.toString() ?? '',
+                                                        optionA: q['option_a']?.toString() ?? '',
+                                                        optionB: q['option_b']?.toString() ?? '',
+                                                        optionC: q['option_c']?.toString() ?? '',
+                                                        optionD: q['option_d']?.toString() ?? '',
+                                                        correctOption:
+                                                            q['correct_option']?.toString() ?? 'A',
+                                                        explanation: q['explanation']?.toString() ?? '',
+                                                        questionImageLink: link,
+                                                      );
+                                                      if (context.mounted) Navigator.of(context).pop();
+                                                    },
+                                                    icon: const Icon(Icons.image_outlined),
+                                                    label: const Text('Replace image'),
+                                                  ),
+                                                  OutlinedButton.icon(
+                                                    onPressed: () async {
+                                                      await widget.api.updatePracticeQuestion(
+                                                        id: q['id'] as int,
+                                                        question: q['question']?.toString() ?? '',
+                                                        optionA: q['option_a']?.toString() ?? '',
+                                                        optionB: q['option_b']?.toString() ?? '',
+                                                        optionC: q['option_c']?.toString() ?? '',
+                                                        optionD: q['option_d']?.toString() ?? '',
+                                                        correctOption:
+                                                            q['correct_option']?.toString() ?? 'A',
+                                                        explanation: q['explanation']?.toString() ?? '',
+                                                        questionImageLink: '',
+                                                      );
+                                                      if (context.mounted) Navigator.of(context).pop();
+                                                    },
+                                                    icon: const Icon(Icons.image_not_supported_outlined),
+                                                    label: const Text('Remove image'),
+                                                  ),
+                                                  OutlinedButton.icon(
+                                                    onPressed: () async {
+                                                      await widget.api.deletePracticeQuestion(
+                                                        q['id'] as int,
+                                                      );
+                                                      if (context.mounted) Navigator.of(context).pop();
+                                                    },
+                                                    icon: const Icon(Icons.delete_outline),
+                                                    label: const Text('Delete'),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                  child: const Text('Manage Practice Questions'),
                 ),
               ],
             ),
@@ -1516,6 +1994,9 @@ class _TestsPageState extends State<TestsPage> {
   final _testOptionD = TextEditingController();
   final _testExplanation = TextEditingController();
   String _testCorrect = 'A';
+  int? _editingQuestionId;
+  File? _testQuestionImage;
+  String _testQuestionImageLink = '';
   int? _batchId;
   int? _editingId;
   int? _selectedTestId;
@@ -1665,30 +2146,83 @@ class _TestsPageState extends State<TestsPage> {
                 const SizedBox(height: 8),
                 TextField(controller: _testExplanation, decoration: const InputDecoration(labelText: 'Explanation')),
                 const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _testQuestionImage == null
+                            ? (_testQuestionImageLink.isEmpty ? 'No image selected' : 'Image uploaded')
+                            : _testQuestionImage!.path,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                        if (result?.files.single.path == null) return;
+                        setState(() => _testQuestionImage = File(result!.files.single.path!));
+                      },
+                      child: const Text('Pick image'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 FilledButton.tonal(
                   onPressed: _selectedTestId == null
                       ? null
                       : () async {
                           try {
-                            await widget.api.addTestQuestion(
-                              testId: _selectedTestId!,
-                              question: _testQuestion.text.trim(),
-                              optionA: _testOptionA.text.trim(),
-                              optionB: _testOptionB.text.trim(),
-                              optionC: _testOptionC.text.trim(),
-                              optionD: _testOptionD.text.trim(),
-                              correctOption: _testCorrect,
-                              explanation: _testExplanation.text.trim(),
-                              subject: _subject.text.trim(),
-                            );
-                            setState(() => _status = 'Question added');
-                            if (context.mounted) _showActionSnackBar(context, 'Question added successfully');
+                            var imageLink = _testQuestionImageLink;
+                            if (_testQuestionImage != null && _batchId != null) {
+                              imageLink = await widget.api.uploadQuestionImage(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _topic.text.trim().isEmpty ? 'Test Questions' : _topic.text.trim(),
+                                file: _testQuestionImage!,
+                              );
+                            }
+                            if (_editingQuestionId == null) {
+                              await widget.api.addTestQuestion(
+                                testId: _selectedTestId!,
+                                question: _testQuestion.text.trim(),
+                                optionA: _testOptionA.text.trim(),
+                                optionB: _testOptionB.text.trim(),
+                                optionC: _testOptionC.text.trim(),
+                                optionD: _testOptionD.text.trim(),
+                                correctOption: _testCorrect,
+                                explanation: _testExplanation.text.trim(),
+                                subject: _subject.text.trim(),
+                                questionImageLink: imageLink,
+                              );
+                            } else {
+                              await widget.api.updateTestQuestion(
+                                id: _editingQuestionId!,
+                                question: _testQuestion.text.trim(),
+                                optionA: _testOptionA.text.trim(),
+                                optionB: _testOptionB.text.trim(),
+                                optionC: _testOptionC.text.trim(),
+                                optionD: _testOptionD.text.trim(),
+                                correctOption: _testCorrect,
+                                explanation: _testExplanation.text.trim(),
+                                subject: _subject.text.trim(),
+                                questionImageLink: imageLink,
+                              );
+                            }
+                            setState(() {
+                              _status = 'Question saved';
+                              _editingQuestionId = null;
+                              _testQuestionImage = null;
+                              _testQuestionImageLink = imageLink;
+                            });
+                            if (context.mounted) _showActionSnackBar(context, 'Question saved successfully');
                           } catch (e) {
                             setState(() => _status = 'Question add failed: $e');
                             if (context.mounted) _showActionSnackBar(context, 'Question add failed', isError: true);
                           }
                         },
-                  child: const Text('Add Question'),
+                  child: Text(_editingQuestionId == null ? 'Add Question' : 'Update Question'),
                 ),
               ],
             ),
@@ -1721,9 +2255,118 @@ class _TestsPageState extends State<TestsPage> {
                                 const Text('No questions yet')
                               else
                                 ...qs.map(
-                                  (q) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: Text('• ${q['question'] ?? ''}'),
+                                  (q) => Card(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(10),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(q['question']?.toString() ?? ''),
+                                          const SizedBox(height: 4),
+                                          Text('Correct: ${q['correct_option'] ?? '-'}'),
+                                          if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                                            const SizedBox(height: 8),
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: Image.network(
+                                                q['question_image_link'].toString(),
+                                                height: 120,
+                                                width: double.infinity,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                          ],
+                                          const SizedBox(height: 8),
+                                          Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: [
+                                              OutlinedButton.icon(
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _editingQuestionId = q['id'] as int;
+                                                    _testQuestion.text = q['question']?.toString() ?? '';
+                                                    _testOptionA.text = q['option_a']?.toString() ?? '';
+                                                    _testOptionB.text = q['option_b']?.toString() ?? '';
+                                                    _testOptionC.text = q['option_c']?.toString() ?? '';
+                                                    _testOptionD.text = q['option_d']?.toString() ?? '';
+                                                    _testCorrect = q['correct_option']?.toString() ?? 'A';
+                                                    _testExplanation.text = q['explanation']?.toString() ?? '';
+                                                    _testQuestionImageLink =
+                                                        q['question_image_link']?.toString() ?? '';
+                                                    _testQuestionImage = null;
+                                                  });
+                                                  Navigator.of(context).pop();
+                                                },
+                                                icon: const Icon(Icons.edit_outlined),
+                                                label: const Text('Edit'),
+                                              ),
+                                              OutlinedButton.icon(
+                                                onPressed: () async {
+                                                  if (_batchId == null) return;
+                                                  final picked = await FilePicker.platform.pickFiles(
+                                                    type: FileType.image,
+                                                  );
+                                                  if (picked?.files.single.path == null) return;
+                                                  final link = await widget.api.uploadQuestionImage(
+                                                    batchId: _batchId!,
+                                                    classLabel: _classLabel.text.trim(),
+                                                    subject: _subject.text.trim(),
+                                                    topic: _topic.text.trim().isEmpty
+                                                        ? 'Test Questions'
+                                                        : _topic.text.trim(),
+                                                    file: File(picked!.files.single.path!),
+                                                  );
+                                                  await widget.api.updateTestQuestion(
+                                                    id: q['id'] as int,
+                                                    question: q['question']?.toString() ?? '',
+                                                    optionA: q['option_a']?.toString() ?? '',
+                                                    optionB: q['option_b']?.toString() ?? '',
+                                                    optionC: q['option_c']?.toString() ?? '',
+                                                    optionD: q['option_d']?.toString() ?? '',
+                                                    correctOption: q['correct_option']?.toString() ?? 'A',
+                                                    explanation: q['explanation']?.toString() ?? '',
+                                                    subject: q['subject']?.toString() ?? _subject.text.trim(),
+                                                    questionImageLink: link,
+                                                  );
+                                                  if (context.mounted) Navigator.of(context).pop();
+                                                },
+                                                icon: const Icon(Icons.image_outlined),
+                                                label: const Text('Replace image'),
+                                              ),
+                                              OutlinedButton.icon(
+                                                onPressed: () async {
+                                                  await widget.api.updateTestQuestion(
+                                                    id: q['id'] as int,
+                                                    question: q['question']?.toString() ?? '',
+                                                    optionA: q['option_a']?.toString() ?? '',
+                                                    optionB: q['option_b']?.toString() ?? '',
+                                                    optionC: q['option_c']?.toString() ?? '',
+                                                    optionD: q['option_d']?.toString() ?? '',
+                                                    correctOption: q['correct_option']?.toString() ?? 'A',
+                                                    explanation: q['explanation']?.toString() ?? '',
+                                                    subject: q['subject']?.toString() ?? _subject.text.trim(),
+                                                    questionImageLink: '',
+                                                  );
+                                                  if (context.mounted) Navigator.of(context).pop();
+                                                },
+                                                icon: const Icon(Icons.image_not_supported_outlined),
+                                                label: const Text('Remove image'),
+                                              ),
+                                              OutlinedButton.icon(
+                                                onPressed: () async {
+                                                  await widget.api.deleteTestQuestion(q['id'] as int);
+                                                  if (context.mounted) Navigator.of(context).pop();
+                                                },
+                                                icon: const Icon(Icons.delete_outline),
+                                                label: const Text('Delete'),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
                             ],
@@ -2410,6 +3053,7 @@ class AdminApi {
     required String correctOption,
     required String explanation,
     required String subject,
+    String questionImageLink = '',
   }) async {
     await _post('/admin/tests/$testId/questions', {
       'question': question,
@@ -2420,11 +3064,90 @@ class AdminApi {
       'correctOption': correctOption,
       'explanation': explanation,
       'subject': subject,
+      'questionImageLink': questionImageLink,
     });
   }
 
   Future<List<dynamic>> testQuestions(int testId) async =>
       (await _get('/admin/tests/$testId/questions'))['questions'] as List<dynamic>;
+
+  Future<void> updateTestQuestion({
+    required int id,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    required String subject,
+    String questionImageLink = '',
+  }) async {
+    await _put('/admin/test-questions/$id', {
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+      'subject': subject,
+      'questionImageLink': questionImageLink,
+    });
+  }
+
+  Future<void> deleteTestQuestion(int id) => _delete('/admin/test-questions/$id');
+
+  Future<List<dynamic>> practiceQuestions(int setId) async =>
+      (await _get('/admin/practice-sets/$setId/questions'))['questions'] as List<dynamic>;
+
+  Future<void> addPracticeQuestion({
+    required int setId,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    String questionImageLink = '',
+  }) async {
+    await _post('/admin/practice-sets/$setId/questions', {
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+      'questionImageLink': questionImageLink,
+    });
+  }
+
+  Future<void> updatePracticeQuestion({
+    required int id,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    String questionImageLink = '',
+  }) async {
+    await _put('/admin/practice-questions/$id', {
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+      'questionImageLink': questionImageLink,
+    });
+  }
+
+  Future<void> deletePracticeQuestion(int id) => _delete('/admin/practice-questions/$id');
 
   Future<void> addPyq({
     required int chapterId,
@@ -2435,6 +3158,7 @@ class AdminApi {
     required String optionD,
     required String correctOption,
     required String explanation,
+    String questionImageLink = '',
   }) async {
     await _post('/admin/chapters/$chapterId/pyqs', {
       'question': question,
@@ -2445,7 +3169,63 @@ class AdminApi {
       'correctOption': correctOption,
       'explanation': explanation,
       'yearLabel': 'NEET',
+      'questionImageLink': questionImageLink,
     });
+  }
+
+  Future<List<dynamic>> pyqs(int chapterId) async =>
+      (await _get('/admin/chapters/$chapterId/pyqs'))['pyqs'] as List<dynamic>;
+
+  Future<void> updatePyq({
+    required int id,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    String questionImageLink = '',
+  }) async {
+    await _put('/admin/pyqs/$id', {
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+      'yearLabel': 'NEET',
+      'questionImageLink': questionImageLink,
+    });
+  }
+
+  Future<void> deletePyq(int id) => _delete('/admin/pyqs/$id');
+
+  Future<String> uploadQuestionImage({
+    required int batchId,
+    required String classLabel,
+    required String subject,
+    required String topic,
+    required File file,
+  }) async {
+    if (token == null) throw Exception('Login first');
+    final req = http.MultipartRequest('POST', Uri.parse('$baseUrl/admin/question-images/upload'));
+    req.headers['Authorization'] = 'Bearer $token';
+    req.fields['batchId'] = '$batchId';
+    req.fields['classLabel'] = classLabel;
+    req.fields['subject'] = subject;
+    req.fields['topic'] = topic;
+    final bytes = await file.readAsBytes();
+    final name = file.path.split(Platform.pathSeparator).last;
+    req.files.add(http.MultipartFile.fromBytes('image', bytes, filename: name));
+    final streamed = await req.send();
+    final body = await streamed.stream.bytesToString();
+    final json = jsonDecode(body) as Map<String, dynamic>;
+    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+      throw Exception(json['error'] ?? 'Image upload failed');
+    }
+    return json['driveLink']?.toString() ?? '';
   }
 
   Future<void> uploadVideo({

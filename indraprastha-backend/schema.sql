@@ -83,6 +83,7 @@ CREATE TABLE pyqs (
   option_d TEXT NOT NULL,
   correct_option CHAR(1) NOT NULL,
   explanation TEXT DEFAULT '',
+  question_image_link TEXT,
   year_label VARCHAR(20) DEFAULT 'NEET',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -107,6 +108,7 @@ CREATE TABLE practice_questions (
   option_d TEXT NOT NULL,
   correct_option CHAR(1) NOT NULL,
   explanation TEXT DEFAULT '',
+  question_image_link TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -134,6 +136,7 @@ CREATE TABLE test_questions (
   option_d TEXT NOT NULL,
   correct_option CHAR(1) NOT NULL,
   explanation TEXT DEFAULT '',
+  question_image_link TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -295,18 +295,24 @@ class ChapterDetailScreen extends ConsumerWidget {
                     if ((chapter['material_type']?.toString() ?? '') == 'pdf' &&
                         chapter['material_drive_link'] != null) ...[
                       SurfaceCard(
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.picture_as_pdf_rounded,
-                                color: AppColors.danger),
-                            const SizedBox(width: AppSpacing.md),
-                            const Expanded(
-                              child: Text(
-                                'Admin uploaded PDF material for this chapter.',
-                              ),
+                            Row(
+                              children: const [
+                                Icon(Icons.picture_as_pdf_rounded, color: AppColors.danger),
+                                SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Text(
+                                    'Admin uploaded PDF material for this chapter.',
+                                  ),
+                                ),
+                              ],
                             ),
+                            const SizedBox(height: AppSpacing.md),
                             PrimaryButton(
                               label: 'Open PDF',
+                              expanded: false,
                               onPressed: () async {
                                 final uri = Uri.tryParse(
                                   chapter['material_drive_link'].toString(),
@@ -396,6 +402,17 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
               children: [
                 Text('Q${index + 1}. ${q['question'] ?? ''}',
                     style: Theme.of(context).textTheme.titleMedium),
+                if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    child: Image.network(
+                      q['question_image_link'].toString(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.sm),
                 ...opts.entries.map((e) {
                   final isSel = selected == e.key;
@@ -569,9 +586,9 @@ class _PdfOrNotesPanel extends StatelessWidget {
     if (s.isEmpty) return '';
     // If the text is char-per-line (vertical), join it.
     final lines = s.split('\n');
-    final shortLines = lines.where((l) => l.trim().isNotEmpty && l.trim().length <= 2).length;
+    final shortLines = lines.where((l) => l.trim().isNotEmpty && l.trim().length <= 3).length;
     if (lines.length > 30 && (shortLines / lines.length) > 0.8) {
-      s = lines.map((l) => l.trim()).where((l) => l.isNotEmpty).join('');
+      s = lines.map((l) => l.trim()).where((l) => l.isNotEmpty).join(' ');
     }
     // Light cleanup: normalize whitespace but preserve paragraphs.
     s = s.replaceAll(RegExp(r'\r'), '\n');

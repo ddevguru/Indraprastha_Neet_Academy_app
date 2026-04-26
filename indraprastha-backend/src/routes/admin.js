@@ -106,6 +106,26 @@ function sanitizeForPostgresText(value) {
   return s.replace(/\u0000/g, '');
 }
 
+async function uploadQuestionImageByHierarchy({ file, batchId, classLabel, subject, topic }) {
+  const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [batchId]);
+  const batchName = batchRes.rows[0]?.name || `Batch-${batchId}`;
+  const resolvedFolderId = await ensureDriveFolderPath({
+    rootFolderId: process.env.GDRIVE_FOLDER_ID,
+    segments: [batchName, classLabel || 'General', subject || 'General', topic || 'Questions'],
+  });
+  const uploaded = await uploadBufferToDrive({
+    fileBuffer: file.buffer,
+    fileName: file.originalname,
+    mimeType: file.mimetype,
+    folderId: resolvedFolderId,
+  });
+  return {
+    driveLink: uploaded.webViewLink || uploaded.webContentLink || '',
+    drive: uploaded,
+    driveFolderId: resolvedFolderId,
+  };
+}
+
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -189,6 +209,30 @@ router.post('/drive/oauth/exchange', adminAuth, async (req, res) => {
   } catch (e) {
     logAdminRouteError('/drive/oauth/exchange', e);
     return res.status(500).json({ error: e.message || 'OAuth exchange failed' });
+  }
+});
+
+router.post('/question-images/upload', adminAuth, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'image file is required' });
+    const { batchId, classLabel, subject, topic } = req.body;
+    if (!batchId) return res.status(400).json({ error: 'batchId is required' });
+    const uploaded = await uploadQuestionImageByHierarchy({
+      file: req.file,
+      batchId,
+      classLabel: classLabel || '',
+      subject: subject || '',
+      topic: topic || 'Questions',
+    });
+    return res.json({
+      success: true,
+      driveLink: uploaded.driveLink,
+      drive: uploaded.drive,
+      driveFolderId: uploaded.driveFolderId,
+    });
+  } catch (e) {
+    logAdminRouteError('/question-images/upload', e);
+    return res.status(500).json({ error: e.message || 'Image upload failed' });
   }
 });
 
@@ -396,11 +440,27 @@ router.delete('/books/:id', adminAuth, async (req, res) => {
 router.post('/books/:bookId/chapters', adminAuth, async (req, res) => {
   const { bookId } = req.params;
   const { title, overview, noteSummary, highlight } = req.body;
+  const bookCheck = await pool.query(
+    `SELECT id
+     FROM books
+     WHERE id = $1
+     LIMIT 1`,
+    [bookId]
+  );
+  if (bookCheck.rows.length === 0) {
+    return res.status(404).json({ error: 'Book not found. Refresh list and try again.' });
+  }
   const result = await pool.query(
     `INSERT INTO book_chapters (book_id, title, overview, note_summary, highlight, material_type)
      VALUES ($1, $2, $3, $4, $5, 'text')
      RETURNING *`,
-    [bookId, title, overview || '', noteSummary || '', highlight || '']
+    [
+      bookId,
+      title,
+      overview || '',
+      sanitizeForPostgresText(noteSummary || ''),
+      sanitizeForPostgresText(highlight || ''),
+    ]
   );
   res.json({ success: true, chapter: result.rows[0] });
 });
@@ -731,7 +791,17 @@ router.post(
 
 router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
   const { chapterId } = req.params;
-  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, yearLabel } =
+  const {
+    question,
+    optionA,
+    optionB,
+    optionC,
+    optionD,
+    correctOption,
+    explanation,
+    yearLabel,
+    questionImageLink,
+  } =
     req.body;
   const chapterCheck = await pool.query(
     `SELECT id
@@ -747,8 +817,8 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
   }
   const result = await pool.query(
     `INSERT INTO pyqs (
-      chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
     [
       chapterId,
       question,
@@ -759,6 +829,7 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
       correctOption,
       explanation || '',
       yearLabel || 'NEET',
+      questionImageLink || '',
     ]
   );
   res.json({ success: true, pyq: result.rows[0] });
@@ -766,13 +837,48 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
 
 router.get('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label
+    `SELECT id, chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link
      FROM pyqs
      WHERE chapter_id = $1
      ORDER BY id DESC`,
     [req.params.chapterId]
   );
   res.json({ success: true, pyqs: result.rows });
+});
+
+router.put('/pyqs/:id', adminAuth, async (req, res) => {
+  const {
+    question,
+    optionA,
+    optionB,
+    optionC,
+    optionD,
+    correctOption,
+    explanation,
+    yearLabel,
+    questionImageLink,
+  } = req.body;
+  const result = await pool.query(
+    `UPDATE pyqs
+     SET question = COALESCE($2, question),
+         option_a = COALESCE($3, option_a),
+         option_b = COALESCE($4, option_b),
+         option_c = COALESCE($5, option_c),
+         option_d = COALESCE($6, option_d),
+         correct_option = COALESCE($7, correct_option),
+         explanation = COALESCE($8, explanation),
+         year_label = COALESCE($9, year_label),
+         question_image_link = COALESCE($10, question_image_link)
+     WHERE id = $1
+     RETURNING *`,
+    [req.params.id, question, optionA, optionB, optionC, optionD, correctOption, explanation, yearLabel, questionImageLink]
+  );
+  return res.json({ success: true, pyq: result.rows[0] || null });
+});
+
+router.delete('/pyqs/:id', adminAuth, async (req, res) => {
+  await pool.query('DELETE FROM pyqs WHERE id = $1', [req.params.id]);
+  return res.json({ success: true });
 });
 
 router.post('/practice-sets', adminAuth, async (req, res) => {
@@ -819,6 +925,64 @@ router.put('/practice-sets/:id', adminAuth, async (req, res) => {
 router.delete('/practice-sets/:id', adminAuth, async (req, res) => {
   await pool.query('DELETE FROM practice_sets WHERE id = $1', [req.params.id]);
   res.json({ success: true });
+});
+
+router.get('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
+     FROM practice_questions
+     WHERE practice_set_id = $1
+     ORDER BY id ASC`,
+    [req.params.setId]
+  );
+  return res.json({ success: true, questions: result.rows });
+});
+
+router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
+  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink } =
+    req.body;
+  const result = await pool.query(
+    `INSERT INTO practice_questions (
+      practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [
+      req.params.setId,
+      question,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
+      correctOption,
+      explanation || '',
+      questionImageLink || '',
+    ]
+  );
+  return res.json({ success: true, question: result.rows[0] });
+});
+
+router.put('/practice-questions/:id', adminAuth, async (req, res) => {
+  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink } =
+    req.body;
+  const result = await pool.query(
+    `UPDATE practice_questions
+     SET question = COALESCE($2, question),
+         option_a = COALESCE($3, option_a),
+         option_b = COALESCE($4, option_b),
+         option_c = COALESCE($5, option_c),
+         option_d = COALESCE($6, option_d),
+         correct_option = COALESCE($7, correct_option),
+         explanation = COALESCE($8, explanation),
+         question_image_link = COALESCE($9, question_image_link)
+     WHERE id = $1
+     RETURNING *`,
+    [req.params.id, question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink]
+  );
+  return res.json({ success: true, question: result.rows[0] || null });
+});
+
+router.delete('/practice-questions/:id', adminAuth, async (req, res) => {
+  await pool.query('DELETE FROM practice_questions WHERE id = $1', [req.params.id]);
+  return res.json({ success: true });
 });
 
 router.post('/tests', adminAuth, async (req, res) => {
@@ -904,12 +1068,22 @@ router.get('/tests/:testId/questions', adminAuth, async (req, res) => {
 });
 
 router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
-  const { subject, question, optionA, optionB, optionC, optionD, correctOption, explanation } =
+  const {
+    subject,
+    question,
+    optionA,
+    optionB,
+    optionC,
+    optionD,
+    correctOption,
+    explanation,
+    questionImageLink,
+  } =
     req.body;
   const result = await pool.query(
     `INSERT INTO test_questions (
-      test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
     [
       req.params.testId,
       subject || 'Biology',
@@ -920,13 +1094,24 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
       optionD,
       correctOption,
       explanation || '',
+      questionImageLink || '',
     ]
   );
   res.json({ success: true, question: result.rows[0] });
 });
 
 router.put('/test-questions/:id', adminAuth, async (req, res) => {
-  const { subject, question, optionA, optionB, optionC, optionD, correctOption, explanation } =
+  const {
+    subject,
+    question,
+    optionA,
+    optionB,
+    optionC,
+    optionD,
+    correctOption,
+    explanation,
+    questionImageLink,
+  } =
     req.body;
   const result = await pool.query(
     `UPDATE test_questions
@@ -937,10 +1122,11 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
          option_c = COALESCE($6, option_c),
          option_d = COALESCE($7, option_d),
          correct_option = COALESCE($8, correct_option),
-         explanation = COALESCE($9, explanation)
+         explanation = COALESCE($9, explanation),
+         question_image_link = COALESCE($10, question_image_link)
      WHERE id = $1
      RETURNING *`,
-    [req.params.id, subject, question, optionA, optionB, optionC, optionD, correctOption, explanation]
+    [req.params.id, subject, question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink]
   );
   res.json({ success: true, question: result.rows[0] });
 });
