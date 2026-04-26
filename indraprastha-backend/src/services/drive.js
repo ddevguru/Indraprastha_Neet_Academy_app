@@ -279,6 +279,25 @@ async function downloadDriveFileBuffer(fileId) {
   return Buffer.from(response.data || []);
 }
 
+async function findRecentPdfInFolder(folderId) {
+  if (!folderId) return '';
+  const drive = createDriveClient();
+  const query = [
+    `'${folderId}' in parents`,
+    "mimeType = 'application/pdf'",
+    'trashed = false',
+  ].join(' and ');
+  const list = await drive.files.list({
+    q: query,
+    fields: 'files(id,createdTime)',
+    orderBy: 'createdTime desc',
+    pageSize: 1,
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
+  });
+  return list.data.files?.[0]?.id || '';
+}
+
 function safeFolderName(value) {
   return (value || 'Unknown')
     .toString()
@@ -376,6 +395,7 @@ module.exports = {
   uploadFilePathToDrive,
   extractPdfTextWithDriveOcr,
   downloadDriveFileBuffer,
+  findRecentPdfInFolder,
   normalizeDriveLink,
   extractDriveFileId,
   buildDrivePublicLinks,

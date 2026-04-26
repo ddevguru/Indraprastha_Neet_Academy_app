@@ -660,48 +660,43 @@ class _DonutMini extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = (correct + wrong + unattempted).clamp(1, 1000000);
-    final correctPct = correct / total;
-    final wrongPct = wrong / total;
-    final unattemptedPct = unattempted / total;
+    final correctPct = correct / total * 100;
+    final wrongPct = wrong / total * 100;
+    final unattemptedPct = unattempted / total * 100;
 
     return SizedBox(
-      width: 130,
-      height: 130,
-      child: Stack(
-        alignment: Alignment.center,
+      width: 180,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircularProgressIndicator(
-            value: 1,
-            strokeWidth: 12,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              AppColors.border,
+          const Text('Performance graph', style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: Row(
+              children: [
+                if (correct > 0)
+                  Expanded(
+                    flex: correct,
+                    child: Container(height: 12, color: AppColors.success),
+                  ),
+                if (wrong > 0)
+                  Expanded(
+                    flex: wrong,
+                    child: Container(height: 12, color: AppColors.danger),
+                  ),
+                if (unattempted > 0)
+                  Expanded(
+                    flex: unattempted,
+                    child: Container(height: 12, color: AppColors.indigo),
+                  ),
+              ],
             ),
           ),
-          CircularProgressIndicator(
-            value: correctPct,
-            strokeWidth: 12,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.success),
-            backgroundColor: Colors.transparent,
-          ),
-          CircularProgressIndicator(
-            value: correctPct + wrongPct,
-            strokeWidth: 12,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.danger),
-            backgroundColor: Colors.transparent,
-          ),
-          CircularProgressIndicator(
-            value: correctPct + wrongPct + unattemptedPct,
-            strokeWidth: 12,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.indigo),
-            backgroundColor: Colors.transparent,
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Done', style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('$total Qs'),
-            ],
-          ),
+          const SizedBox(height: 8),
+          Text('Correct: ${correctPct.toStringAsFixed(0)}%'),
+          Text('Wrong: ${wrongPct.toStringAsFixed(0)}%'),
+          Text('Unattempted: ${unattemptedPct.toStringAsFixed(0)}%'),
         ],
       ),
     );

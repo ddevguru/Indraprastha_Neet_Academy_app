@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const pdfParse = require('pdf-parse');
 const { pool } = require('../db');
 const {
   normalizeDriveLink,
@@ -7,6 +8,7 @@ const {
   buildDrivePublicLinks,
   downloadDriveFileBuffer,
   extractPdfTextWithDriveOcr,
+  findRecentPdfInFolder,
 } = require('../services/drive');
 
 const router = express.Router();
@@ -71,10 +73,14 @@ function mapQuestionImageLink(question) {
 async function ensureChapterExtracted(chapter) {
   const noteSummary = (chapter.note_summary || '').toString().trim();
   const materialType = (chapter.material_type || '').toString().toLowerCase();
-  const fileId = chapter.material_drive_file_id || extractDriveFileId(chapter.material_drive_link);
+  const persistedFileId = chapter.material_drive_file_id || extractDriveFileId(chapter.material_drive_link);
+  const fileId = persistedFileId || (await findRecentPdfInFolder(chapter.material_drive_folder_id));
 
   if (materialType !== 'pdf' || noteSummary.isNotEmpty || !fileId) {
-    return mapChapterLinks(chapter);
+    return mapChapterLinks({
+      ...chapter,
+      material_drive_file_id: persistedFileId || fileId || '',
+    });
   }
 
   try {
@@ -82,11 +88,20 @@ async function ensureChapterExtracted(chapter) {
     if (!pdfBuffer.length) {
       return mapChapterLinks(chapter);
     }
+    let extractedText = '';
+    try {
+      const parsed = await pdfParse(pdfBuffer);
+      extractedText = (parsed.text || '').replace(/\u0000/g, '').trim();
+    } catch (_) {}
+
     const ocrText = await extractPdfTextWithDriveOcr({
       fileBuffer: pdfBuffer,
       fileName: `${chapter.title || 'chapter'}.pdf`,
     });
-    const cleaned = (ocrText || '').replace(/\u0000/g, '').trim();
+    if ((ocrText || '').trim().length > extractedText.length) {
+      extractedText = (ocrText || '').trim();
+    }
+    const cleaned = (extractedText || '').replace(/\u0000/g, '').trim();
     if (!cleaned) {
       return mapChapterLinks(chapter);
     }
@@ -98,10 +113,11 @@ async function ensureChapterExtracted(chapter) {
     const updated = await pool.query(
       `UPDATE book_chapters
        SET note_summary = $2,
-           highlight = CASE WHEN COALESCE(highlight, '') = '' THEN $3 ELSE highlight END
+           highlight = CASE WHEN COALESCE(highlight, '') = '' THEN $3 ELSE highlight END,
+           material_drive_file_id = COALESCE(NULLIF(material_drive_file_id, ''), $4)
        WHERE id = $1
        RETURNING id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id`,
-      [chapter.id, cleaned.slice(0, 120000), highlight]
+      [chapter.id, cleaned.slice(0, 120000), highlight, fileId]
     );
     return mapChapterLinks({
       ...chapter,
@@ -342,7 +358,7 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
     }
     // Ensure user is submitting only their batch's test.
     const testExists = await pool.query(
-      `SELECT id
+      `SELECT id, title, subject, topic
        FROM tests
        WHERE id = $1 AND batch_id = $2
        LIMIT 1`,
@@ -373,16 +389,37 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
       [req.user.id, testId, accuracy, correctCount, wrongCount, unattemptedCount]
     );
     const analyticsId = analytics.rows[0].id;
+    const testMeta = testExists.rows[0];
+    const subject = (testMeta.subject || 'this subject').toString();
+    const topic = (testMeta.topic || 'current topic').toString();
+    const safeAccuracy = Number(accuracy) || 0;
+    const safeCorrect = Number(correctCount) || 0;
+    const safeWrong = Number(wrongCount) || 0;
+    const safeUnattempted = Number(unattemptedCount) || 0;
+    const totalAttempted = safeCorrect + safeWrong;
+    const attemptRate = totalAttempted + safeUnattempted > 0
+      ? Math.round((totalAttempted / (totalAttempted + safeUnattempted)) * 100)
+      : 0;
+
     const insightRows = [
       [
-        'AI Exam Summary',
-        'Your biology score is stable but physics accuracy dropped. Revise mechanics and do 30 mixed MCQs.',
-        'high',
+        `${subject} • ${topic} performance`,
+        `You scored ${safeAccuracy.toFixed(1)}% accuracy in ${subject} (${topic}). Correct: ${safeCorrect}, Wrong: ${safeWrong}, Unattempted: ${safeUnattempted}.`,
+        safeAccuracy < 55 ? 'high' : safeAccuracy < 75 ? 'medium' : 'low',
       ],
       [
-        'Recommended Next Step',
-        'Do 1 full test after 48 hours and review incorrect questions section-wise.',
+        `Next action for ${topic}`,
+        safeWrong > safeCorrect
+          ? `Wrong answers are higher than correct in ${topic}. Revise theory first, then solve 30 targeted MCQs from ${topic}.`
+          : `Keep momentum in ${topic}: do one timed revision quiz and analyse each wrong option.`,
         'medium',
+      ],
+      [
+        'Attempt strategy',
+        attemptRate < 80
+          ? `Attempt rate is ${attemptRate}%. Increase attempt rate with elimination strategy and mark best possible options in ${subject}.`
+          : `Attempt rate is ${attemptRate}%, which is good. Focus on reducing silly mistakes in ${topic}.`,
+        'low',
       ],
     ];
     let insightsRows = [];
