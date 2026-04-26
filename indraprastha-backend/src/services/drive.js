@@ -1,6 +1,8 @@
 const { google } = require('googleapis');
 const fs = require('fs');
 const { Readable } = require('stream');
+const os = require('os');
+const path = require('path');
 
 function createServiceAccountDriveClient() {
   const clientEmail = process.env.GDRIVE_CLIENT_EMAIL;
@@ -57,22 +59,46 @@ async function uploadBufferToDrive({
   folderId,
 }) {
   const drive = createDriveClient();
-  const normalizedBuffer = Buffer.isBuffer(fileBuffer)
-    ? fileBuffer
-    : Buffer.from(fileBuffer);
-  const response = await drive.files.create({
-    requestBody: {
-      name: fileName,
-      parents: folderId ? [folderId] : undefined,
-    },
-    media: {
-      mimeType,
-      // googleapis multipart upload expects a stream with .pipe()
-      body: Readable.from(normalizedBuffer),
-    },
-    fields: 'id,webViewLink,webContentLink',
-    supportsAllDrives: true,
-  });
+  const normalizedBuffer = normalizeToBuffer(fileBuffer);
+  let response;
+  try {
+    response = await drive.files.create({
+      requestBody: {
+        name: fileName,
+        parents: folderId ? [folderId] : undefined,
+      },
+      media: {
+        mimeType,
+        // googleapis multipart upload expects a stream with .pipe()
+        body: Readable.from(normalizedBuffer),
+      },
+      fields: 'id,webViewLink,webContentLink',
+      supportsAllDrives: true,
+    });
+  } catch (error) {
+    // Safety fallback for environments where multipart stream handling is quirky.
+    const message = (error && error.message) || '';
+    if (!message.includes('.pipe is not a function')) {
+      throw error;
+    }
+    const tmpPath = path.join(
+      os.tmpdir(),
+      `indra_drive_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    );
+    fs.writeFileSync(tmpPath, normalizedBuffer);
+    try {
+      return await uploadFilePathToDrive({
+        filePath: tmpPath,
+        fileName,
+        mimeType,
+        folderId,
+      });
+    } finally {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch (_) {}
+    }
+  }
 
   const fileId = response.data.id;
   await drive.permissions.create({
@@ -92,6 +118,16 @@ async function uploadBufferToDrive({
     webViewLink: meta.data.webViewLink,
     webContentLink: meta.data.webContentLink,
   };
+}
+
+function normalizeToBuffer(fileBuffer) {
+  if (Buffer.isBuffer(fileBuffer)) return fileBuffer;
+  if (fileBuffer instanceof Uint8Array) return Buffer.from(fileBuffer);
+  if (fileBuffer && fileBuffer.type === 'Buffer' && Array.isArray(fileBuffer.data)) {
+    return Buffer.from(fileBuffer.data);
+  }
+  if (typeof fileBuffer === 'string') return Buffer.from(fileBuffer, 'base64');
+  return Buffer.from(fileBuffer || '');
 }
 
 async function uploadFilePathToDrive({
