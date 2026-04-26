@@ -25,6 +25,12 @@ String _resolveDriveImageUrl(String raw) {
   return 'https://drive.google.com/uc?export=view&id=$id';
 }
 
+num? _asNum(dynamic value) {
+  if (value is num) return value;
+  if (value is String) return num.tryParse(value);
+  return null;
+}
+
 Widget _buildQuestionImage(String rawUrl) {
   return ClipRRect(
     borderRadius: BorderRadius.circular(AppRadii.md),
@@ -586,11 +592,12 @@ class _ScoreSummaryCard extends StatelessWidget {
     final analytics = Map<String, dynamic>.from(response['analytics'] as Map? ?? const {});
     final attempt = Map<String, dynamic>.from(response['attempt'] as Map? ?? const {});
     final donut = Map<String, dynamic>.from(response['donut'] as Map? ?? const {});
-    final correct = (donut['correct'] as num?)?.toInt() ?? (analytics['correct_count'] as num?)?.toInt() ?? 0;
-    final wrong = (donut['wrong'] as num?)?.toInt() ?? (analytics['wrong_count'] as num?)?.toInt() ?? 0;
-    final unattempted = (donut['unattempted'] as num?)?.toInt() ?? (analytics['unattempted_count'] as num?)?.toInt() ?? 0;
-    final score = (attempt['score'] as num?)?.toInt() ?? 0;
-    final accuracy = (analytics['overall_accuracy'] as num?)?.toDouble() ?? 0.0;
+    final correct = _asNum(donut['correct'])?.toInt() ?? _asNum(analytics['correct_count'])?.toInt() ?? 0;
+    final wrong = _asNum(donut['wrong'])?.toInt() ?? _asNum(analytics['wrong_count'])?.toInt() ?? 0;
+    final unattempted =
+        _asNum(donut['unattempted'])?.toInt() ?? _asNum(analytics['unattempted_count'])?.toInt() ?? 0;
+    final score = _asNum(attempt['score'])?.toInt() ?? 0;
+    final accuracy = _asNum(analytics['overall_accuracy'])?.toDouble() ?? 0.0;
 
     return SurfaceCard(
       child: Column(

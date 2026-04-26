@@ -1,7 +1,13 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
-const { normalizeDriveLink, extractDriveFileId, buildDrivePublicLinks } = require('../services/drive');
+const {
+  normalizeDriveLink,
+  extractDriveFileId,
+  buildDrivePublicLinks,
+  downloadDriveFileBuffer,
+  extractPdfTextWithDriveOcr,
+} = require('../services/drive');
 
 const router = express.Router();
 
@@ -62,6 +68,50 @@ function mapQuestionImageLink(question) {
   };
 }
 
+async function ensureChapterExtracted(chapter) {
+  const noteSummary = (chapter.note_summary || '').toString().trim();
+  const materialType = (chapter.material_type || '').toString().toLowerCase();
+  const fileId = chapter.material_drive_file_id || extractDriveFileId(chapter.material_drive_link);
+
+  if (materialType !== 'pdf' || noteSummary.isNotEmpty || !fileId) {
+    return mapChapterLinks(chapter);
+  }
+
+  try {
+    const pdfBuffer = await downloadDriveFileBuffer(fileId);
+    if (!pdfBuffer.length) {
+      return mapChapterLinks(chapter);
+    }
+    const ocrText = await extractPdfTextWithDriveOcr({
+      fileBuffer: pdfBuffer,
+      fileName: `${chapter.title || 'chapter'}.pdf`,
+    });
+    const cleaned = (ocrText || '').replace(/\u0000/g, '').trim();
+    if (!cleaned) {
+      return mapChapterLinks(chapter);
+    }
+
+    const highlight =
+      cleaned.replace(/\n+/g, ' ').split(/[.?!]/).find((s) => s.trim().length > 20)?.trim().slice(0, 220) ||
+      cleaned.slice(0, 220);
+
+    const updated = await pool.query(
+      `UPDATE book_chapters
+       SET note_summary = $2,
+           highlight = CASE WHEN COALESCE(highlight, '') = '' THEN $3 ELSE highlight END
+       WHERE id = $1
+       RETURNING id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id`,
+      [chapter.id, cleaned.slice(0, 120000), highlight]
+    );
+    return mapChapterLinks({
+      ...chapter,
+      ...updated.rows[0],
+    });
+  } catch (_) {
+    return mapChapterLinks(chapter);
+  }
+}
+
 router.get('/course', userAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT c.id, c.name, b.id AS batch_id, b.name AS batch_name, b.target_year, b.class_label
@@ -102,7 +152,8 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
     [req.params.bookId, req.user.batch_id]
   );
   if (chapters.rows.length > 0) {
-    return res.json({ success: true, chapters: chapters.rows.map(mapChapterLinks) });
+    const hydrated = await Promise.all(chapters.rows.map(ensureChapterExtracted));
+    return res.json({ success: true, chapters: hydrated });
   }
 
   // Backward-compatible fallback:
@@ -149,7 +200,7 @@ router.get('/chapters/:chapterId', userAuth, async (req, res) => {
   if (chapter.rows.length === 0) {
     return res.status(404).json({ error: 'Chapter not found' });
   }
-  res.json({ success: true, chapter: mapChapterLinks(chapter.rows[0]) });
+  res.json({ success: true, chapter: await ensureChapterExtracted(chapter.rows[0]) });
 });
 
 router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {

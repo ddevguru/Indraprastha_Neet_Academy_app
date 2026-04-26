@@ -263,6 +263,22 @@ async function extractPdfTextWithDriveOcr({ fileBuffer, fileName }) {
   }
 }
 
+async function downloadDriveFileBuffer(fileId) {
+  if (!fileId) return Buffer.alloc(0);
+  const drive = createDriveClient();
+  const response = await drive.files.get(
+    {
+      fileId,
+      alt: 'media',
+      supportsAllDrives: true,
+    },
+    {
+      responseType: 'arraybuffer',
+    }
+  );
+  return Buffer.from(response.data || []);
+}
+
 function safeFolderName(value) {
   return (value || 'Unknown')
     .toString()
@@ -359,6 +375,7 @@ module.exports = {
   uploadBufferToDrive,
   uploadFilePathToDrive,
   extractPdfTextWithDriveOcr,
+  downloadDriveFileBuffer,
   normalizeDriveLink,
   extractDriveFileId,
   buildDrivePublicLinks,
