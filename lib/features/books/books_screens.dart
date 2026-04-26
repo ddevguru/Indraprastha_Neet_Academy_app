@@ -25,15 +25,18 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
 
   Future<Map<String, dynamic>> _loadData() async {
     final repo = ContentRepository();
-    final course = await repo.fetchCourse();
-    final books = await repo.fetchBooks();
+    final results = await Future.wait([
+      repo.fetchCourse(),
+      repo.fetchBooks(),
+    ]);
+    final course = results[0] as Map<String, dynamic>;
+    final books = results[1] as List<Map<String, dynamic>>;
     return {'course': course['course'], 'books': books};
   }
 
   @override
   Widget build(BuildContext context) {
     final uiState = ref.watch(appUiControllerProvider);
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: CenteredContent(
@@ -59,6 +62,12 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                 final books = List<Map<String, dynamic>>.from(
                   snapshot.data?['books'] as List<dynamic>? ?? const [],
                 );
+                final bookmarkedIds = uiState.bookmarkedBookIds
+                    .map((e) => e.toString())
+                    .toSet();
+                final bookmarkedBooks = books
+                    .where((b) => bookmarkedIds.contains(b['id']?.toString() ?? ''))
+                    .toList();
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -131,45 +140,71 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                           ),
                         ),
                       ),
+                    const SizedBox(height: AppSpacing.xl),
+                    SurfaceCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SectionHeader(
+                            title: 'Saved bookmarks',
+                            subtitle:
+                                'Your quick-access reading stack for high-yield revision.',
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          if (bookmarkedBooks.isEmpty)
+                            const EmptyStateWidget(
+                              title: 'No bookmarks yet',
+                              subtitle:
+                                  'Bookmark books to build a faster revision stack.',
+                              icon: Icons.bookmark_border_rounded,
+                            )
+                          else
+                            ...bookmarkedBooks.map(
+                              (book) => Padding(
+                                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                                child: ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.bookmark_rounded),
+                                  title: Text(book['title']?.toString() ?? ''),
+                                  subtitle: Text('${book['subject'] ?? ''} • ${book['topic'] ?? ''}'),
+                                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                                  onTap: () async {
+                                    final bookId =
+                                        int.tryParse(book['id']?.toString() ?? '');
+                                    if (bookId == null) return;
+                                    final chapters =
+                                        await ContentRepository().fetchChapters(bookId);
+                                    if (!context.mounted) return;
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    if (chapters.isEmpty) {
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('No chapters available for this book.'),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    final chapterId = int.tryParse(
+                                      chapters.first['id']?.toString() ?? '',
+                                    );
+                                    if (chapterId == null) return;
+                                    if (!context.mounted) return;
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            ChapterDetailScreen(chapterId: chapterId),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
                 );
               },
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: const [
-                _CategoryChip('NCERT books'),
-                _CategoryChip('Handwritten notes'),
-                _CategoryChip('Short notes'),
-                _CategoryChip('Formula sheets'),
-                _CategoryChip('Biology diagrams'),
-                _CategoryChip('Saved bookmarks'),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            SurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SectionHeader(
-                    title: 'Saved bookmarks',
-                    subtitle:
-                        'Your quick-access reading stack for high-yield revision.',
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  if (uiState.bookmarkedBookIds.isEmpty)
-                    const EmptyStateWidget(
-                      title: 'No bookmarks yet',
-                      subtitle:
-                          'Save books and chapters from your reading flow to build a faster revision stack.',
-                      icon: Icons.bookmark_border_rounded,
-                    )
-                  else
-                    const Text('Bookmarked section backend integration in progress.'),
-                ],
-              ),
             ),
           ],
         ),
@@ -437,30 +472,6 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
           );
         },
       ),
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? AppColors.surfaceMuted.withValues(alpha: 0.22)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(label),
     );
   }
 }
