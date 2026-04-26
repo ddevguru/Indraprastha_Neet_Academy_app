@@ -397,6 +397,18 @@ async function ensureDatabaseSchema() {
     );
   `);
 
+  // Performance indexes for frequent mobile/admin listing filters.
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_batch_id ON users(batch_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_books_batch_class_subject_topic ON books(batch_id, class_label, subject, topic);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_book_chapters_book_id ON book_chapters(book_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pyqs_chapter_id ON pyqs(chapter_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_practice_sets_batch_class_subject_topic ON practice_sets(batch_id, class_label, subject, topic);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_practice_questions_set_id ON practice_questions(practice_set_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tests_batch_class_subject_topic ON tests(batch_id, class_label, subject, topic);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_test_questions_test_id ON test_questions(test_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_videos_batch_class_subject_topic ON videos(batch_id, class_label, subject, topic);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_analytics_user_created ON exam_analytics(user_id, created_at DESC);`);
+
   const collegeCount = await pool.query('SELECT COUNT(*)::int AS count FROM colleges');
   if (collegeCount.rows[0].count === 0) {
     await pool.query(`

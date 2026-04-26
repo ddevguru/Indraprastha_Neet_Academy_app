@@ -518,16 +518,23 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
   }
 }
 
-class _PdfOrNotesPanel extends StatelessWidget {
+class _PdfOrNotesPanel extends StatefulWidget {
   const _PdfOrNotesPanel({required this.chapter});
 
   final Map<String, dynamic> chapter;
 
   @override
+  State<_PdfOrNotesPanel> createState() => _PdfOrNotesPanelState();
+}
+
+class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
+  bool _loadPreview = false;
+
+  @override
   Widget build(BuildContext context) {
-    final materialType = (chapter['material_type']?.toString() ?? '').toLowerCase();
-    final driveLink = chapter['material_drive_link']?.toString() ?? '';
-    final note = _normalizeExtractedText(chapter['note_summary']?.toString() ?? '');
+    final materialType = (widget.chapter['material_type']?.toString() ?? '').toLowerCase();
+    final driveLink = widget.chapter['material_drive_link']?.toString() ?? '';
+    final note = _normalizeExtractedText(widget.chapter['note_summary']?.toString() ?? '');
     final previewUrl = _toDrivePreviewUrl(driveLink);
 
     if (materialType == 'pdf' && previewUrl != null) {
@@ -538,18 +545,25 @@ class _PdfOrNotesPanel extends StatelessWidget {
           children: [
             Text('Structured notes', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.sm),
-            SizedBox(
-              height: 240,
-              child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.md),
-                  child: WebViewWidget(
-                    controller: WebViewController()
-                      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                      ..setBackgroundColor(Colors.transparent)
-                      ..loadRequest(Uri.parse(previewUrl)),
-                  ),
+            if (!_loadPreview)
+              SecondaryButton(
+                label: 'Load PDF preview',
+                expanded: false,
+                onPressed: () => setState(() => _loadPreview = true),
+              )
+            else
+              SizedBox(
+                height: 240,
+                child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    child: WebViewWidget(
+                      controller: WebViewController()
+                        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                        ..setBackgroundColor(Colors.transparent)
+                        ..loadRequest(Uri.parse(previewUrl)),
+                    ),
+                ),
               ),
-            ),
             if (note.trim().isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
               Text(

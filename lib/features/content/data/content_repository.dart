@@ -6,10 +6,13 @@ import 'package:http/http.dart' as http;
 import '../../../core/constants/api_constants.dart';
 
 class ContentRepository {
-  ContentRepository({http.Client? client}) : _client = client ?? http.Client();
+  ContentRepository({http.Client? client}) : _client = client ?? _sharedClient;
 
   final http.Client _client;
+  static final http.Client _sharedClient = http.Client();
   static const _secureStorage = FlutterSecureStorage();
+  static final Map<String, ({DateTime at, Map<String, dynamic> data})> _cache = {};
+  static const Duration _cacheTtl = Duration(seconds: 20);
 
   Future<String?> get _token async => _secureStorage.read(key: 'auth_token');
 
@@ -82,6 +85,7 @@ class ContentRepository {
         ? <String, dynamic>{}
         : jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      _cache.clear();
       return body;
     }
     throw Exception(body['error']?.toString() ?? 'Failed request');
@@ -105,6 +109,12 @@ class ContentRepository {
     if (token == null) {
       return {};
     }
+    final cacheKey = '$token::$path';
+    final cached = _cache[cacheKey];
+    final now = DateTime.now();
+    if (cached != null && now.difference(cached.at) <= _cacheTtl) {
+      return cached.data;
+    }
     final response = await _client.get(
       Uri.parse('$baseUrl$path'),
       headers: {'Authorization': 'Bearer $token'},
@@ -113,6 +123,7 @@ class ContentRepository {
         ? <String, dynamic>{}
         : jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      _cache[cacheKey] = (at: now, data: body);
       return body;
     }
     throw Exception(body['error']?.toString() ?? 'Failed request');

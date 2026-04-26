@@ -6,9 +6,8 @@ const { normalizeDriveLink, extractDriveFileId, buildDrivePublicLinks } = requir
 const router = express.Router();
 
 router.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+  // Small private cache window improves app responsiveness on back-navigation.
+  res.setHeader('Cache-Control', 'private, max-age=20, stale-while-revalidate=40');
   next();
 });
 
