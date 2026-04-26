@@ -89,7 +89,7 @@ async function extractPdfBasics(fileBuffer, fileName = 'document.pdf') {
       }
     }
 
-    if (!rawText || rawText.trim().length < 30) {
+    if (!rawText || rawText.trim().length === 0) {
       return {
         noteSummary: '',
         highlight: '',

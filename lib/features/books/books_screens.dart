@@ -25,6 +25,32 @@ String _resolveDriveImageUrl(String raw) {
   return 'https://drive.google.com/uc?export=view&id=$id';
 }
 
+Widget _buildQuestionImage(String rawUrl) {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(AppRadii.md),
+    child: Image.network(
+      _resolveDriveImageUrl(rawUrl),
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.low,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          height: 180,
+          alignment: Alignment.center,
+          color: AppColors.surfaceMuted,
+          child: const CircularProgressIndicator(strokeWidth: 2),
+        );
+      },
+      errorBuilder: (_, __, ___) => Container(
+        height: 120,
+        alignment: Alignment.center,
+        color: AppColors.surfaceMuted,
+        child: const Text('Image unavailable'),
+      ),
+    ),
+  );
+}
+
 class BooksScreen extends ConsumerStatefulWidget {
   const BooksScreen({super.key});
 
@@ -421,14 +447,7 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                     style: Theme.of(context).textTheme.titleMedium),
                 if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.sm),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadii.md),
-                    child: Image.network(
-                      _resolveDriveImageUrl(q['question_image_link'].toString()),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  ),
+                  _buildQuestionImage(q['question_image_link'].toString()),
                 ],
                 const SizedBox(height: AppSpacing.sm),
                 ...opts.entries.map((e) {
@@ -513,20 +532,22 @@ class _PdfOrNotesPanel extends StatelessWidget {
 
     if (materialType == 'pdf' && previewUrl != null) {
       return SurfaceCard(
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Structured notes', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.sm),
-            Expanded(
+            SizedBox(
+              height: 240,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadii.md),
-                child: WebViewWidget(
-                  controller: WebViewController()
-                    ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                    ..setBackgroundColor(Colors.transparent)
-                    ..loadRequest(Uri.parse(previewUrl)),
-                ),
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  child: WebViewWidget(
+                    controller: WebViewController()
+                      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                      ..setBackgroundColor(Colors.transparent)
+                      ..loadRequest(Uri.parse(previewUrl)),
+                  ),
               ),
             ),
             if (note.trim().isNotEmpty) ...[
@@ -548,8 +569,14 @@ class _PdfOrNotesPanel extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
                 ),
               ),
+            ] else ...[
+              const SizedBox(height: AppSpacing.md),
+              const Text(
+                'Extraction in progress... agar yeh text na aaye to chapter ko re-upload karein.',
+              ),
             ],
           ],
+        ),
         ),
       );
     }

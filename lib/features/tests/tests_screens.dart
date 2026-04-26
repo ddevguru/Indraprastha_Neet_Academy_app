@@ -25,6 +25,32 @@ String _resolveDriveImageUrl(String raw) {
   return 'https://drive.google.com/uc?export=view&id=$id';
 }
 
+Widget _buildQuestionImage(String rawUrl) {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(AppRadii.md),
+    child: Image.network(
+      _resolveDriveImageUrl(rawUrl),
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.low,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          height: 180,
+          alignment: Alignment.center,
+          color: AppColors.surfaceMuted,
+          child: const CircularProgressIndicator(strokeWidth: 2),
+        );
+      },
+      errorBuilder: (_, __, ___) => Container(
+        height: 120,
+        alignment: Alignment.center,
+        color: AppColors.surfaceMuted,
+        child: const Text('Image unavailable'),
+      ),
+    ),
+  );
+}
+
 class TestsScreen extends StatefulWidget {
   const TestsScreen({super.key});
 
@@ -392,14 +418,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
                     Text(q['question']?.toString() ?? ''),
                     if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.md),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadii.md),
-                        child: Image.network(
-                          _resolveDriveImageUrl(q['question_image_link'].toString()),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        ),
-                      ),
+                      _buildQuestionImage(q['question_image_link'].toString()),
                     ],
                     const SizedBox(height: AppSpacing.lg),
                     ...options.entries.map(
@@ -492,9 +511,18 @@ class _TestResultScreenState extends State<TestResultScreen> {
                                 });
                               } catch (e) {
                                 if (!mounted) return;
+                                setState(() {
+                                  _submitted = true;
+                                  _submitResponse = _buildLocalSubmitResponse(
+                                    questions: questions,
+                                    test: test,
+                                  );
+                                });
                                 messenger.showSnackBar(
                                   SnackBar(
-                                    content: Text('Submit failed: $e'),
+                                    content: Text(
+                                      'Server submit failed, local result shown. Error: $e',
+                                    ),
                                   ),
                                 );
                               } finally {
