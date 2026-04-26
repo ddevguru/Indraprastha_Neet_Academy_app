@@ -206,6 +206,63 @@ async function uploadFilePathToDrive({
   };
 }
 
+function streamToString(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+  });
+}
+
+async function extractPdfTextWithDriveOcr({ fileBuffer, fileName }) {
+  const drive = createDriveClient();
+  const normalizedBuffer = normalizeToBuffer(fileBuffer);
+  let tempDocId = '';
+  try {
+    const created = await drive.files.create({
+      requestBody: {
+        // Upload PDF as Google Doc to trigger Drive OCR/conversion.
+        name: `ocr_${Date.now()}_${safeFolderName(fileName || 'document.pdf')}`,
+        mimeType: 'application/vnd.google-apps.document',
+      },
+      media: {
+        mimeType: 'application/pdf',
+        body: Readable.from(normalizedBuffer),
+      },
+      fields: 'id',
+      supportsAllDrives: true,
+    });
+    tempDocId = created.data.id || '';
+    if (!tempDocId) return '';
+
+    const exported = await drive.files.export(
+      {
+        fileId: tempDocId,
+        mimeType: 'text/plain',
+      },
+      { responseType: 'stream' }
+    );
+    const text = await streamToString(exported.data);
+    return (text || '').replace(/\u0000/g, '').trim();
+  } catch (error) {
+    console.error('[DRIVE_OCR_ERROR]', {
+      message: error?.message || 'Drive OCR failed',
+      stack: error?.stack,
+    });
+    return '';
+  } finally {
+    if (tempDocId) {
+      try {
+        await drive.files.delete({
+          fileId: tempDocId,
+          supportsAllDrives: true,
+        });
+      } catch (_) {}
+    }
+  }
+}
+
 function safeFolderName(value) {
   return (value || 'Unknown')
     .toString()
@@ -301,8 +358,10 @@ async function exchangeDriveOAuthCode({ code }) {
 module.exports = {
   uploadBufferToDrive,
   uploadFilePathToDrive,
+  extractPdfTextWithDriveOcr,
   normalizeDriveLink,
   extractDriveFileId,
+  buildDrivePublicLinks,
   ensureDriveFolderPath,
   getDriveOAuthConsentUrl,
   exchangeDriveOAuthCode,

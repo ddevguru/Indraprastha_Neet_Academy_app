@@ -1,7 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
-const { normalizeDriveLink } = require('../services/drive');
+const { normalizeDriveLink, extractDriveFileId, buildDrivePublicLinks } = require('../services/drive');
 
 const router = express.Router();
 
@@ -41,16 +41,25 @@ async function userAuth(req, res, next) {
 }
 
 function mapChapterLinks(chapter) {
+  const fileId = chapter.material_drive_file_id || extractDriveFileId(chapter.material_drive_link);
+  const links = buildDrivePublicLinks(fileId);
   return {
     ...chapter,
-    material_drive_link: normalizeDriveLink(chapter.material_drive_link, 'preview'),
+    material_drive_file_id: fileId || '',
+    material_drive_link:
+      links.previewLink || normalizeDriveLink(chapter.material_drive_link, 'preview'),
   };
 }
 
 function mapQuestionImageLink(question) {
+  const fileId =
+    question.question_image_drive_file_id || extractDriveFileId(question.question_image_link);
+  const links = buildDrivePublicLinks(fileId);
   return {
     ...question,
-    question_image_link: normalizeDriveLink(question.question_image_link, 'image'),
+    question_image_drive_file_id: fileId || '',
+    question_image_link:
+      links.imageLink || normalizeDriveLink(question.question_image_link, 'image'),
   };
 }
 
@@ -85,7 +94,7 @@ router.get('/books', userAuth, async (req, res) => {
 
 router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
   const chapters = await pool.query(
-    `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type, ch.material_drive_link,
+    `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type, ch.material_drive_link, ch.material_drive_file_id, ch.material_drive_folder_id,
         (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS linked_pyq_count
      FROM book_chapters ch
      JOIN books b ON b.id = ch.book_id
@@ -117,7 +126,7 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
   const created = await pool.query(
     `INSERT INTO book_chapters (book_id, title, overview, note_summary, highlight, material_type)
      VALUES ($1, $2, '', '', '', 'text')
-     RETURNING id, title, overview, note_summary, highlight, material_type, material_drive_link`,
+     RETURNING id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id`,
     [book.id, defaultChapterTitle]
   );
 
@@ -130,7 +139,7 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
 
 router.get('/chapters/:chapterId', userAuth, async (req, res) => {
   const chapter = await pool.query(
-    `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type, ch.material_drive_link,
+    `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type, ch.material_drive_link, ch.material_drive_file_id, ch.material_drive_folder_id,
         (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS linked_pyq_count
      FROM book_chapters ch
      JOIN books b ON b.id = ch.book_id
@@ -146,7 +155,7 @@ router.get('/chapters/:chapterId', userAuth, async (req, res) => {
 
 router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
   const pyqs = await pool.query(
-    `SELECT p.id, p.question, p.option_a, p.option_b, p.option_c, p.option_d, p.correct_option, p.explanation, p.year_label, p.question_image_link
+    `SELECT p.id, p.question, p.option_a, p.option_b, p.option_c, p.option_d, p.correct_option, p.explanation, p.year_label, p.question_image_link, p.question_image_drive_file_id, p.question_image_drive_folder_id
      FROM pyqs p
      JOIN book_chapters ch ON ch.id = p.chapter_id
      JOIN books b ON b.id = ch.book_id
@@ -190,7 +199,7 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
     return res.status(404).json({ error: 'Practice set not found' });
   }
   const questions = await pool.query(
-    `SELECT id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
+    `SELECT id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
      FROM practice_questions
      WHERE practice_set_id = $1
      ORDER BY id ASC`,
@@ -235,7 +244,7 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
     return res.status(404).json({ error: 'Test not found' });
   }
   const questions = await pool.query(
-    `SELECT id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
+    `SELECT id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
      FROM test_questions
      WHERE test_id = $1
      ORDER BY id ASC`,

@@ -154,6 +154,14 @@ async function ensureDatabaseSchema() {
     ALTER TABLE book_chapters
     ADD COLUMN IF NOT EXISTS material_drive_link TEXT;
   `);
+  await pool.query(`
+    ALTER TABLE book_chapters
+    ADD COLUMN IF NOT EXISTS material_drive_file_id TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE book_chapters
+    ADD COLUMN IF NOT EXISTS material_drive_folder_id TEXT;
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS pyqs (
@@ -174,6 +182,14 @@ async function ensureDatabaseSchema() {
   await pool.query(`
     ALTER TABLE pyqs
     ADD COLUMN IF NOT EXISTS question_image_link TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE pyqs
+    ADD COLUMN IF NOT EXISTS question_image_drive_file_id TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE pyqs
+    ADD COLUMN IF NOT EXISTS question_image_drive_folder_id TEXT;
   `);
 
   await pool.query(`
@@ -218,6 +234,14 @@ async function ensureDatabaseSchema() {
   await pool.query(`
     ALTER TABLE practice_questions
     ADD COLUMN IF NOT EXISTS question_image_link TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS question_image_drive_file_id TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS question_image_drive_folder_id TEXT;
   `);
 
   await pool.query(`
@@ -272,6 +296,14 @@ async function ensureDatabaseSchema() {
   await pool.query(`
     ALTER TABLE test_questions
     ADD COLUMN IF NOT EXISTS question_image_link TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS question_image_drive_file_id TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS question_image_drive_folder_id TEXT;
   `);
 
   await pool.query(`

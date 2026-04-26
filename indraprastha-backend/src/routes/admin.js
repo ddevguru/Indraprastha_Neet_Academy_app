@@ -12,7 +12,10 @@ const { pool } = require('../db');
 const {
   uploadBufferToDrive,
   uploadFilePathToDrive,
+  extractPdfTextWithDriveOcr,
   normalizeDriveLink,
+  extractDriveFileId,
+  buildDrivePublicLinks,
   ensureDriveFolderPath,
   getDriveOAuthConsentUrl,
   exchangeDriveOAuthCode,
@@ -66,13 +69,26 @@ function hierarchyFromBody(body = {}) {
   };
 }
 
-async function extractPdfBasics(fileBuffer) {
+async function extractPdfBasics(fileBuffer, fileName = 'document.pdf') {
   try {
     const parsed = await pdfParse(Buffer.from(fileBuffer));
-    const rawText = (parsed.text || '')
+    let rawText = (parsed.text || '')
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .replace(/\u0000/g, '');
+
+    // For scanned/image PDFs, pdf-parse often returns little/no text.
+    // Fallback to Drive OCR extraction.
+    if (!rawText || rawText.trim().length < 200) {
+      const ocrText = await extractPdfTextWithDriveOcr({
+        fileBuffer,
+        fileName,
+      });
+      if ((ocrText || '').trim().length > (rawText || '').trim().length) {
+        rawText = ocrText;
+      }
+    }
+
     if (!rawText || rawText.trim().length < 30) {
       return {
         noteSummary: '',
@@ -106,25 +122,50 @@ function sanitizeForPostgresText(value) {
 }
 
 function mapChapterLinks(chapter) {
+  const fileId = chapter.material_drive_file_id || extractDriveFileId(chapter.material_drive_link);
+  const links = buildDrivePublicLinks(fileId);
   return {
     ...chapter,
-    material_drive_link: normalizeDriveLink(chapter.material_drive_link, 'preview'),
+    material_drive_file_id: fileId || '',
+    material_drive_link:
+      links.previewLink || normalizeDriveLink(chapter.material_drive_link, 'preview'),
   };
 }
 
 function mapQuestionImageLink(question) {
+  const fileId =
+    question.question_image_drive_file_id || extractDriveFileId(question.question_image_link);
+  const links = buildDrivePublicLinks(fileId);
   return {
     ...question,
-    question_image_link: normalizeDriveLink(question.question_image_link, 'image'),
+    question_image_drive_file_id: fileId || '',
+    question_image_link:
+      links.imageLink || normalizeDriveLink(question.question_image_link, 'image'),
   };
 }
 
-async function uploadQuestionImageByHierarchy({ file, batchId, classLabel, subject, topic }) {
+async function uploadQuestionImageByHierarchy({
+  file,
+  batchId,
+  classLabel,
+  subject,
+  topic,
+  contentType,
+  contentId,
+}) {
   const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [batchId]);
   const batchName = batchRes.rows[0]?.name || `Batch-${batchId}`;
+  const idSegment =
+    contentType && contentId ? `${String(contentType).toUpperCase()}-${contentId}` : '';
   const resolvedFolderId = await ensureDriveFolderPath({
     rootFolderId: process.env.GDRIVE_FOLDER_ID,
-    segments: [batchName, classLabel || 'General', subject || 'General', topic || 'Questions'],
+    segments: [
+      batchName,
+      classLabel || 'General',
+      subject || 'General',
+      topic || 'Questions',
+      idSegment || 'General',
+    ],
   });
   const uploaded = await uploadBufferToDrive({
     fileBuffer: file.buffer,
@@ -134,6 +175,7 @@ async function uploadQuestionImageByHierarchy({ file, batchId, classLabel, subje
   });
   return {
     driveLink: uploaded.imageLink || normalizeDriveLink(uploaded.webViewLink, 'image') || '',
+    driveFileId: uploaded.fileId || '',
     drive: uploaded,
     driveFolderId: resolvedFolderId,
   };
@@ -228,7 +270,7 @@ router.post('/drive/oauth/exchange', adminAuth, async (req, res) => {
 router.post('/question-images/upload', adminAuth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'image file is required' });
-    const { batchId, classLabel, subject, topic } = req.body;
+    const { batchId, classLabel, subject, topic, contentType, contentId } = req.body;
     if (!batchId) return res.status(400).json({ error: 'batchId is required' });
     const uploaded = await uploadQuestionImageByHierarchy({
       file: req.file,
@@ -236,11 +278,14 @@ router.post('/question-images/upload', adminAuth, upload.single('image'), async 
       classLabel: classLabel || '',
       subject: subject || '',
       topic: topic || 'Questions',
+      contentType: contentType || '',
+      contentId: contentId || '',
     });
     return res.json({
       success: true,
       driveLink: uploaded.driveLink,
       imageLink: uploaded.driveLink,
+      driveFileId: uploaded.driveFileId,
       drive: uploaded.drive,
       driveFolderId: uploaded.driveFolderId,
     });
@@ -418,7 +463,7 @@ router.get('/books', adminAuth, async (_req, res) => {
 
 router.get('/books/:bookId/chapters', adminAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, book_id, title, overview, note_summary, highlight, material_type, material_drive_link
+    `SELECT id, book_id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id
      FROM book_chapters
      WHERE book_id = $1
      ORDER BY id ASC`,
@@ -523,12 +568,12 @@ router.post(
         mimeType: req.file.mimetype,
         folderId: resolvedFolderId,
       });
-      const extracted = await extractPdfBasics(req.file.buffer);
+      const extracted = await extractPdfBasics(req.file.buffer, req.file.originalname);
 
       const chapter = await pool.query(
         `INSERT INTO book_chapters (
-          book_id, title, overview, note_summary, highlight, material_type, material_drive_link
-         ) VALUES ($1,$2,$3,$4,$5,'pdf',$6)
+          book_id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id
+         ) VALUES ($1,$2,$3,$4,$5,'pdf',$6,$7,$8)
          RETURNING *`,
         [
           bookId,
@@ -537,6 +582,8 @@ router.post(
           extracted.noteSummary,
           extracted.highlight,
           uploaded.previewLink || normalizeDriveLink(uploaded.webViewLink, 'preview'),
+          uploaded.fileId || '',
+          resolvedFolderId,
         ]
       );
 
@@ -683,14 +730,14 @@ router.post('/books/pdf-upload-complete', adminAuth, async (req, res) => {
     });
 
     const pdfBuffer = fs.readFileSync(assembledPath);
-    const extracted = await extractPdfBasics(pdfBuffer);
+    const extracted = await extractPdfBasics(pdfBuffer, meta.fileName);
 
     const safeNoteSummary = sanitizeForPostgresText(extracted.noteSummary);
     const safeHighlight = sanitizeForPostgresText(extracted.highlight);
     const chapter = await pool.query(
       `INSERT INTO book_chapters (
-        book_id, title, overview, note_summary, highlight, material_type, material_drive_link
-       ) VALUES ($1,$2,$3,$4,$5,'pdf',$6)
+        book_id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id
+       ) VALUES ($1,$2,$3,$4,$5,'pdf',$6,$7,$8)
        RETURNING *`,
       [
         bookId,
@@ -699,6 +746,8 @@ router.post('/books/pdf-upload-complete', adminAuth, async (req, res) => {
         safeNoteSummary,
         safeHighlight,
         uploaded.previewLink || normalizeDriveLink(uploaded.webViewLink, 'preview'),
+        uploaded.fileId || '',
+        resolvedFolderId,
       ]
     );
 
@@ -762,14 +811,14 @@ router.post(
         mimeType: req.file.mimetype,
         folderId: resolvedFolderId,
       });
-      const extracted = await extractPdfBasics(req.file.buffer);
+      const extracted = await extractPdfBasics(req.file.buffer, req.file.originalname);
 
       const safeNoteSummary = sanitizeForPostgresText(extracted.noteSummary);
       const safeHighlight = sanitizeForPostgresText(extracted.highlight);
       const chapter = await pool.query(
         `INSERT INTO book_chapters (
-          book_id, title, overview, note_summary, highlight, material_type, material_drive_link
-         ) VALUES ($1,$2,$3,$4,$5,'pdf',$6)
+          book_id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id
+         ) VALUES ($1,$2,$3,$4,$5,'pdf',$6,$7,$8)
          RETURNING *`,
         [
           req.params.bookId,
@@ -778,6 +827,8 @@ router.post(
           safeNoteSummary,
           safeHighlight,
           uploaded.previewLink || normalizeDriveLink(uploaded.webViewLink, 'preview'),
+          uploaded.fileId || '',
+          resolvedFolderId,
         ]
       );
 
@@ -831,8 +882,8 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
   }
   const result = await pool.query(
     `INSERT INTO pyqs (
-      chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     [
       chapterId,
       question,
@@ -844,6 +895,8 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
       explanation || '',
       yearLabel || 'NEET',
       normalizeDriveLink(questionImageLink || '', 'image'),
+      extractDriveFileId(questionImageLink || ''),
+      '',
     ]
   );
   res.json({ success: true, pyq: mapQuestionImageLink(result.rows[0]) });
@@ -851,7 +904,7 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
 
 router.get('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link
+    `SELECT id, chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
      FROM pyqs
      WHERE chapter_id = $1
      ORDER BY id DESC`,
@@ -882,7 +935,9 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
          correct_option = COALESCE($7, correct_option),
          explanation = COALESCE($8, explanation),
          year_label = COALESCE($9, year_label),
-         question_image_link = COALESCE($10, question_image_link)
+         question_image_link = COALESCE($10, question_image_link),
+         question_image_drive_file_id = COALESCE($11, question_image_drive_file_id),
+         question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id)
      WHERE id = $1
      RETURNING *`,
     [
@@ -896,6 +951,8 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
       explanation,
       yearLabel,
       questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
+      questionImageLink == null ? null : extractDriveFileId(questionImageLink),
+      null,
     ]
   );
   return res.json({
@@ -957,7 +1014,7 @@ router.delete('/practice-sets/:id', adminAuth, async (req, res) => {
 
 router.get('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
+    `SELECT id, practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
      FROM practice_questions
      WHERE practice_set_id = $1
      ORDER BY id ASC`,
@@ -971,8 +1028,8 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
     req.body;
   const result = await pool.query(
     `INSERT INTO practice_questions (
-      practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
     [
       req.params.setId,
       question,
@@ -983,6 +1040,8 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
       correctOption,
       explanation || '',
       normalizeDriveLink(questionImageLink || '', 'image'),
+      extractDriveFileId(questionImageLink || ''),
+      '',
     ]
   );
   return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
@@ -1000,7 +1059,9 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
          option_d = COALESCE($6, option_d),
          correct_option = COALESCE($7, correct_option),
          explanation = COALESCE($8, explanation),
-         question_image_link = COALESCE($9, question_image_link)
+         question_image_link = COALESCE($9, question_image_link),
+         question_image_drive_file_id = COALESCE($10, question_image_drive_file_id),
+         question_image_drive_folder_id = COALESCE($11, question_image_drive_folder_id)
      WHERE id = $1
      RETURNING *`,
     [
@@ -1013,6 +1074,8 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
       correctOption,
       explanation,
       questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
+      questionImageLink == null ? null : extractDriveFileId(questionImageLink),
+      null,
     ]
   );
   return res.json({
@@ -1123,8 +1186,8 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
     req.body;
   const result = await pool.query(
     `INSERT INTO test_questions (
-      test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     [
       req.params.testId,
       subject || 'Biology',
@@ -1136,6 +1199,8 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
       correctOption,
       explanation || '',
       normalizeDriveLink(questionImageLink || '', 'image'),
+      extractDriveFileId(questionImageLink || ''),
+      '',
     ]
   );
   res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
@@ -1164,7 +1229,9 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
          option_d = COALESCE($7, option_d),
          correct_option = COALESCE($8, correct_option),
          explanation = COALESCE($9, explanation),
-         question_image_link = COALESCE($10, question_image_link)
+         question_image_link = COALESCE($10, question_image_link),
+         question_image_drive_file_id = COALESCE($11, question_image_drive_file_id),
+         question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id)
      WHERE id = $1
      RETURNING *`,
     [
@@ -1178,6 +1245,8 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
       correctOption,
       explanation,
       questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
+      questionImageLink == null ? null : extractDriveFileId(questionImageLink),
+      null,
     ]
   );
   res.json({

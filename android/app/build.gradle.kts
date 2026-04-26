@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.indraprastha"
+        applicationId = "com.indraprastha.student"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -29,20 +29,6 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["appLabel"] = "Indraprastha Neet Academy"
-    }
-
-    flavorDimensions += "app"
-    productFlavors {
-        create("student") {
-            dimension = "app"
-            applicationId = "com.indraprastha.student"
-            manifestPlaceholders["appLabel"] = "Indraprastha Neet Academy"
-        }
-        create("admin") {
-            dimension = "app"
-            applicationId = "com.indraprastha.admin"
-            manifestPlaceholders["appLabel"] = "Indraprastha Admin"
-        }
     }
 
     buildTypes {

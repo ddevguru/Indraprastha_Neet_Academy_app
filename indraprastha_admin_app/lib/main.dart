@@ -1297,6 +1297,8 @@ class _BooksPageState extends State<BooksPage> {
                               subject: _subject.text.trim(),
                               topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
                               file: _pyqImage!,
+                              contentType: 'pyq',
+                              contentId: _selectedChapterId,
                             );
                           }
                           if (_editingPyqId != null) {
@@ -1729,6 +1731,8 @@ class _PracticePageState extends State<PracticePage> {
                                 subject: _subject.text.trim(),
                                 topic: _topic.text.trim().isEmpty ? 'Practice Questions' : _topic.text.trim(),
                                 file: _pqImage!,
+                                contentType: 'practice',
+                                contentId: _selectedSetId,
                               );
                             }
                             if (_editingPracticeQuestionId == null) {
@@ -2181,6 +2185,8 @@ class _TestsPageState extends State<TestsPage> {
                                 subject: _subject.text.trim(),
                                 topic: _topic.text.trim().isEmpty ? 'Test Questions' : _topic.text.trim(),
                                 file: _testQuestionImage!,
+                                contentType: 'test',
+                                contentId: _selectedTestId,
                               );
                             }
                             if (_editingQuestionId == null) {
@@ -3208,6 +3214,8 @@ class AdminApi {
     required String subject,
     required String topic,
     required File file,
+    String contentType = '',
+    int? contentId,
   }) async {
     if (token == null) throw Exception('Login first');
     final req = http.MultipartRequest('POST', Uri.parse('$baseUrl/admin/question-images/upload'));
@@ -3216,6 +3224,8 @@ class AdminApi {
     req.fields['classLabel'] = classLabel;
     req.fields['subject'] = subject;
     req.fields['topic'] = topic;
+    if (contentType.trim().isNotEmpty) req.fields['contentType'] = contentType.trim();
+    if (contentId != null) req.fields['contentId'] = '$contentId';
     final bytes = await file.readAsBytes();
     final name = file.path.split(Platform.pathSeparator).last;
     req.files.add(http.MultipartFile.fromBytes('image', bytes, filename: name));
