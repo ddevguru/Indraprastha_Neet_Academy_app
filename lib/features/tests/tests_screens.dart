@@ -126,6 +126,7 @@ class _TestsScreenState extends State<TestsScreen> {
                         (t) => Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.md),
                           child: TestCard(
+                            // completed status from backend latest attempts
                             test: TestItem(
                               id: '${t['id']}',
                               title: t['title']?.toString() ?? 'Test',
@@ -135,8 +136,8 @@ class _TestsScreenState extends State<TestsScreen> {
                               questions: (t['question_count'] as num?)?.toInt() ?? 180,
                               syllabusCoverage: t['syllabus_coverage']?.toString() ?? '',
                               scheduleLabel: t['schedule_label']?.toString() ?? '',
-                              completed: false,
-                              scoreLabel: '--',
+                              completed: t['is_completed'] == true,
+                              scoreLabel: (t['last_score']?.toString() ?? '--'),
                             ),
                             onTap: () => context.push('/tests/detail/${t['id']}'),
                           ),

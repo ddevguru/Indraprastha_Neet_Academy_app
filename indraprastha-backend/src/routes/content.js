@@ -282,15 +282,24 @@ router.get('/tests', userAuth, async (req, res) => {
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
   const result = await pool.query(
-    `SELECT t.id, t.title, t.category, t.subject, t.topic, t.class_label, t.duration_minutes, t.marks, t.question_count, t.syllabus_coverage, t.schedule_label
+    `SELECT t.id, t.title, t.category, t.subject, t.topic, t.class_label, t.duration_minutes, t.marks, t.question_count, t.syllabus_coverage, t.schedule_label,
+        (ta.id IS NOT NULL) AS is_completed,
+        ta.score AS last_score
      FROM tests t
      JOIN batches ub ON ub.id = $1
+     LEFT JOIN LATERAL (
+       SELECT id, score
+       FROM test_attempts
+       WHERE user_id = $4 AND test_id = t.id
+       ORDER BY attempted_at DESC
+       LIMIT 1
+     ) ta ON true
      WHERE t.batch_id = $1
        AND (t.class_label IS NULL OR t.class_label = '' OR t.class_label = ub.class_label)
        AND ($2 = '' OR t.subject = $2)
        AND ($3 = '' OR t.topic = $3)
      ORDER BY id DESC`,
-    [req.user.batch_id, subject, topic]
+    [req.user.batch_id, subject, topic, req.user.id]
   );
   res.json({ success: true, tests: result.rows });
 });

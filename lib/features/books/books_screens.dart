@@ -528,7 +528,8 @@ class _PdfOrNotesPanel extends StatefulWidget {
 }
 
 class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
-  bool _loadPreview = false;
+  bool _loadPreview = true;
+  int _previewKey = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -541,56 +542,108 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
       return SurfaceCard(
         child: SingleChildScrollView(
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Structured notes', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.sm),
-            if (!_loadPreview)
-              SecondaryButton(
-                label: 'Load PDF preview',
-                expanded: false,
-                onPressed: () => setState(() => _loadPreview = true),
-              )
-            else
-              SizedBox(
-                height: 240,
-                child: ClipRRect(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  gradient: AppGradients.primary,
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.auto_stories_rounded, color: Colors.white),
+                    SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Chapter Reader',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: SecondaryButton(
+                      label: _loadPreview ? 'Reload Preview' : 'Load Preview',
+                      onPressed: () {
+                        setState(() {
+                          _loadPreview = true;
+                          _previewKey++;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: PrimaryButton(
+                      label: 'Open Full PDF',
+                      onPressed: () async {
+                        final uri = Uri.tryParse(previewUrl);
+                        if (uri == null) return;
+                        await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (_loadPreview)
+                Container(
+                  height: 360,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: ClipRRect(
                     borderRadius: BorderRadius.circular(AppRadii.md),
                     child: WebViewWidget(
+                      key: ValueKey('pdf-preview-$_previewKey'),
                       controller: WebViewController()
                         ..setJavaScriptMode(JavaScriptMode.unrestricted)
                         ..setBackgroundColor(Colors.transparent)
                         ..loadRequest(Uri.parse(previewUrl)),
                     ),
+                  ),
                 ),
-              ),
-            if (note.trim().isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'Extracted text',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(AppRadii.md),
+              if (note.trim().isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Quick text extract',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
-                child: SelectableText(
-                  note,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
+                const SizedBox(height: AppSpacing.xs),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                  ),
+                  child: SelectableText(
+                    note,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
+                  ),
                 ),
-              ),
-            ] else ...[
-              const SizedBox(height: AppSpacing.md),
-              const Text(
-                'Extraction in progress... agar yeh text na aaye to chapter ko re-upload karein.',
-              ),
+              ] else ...[
+                const SizedBox(height: AppSpacing.sm),
+                const Text(
+                  'Reader mode active. PDF content above visible in original format.',
+                ),
+              ],
             ],
-          ],
-        ),
+          ),
         ),
       );
     }
@@ -615,10 +668,12 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
     final uri = Uri.tryParse(raw);
     if (uri == null) return null;
 
-    // If we can extract Drive fileId, use /preview (best for embedded view).
+    // If we can extract Drive fileId, use viewerng embedded URL.
+    // This tends to be more reliable across Android webview variants.
     final id = _extractGoogleDriveFileId(uri);
     if (id != null && id.isNotEmpty) {
-      return 'https://drive.google.com/file/d/$id/preview';
+      final downloadUrl = 'https://drive.google.com/uc?export=download&id=$id';
+      return 'https://drive.google.com/viewerng/viewer?embedded=true&url=${Uri.encodeComponent(downloadUrl)}';
     }
 
     // Fallback: just open the given URL in webview.
