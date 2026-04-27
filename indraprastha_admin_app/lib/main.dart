@@ -940,6 +940,15 @@ class _BooksPageState extends State<BooksPage> {
   double _pdfProgress = 0.0;
   bool _pdfUploading = false;
 
+  void _resetBookForm() {
+    _editingId = null;
+    _bookTitle.clear();
+    _chapter.clear();
+    _chapterOverview.clear();
+    _chapterHighlight.clear();
+    _pdf = null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1055,41 +1064,43 @@ class _BooksPageState extends State<BooksPage> {
                       ? null
                       : () async {
                           try {
-                            final chapterTitle = _chapter.text.trim().isEmpty
-                                ? 'Introduction'
-                                : _chapter.text.trim();
+                            final title = _bookTitle.text.trim();
+                            final subject = _subject.text.trim();
+                            final topic = _chapter.text.trim();
+                            if (title.isEmpty || subject.isEmpty || topic.isEmpty) {
+                              setState(() => _status = 'Please fill title, subject and chapter.');
+                              if (context.mounted) {
+                                _showActionSnackBar(
+                                  context,
+                                  'Title, Subject aur Chapter required hai.',
+                                  isError: true,
+                                );
+                              }
+                              return;
+                            }
                             if (_editingId == null) {
-                              final bookId = await widget.api.addBook(
+                              await widget.api.addBook(
                                 batchId: _batchId!,
                                 classLabel: _classLabel.text.trim(),
-                                title: _bookTitle.text.trim().isEmpty
-                                    ? '${_subject.text.trim()} Book'
-                                    : _bookTitle.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: chapterTitle,
+                                title: title,
+                                subject: subject,
+                                topic: topic,
                                 category: _bookCategory,
-                              );
-                              await widget.api.createBookChapter(
-                                bookId: bookId,
-                                title: chapterTitle,
-                                overview:
-                                    'Chapter overview will be managed from admin panel.',
-                                noteSummary:
-                                    'Add notes/PDF content for this chapter.',
-                                highlight: 'Start with high-yield concepts first.',
                               );
                             } else {
                               await widget.api.updateBook(
                                 id: _editingId!,
                                 classLabel: _classLabel.text.trim(),
-                                title: _bookTitle.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: chapterTitle,
+                                title: title,
+                                subject: subject,
+                                topic: topic,
                               );
-                              _editingId = null;
                             }
                             await _loadBatches();
-                            setState(() => _status = 'Book saved with chapter');
+                            setState(() {
+                              _status = 'Book saved successfully';
+                              _resetBookForm();
+                            });
                             if (context.mounted) {
                               _showActionSnackBar(context, 'Book saved successfully');
                             }
@@ -1126,7 +1137,11 @@ class _BooksPageState extends State<BooksPage> {
                               },
                             );
                             await _loadBatches();
-                            setState(() => _status = 'PDF uploaded to Drive successfully');
+                            setState(() {
+                              _status = 'PDF uploaded to Drive successfully';
+                              _pdf = null;
+                              _chapter.clear();
+                            });
                             if (context.mounted) {
                               _showActionSnackBar(context, 'PDF uploaded successfully');
                             }

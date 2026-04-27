@@ -78,6 +78,49 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
     return {'course': course['course'], 'books': books};
   }
 
+  Future<void> _openBookChapter(BuildContext context, Map<String, dynamic> book) async {
+    final bookId = int.tryParse(book['id']?.toString() ?? '');
+    if (bookId == null) return;
+    final chapters = await ContentRepository().fetchChapters(bookId);
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (chapters.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No chapters available for this book.'),
+        ),
+      );
+      return;
+    }
+
+    final chapterId = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView.separated(
+          shrinkWrap: true,
+          itemCount: chapters.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (ctx, index) {
+            final chapter = chapters[index];
+            final id = int.tryParse(chapter['id']?.toString() ?? '');
+            return ListTile(
+              title: Text(chapter['title']?.toString() ?? 'Chapter ${index + 1}'),
+              subtitle: Text(chapter['overview']?.toString() ?? ''),
+              onTap: id == null ? null : () => Navigator.of(ctx).pop(id),
+            );
+          },
+        ),
+      ),
+    );
+    if (!context.mounted || chapterId == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChapterDetailScreen(chapterId: chapterId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final uiState = ref.watch(appUiControllerProvider);
@@ -152,34 +195,7 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                                 Icons.arrow_forward_ios_rounded,
                                 size: 16,
                               ),
-                              onTap: () async {
-                                final bookId =
-                                    int.tryParse(book['id']?.toString() ?? '');
-                                if (bookId == null) return;
-                                final chapters =
-                                    await ContentRepository().fetchChapters(bookId);
-                                if (!context.mounted) return;
-                                final messenger = ScaffoldMessenger.of(context);
-                                if (chapters.isEmpty) {
-                                  messenger.showSnackBar(
-                                    const SnackBar(
-                                      content: Text('No chapters available for this book.'),
-                                    ),
-                                  );
-                                  return;
-                                }
-                                final chapterId = int.tryParse(
-                                  chapters.first['id']?.toString() ?? '',
-                                );
-                                if (chapterId == null) return;
-                                if (!context.mounted) return;
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        ChapterDetailScreen(chapterId: chapterId),
-                                  ),
-                                );
-                              },
+                              onTap: () => _openBookChapter(context, book),
                             ),
                           ),
                         ),
@@ -212,34 +228,7 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                                   title: Text(book['title']?.toString() ?? ''),
                                   subtitle: Text('${book['subject'] ?? ''} • ${book['topic'] ?? ''}'),
                                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                                  onTap: () async {
-                                    final bookId =
-                                        int.tryParse(book['id']?.toString() ?? '');
-                                    if (bookId == null) return;
-                                    final chapters =
-                                        await ContentRepository().fetchChapters(bookId);
-                                    if (!context.mounted) return;
-                                    final messenger = ScaffoldMessenger.of(context);
-                                    if (chapters.isEmpty) {
-                                      messenger.showSnackBar(
-                                        const SnackBar(
-                                          content: Text('No chapters available for this book.'),
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    final chapterId = int.tryParse(
-                                      chapters.first['id']?.toString() ?? '',
-                                    );
-                                    if (chapterId == null) return;
-                                    if (!context.mounted) return;
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            ChapterDetailScreen(chapterId: chapterId),
-                                      ),
-                                    );
-                                  },
+                                  onTap: () => _openBookChapter(context, book),
                                 ),
                               ),
                             ),
@@ -578,9 +567,7 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
                     child: SecondaryButton(
                       label: _loadPreview ? 'Reload Preview' : 'Load Preview',
                       onPressed: () {
-                        if (previewUrl != null) {
-                          _webViewController?.loadRequest(Uri.parse(previewUrl));
-                        }
+                        _webViewController?.loadRequest(Uri.parse(previewUrl));
                         setState(() {
                           _loadPreview = true;
                           _previewKey++;
