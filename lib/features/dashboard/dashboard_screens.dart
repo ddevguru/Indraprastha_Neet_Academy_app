@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/providers/app_state.dart';
 import '../auth/bloc/auth_bloc.dart';
 import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
@@ -64,6 +65,7 @@ class DashboardHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = context.watch<AuthBloc>().state.user;
+    final uiState = ref.watch(appUiControllerProvider);
     if (user == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -95,6 +97,19 @@ class DashboardHomeScreen extends ConsumerWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          IconButton(
+                            onPressed: () => ref
+                                .read(appUiControllerProvider.notifier)
+                                .toggleTheme(uiState.themeMode != ThemeMode.dark),
+                            tooltip: uiState.themeMode == ThemeMode.dark
+                                ? 'Switch to light mode'
+                                : 'Switch to dark mode',
+                            icon: Icon(
+                              uiState.themeMode == ThemeMode.dark
+                                  ? Icons.light_mode_rounded
+                                  : Icons.dark_mode_rounded,
+                            ),
+                          ),
                           IconButton(
                             onPressed: () => context.push('/saved'),
                             icon: const Icon(Icons.bookmark_outline_rounded),

@@ -581,7 +581,7 @@ class _SettingsPanel extends ConsumerWidget {
         children: [
           const SectionHeader(
             title: 'Profile and settings',
-            subtitle: 'Control theme, notifications, downloads, and exam preferences.',
+            subtitle: 'Control notifications, downloads, and exam preferences.',
           ),
           const SizedBox(height: AppSpacing.md),
           ListTile(
@@ -589,15 +589,6 @@ class _SettingsPanel extends ConsumerWidget {
             leading: const Icon(Icons.flag_outlined),
             title: const Text('Exam target'),
             subtitle: Text(user.targetExamYear),
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: uiState.themeMode == ThemeMode.dark,
-            onChanged: (value) => ref
-                .read(appUiControllerProvider.notifier)
-                .toggleTheme(value),
-            title: const Text('Dark mode'),
-            subtitle: const Text('Light theme first, with a local toggle for preference.'),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
