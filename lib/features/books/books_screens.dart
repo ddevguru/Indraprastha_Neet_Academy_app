@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -493,39 +495,23 @@ class ChapterDetailScreen extends ConsumerWidget {
             ),
             body: Column(
               children: [
-                // ── Chapter info header ─────────────────────────────────────
+                // ── Compact status bar ──────────────────────────────────────
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.sm),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
+                  child: Row(
                     children: [
+                      const Icon(Icons.quiz_outlined, size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
                       Text(
-                        chapter['title']?.toString() ?? '',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      if ((chapter['overview']?.toString() ?? '').isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(chapter['overview']?.toString() ?? ''),
-                      ],
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Linked PYQs: ${chapter['linked_pyq_count'] ?? pyqs.length}',
+                        '${chapter['linked_pyq_count'] ?? pyqs.length} PYQs',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       if (chapter['has_pdf'] == true) ...[
-                        const SizedBox(height: AppSpacing.xs),
-                        Row(
-                          children: [
-                            const Icon(Icons.picture_as_pdf_rounded,
-                                size: 16, color: AppColors.danger),
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(
-                              'PDF available — open the Book tab to read',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        const Icon(Icons.picture_as_pdf_rounded, size: 14, color: AppColors.danger),
+                        const SizedBox(width: 4),
+                        Text('PDF', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.danger)),
                       ],
                     ],
                   ),
@@ -812,15 +798,21 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
               ),
               const Divider(height: 1),
               Expanded(
-                flex: note.trim().isNotEmpty ? 7 : 10,
+                flex: note.trim().isNotEmpty ? 8 : 10,
                 child: ClipRect(
-                  child: WebViewWidget(key: ValueKey('pdf-$_previewKey'), controller: _webViewController!),
+                  child: WebViewWidget(
+                    key: ValueKey('pdf-$_previewKey'),
+                    controller: _webViewController!,
+                    gestureRecognizers: {
+                      Factory<VerticalDragGestureRecognizer>(VerticalDragGestureRecognizer.new),
+                    },
+                  ),
                 ),
               ),
               if (note.trim().isNotEmpty) ...[
                 const Divider(height: 1),
                 Expanded(
-                  flex: 4,
+                  flex: 5,
                   child: Padding(
                     padding: const EdgeInsets.all(AppSpacing.xs),
                     child: Column(
