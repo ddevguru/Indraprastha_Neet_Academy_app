@@ -17,15 +17,15 @@ class ContentRepository {
   Future<String?> get _token async => _secureStorage.read(key: 'auth_token');
 
   Future<Map<String, dynamic>> fetchCourse() =>
-      _get('/content/course');
+      _get('/content/course', bypassCache: true);
 
   Future<List<Map<String, dynamic>>> fetchBooks() async {
-    final data = await _get('/content/books');
+    final data = await _get('/content/books', bypassCache: true);
     return List<Map<String, dynamic>>.from(data['books'] as List<dynamic>);
   }
 
   Future<List<Map<String, dynamic>>> fetchChapters(int bookId) async {
-    final data = await _get('/content/books/$bookId/chapters');
+    final data = await _get('/content/books/$bookId/chapters', bypassCache: true);
     return List<Map<String, dynamic>>.from(data['chapters'] as List<dynamic>);
   }
 
@@ -104,7 +104,10 @@ class ContentRepository {
     return List<Map<String, dynamic>>.from(data['packages'] as List<dynamic>);
   }
 
-  Future<Map<String, dynamic>> _get(String path) async {
+  Future<Map<String, dynamic>> _get(
+    String path, {
+    bool bypassCache = false,
+  }) async {
     final token = await _token;
     if (token == null) {
       return {};
@@ -112,7 +115,7 @@ class ContentRepository {
     final cacheKey = '$token::$path';
     final cached = _cache[cacheKey];
     final now = DateTime.now();
-    if (cached != null && now.difference(cached.at) <= _cacheTtl) {
+    if (!bypassCache && cached != null && now.difference(cached.at) <= _cacheTtl) {
       return cached.data;
     }
     final response = await _client.get(

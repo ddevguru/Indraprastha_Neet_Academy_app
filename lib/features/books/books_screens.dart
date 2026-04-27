@@ -530,15 +530,19 @@ class _PdfOrNotesPanel extends StatefulWidget {
 class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
   bool _loadPreview = true;
   int _previewKey = 0;
+  WebViewController? _webViewController;
+  String? _loadedPreviewUrl;
 
   @override
   Widget build(BuildContext context) {
     final materialType = (widget.chapter['material_type']?.toString() ?? '').toLowerCase();
-    final driveLink = widget.chapter['material_drive_link']?.toString() ?? '';
+    final isPdfMaterial = materialType.contains('pdf');
+    final driveLink = _resolveMaterialLink(widget.chapter);
     final note = _normalizeExtractedText(widget.chapter['note_summary']?.toString() ?? '');
     final previewUrl = _toDrivePreviewUrl(driveLink);
+    _ensurePreviewController(previewUrl);
 
-    if (materialType == 'pdf' && previewUrl != null) {
+    if (isPdfMaterial && previewUrl != null) {
       return SurfaceCard(
         child: SingleChildScrollView(
           child: Column(
@@ -574,6 +578,9 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
                     child: SecondaryButton(
                       label: _loadPreview ? 'Reload Preview' : 'Load Preview',
                       onPressed: () {
+                        if (previewUrl != null) {
+                          _webViewController?.loadRequest(Uri.parse(previewUrl));
+                        }
                         setState(() {
                           _loadPreview = true;
                           _previewKey++;
@@ -597,7 +604,7 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
               const SizedBox(height: AppSpacing.md),
               if (_loadPreview)
                 Container(
-                  height: 360,
+                  height: 420,
                   decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(AppRadii.md),
@@ -607,10 +614,7 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
                     borderRadius: BorderRadius.circular(AppRadii.md),
                     child: WebViewWidget(
                       key: ValueKey('pdf-preview-$_previewKey'),
-                      controller: WebViewController()
-                        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                        ..setBackgroundColor(Colors.transparent)
-                        ..loadRequest(Uri.parse(previewUrl)),
+                      controller: _webViewController!,
                     ),
                   ),
                 ),
@@ -652,7 +656,7 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
       title: 'Structured notes',
       content: note.trim().isNotEmpty
           ? note
-          : (materialType == 'pdf'
+          : (isPdfMaterial
               ? 'PDF uploaded, but extracted text is not available (scan/image PDF). Use Open PDF.'
               : ''),
       bullets: const [
@@ -661,6 +665,33 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
         'High-yield mistakes to avoid',
       ],
     );
+  }
+
+  String _resolveMaterialLink(Map<String, dynamic> chapter) {
+    const candidateKeys = [
+      'material_drive_link',
+      'material_link',
+      'pdf_link',
+      'drive_link',
+      'url',
+    ];
+    for (final key in candidateKeys) {
+      final value = chapter[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+    return '';
+  }
+
+  void _ensurePreviewController(String? previewUrl) {
+    if (previewUrl == null) return;
+    if (_webViewController != null && _loadedPreviewUrl == previewUrl) return;
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.transparent)
+      ..loadRequest(Uri.parse(previewUrl));
+    _loadedPreviewUrl = previewUrl;
   }
 
   String? _toDrivePreviewUrl(String raw) {
@@ -690,6 +721,9 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
 
     final m2 = RegExp(r'drive\.google\.com\/open\?id=([^&]+)').firstMatch(s);
     if (m2 != null) return m2.group(1);
+
+    final m3 = RegExp(r'[?&]id=([^&]+)').firstMatch(s);
+    if (m3 != null) return m3.group(1);
 
     return null;
   }
