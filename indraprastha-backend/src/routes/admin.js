@@ -127,8 +127,12 @@ function mapChapterLinks(chapter) {
   return {
     ...chapter,
     material_drive_file_id: fileId || '',
+    // Return downloadLink so the Flutter app can wrap it inside the
+    // Google viewerng embedded viewer, which works reliably in Android
+    // WebView. The old previewLink (/file/d/{id}/preview) is blocked
+    // by X-Frame-Options on most Android WebView builds.
     material_drive_link:
-      links.previewLink || normalizeDriveLink(chapter.material_drive_link, 'preview'),
+      links.downloadLink || normalizeDriveLink(chapter.material_drive_link, 'download'),
   };
 }
 
@@ -581,7 +585,7 @@ router.post(
           req.body.overview || 'Imported from PDF',
           extracted.noteSummary,
           extracted.highlight,
-          uploaded.previewLink || normalizeDriveLink(uploaded.webViewLink, 'preview'),
+          uploaded.downloadLink || normalizeDriveLink(uploaded.webViewLink, 'download'),
           uploaded.fileId || '',
           resolvedFolderId,
         ]
@@ -745,7 +749,7 @@ router.post('/books/pdf-upload-complete', adminAuth, async (req, res) => {
         'Imported from PDF',
         safeNoteSummary,
         safeHighlight,
-        uploaded.previewLink || normalizeDriveLink(uploaded.webViewLink, 'preview'),
+        uploaded.downloadLink || normalizeDriveLink(uploaded.webViewLink, 'download'),
         uploaded.fileId || '',
         resolvedFolderId,
       ]
@@ -826,7 +830,7 @@ router.post(
           req.body.overview || 'Imported from PDF',
           safeNoteSummary,
           safeHighlight,
-          uploaded.previewLink || normalizeDriveLink(uploaded.webViewLink, 'preview'),
+          uploaded.downloadLink || normalizeDriveLink(uploaded.webViewLink, 'download'),
           uploaded.fileId || '',
           resolvedFolderId,
         ]

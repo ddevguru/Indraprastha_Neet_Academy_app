@@ -346,9 +346,17 @@ class ChapterDetailScreen extends ConsumerWidget {
                               label: 'Open PDF',
                               expanded: false,
                               onPressed: () async {
-                                final uri = Uri.tryParse(
-                                  chapter['material_drive_link'].toString(),
-                                );
+                                // Backend now returns a downloadLink.
+                                // Wrap it in viewerng for reliable
+                                // rendering on all Android WebView versions.
+                                final raw =
+                                    chapter['material_drive_link']?.toString() ?? '';
+                                if (raw.isEmpty) return;
+                                final encoded = Uri.encodeComponent(raw);
+                                final viewerUrl =
+                                    'https://drive.google.com/viewerng/viewer'
+                                    '?embedded=true&url=$encoded';
+                                final uri = Uri.tryParse(viewerUrl);
                                 if (uri == null) return;
                                 await launchUrl(
                                   uri,
@@ -531,6 +539,66 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
     final previewUrl = _toDrivePreviewUrl(driveLink);
     _ensurePreviewController(previewUrl);
 
+    // ── Error state: chapter is marked as PDF but no valid Drive link ──────────
+    // This happens when the admin has not uploaded the PDF yet, or the link
+    // stored in the DB is malformed.  Show a clear message instead of falling
+    // through silently to the text-notes panel.
+    if (isPdfMaterial && previewUrl == null) {
+      return SurfaceCard(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.picture_as_pdf_rounded,
+                    size: 52, color: AppColors.danger),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'PDF not available',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                const Text(
+                  'The PDF link for this chapter is missing or invalid. '
+                  'Ask the admin to re-upload the PDF from the admin panel.',
+                  textAlign: TextAlign.center,
+                ),
+                if (note.trim().isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  const Divider(),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Text extract available below',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                    ),
+                    child: SelectableText(
+                      note,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(height: 1.45),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (isPdfMaterial && previewUrl != null) {
       return SurfaceCard(
         child: SingleChildScrollView(
@@ -580,6 +648,8 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
                     child: PrimaryButton(
                       label: 'Open Full PDF',
                       onPressed: () async {
+                        // Open the same viewerng URL used by the embedded
+                        // WebView so the experience is consistent.
                         final uri = Uri.tryParse(previewUrl);
                         if (uri == null) return;
                         await launchUrl(uri, mode: LaunchMode.inAppBrowserView);

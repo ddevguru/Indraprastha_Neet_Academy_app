@@ -53,8 +53,12 @@ function mapChapterLinks(chapter) {
   return {
     ...chapter,
     material_drive_file_id: fileId || '',
+    // Return downloadLink so the Flutter app can wrap it inside the
+    // Google viewerng embedded viewer, which works reliably in Android
+    // WebView. The old previewLink (/file/d/{id}/preview) is blocked
+    // by X-Frame-Options on most Android WebView builds.
     material_drive_link:
-      links.previewLink || normalizeDriveLink(chapter.material_drive_link, 'preview'),
+      links.downloadLink || normalizeDriveLink(chapter.material_drive_link, 'download'),
   };
 }
 
@@ -76,7 +80,7 @@ async function ensureChapterExtracted(chapter) {
   const persistedFileId = chapter.material_drive_file_id || extractDriveFileId(chapter.material_drive_link);
   const fileId = persistedFileId || (await findRecentPdfInFolder(chapter.material_drive_folder_id));
 
-  if (materialType !== 'pdf' || noteSummary.isNotEmpty || !fileId) {
+  if (materialType !== 'pdf' || noteSummary.length > 0 || !fileId) {
     return mapChapterLinks({
       ...chapter,
       material_drive_file_id: persistedFileId || fileId || '',

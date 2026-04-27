@@ -156,11 +156,20 @@ async function ensureDatabaseSchema() {
   `);
   await pool.query(`
     ALTER TABLE book_chapters
-    ADD COLUMN IF NOT EXISTS material_drive_file_id TEXT;
+    ADD COLUMN IF NOT EXISTS material_drive_file_id TEXT DEFAULT '';
   `);
   await pool.query(`
     ALTER TABLE book_chapters
-    ADD COLUMN IF NOT EXISTS material_drive_folder_id TEXT;
+    ADD COLUMN IF NOT EXISTS material_drive_folder_id TEXT DEFAULT '';
+  `);
+
+  // Backfill NULL -> '' so JS string .length checks work on old rows
+  await pool.query(`
+    UPDATE book_chapters
+    SET
+      material_drive_file_id   = COALESCE(material_drive_file_id, ''),
+      material_drive_folder_id = COALESCE(material_drive_folder_id, '')
+    WHERE material_drive_file_id IS NULL OR material_drive_folder_id IS NULL;
   `);
 
   await pool.query(`
