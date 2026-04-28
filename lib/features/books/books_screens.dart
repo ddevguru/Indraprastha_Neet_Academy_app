@@ -798,7 +798,7 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
               ),
               const Divider(height: 1),
               Expanded(
-                flex: note.trim().isNotEmpty ? 8 : 10,
+                flex: note.trim().isNotEmpty ? 10 : 12,
                 child: ClipRect(
                   child: WebViewWidget(
                     key: ValueKey('pdf-$_previewKey'),
@@ -812,7 +812,7 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
               if (note.trim().isNotEmpty) ...[
                 const Divider(height: 1),
                 Expanded(
-                  flex: 5,
+                  flex: 8,
                   child: Padding(
                     padding: const EdgeInsets.all(AppSpacing.xs),
                     child: Column(
@@ -1006,7 +1006,7 @@ class _ScrollableNoteBoxState extends State<_ScrollableNoteBox> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 300,
+      height: 420,
       width: double.infinity,
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,

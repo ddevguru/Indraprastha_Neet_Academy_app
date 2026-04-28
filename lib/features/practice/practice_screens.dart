@@ -9,6 +9,87 @@ import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 
+String _decodeHtmlEntities(String input) {
+  return input
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&apos;', "'");
+}
+
+String _sanitizeRichText(dynamic rawValue) {
+  if (rawValue == null) return '';
+  final text = rawValue.toString().trim();
+  if (text.isEmpty) return '';
+  final withoutBreaks = text
+      .replaceAll(RegExp(r'(?i)<br\s*/?>'), '\n')
+      .replaceAll(RegExp(r'(?i)</p\s*>'), '\n')
+      .replaceAll(RegExp(r'(?i)<p[^>]*>'), '');
+  final withoutTags = withoutBreaks.replaceAll(RegExp(r'<[^>]*>'), '');
+  final decoded = _decodeHtmlEntities(withoutTags);
+  return decoded
+      .replaceAll('\r\n', '\n')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+}
+
+List<String> _extractOptions(Map<String, dynamic> question) {
+  final directOptions = [
+    question['option_a'] ?? question['optionA'],
+    question['option_b'] ?? question['optionB'],
+    question['option_c'] ?? question['optionC'],
+    question['option_d'] ?? question['optionD'],
+  ].map(_sanitizeRichText).toList();
+
+  if (directOptions.any((option) => option.isNotEmpty)) {
+    return directOptions;
+  }
+
+  final dynamic fallback = question['options'];
+  if (fallback is List) {
+    final options = fallback.map(_sanitizeRichText).toList();
+    while (options.length < 4) {
+      options.add('');
+    }
+    return options.take(4).toList();
+  }
+  if (fallback is Map) {
+    return [
+      _sanitizeRichText(fallback['A'] ?? fallback['a'] ?? fallback['1']),
+      _sanitizeRichText(fallback['B'] ?? fallback['b'] ?? fallback['2']),
+      _sanitizeRichText(fallback['C'] ?? fallback['c'] ?? fallback['3']),
+      _sanitizeRichText(fallback['D'] ?? fallback['d'] ?? fallback['4']),
+    ];
+  }
+  return const ['', '', '', ''];
+}
+
+int _resolveCorrectIndex(Map<String, dynamic> question) {
+  final raw = (question['correct_option'] ?? question['correctOption'] ?? 'A')
+      .toString()
+      .trim();
+  if (raw.isEmpty) return 0;
+
+  final asInt = int.tryParse(raw);
+  if (asInt != null && asInt >= 1 && asInt <= 4) {
+    return asInt - 1;
+  }
+
+  final normalized = raw.toUpperCase();
+  final firstChar = normalized.isNotEmpty ? normalized[0] : 'A';
+  final indexFromChar = ['A', 'B', 'C', 'D'].indexOf(firstChar);
+  if (indexFromChar >= 0) return indexFromChar;
+
+  if (normalized.contains('OPTION_A')) return 0;
+  if (normalized.contains('OPTION_B')) return 1;
+  if (normalized.contains('OPTION_C')) return 2;
+  if (normalized.contains('OPTION_D')) return 3;
+  return 0;
+}
+
 String _resolveDriveImageUrl(String raw) {
   final value = raw.trim();
   if (value.isEmpty) return value;
@@ -226,14 +307,13 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
         }
 
         final question = questions[_currentIndex.clamp(0, questions.length - 1)];
-        final options = [
-          question['option_a']?.toString() ?? '',
-          question['option_b']?.toString() ?? '',
-          question['option_c']?.toString() ?? '',
-          question['option_d']?.toString() ?? '',
-        ];
-        final correctOption = (question['correct_option']?.toString() ?? 'A').toUpperCase();
-        final correctIndex = ['A', 'B', 'C', 'D'].indexOf(correctOption).clamp(0, 3);
+        final questionText = _sanitizeRichText(question['question']);
+        final options = _extractOptions(question);
+        final nonEmptyOptionIndexes = List<int>.generate(options.length, (i) => i)
+            .where((i) => options[i].trim().isNotEmpty)
+            .toList();
+        final correctIndex = _resolveCorrectIndex(question).clamp(0, 3);
+        final correctLabel = ['A', 'B', 'C', 'D'][correctIndex];
         final uiState = ref.watch(appUiControllerProvider);
         final qId = question['id'].toString();
         final isBookmarked = uiState.bookmarkedQuestionIds.contains(qId);
@@ -246,7 +326,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                 onPressed: () {
                   final shareText = StringBuffer()
                     ..writeln('Question:')
-                    ..writeln(question['question']?.toString() ?? '')
+                    ..writeln(questionText)
                     ..writeln()
                     ..writeln('Options:')
                     ..writeln('A) ${options[0]}')
@@ -293,7 +373,9 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          question['question']?.toString() ?? '',
+                          questionText.isEmpty
+                              ? 'Question text unavailable'
+                              : questionText,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         if ((question['question_image_link']?.toString() ?? '').isNotEmpty) ...[
@@ -301,7 +383,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           _buildQuestionImage(question['question_image_link'].toString()),
                         ],
                         const SizedBox(height: AppSpacing.lg),
-                        ...List.generate(options.length, (index) {
+                        ...nonEmptyOptionIndexes.map((index) {
                           final selected = _selectedOption == index;
                           final revealState = _submitted && (selected || index == correctIndex);
                           return Padding(
@@ -330,11 +412,16 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                             : AppColors.border,
                                   ),
                                 ),
-                                child: Text(options[index]),
+                                child: Text('${['A', 'B', 'C', 'D'][index]}) ${options[index]}'),
                               ),
                             ),
                           );
                         }),
+                        if (nonEmptyOptionIndexes.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: AppSpacing.md),
+                            child: Text('Options unavailable for this question.'),
+                          ),
                         const SizedBox(height: AppSpacing.sm),
                         PrimaryButton(
                           label: _submitted ? 'Next question' : 'Submit answer',
@@ -342,7 +429,9 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           expanded: true,
                           onPressed: () {
                             if (!_submitted) {
-                              if (_selectedOption == null) return;
+                              if (_selectedOption == null || nonEmptyOptionIndexes.isEmpty) {
+                                return;
+                              }
                               setState(() => _submitted = true);
                               return;
                             }
@@ -371,7 +460,18 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           Text('Explanation',
                               style: Theme.of(context).textTheme.titleLarge),
                           const SizedBox(height: AppSpacing.sm),
-                          Text(question['explanation']?.toString() ?? ''),
+                          Text(
+                            _sanitizeRichText(question['explanation']).isEmpty
+                                ? 'No explanation available.'
+                                : _sanitizeRichText(question['explanation']),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Correct answer: $correctLabel',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
                         ],
                       ),
                     ),
