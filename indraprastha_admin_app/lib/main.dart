@@ -1139,8 +1139,11 @@ class _BooksPageState extends State<BooksPage> {
                             await _loadBatches();
                             setState(() {
                               _status = 'PDF uploaded to Drive successfully';
+                              // Only clear the picked PDF file — do NOT clear
+                              // the chapter title or other text fields here.
+                              // Those are cleared only when "Add Book" /
+                              // "Update Book" is tapped (via _resetBookForm).
                               _pdf = null;
-                              _chapter.clear();
                             });
                             if (context.mounted) {
                               _showActionSnackBar(context, 'PDF uploaded successfully');

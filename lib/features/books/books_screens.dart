@@ -93,26 +93,7 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
       return;
     }
 
-    final chapterId = await showModalBottomSheet<int>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: ListView.separated(
-          shrinkWrap: true,
-          itemCount: chapters.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (ctx, index) {
-            final chapter = chapters[index];
-            final id = int.tryParse(chapter['id']?.toString() ?? '');
-            return ListTile(
-              title: Text(chapter['title']?.toString() ?? 'Chapter ${index + 1}'),
-              subtitle: Text(chapter['overview']?.toString() ?? ''),
-              onTap: id == null ? null : () => Navigator.of(ctx).pop(id),
-            );
-          },
-        ),
-      ),
-    );
+    final chapterId = int.tryParse(chapters.first['id']?.toString() ?? '');
     if (!context.mounted || chapterId == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -301,54 +282,40 @@ class ChapterDetailScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: CenteredContent(
-                maxWidth: 1100,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SurfaceCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            chapter['title']?.toString() ?? '',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(chapter['overview']?.toString() ?? ''),
-                          const SizedBox(height: AppSpacing.md),
-                          Text('Linked PYQs: ${chapter['linked_pyq_count'] ?? pyqs.length}'),
-                        ],
+            body: Column(
+              children: [
+                // ── Chapter info header ─────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.sm),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chapter['title']?.toString() ?? '',
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    if ((chapter['material_type']?.toString() ?? '') == 'pdf' &&
-                        chapter['material_drive_link'] != null) ...[
-                      SurfaceCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      if ((chapter['overview']?.toString() ?? '').isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(chapter['overview']?.toString() ?? ''),
+                      ],
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Linked PYQs: ${chapter['linked_pyq_count'] ?? pyqs.length}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if ((chapter['material_type']?.toString() ?? '') == 'pdf' &&
+                          (chapter['material_drive_link']?.toString() ?? '').isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
                           children: [
-                            Row(
-                              children: const [
-                                Icon(Icons.picture_as_pdf_rounded, color: AppColors.danger),
-                                SizedBox(width: AppSpacing.md),
-                                Expanded(
-                                  child: Text(
-                                    'Admin uploaded PDF material for this chapter.',
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: AppSpacing.md),
+                            const Icon(Icons.picture_as_pdf_rounded,
+                                size: 18, color: AppColors.danger),
+                            const SizedBox(width: AppSpacing.sm),
                             PrimaryButton(
                               label: 'Open PDF',
                               expanded: false,
                               onPressed: () async {
-                                // Backend now returns a downloadLink.
-                                // Wrap it in viewerng for reliable
-                                // rendering on all Android WebView versions.
                                 final raw =
                                     chapter['material_drive_link']?.toString() ?? '';
                                 if (raw.isEmpty) return;
@@ -366,31 +333,36 @@ class ChapterDetailScreen extends ConsumerWidget {
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
+                      ],
                     ],
-                    SizedBox(
-                      height: 420,
-                      child: TabBarView(
-                        children: [
-                          _PdfOrNotesPanel(chapter: chapter),
-                          _PyqSolvePanel(pyqs: pyqs),
-                          _DetailPanel(
-                            title: 'Important lines',
-                            content: chapter['highlight']?.toString() ?? '',
-                            bullets: const [
-                              'Highlighted lines for revision',
-                              'One-tap bookmark',
-                              'Inline note highlight style',
-                            ],
-                            highlight: true,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                const Divider(height: 1),
+                // ── TabBarView fills all remaining space ────────────────────
+                // Using Expanded here (not a fixed-height SizedBox) is what
+                // makes the 3 sections visible. A SizedBox inside a
+                // SingleChildScrollView collapses TabBarView because both
+                // scroll in the same axis and Flutter cannot resolve the
+                // unbounded-height constraint.
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _PdfOrNotesPanel(chapter: chapter),
+                      _PyqSolvePanel(pyqs: pyqs),
+                      _DetailPanel(
+                        title: 'Important lines',
+                        content: chapter['highlight']?.toString() ?? '',
+                        bullets: const [
+                          'Highlighted lines for revision',
+                          'One-tap bookmark',
+                          'Inline note highlight style',
+                        ],
+                        highlight: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -421,9 +393,11 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
         bullets: ['Admin panel se PYQs add hone ke baad yahan solve kar sakte ho.'],
       );
     }
-    return SurfaceCard(
-      child: ListView.builder(
-        itemCount: widget.pyqs.length,
+    return SizedBox.expand(
+      child: SurfaceCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: ListView.builder(
+          itemCount: widget.pyqs.length,
         itemBuilder: (context, index) {
           final q = widget.pyqs[index];
           final correct = (q['correct_option']?.toString() ?? 'A').toUpperCase();
@@ -510,6 +484,7 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
             ),
           );
         },
+        ),
       ),
     );
   }
@@ -539,43 +514,153 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
     final previewUrl = _toDrivePreviewUrl(driveLink);
     _ensurePreviewController(previewUrl);
 
-    // ── Error state: chapter is marked as PDF but no valid Drive link ──────────
-    // This happens when the admin has not uploaded the PDF yet, or the link
-    // stored in the DB is malformed.  Show a clear message instead of falling
-    // through silently to the text-notes panel.
+    // ── Error state: PDF chapter but no valid Drive link ───────────────────
     if (isPdfMaterial && previewUrl == null) {
-      return SurfaceCard(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.picture_as_pdf_rounded,
-                    size: 52, color: AppColors.danger),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  'PDF not available',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                const Text(
-                  'The PDF link for this chapter is missing or invalid. '
-                  'Ask the admin to re-upload the PDF from the admin panel.',
-                  textAlign: TextAlign.center,
-                ),
-                if (note.trim().isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  const Divider(),
-                  const SizedBox(height: AppSpacing.sm),
+      return SizedBox.expand(
+        child: SurfaceCard(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.picture_as_pdf_rounded,
+                      size: 52, color: AppColors.danger),
+                  const SizedBox(height: AppSpacing.md),
                   Text(
-                    'Text extract available below',
-                    style: Theme.of(context).textTheme.titleSmall,
+                    'PDF not available',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
+                  const SizedBox(height: AppSpacing.xs),
+                  const Text(
+                    'The PDF link for this chapter is missing or invalid. '
+                    'Ask the admin to re-upload the PDF from the admin panel.',
+                    textAlign: TextAlign.center,
+                  ),
+                  if (note.trim().isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    const Divider(),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Text extract available below',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                      ),
+                      child: SelectableText(
+                        note,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(height: 1.45),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ── Normal PDF viewer ──────────────────────────────────────────────────
+    if (isPdfMaterial && previewUrl != null) {
+      return SizedBox.expand(
+        child: SurfaceCard(
+          padding: EdgeInsets.zero,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.primary,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.auto_stories_rounded, color: Colors.white),
+                      SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Chapter Reader',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SecondaryButton(
+                        label: _loadPreview ? 'Reload Preview' : 'Load Preview',
+                        onPressed: () {
+                          _webViewController?.loadRequest(Uri.parse(previewUrl));
+                          setState(() {
+                            _loadPreview = true;
+                            _previewKey++;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: PrimaryButton(
+                        label: 'Open Full PDF',
+                        onPressed: () async {
+                          final uri = Uri.tryParse(previewUrl);
+                          if (uri == null) return;
+                          await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                if (_loadPreview)
+                  Container(
+                    height: 420,
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      child: WebViewWidget(
+                        key: ValueKey('pdf-preview-$_previewKey'),
+                        controller: _webViewController!,
+                      ),
+                    ),
+                  ),
+                if (note.trim().isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'Quick text extract',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(AppSpacing.md),
@@ -585,11 +670,13 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
                     ),
                     child: SelectableText(
                       note,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(height: 1.45),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
                     ),
+                  ),
+                ] else ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(
+                    'Reader mode active. PDF content above visible in original format.',
                   ),
                 ],
               ],
@@ -599,128 +686,21 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
       );
     }
 
-    if (isPdfMaterial && previewUrl != null) {
-      return SurfaceCard(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  gradient: AppGradients.primary,
-                  borderRadius: BorderRadius.circular(AppRadii.md),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.auto_stories_rounded, color: Colors.white),
-                    SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        'Chapter Reader',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  Expanded(
-                    child: SecondaryButton(
-                      label: _loadPreview ? 'Reload Preview' : 'Load Preview',
-                      onPressed: () {
-                        _webViewController?.loadRequest(Uri.parse(previewUrl));
-                        setState(() {
-                          _loadPreview = true;
-                          _previewKey++;
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: PrimaryButton(
-                      label: 'Open Full PDF',
-                      onPressed: () async {
-                        // Open the same viewerng URL used by the embedded
-                        // WebView so the experience is consistent.
-                        final uri = Uri.tryParse(previewUrl);
-                        if (uri == null) return;
-                        await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              if (_loadPreview)
-                Container(
-                  height: 420,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(AppRadii.md),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadii.md),
-                    child: WebViewWidget(
-                      key: ValueKey('pdf-preview-$_previewKey'),
-                      controller: _webViewController!,
-                    ),
-                  ),
-                ),
-              if (note.trim().isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  'Quick text extract',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(AppRadii.md),
-                  ),
-                  child: SelectableText(
-                    note,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
-                  ),
-                ),
-              ] else ...[
-                const SizedBox(height: AppSpacing.sm),
-                const Text(
-                  'Reader mode active. PDF content above visible in original format.',
-                ),
-              ],
-            ],
-          ),
-        ),
-      );
-    }
-
-    return _DetailPanel(
-      title: 'Structured notes',
-      content: note.trim().isNotEmpty
-          ? note
-          : (isPdfMaterial
-              ? 'PDF uploaded, but extracted text is not available (scan/image PDF). Use Open PDF.'
-              : ''),
-      bullets: const [
-        'Concept overview cards',
-        'Formula and memory anchors',
-        'High-yield mistakes to avoid',
-      ],
+    // ── Text / notes fallback ──────────────────────────────────────────────
+    return SizedBox.expand(
+      child: _DetailPanel(
+        title: 'Structured notes',
+        content: note.trim().isNotEmpty
+            ? note
+            : (isPdfMaterial
+                ? 'PDF uploaded, but extracted text is not available (scan/image PDF). Use Open PDF.'
+                : ''),
+        bullets: const [
+          'Concept overview cards',
+          'Formula and memory anchors',
+          'High-yield mistakes to avoid',
+        ],
+      ),
     );
   }
 
@@ -818,47 +798,50 @@ class _DetailPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formatted = _formatReadableContent(content);
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.sm),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: BoxDecoration(
-                  color: highlight ? AppColors.indigoSoft : AppColors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(AppRadii.md),
-                ),
-                child: SelectableText(
-                  formatted.isEmpty ? 'No content available yet.' : formatted,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          ...bullets.map(
-            (bullet) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4),
-                    child: Icon(Icons.check_circle_rounded,
-                        size: 18, color: AppColors.indigo),
+    // SizedBox.expand ensures this panel fills its Expanded slot in TabBarView.
+    return SizedBox.expand(
+      child: SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.sm),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: highlight ? AppColors.indigoSoft : AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(child: Text(bullet)),
-                ],
+                  child: SelectableText(
+                    formatted.isEmpty ? 'No content available yet.' : formatted,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.lg),
+            ...bullets.map(
+              (bullet) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Icon(Icons.check_circle_rounded,
+                          size: 18, color: AppColors.indigo),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(child: Text(bullet)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
