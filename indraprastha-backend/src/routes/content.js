@@ -353,6 +353,24 @@ router.get('/videos', userAuth, async (req, res) => {
   res.json({ success: true, videos: result.rows });
 });
 
+router.get('/mcqs', userAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, batch_id, class_label, subject, topic, question,
+              option_a, option_b, option_c, option_d, correct_option,
+              explanation, question_image_link, question_image_drive_file_id, created_at
+       FROM daily_mcqs
+       WHERE batch_id = $1 AND is_active = TRUE
+       ORDER BY created_at DESC
+       LIMIT 30`,
+      [req.user.batch_id]
+    );
+    res.json({ success: true, mcqs: result.rows.map(mapQuestionImageLink) });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to fetch MCQs' });
+  }
+});
+
 router.get('/packages', userAuth, async (_req, res) => {
   const result = await pool.query(
     `SELECT id, name, price_label, validity, highlight, features_json, is_active

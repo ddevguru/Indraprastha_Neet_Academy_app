@@ -241,6 +241,7 @@ class _AdminHomeState extends State<AdminHome> {
     'Books',
     'Practice',
     'Tests',
+    'MCQs',
     'Videos',
     'Packages',
   ];
@@ -250,6 +251,7 @@ class _AdminHomeState extends State<AdminHome> {
     (Icons.upload_file_outlined, 'Books'),
     (Icons.flash_on_outlined, 'Practice'),
     (Icons.fact_check_outlined, 'Tests'),
+    (Icons.quiz_outlined, 'MCQs'),
     (Icons.smart_display_outlined, 'Videos'),
     (Icons.workspace_premium_outlined, 'Packages'),
   ];
@@ -311,6 +313,7 @@ class _AdminHomeState extends State<AdminHome> {
       BooksPage(api: _api),
       PracticePage(api: _api),
       TestsPage(api: _api),
+      McqsPage(api: _api),
       VideosPage(api: _api),
       PackagesPage(api: _api),
     ];
@@ -1060,7 +1063,7 @@ class _BooksPageState extends State<BooksPage> {
                 ),
                 const SizedBox(height: 8),
                 FilledButton(
-                  onPressed: _batchId == null
+                  onPressed: (_batchId == null || _pdfUploading)
                       ? null
                       : () async {
                           try {
@@ -1078,8 +1081,9 @@ class _BooksPageState extends State<BooksPage> {
                               }
                               return;
                             }
+                            int? savedBookId;
                             if (_editingId == null) {
-                              await widget.api.addBook(
+                              savedBookId = await widget.api.addBook(
                                 batchId: _batchId!,
                                 classLabel: _classLabel.text.trim(),
                                 title: title,
@@ -1095,20 +1099,43 @@ class _BooksPageState extends State<BooksPage> {
                                 subject: subject,
                                 topic: topic,
                               );
+                              savedBookId = _editingId;
+                            }
+                            if (_pdf != null) {
+                              setState(() {
+                                _pdfUploading = true;
+                                _pdfProgress = 0.0;
+                              });
+                              await widget.api.uploadBookByHierarchyChunked(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                subject: subject,
+                                chapterTitle: topic,
+                                pdfFile: _pdf!,
+                                bookId: savedBookId,
+                                onProgress: (p) {
+                                  if (mounted) setState(() => _pdfProgress = p);
+                                },
+                              );
                             }
                             await _loadBatches();
                             setState(() {
-                              _status = 'Book saved successfully';
+                              _status = _pdf != null ? 'Book and PDF saved successfully' : 'Book saved successfully';
                               _resetBookForm();
                             });
                             if (context.mounted) {
-                              _showActionSnackBar(context, 'Book saved successfully');
+                              _showActionSnackBar(
+                                context,
+                                _pdf != null ? 'Book and PDF added successfully' : 'Book saved successfully',
+                              );
                             }
                           } catch (e) {
                             setState(() => _status = 'Failed: $e');
                             if (context.mounted) {
                               _showActionSnackBar(context, 'Book save failed', isError: true);
                             }
+                          } finally {
+                            if (mounted) setState(() => _pdfUploading = false);
                           }
                         },
                   child: Text(_editingId == null ? 'Add Book' : 'Update Book'),
@@ -1157,7 +1184,7 @@ class _BooksPageState extends State<BooksPage> {
                             if (mounted) setState(() => _pdfUploading = false);
                           }
                         },
-                  child: const Text('Upload Chapter PDF'),
+                  child: const Text('Add Extra Chapter PDF to Existing Book'),
                 ),
                 if (_pdfUploading) ...[
                   const SizedBox(height: 10),
@@ -1778,10 +1805,17 @@ class _PracticePageState extends State<PracticePage> {
                                 questionImageLink: imageLink,
                               );
                             }
+                            _pqQuestion.clear();
+                            _pqOptionA.clear();
+                            _pqOptionB.clear();
+                            _pqOptionC.clear();
+                            _pqOptionD.clear();
+                            _pqExplanation.clear();
                             setState(() {
                               _editingPracticeQuestionId = null;
                               _pqImage = null;
-                              _pqImageLink = imageLink;
+                              _pqImageLink = '';
+                              _pqCorrect = 'A';
                             });
                             if (context.mounted) _showActionSnackBar(context, 'Practice question saved');
                           } catch (_) {
@@ -2440,6 +2474,309 @@ class _TestsPageState extends State<TestsPage> {
   }
 }
 
+// ─── MCQs Page ────────────────────────────────────────────────────────────────
+
+class McqsPage extends StatefulWidget {
+  const McqsPage({super.key, required this.api});
+  final AdminApi api;
+  @override
+  State<McqsPage> createState() => _McqsPageState();
+}
+
+class _McqsPageState extends State<McqsPage> {
+  final _question = TextEditingController();
+  final _classLabel = TextEditingController(text: 'Class 11');
+  final _subject = TextEditingController(text: 'Biology');
+  final _topic = TextEditingController();
+  final _optionA = TextEditingController();
+  final _optionB = TextEditingController();
+  final _optionC = TextEditingController();
+  final _optionD = TextEditingController();
+  final _explanation = TextEditingController();
+  String _correct = 'A';
+  int? _batchId;
+  int? _editingId;
+  File? _image;
+  String _imageLink = '';
+  List<dynamic> _batches = const [];
+  List<dynamic> _mcqs = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final b = await widget.api.batches();
+    final m = await widget.api.mcqs();
+    setState(() {
+      _batches = b['batches'] as List<dynamic>;
+      _mcqs = m['mcqs'] as List<dynamic>;
+      _batchId ??= _batches.isNotEmpty ? (_batches.first as Map<String, dynamic>)['id'] as int : null;
+    });
+  }
+
+  void _resetForm() {
+    _question.clear();
+    _optionA.clear();
+    _optionB.clear();
+    _optionC.clear();
+    _optionD.clear();
+    _explanation.clear();
+    setState(() {
+      _editingId = null;
+      _image = null;
+      _imageLink = '';
+      _correct = 'A';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                DropdownButtonFormField<int>(
+                  initialValue: _batchId,
+                  items: _batches
+                      .map((e) => DropdownMenuItem<int>(
+                            value: (e as Map<String, dynamic>)['id'] as int,
+                            child: Text(e['name'].toString()),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setState(() => _batchId = v),
+                  decoration: const InputDecoration(labelText: 'Batch'),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: _classLabel, decoration: const InputDecoration(labelText: 'Class')),
+                const SizedBox(height: 8),
+                TextField(controller: _subject, decoration: const InputDecoration(labelText: 'Subject')),
+                const SizedBox(height: 8),
+                TextField(controller: _topic, decoration: const InputDecoration(labelText: 'Topic')),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _question,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Question'),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: _optionA, decoration: const InputDecoration(labelText: 'Option A')),
+                const SizedBox(height: 8),
+                TextField(controller: _optionB, decoration: const InputDecoration(labelText: 'Option B')),
+                const SizedBox(height: 8),
+                TextField(controller: _optionC, decoration: const InputDecoration(labelText: 'Option C')),
+                const SizedBox(height: 8),
+                TextField(controller: _optionD, decoration: const InputDecoration(labelText: 'Option D')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _correct,
+                  items: const [
+                    DropdownMenuItem(value: 'A', child: Text('Correct: A')),
+                    DropdownMenuItem(value: 'B', child: Text('Correct: B')),
+                    DropdownMenuItem(value: 'C', child: Text('Correct: C')),
+                    DropdownMenuItem(value: 'D', child: Text('Correct: D')),
+                  ],
+                  onChanged: (v) => setState(() => _correct = v ?? 'A'),
+                  decoration: const InputDecoration(labelText: 'Correct option'),
+                ),
+                const SizedBox(height: 8),
+                TextField(controller: _explanation, decoration: const InputDecoration(labelText: 'Explanation')),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _image == null
+                            ? (_imageLink.isEmpty ? 'No image selected' : 'Image uploaded')
+                            : _image!.path,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                        if (result?.files.single.path == null) return;
+                        setState(() => _image = File(result!.files.single.path!));
+                      },
+                      child: const Text('Pick image'),
+                    ),
+                    if (_image != null || _imageLink.isNotEmpty)
+                      TextButton(
+                        onPressed: () => setState(() {
+                          _image = null;
+                          _imageLink = '';
+                        }),
+                        child: const Text('Remove'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    FilledButton(
+                      onPressed: _batchId == null
+                          ? null
+                          : () async {
+                              try {
+                                var link = _imageLink;
+                                if (_image != null) {
+                                  link = await widget.api.uploadQuestionImage(
+                                    batchId: _batchId!,
+                                    classLabel: _classLabel.text.trim(),
+                                    subject: _subject.text.trim(),
+                                    topic: _topic.text.trim().isEmpty ? 'MCQs' : _topic.text.trim(),
+                                    file: _image!,
+                                    contentType: 'mcq',
+                                  );
+                                }
+                                if (_editingId == null) {
+                                  await widget.api.addMcq(
+                                    batchId: _batchId!,
+                                    classLabel: _classLabel.text.trim(),
+                                    subject: _subject.text.trim(),
+                                    topic: _topic.text.trim(),
+                                    question: _question.text.trim(),
+                                    optionA: _optionA.text.trim(),
+                                    optionB: _optionB.text.trim(),
+                                    optionC: _optionC.text.trim(),
+                                    optionD: _optionD.text.trim(),
+                                    correctOption: _correct,
+                                    explanation: _explanation.text.trim(),
+                                    questionImageLink: link,
+                                  );
+                                } else {
+                                  await widget.api.updateMcq(
+                                    id: _editingId!,
+                                    classLabel: _classLabel.text.trim(),
+                                    subject: _subject.text.trim(),
+                                    topic: _topic.text.trim(),
+                                    question: _question.text.trim(),
+                                    optionA: _optionA.text.trim(),
+                                    optionB: _optionB.text.trim(),
+                                    optionC: _optionC.text.trim(),
+                                    optionD: _optionD.text.trim(),
+                                    correctOption: _correct,
+                                    explanation: _explanation.text.trim(),
+                                    questionImageLink: link.isEmpty ? null : link,
+                                  );
+                                }
+                                await _load();
+                                _resetForm();
+                                if (context.mounted) {
+                                  _showActionSnackBar(context, 'MCQ saved successfully');
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  _showActionSnackBar(context, 'MCQ save failed', isError: true);
+                                }
+                              }
+                            },
+                      child: Text(_editingId == null ? 'Add MCQ' : 'Update MCQ'),
+                    ),
+                    if (_editingId != null)
+                      OutlinedButton(
+                        onPressed: _resetForm,
+                        child: const Text('Cancel'),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        ..._mcqs.map((e) {
+          final m = e as Map<String, dynamic>;
+          final hasImage = (m['question_image_link']?.toString() ?? '').isNotEmpty;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(m['question']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text('A: ${m['option_a'] ?? ''}  B: ${m['option_b'] ?? ''}', style: const TextStyle(fontSize: 12)),
+                  Text('C: ${m['option_c'] ?? ''}  D: ${m['option_d'] ?? ''}', style: const TextStyle(fontSize: 12)),
+                  Text('Correct: ${m['correct_option'] ?? '-'}  |  ${m['subject'] ?? ''}  ${m['topic'] ?? ''}',
+                      style: const TextStyle(fontSize: 12, color: Colors.green)),
+                  if (hasImage) ...[
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        m['question_image_link'].toString(),
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _editingId = m['id'] as int;
+                            _question.text = m['question']?.toString() ?? '';
+                            _optionA.text = m['option_a']?.toString() ?? '';
+                            _optionB.text = m['option_b']?.toString() ?? '';
+                            _optionC.text = m['option_c']?.toString() ?? '';
+                            _optionD.text = m['option_d']?.toString() ?? '';
+                            _correct = m['correct_option']?.toString() ?? 'A';
+                            _explanation.text = m['explanation']?.toString() ?? '';
+                            _imageLink = m['question_image_link']?.toString() ?? '';
+                            _image = null;
+                          });
+                        },
+                        icon: const Icon(Icons.edit_outlined, size: 16),
+                        label: const Text('Edit'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final shouldDelete = await _confirmDeleteDialog(
+                            context,
+                            title: 'Delete MCQ?',
+                            body: 'This MCQ will be removed permanently.',
+                          );
+                          if (!shouldDelete) return;
+                          try {
+                            await widget.api.deleteMcq(m['id'] as int);
+                            await _load();
+                            if (context.mounted) _showActionSnackBar(context, 'MCQ deleted');
+                          } catch (_) {
+                            if (context.mounted) _showActionSnackBar(context, 'Delete failed', isError: true);
+                          }
+                        },
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        label: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────���─────────
+
 class VideosPage extends StatefulWidget {
   const VideosPage({super.key, required this.api});
   final AdminApi api;
@@ -2884,17 +3221,20 @@ class AdminApi {
     required String chapterTitle,
     required File pdfFile,
     required void Function(double progress) onProgress,
+    int? bookId,
   }) async {
     if (token == null) throw Exception('Login first');
     final fileName = pdfFile.path.split(Platform.pathSeparator).last;
-    final init = await _postMap('/admin/books/pdf-upload-init', {
+    final initPayload = <String, dynamic>{
       'batchId': batchId,
       'classLabel': classLabel,
       'subject': subject,
       'chapterTitle': chapterTitle,
       'fileName': fileName,
       'mimeType': 'application/pdf',
-    });
+    };
+    if (bookId != null && bookId > 0) initPayload['bookId'] = bookId;
+    final init = await _postMap('/admin/books/pdf-upload-init', initPayload);
     final uploadId = init['uploadId']?.toString();
     final chunkSize = (init['chunkSize'] as num?)?.toInt() ?? (512 * 1024);
     if (uploadId == null || uploadId.isEmpty) {
@@ -3225,6 +3565,69 @@ class AdminApi {
   }
 
   Future<void> deletePyq(int id) => _delete('/admin/pyqs/$id');
+
+  Future<Map<String, dynamic>> mcqs() => _get('/admin/mcqs');
+
+  Future<void> addMcq({
+    required int batchId,
+    required String classLabel,
+    required String subject,
+    required String topic,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    String questionImageLink = '',
+  }) async {
+    await _post('/admin/mcqs', {
+      'batchId': batchId,
+      'classLabel': classLabel,
+      'subject': subject,
+      'topic': topic,
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+      'questionImageLink': questionImageLink,
+    });
+  }
+
+  Future<void> updateMcq({
+    required int id,
+    required String classLabel,
+    required String subject,
+    required String topic,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    String? questionImageLink,
+  }) async {
+    await _put('/admin/mcqs/$id', {
+      'classLabel': classLabel,
+      'subject': subject,
+      'topic': topic,
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+      'questionImageLink': questionImageLink,
+    });
+  }
+
+  Future<void> deleteMcq(int id) => _delete('/admin/mcqs/$id');
 
   Future<String> uploadQuestionImage({
     required int batchId,

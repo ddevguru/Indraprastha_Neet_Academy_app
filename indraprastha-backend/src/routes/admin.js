@@ -612,7 +612,7 @@ router.post(
 // Chunked PDF upload (Render-safe) -> Drive + extract + book_chapters insert
 router.post('/books/pdf-upload-init', adminAuth, async (req, res) => {
   try {
-    const { batchId, classLabel, subject, chapterTitle, fileName, mimeType } = req.body;
+    const { batchId, classLabel, subject, chapterTitle, fileName, mimeType, bookId } = req.body;
     if (!batchId || !classLabel || !subject || !chapterTitle || !fileName) {
       return res.status(400).json({
         error: 'batchId, classLabel, subject, chapterTitle, fileName are required',
@@ -621,24 +621,19 @@ router.post('/books/pdf-upload-init', adminAuth, async (req, res) => {
     const uploadId = crypto.randomUUID();
     const dir = path.join(UPLOAD_ROOT, uploadId);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(
-      path.join(dir, 'meta.json'),
-      JSON.stringify(
-        {
-          uploadId,
-          kind: 'pdf',
-          batchId,
-          classLabel,
-          subject,
-          chapterTitle,
-          fileName,
-          mimeType: mimeType || 'application/pdf',
-          createdAt: Date.now(),
-        },
-        null,
-        2
-      )
-    );
+    const metaObj = {
+      uploadId,
+      kind: 'pdf',
+      batchId,
+      classLabel,
+      subject,
+      chapterTitle,
+      fileName,
+      mimeType: mimeType || 'application/pdf',
+      createdAt: Date.now(),
+    };
+    if (bookId) metaObj.bookId = Number(bookId);
+    fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(metaObj, null, 2));
     return res.json({ success: true, uploadId, chunkSize: 512 * 1024 });
   } catch (e) {
     logAdminRouteError('/books/pdf-upload-init', e);
@@ -701,22 +696,22 @@ router.post('/books/pdf-upload-complete', adminAuth, async (req, res) => {
     }
     await new Promise((resolve) => out.end(resolve));
 
-    const existingBook = await pool.query(
-      `SELECT id
-       FROM books
-       WHERE batch_id = $1 AND class_label = $2 AND subject = $3
-       LIMIT 1`,
-      [meta.batchId, meta.classLabel, meta.subject]
-    );
-    let bookId = existingBook.rows[0]?.id;
+    let bookId = meta.bookId || null;
     if (!bookId) {
-      const createdBook = await pool.query(
-        `INSERT INTO books (batch_id, class_label, title, subject, topic, level, category)
-         VALUES ($1,$2,$3,$4,$5,'Core','NCERT books')
-         RETURNING id`,
-        [meta.batchId, meta.classLabel, `${meta.subject} Master Book`, meta.subject, meta.chapterTitle]
+      const existingBook = await pool.query(
+        `SELECT id FROM books WHERE batch_id = $1 AND class_label = $2 AND subject = $3 LIMIT 1`,
+        [meta.batchId, meta.classLabel, meta.subject]
       );
-      bookId = createdBook.rows[0].id;
+      bookId = existingBook.rows[0]?.id;
+      if (!bookId) {
+        const createdBook = await pool.query(
+          `INSERT INTO books (batch_id, class_label, title, subject, topic, level, category)
+           VALUES ($1,$2,$3,$4,$5,'Core','NCERT books')
+           RETURNING id`,
+          [meta.batchId, meta.classLabel, `${meta.subject} Master Book`, meta.subject, meta.chapterTitle]
+        );
+        bookId = createdBook.rows[0].id;
+      }
     }
 
     const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [meta.batchId]);
@@ -1625,6 +1620,105 @@ router.put('/packages/:id', adminAuth, async (req, res) => {
 router.delete('/packages/:id', adminAuth, async (req, res) => {
   await pool.query('DELETE FROM packages WHERE id = $1', [req.params.id]);
   res.json({ success: true });
+});
+
+// ─── Daily MCQs ───────────────────────────────────────────────────────────────
+
+router.get('/mcqs', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT dm.*, b.name AS batch_name
+       FROM daily_mcqs dm
+       JOIN batches b ON b.id = dm.batch_id
+       ORDER BY dm.created_at DESC`
+    );
+    return res.json({ success: true, mcqs: result.rows.map(mapQuestionImageLink) });
+  } catch (e) {
+    logAdminRouteError('/mcqs GET', e);
+    return res.status(500).json({ error: e.message || 'Failed to fetch MCQs' });
+  }
+});
+
+router.post('/mcqs', adminAuth, async (req, res) => {
+  try {
+    const {
+      batchId, classLabel, subject, topic,
+      question, optionA, optionB, optionC, optionD,
+      correctOption, explanation, questionImageLink,
+    } = req.body;
+    if (!batchId || !question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
+      return res.status(400).json({ error: 'batchId, question, options and correctOption are required' });
+    }
+    const result = await pool.query(
+      `INSERT INTO daily_mcqs
+         (batch_id, class_label, subject, topic, question, option_a, option_b, option_c, option_d,
+          correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [
+        batchId, classLabel || '', subject || '', topic || '',
+        question, optionA, optionB, optionC, optionD,
+        correctOption, explanation || '',
+        normalizeDriveLink(questionImageLink || '', 'image'),
+        extractDriveFileId(questionImageLink || ''),
+        '',
+      ]
+    );
+    return res.json({ success: true, mcq: mapQuestionImageLink(result.rows[0]) });
+  } catch (e) {
+    logAdminRouteError('/mcqs POST', e);
+    return res.status(500).json({ error: e.message || 'Failed to add MCQ' });
+  }
+});
+
+router.put('/mcqs/:id', adminAuth, async (req, res) => {
+  try {
+    const {
+      classLabel, subject, topic,
+      question, optionA, optionB, optionC, optionD,
+      correctOption, explanation, questionImageLink, isActive,
+    } = req.body;
+    const result = await pool.query(
+      `UPDATE daily_mcqs
+       SET class_label                  = COALESCE($2,  class_label),
+           subject                      = COALESCE($3,  subject),
+           topic                        = COALESCE($4,  topic),
+           question                     = COALESCE($5,  question),
+           option_a                     = COALESCE($6,  option_a),
+           option_b                     = COALESCE($7,  option_b),
+           option_c                     = COALESCE($8,  option_c),
+           option_d                     = COALESCE($9,  option_d),
+           correct_option               = COALESCE($10, correct_option),
+           explanation                  = COALESCE($11, explanation),
+           question_image_link          = COALESCE($12, question_image_link),
+           question_image_drive_file_id = COALESCE($13, question_image_drive_file_id),
+           is_active                    = COALESCE($14, is_active)
+       WHERE id = $1
+       RETURNING *`,
+      [
+        req.params.id,
+        classLabel, subject, topic,
+        question, optionA, optionB, optionC, optionD,
+        correctOption, explanation,
+        questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
+        questionImageLink == null ? null : extractDriveFileId(questionImageLink),
+        isActive ?? null,
+      ]
+    );
+    return res.json({ success: true, mcq: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null });
+  } catch (e) {
+    logAdminRouteError('/mcqs/:id PUT', e);
+    return res.status(500).json({ error: e.message || 'Failed to update MCQ' });
+  }
+});
+
+router.delete('/mcqs/:id', adminAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM daily_mcqs WHERE id = $1', [req.params.id]);
+    return res.json({ success: true });
+  } catch (e) {
+    logAdminRouteError('/mcqs/:id DELETE', e);
+    return res.status(500).json({ error: e.message || 'Failed to delete MCQ' });
+  }
 });
 
 module.exports = router;

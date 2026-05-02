@@ -406,6 +406,28 @@ async function ensureDatabaseSchema() {
     );
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS daily_mcqs (
+      id SERIAL PRIMARY KEY,
+      batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      class_label VARCHAR(40),
+      subject VARCHAR(80) DEFAULT '',
+      topic VARCHAR(140) DEFAULT '',
+      question TEXT NOT NULL,
+      option_a TEXT NOT NULL,
+      option_b TEXT NOT NULL,
+      option_c TEXT NOT NULL,
+      option_d TEXT NOT NULL,
+      correct_option CHAR(1) NOT NULL,
+      explanation TEXT DEFAULT '',
+      question_image_link TEXT,
+      question_image_drive_file_id TEXT,
+      question_image_drive_folder_id TEXT DEFAULT '',
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // Performance indexes for frequent mobile/admin listing filters.
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_batch_id ON users(batch_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_books_batch_class_subject_topic ON books(batch_id, class_label, subject, topic);`);
@@ -415,6 +437,7 @@ async function ensureDatabaseSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_practice_questions_set_id ON practice_questions(practice_set_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_tests_batch_class_subject_topic ON tests(batch_id, class_label, subject, topic);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_test_questions_test_id ON test_questions(test_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_mcqs_batch_active ON daily_mcqs(batch_id, is_active);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_videos_batch_class_subject_topic ON videos(batch_id, class_label, subject, topic);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_analytics_user_created ON exam_analytics(user_id, created_at DESC);`);
 
