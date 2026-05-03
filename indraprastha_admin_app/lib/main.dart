@@ -1140,49 +1140,6 @@ class _BooksPageState extends State<BooksPage> {
                         },
                   child: Text(_editingId == null ? 'Add Book' : 'Update Book'),
                 ),
-                const SizedBox(height: 8),
-                FilledButton.tonal(
-                  onPressed: (_pdf == null || _batchId == null || _selectedBookId == null || _pdfUploading)
-                      ? null
-                      : () async {
-                          try {
-                            setState(() {
-                              _pdfUploading = true;
-                              _pdfProgress = 0.0;
-                              _status = null;
-                            });
-                            await widget.api.uploadBookByHierarchyChunked(
-                              batchId: _batchId!,
-                              classLabel: _classLabel.text.trim(),
-                              subject: _subject.text.trim(),
-                              chapterTitle: _chapter.text.trim().isEmpty
-                                  ? 'Introduction'
-                                  : _chapter.text.trim(),
-                              pdfFile: _pdf!,
-                              bookId: _selectedBookId,
-                              onProgress: (p) {
-                                if (mounted) setState(() => _pdfProgress = p);
-                              },
-                            );
-                            await _loadBatches();
-                            setState(() {
-                              _status = 'PDF uploaded to Drive successfully';
-                              _pdf = null;
-                            });
-                            if (context.mounted) {
-                              _showActionSnackBar(context, 'PDF uploaded successfully');
-                            }
-                          } catch (e) {
-                            setState(() => _status = 'PDF upload failed: $e');
-                            if (context.mounted) {
-                              _showActionSnackBar(context, 'PDF upload failed', isError: true);
-                            }
-                          } finally {
-                            if (mounted) setState(() => _pdfUploading = false);
-                          }
-                        },
-                  child: const Text('Add Extra Chapter PDF to Selected Book'),
-                ),
                 if (_pdfUploading) ...[
                   const SizedBox(height: 10),
                   LinearProgressIndicator(value: _pdfProgress == 0 ? null : _pdfProgress),

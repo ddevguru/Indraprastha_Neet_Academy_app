@@ -243,9 +243,7 @@ router.get('/practice-sets', userAuth, async (req, res) => {
     `SELECT ps.id, ps.title, ps.topic, ps.subject, ps.class_label, ps.difficulty, ps.estimated_minutes,
         (SELECT COUNT(*)::int FROM practice_questions pq WHERE pq.practice_set_id = ps.id) AS question_count
      FROM practice_sets ps
-     JOIN batches ub ON ub.id = $1
      WHERE ps.batch_id = $1
-       AND (ps.class_label IS NULL OR ps.class_label = '' OR ps.class_label = ub.class_label)
        AND ($2 = '' OR ps.subject = $2)
        AND ($3 = '' OR ps.topic = $3)
      ORDER BY id DESC`,
@@ -258,10 +256,7 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
   const setMeta = await pool.query(
     `SELECT ps.id, ps.title, ps.topic, ps.subject, ps.difficulty, ps.estimated_minutes
      FROM practice_sets ps
-     JOIN batches ub ON ub.id = $2
-     WHERE ps.id = $1
-       AND ps.batch_id = $2
-       AND (ps.class_label IS NULL OR ps.class_label = '' OR ps.class_label = ub.class_label)
+     WHERE ps.id = $1 AND ps.batch_id = $2
      LIMIT 1`,
     [req.params.setId, req.user.batch_id]
   );

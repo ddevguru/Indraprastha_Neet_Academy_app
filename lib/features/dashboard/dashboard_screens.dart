@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../auth/bloc/auth_bloc.dart';
 import '../content/data/content_repository.dart';
+import '../../core/providers/app_state.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/adaptive_scaffold.dart';
 import '../../widgets/app_widgets.dart';
@@ -72,6 +73,7 @@ class DashboardHomeScreen extends ConsumerWidget {
     final statsFuture = Future.wait([
       ContentRepository().fetchTests(),
       ContentRepository().fetchLatestAnalytics(),
+      ContentRepository().fetchDailyMcqCount(),
     ]);
 
     return SingleChildScrollView(
@@ -80,32 +82,55 @@ class DashboardHomeScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Greeting card ──────────────────────────────────────────────
             SurfaceCard(
               borderRadius: AppRadii.xl,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(20),
+                  Row(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: () => context.push('/saved'),
+                              icon: const Icon(Icons.bookmark_outline_rounded),
+                            ),
+                            IconButton(
+                              onPressed: () => context.push('/notifications'),
+                              icon: const Icon(Icons.notifications_none_rounded),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            onPressed: () => context.push('/saved'),
-                            icon: const Icon(Icons.bookmark_outline_rounded),
+                      const Spacer(),
+                      // ── Theme toggle ───────────────────────────────────
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: IconButton(
+                          onPressed: () => ref
+                              .read(appUiControllerProvider.notifier)
+                              .toggleTheme(
+                                ref.read(appUiControllerProvider).themeMode != ThemeMode.dark,
+                              ),
+                          icon: Icon(
+                            ref.watch(appUiControllerProvider).themeMode == ThemeMode.dark
+                                ? Icons.light_mode_rounded
+                                : Icons.dark_mode_outlined,
                           ),
-                          IconButton(
-                            onPressed: () => context.push('/notifications'),
-                            icon: const Icon(Icons.notifications_none_rounded),
-                          ),
-                        ],
+                          tooltip: 'Toggle dark mode',
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Row(
@@ -127,71 +152,6 @@ class DashboardHomeScreen extends ConsumerWidget {
                                 maxLines: 1,
                               ),
                             ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: () =>
-                                    context.push('/todays-mcq-test'),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.md),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: AppSpacing.xs,
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Padding(
-                                        padding:
-                                            EdgeInsets.only(top: 2),
-                                        child: Icon(
-                                          Icons.quiz_outlined,
-                                          size: 22,
-                                          color: AppColors.indigo,
-                                        ),
-                                      ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              "Today's MCQ test",
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .titleMedium
-                                                  ?.copyWith(
-                                                    color: AppColors.indigo,
-                                                    fontWeight:
-                                                        FontWeight.w700,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              'Day of the MCQs — see which subjects & chapters, then start',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color:
-                                                        AppColors.textSecondary,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const Icon(
-                                        Icons.chevron_right_rounded,
-                                        color: AppColors.indigo,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
                               '${user.targetExamYear} target. Stay consistent and keep the revision cycle tight.',
@@ -202,6 +162,73 @@ class DashboardHomeScreen extends ConsumerWidget {
                     ],
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // ── Today's MCQs — separate blue banner ───────────────────────
+            Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadii.xl),
+              child: InkWell(
+                onTap: () => context.push('/todays-mcq-test'),
+                borderRadius: BorderRadius.circular(AppRadii.xl),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.md,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.primary,
+                    borderRadius: BorderRadius.circular(AppRadii.xl),
+                    boxShadow: AppShadows.soft,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                        ),
+                        child: const Icon(
+                          Icons.quiz_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Today's MCQs",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Daily MCQ test — subjects, chapters, start',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -216,6 +243,9 @@ class DashboardHomeScreen extends ConsumerWidget {
                 final analytics = snapshot.data != null
                     ? Map<String, dynamic>.from(snapshot.data![1] as Map)
                     : const <String, dynamic>{};
+                final mcqCount = snapshot.data != null
+                    ? (snapshot.data![2] as int? ?? 0)
+                    : 0;
                 final donut = Map<String, dynamic>.from(
                   analytics['donut'] as Map? ?? const {},
                 );
@@ -236,7 +266,7 @@ class DashboardHomeScreen extends ConsumerWidget {
                       _CurrentPlanCard(
                         activePlan: user.preferredPlan,
                         syllabus: '${(coverage * 100).round()}%',
-                        streak: '${streak == '0' ? '--' : '$streak%'}',
+                        streak: streak == '0' ? '--' : '$streak%',
                         testsTaken: '${tests.length}',
                       ),
                       const SizedBox(height: AppSpacing.lg),
@@ -244,6 +274,7 @@ class DashboardHomeScreen extends ConsumerWidget {
                         coverage: coverage,
                         accuracy: accuracy,
                         testsTaken: tests.length,
+                        mcqCount: mcqCount,
                       ),
                     ],
                   );
@@ -256,7 +287,7 @@ class DashboardHomeScreen extends ConsumerWidget {
                       child: _CurrentPlanCard(
                         activePlan: user.preferredPlan,
                         syllabus: '${(coverage * 100).round()}%',
-                        streak: '${streak == '0' ? '--' : '$streak%'}',
+                        streak: streak == '0' ? '--' : '$streak%',
                         testsTaken: '${tests.length}',
                       ),
                     ),
@@ -266,6 +297,7 @@ class DashboardHomeScreen extends ConsumerWidget {
                         coverage: coverage,
                         accuracy: accuracy,
                         testsTaken: tests.length,
+                        mcqCount: mcqCount,
                       ),
                     ),
                   ],
@@ -432,11 +464,13 @@ class _DailyTargetCard extends StatelessWidget {
     required this.coverage,
     required this.accuracy,
     required this.testsTaken,
+    required this.mcqCount,
   });
 
   final double coverage;
   final double accuracy;
   final int testsTaken;
+  final int mcqCount;
 
   @override
   Widget build(BuildContext context) {
@@ -447,9 +481,9 @@ class _DailyTargetCard extends StatelessWidget {
           const Text('Daily target', style: TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: AppSpacing.sm),
           MetricBar(
-            label: 'Syllabus coverage',
-            value: coverage,
-            trailing: '${(coverage * 100).round()}%',
+            label: 'Daily MCQs',
+            value: mcqCount > 0 ? 1.0 : 0.0,
+            trailing: mcqCount > 0 ? '$mcqCount available' : 'None today',
           ),
           const SizedBox(height: AppSpacing.md),
           MetricBar(

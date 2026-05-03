@@ -104,6 +104,16 @@ class ContentRepository {
     return List<Map<String, dynamic>>.from(data['packages'] as List<dynamic>);
   }
 
+  Future<int> fetchDailyMcqCount() async {
+    try {
+      final data = await _get('/content/mcqs');
+      final mcqs = data['mcqs'] as List<dynamic>? ?? [];
+      return mcqs.length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   Future<Map<String, dynamic>> _get(
     String path, {
     bool bypassCache = false,
