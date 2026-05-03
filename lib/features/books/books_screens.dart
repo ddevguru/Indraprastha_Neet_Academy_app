@@ -93,7 +93,12 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
       return;
     }
 
-    final chapterId = int.tryParse(chapters.first['id']?.toString() ?? '');
+    // Prefer the PDF chapter; fall back to first chapter.
+    final target = chapters.firstWhere(
+      (c) => (c['material_type']?.toString() ?? '').toLowerCase() == 'pdf',
+      orElse: () => chapters.first,
+    );
+    final chapterId = int.tryParse(target['id']?.toString() ?? '');
     if (!context.mounted || chapterId == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(

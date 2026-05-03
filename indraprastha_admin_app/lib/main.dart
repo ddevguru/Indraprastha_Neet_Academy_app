@@ -1142,7 +1142,7 @@ class _BooksPageState extends State<BooksPage> {
                 ),
                 const SizedBox(height: 8),
                 FilledButton.tonal(
-                  onPressed: (_pdf == null || _batchId == null || _pdfUploading)
+                  onPressed: (_pdf == null || _batchId == null || _selectedBookId == null || _pdfUploading)
                       ? null
                       : () async {
                           try {
@@ -1159,6 +1159,7 @@ class _BooksPageState extends State<BooksPage> {
                                   ? 'Introduction'
                                   : _chapter.text.trim(),
                               pdfFile: _pdf!,
+                              bookId: _selectedBookId,
                               onProgress: (p) {
                                 if (mounted) setState(() => _pdfProgress = p);
                               },
@@ -1166,10 +1167,6 @@ class _BooksPageState extends State<BooksPage> {
                             await _loadBatches();
                             setState(() {
                               _status = 'PDF uploaded to Drive successfully';
-                              // Only clear the picked PDF file — do NOT clear
-                              // the chapter title or other text fields here.
-                              // Those are cleared only when "Add Book" /
-                              // "Update Book" is tapped (via _resetBookForm).
                               _pdf = null;
                             });
                             if (context.mounted) {
@@ -1184,7 +1181,7 @@ class _BooksPageState extends State<BooksPage> {
                             if (mounted) setState(() => _pdfUploading = false);
                           }
                         },
-                  child: const Text('Add Extra Chapter PDF to Existing Book'),
+                  child: const Text('Add Extra Chapter PDF to Selected Book'),
                 ),
                 if (_pdfUploading) ...[
                   const SizedBox(height: 10),
