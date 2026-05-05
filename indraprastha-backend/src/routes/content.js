@@ -150,13 +150,10 @@ router.get('/books', userAuth, async (req, res) => {
   const books = await pool.query(
     `SELECT bk.id, bk.title, bk.subject, bk.topic, bk.level, bk.category, bk.class_label
      FROM books bk
-     JOIN batches ub ON ub.id = $1
-     WHERE bk.batch_id = $1
-       AND (bk.class_label IS NULL OR bk.class_label = '' OR bk.class_label = ub.class_label)
-       AND ($2 = '' OR bk.subject = $2)
-       AND ($3 = '' OR bk.topic = $3)
+     WHERE ($1 = '' OR bk.subject = $1)
+       AND ($2 = '' OR bk.topic = $2)
      ORDER BY id DESC`,
-    [req.user.batch_id, subject, topic]
+    [subject, topic]
   );
   res.json({ success: true, books: books.rows });
 });
@@ -166,10 +163,9 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
     `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type, ch.material_drive_link, ch.material_drive_file_id, ch.material_drive_folder_id,
         (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS linked_pyq_count
      FROM book_chapters ch
-     JOIN books b ON b.id = ch.book_id
-     WHERE ch.book_id = $1 AND b.batch_id = $2
+     WHERE ch.book_id = $1
      ORDER BY ch.id ASC`,
-    [req.params.bookId, req.user.batch_id]
+    [req.params.bookId]
   );
   if (chapters.rows.length > 0) {
     const hydrated = await Promise.all(chapters.rows.map(ensureChapterExtracted));
@@ -181,9 +177,9 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
   const bookResult = await pool.query(
     `SELECT id, title, topic
      FROM books
-     WHERE id = $1 AND batch_id = $2
+     WHERE id = $1
      LIMIT 1`,
-    [req.params.bookId, req.user.batch_id]
+    [req.params.bookId]
   );
   if (bookResult.rows.length === 0) {
     return res.json({ success: true, chapters: [] });
@@ -212,10 +208,9 @@ router.get('/chapters/:chapterId', userAuth, async (req, res) => {
     `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type, ch.material_drive_link, ch.material_drive_file_id, ch.material_drive_folder_id,
         (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS linked_pyq_count
      FROM book_chapters ch
-     JOIN books b ON b.id = ch.book_id
-     WHERE ch.id = $1 AND b.batch_id = $2
+     WHERE ch.id = $1
      LIMIT 1`,
-    [req.params.chapterId, req.user.batch_id]
+    [req.params.chapterId]
   );
   if (chapter.rows.length === 0) {
     return res.status(404).json({ error: 'Chapter not found' });
@@ -227,11 +222,9 @@ router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
   const pyqs = await pool.query(
     `SELECT p.id, p.question, p.option_a, p.option_b, p.option_c, p.option_d, p.correct_option, p.explanation, p.year_label, p.question_image_link, p.question_image_drive_file_id, p.question_image_drive_folder_id
      FROM pyqs p
-     JOIN book_chapters ch ON ch.id = p.chapter_id
-     JOIN books b ON b.id = ch.book_id
-     WHERE p.chapter_id = $1 AND b.batch_id = $2
+     WHERE p.chapter_id = $1
      ORDER BY p.id ASC`,
-    [req.params.chapterId, req.user.batch_id]
+    [req.params.chapterId]
   );
   res.json({ success: true, pyqs: pyqs.rows.map(mapQuestionImageLink) });
 });
@@ -243,11 +236,10 @@ router.get('/practice-sets', userAuth, async (req, res) => {
     `SELECT ps.id, ps.title, ps.topic, ps.subject, ps.class_label, ps.difficulty, ps.estimated_minutes,
         (SELECT COUNT(*)::int FROM practice_questions pq WHERE pq.practice_set_id = ps.id) AS question_count
      FROM practice_sets ps
-     WHERE ps.batch_id = $1
-       AND ($2 = '' OR ps.subject = $2)
-       AND ($3 = '' OR ps.topic = $3)
+     WHERE ($1 = '' OR ps.subject = $1)
+       AND ($2 = '' OR ps.topic = $2)
      ORDER BY id DESC`,
-    [req.user.batch_id, subject, topic]
+    [subject, topic]
   );
   res.json({ success: true, practiceSets: result.rows });
 });
@@ -256,9 +248,9 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
   const setMeta = await pool.query(
     `SELECT ps.id, ps.title, ps.topic, ps.subject, ps.difficulty, ps.estimated_minutes
      FROM practice_sets ps
-     WHERE ps.id = $1 AND ps.batch_id = $2
+     WHERE ps.id = $1
      LIMIT 1`,
-    [req.params.setId, req.user.batch_id]
+    [req.params.setId]
   );
   if (setMeta.rows.length === 0) {
     return res.status(404).json({ error: 'Practice set not found' });
@@ -285,20 +277,17 @@ router.get('/tests', userAuth, async (req, res) => {
         (ta.id IS NOT NULL) AS is_completed,
         ta.score AS last_score
      FROM tests t
-     JOIN batches ub ON ub.id = $1
      LEFT JOIN LATERAL (
        SELECT id, score
        FROM test_attempts
-       WHERE user_id = $4 AND test_id = t.id
+       WHERE user_id = $3 AND test_id = t.id
        ORDER BY attempted_at DESC
        LIMIT 1
      ) ta ON true
-     WHERE t.batch_id = $1
-       AND (t.class_label IS NULL OR t.class_label = '' OR t.class_label = ub.class_label)
-       AND ($2 = '' OR t.subject = $2)
-       AND ($3 = '' OR t.topic = $3)
+     WHERE ($1 = '' OR t.subject = $1)
+       AND ($2 = '' OR t.topic = $2)
      ORDER BY id DESC`,
-    [req.user.batch_id, subject, topic, req.user.id]
+    [subject, topic, req.user.id]
   );
   res.json({ success: true, tests: result.rows });
 });
@@ -307,12 +296,9 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
   const testMeta = await pool.query(
     `SELECT t.id, t.title, t.subject, t.topic, t.duration_minutes, t.marks, t.question_count
      FROM tests t
-     JOIN batches ub ON ub.id = $2
      WHERE t.id = $1
-       AND t.batch_id = $2
-       AND (t.class_label IS NULL OR t.class_label = '' OR t.class_label = ub.class_label)
      LIMIT 1`,
-    [req.params.testId, req.user.batch_id]
+    [req.params.testId]
   );
   if (testMeta.rows.length === 0) {
     return res.status(404).json({ error: 'Test not found' });
@@ -337,13 +323,10 @@ router.get('/videos', userAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT v.id, v.title, v.subject, v.topic, v.class_label, v.chapter_hint, v.section_label, v.duration_label, v.drive_link
      FROM videos v
-     JOIN batches ub ON ub.id = $1
-     WHERE v.batch_id = $1
-       AND (v.class_label IS NULL OR v.class_label = '' OR v.class_label = ub.class_label)
-       AND ($2 = '' OR v.subject = $2)
-       AND ($3 = '' OR v.topic = $3)
+     WHERE ($1 = '' OR v.subject = $1)
+       AND ($2 = '' OR v.topic = $2)
      ORDER BY id DESC`,
-    [req.user.batch_id, subject, topic]
+    [subject, topic]
   );
   res.json({ success: true, videos: result.rows });
 });
@@ -351,14 +334,13 @@ router.get('/videos', userAuth, async (req, res) => {
 router.get('/mcqs', userAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, batch_id, class_label, subject, topic, question,
+      `SELECT id, subject, topic, question,
               option_a, option_b, option_c, option_d, correct_option,
               explanation, question_image_link, question_image_drive_file_id, created_at
        FROM daily_mcqs
-       WHERE batch_id = $1 AND is_active = TRUE
+       WHERE is_active = TRUE
        ORDER BY created_at DESC
-       LIMIT 30`,
-      [req.user.batch_id]
+       LIMIT 30`
     );
     res.json({ success: true, mcqs: result.rows.map(mapQuestionImageLink) });
   } catch (e) {
@@ -382,16 +364,15 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
     if (!Number.isFinite(testId) || testId <= 0) {
       return res.status(400).json({ error: 'Invalid testId' });
     }
-    // Ensure user is submitting only their batch's test.
     const testExists = await pool.query(
       `SELECT id, title, subject, topic
        FROM tests
-       WHERE id = $1 AND batch_id = $2
+       WHERE id = $1
        LIMIT 1`,
-      [testId, req.user.batch_id]
+      [testId]
     );
     if (testExists.rows.length === 0) {
-      return res.status(404).json({ error: 'Test not found for your batch' });
+      return res.status(404).json({ error: 'Test not found' });
     }
 
     const {

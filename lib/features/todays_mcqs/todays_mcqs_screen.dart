@@ -14,59 +14,81 @@ class TodaysMcqsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(dailyMcqsProvider);
-    final active = items.activeInTodaysFeed;
-    final archived = items.archivedToChapters;
+    final asyncItems = ref.watch(dailyMcqsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text("Today's MCQs")),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: CenteredContent(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionHeader(
-                title: "Today's rotation",
-                subtitle:
-                    'Questions stay here for 24 hours from issue time, then move into '
-                    'Books → chapter → PYQs / practice for that standard.',
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              if (active.isEmpty)
-                const EmptyStateWidget(
-                  title: 'No MCQs in the daily window',
-                  subtitle:
-                      'Everything issued in the last session has moved to your chapters. '
-                      'Open a chapter below or pull to refresh after the next daily drop.',
-                  icon: Icons.quiz_outlined,
-                )
-              else
-                ...active.map((e) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                      child: _McqCard(item: e, showTimer: true),
-                    )),
-              if (archived.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.xl),
-                SectionHeader(
-                  title: 'Moved to your chapters (24h passed)',
-                  subtitle:
-                      'These now appear under the matching subject and chapter in Books and Practice.',
-                ),
+      body: asyncItems.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Failed to load MCQs: $e', textAlign: TextAlign.center),
                 const SizedBox(height: AppSpacing.md),
-                ...archived.map((e) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                      child: _McqCard(
-                        item: e,
-                        showTimer: false,
-                        onOpenChapter: () =>
-                            context.push('/books/chapter/${e.chapterId}'),
-                      ),
-                    )),
+                FilledButton(
+                  onPressed: () => ref.read(dailyMcqsProvider.notifier).refresh(),
+                  child: const Text('Retry'),
+                ),
               ],
-            ],
+            ),
           ),
         ),
+        data: (items) {
+          final active = items.activeInTodaysFeed;
+          final archived = items.archivedToChapters;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: CenteredContent(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SectionHeader(
+                    title: "Today's rotation",
+                    subtitle:
+                        'Questions stay here for 24 hours from issue time, then move into '
+                        'Books → chapter → PYQs / practice for that standard.',
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  if (active.isEmpty)
+                    const EmptyStateWidget(
+                      title: 'No MCQs in the daily window',
+                      subtitle:
+                          'Everything issued in the last session has moved to your chapters. '
+                          'Open a chapter below or pull to refresh after the next daily drop.',
+                      icon: Icons.quiz_outlined,
+                    )
+                  else
+                    ...active.map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: _McqCard(item: e, showTimer: true),
+                        )),
+                  if (archived.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.xl),
+                    SectionHeader(
+                      title: 'Moved to your chapters (24h passed)',
+                      subtitle:
+                          'These now appear under the matching subject and chapter in Books and Practice.',
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    ...archived.map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: _McqCard(
+                            item: e,
+                            showTimer: false,
+                            onOpenChapter: () =>
+                                context.push('/books/chapter/${e.chapterId}'),
+                          ),
+                        )),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

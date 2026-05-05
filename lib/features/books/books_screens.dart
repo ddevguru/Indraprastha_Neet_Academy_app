@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -545,31 +547,6 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
                     'Ask the admin to re-upload the PDF from the admin panel.',
                     textAlign: TextAlign.center,
                   ),
-                  if (note.trim().isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.lg),
-                    const Divider(),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Text extract available below',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(AppRadii.md),
-                      ),
-                      child: SelectableText(
-                        note,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(height: 1.45),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -583,109 +560,90 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
       return SizedBox.expand(
         child: SurfaceCard(
           padding: EdgeInsets.zero,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.primary,
-                    borderRadius: BorderRadius.circular(AppRadii.md),
-                  ),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.auto_stories_rounded, color: Colors.white),
-                      SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          'Chapter Reader',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md, AppSpacing.md, AppSpacing.md, 0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        gradient: AppGradients.primary,
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.auto_stories_rounded, color: Colors.white),
+                          SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Chapter Reader',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SecondaryButton(
+                            label: _loadPreview ? 'Reload Preview' : 'Load Preview',
+                            onPressed: () {
+                              _webViewController?.loadRequest(Uri.parse(previewUrl));
+                              setState(() {
+                                _loadPreview = true;
+                                _previewKey++;
+                              });
+                            },
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SecondaryButton(
-                        label: _loadPreview ? 'Reload Preview' : 'Load Preview',
-                        onPressed: () {
-                          _webViewController?.loadRequest(Uri.parse(previewUrl));
-                          setState(() {
-                            _loadPreview = true;
-                            _previewKey++;
-                          });
-                        },
-                      ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: PrimaryButton(
+                            label: 'Open Full PDF',
+                            onPressed: () async {
+                              final uri = Uri.tryParse(previewUrl);
+                              if (uri == null) return;
+                              await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: PrimaryButton(
-                        label: 'Open Full PDF',
-                        onPressed: () async {
-                          final uri = Uri.tryParse(previewUrl);
-                          if (uri == null) return;
-                          await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-                        },
-                      ),
-                    ),
+                    const SizedBox(height: AppSpacing.md),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.md),
-                if (_loadPreview)
-                  Container(
-                    height: 420,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(AppRadii.md),
-                      border: Border.all(color: AppColors.border),
+              ),
+              if (_loadPreview)
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(AppRadii.md),
+                      bottomRight: Radius.circular(AppRadii.md),
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadii.md),
-                      child: WebViewWidget(
-                        key: ValueKey('pdf-preview-$_previewKey'),
-                        controller: _webViewController!,
-                      ),
-                    ),
-                  ),
-                if (note.trim().isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'Quick text extract',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(AppRadii.md),
-                    ),
-                    child: SelectableText(
-                      note,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
+                    child: WebViewWidget(
+                      key: ValueKey('pdf-preview-$_previewKey'),
+                      controller: _webViewController!,
+                      gestureRecognizers: {
+                        Factory<EagerGestureRecognizer>(
+                          EagerGestureRecognizer.new,
+                        ),
+                      },
                     ),
                   ),
-                ] else ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  const Text(
-                    'Reader mode active. PDF content above visible in original format.',
-                  ),
-                ],
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       );
@@ -741,12 +699,9 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
     final uri = Uri.tryParse(raw);
     if (uri == null) return null;
 
-    // If we can extract Drive fileId, use viewerng embedded URL.
-    // This tends to be more reliable across Android webview variants.
     final id = _extractGoogleDriveFileId(uri);
     if (id != null && id.isNotEmpty) {
-      final downloadUrl = 'https://drive.google.com/uc?export=download&id=$id';
-      return 'https://drive.google.com/viewerng/viewer?embedded=true&url=${Uri.encodeComponent(downloadUrl)}';
+      return 'https://drive.google.com/file/d/$id/preview';
     }
 
     // Fallback: just open the given URL in webview.

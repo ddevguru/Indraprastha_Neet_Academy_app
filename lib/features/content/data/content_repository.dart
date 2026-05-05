@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/constants/api_constants.dart';
+import '../../../models/daily_mcq_item.dart';
 
 class ContentRepository {
   ContentRepository({http.Client? client}) : _client = client ?? _sharedClient;
@@ -102,6 +103,18 @@ class ContentRepository {
   Future<List<Map<String, dynamic>>> fetchPackages() async {
     final data = await _get('/content/packages');
     return List<Map<String, dynamic>>.from(data['packages'] as List<dynamic>);
+  }
+
+  Future<List<DailyMcqItem>> fetchDailyMcqs() async {
+    try {
+      final data = await _get('/content/mcqs');
+      final mcqs = data['mcqs'] as List<dynamic>? ?? [];
+      return mcqs
+          .map((m) => DailyMcqItem.fromApi(m as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<int> fetchDailyMcqCount() async {

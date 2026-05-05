@@ -1,16 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/content/data/content_repository.dart';
 import '../../models/daily_mcq_item.dart';
-import '../data/daily_mcqs_data.dart';
 
-class DailyMcqsNotifier extends Notifier<List<DailyMcqItem>> {
+class DailyMcqsNotifier extends AsyncNotifier<List<DailyMcqItem>> {
   @override
-  List<DailyMcqItem> build() => DailyMcqsData.seedSession();
+  Future<List<DailyMcqItem>> build() => ContentRepository().fetchDailyMcqs();
 
-  void reset() {
-    state = DailyMcqsData.seedSession();
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => ContentRepository().fetchDailyMcqs());
   }
 }
 
 final dailyMcqsProvider =
-    NotifierProvider<DailyMcqsNotifier, List<DailyMcqItem>>(DailyMcqsNotifier.new);
+    AsyncNotifierProvider<DailyMcqsNotifier, List<DailyMcqItem>>(
+      DailyMcqsNotifier.new,
+    );

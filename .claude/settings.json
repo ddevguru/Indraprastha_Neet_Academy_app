@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -E \"\\\\.\\(js|jsx|ts|tsx|dart\\)$\")"
+      "Bash(grep -E \"\\\\.\\(js|jsx|ts|tsx|dart\\)$\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\indraprastha\\\\lib\" -Recurse -Filter \"*.dart\")"
     ]
   }
 }
