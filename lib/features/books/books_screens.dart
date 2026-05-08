@@ -43,7 +43,7 @@ Widget _buildQuestionImage(String rawUrl) {
           child: const CircularProgressIndicator(strokeWidth: 2),
         );
       },
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (ctx, err, st) => Container(
         height: 120,
         alignment: Alignment.center,
         color: AppColors.surfaceMuted,
@@ -169,24 +169,9 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                         icon: Icons.menu_book_outlined,
                       )
                     else
-                      ...books.map(
-                        (book) => Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: SurfaceCard(
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(book['title']?.toString() ?? ''),
-                              subtitle: Text(
-                                '${book['subject'] ?? ''} . ${book['topic'] ?? ''}',
-                              ),
-                              trailing: const Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                size: 16,
-                              ),
-                              onTap: () => _openBookChapter(context, book),
-                            ),
-                          ),
-                        ),
+                      _SubjectBooksSection(
+                        books: books,
+                        onBookTap: (book) => _openBookChapter(context, book),
                       ),
                     const SizedBox(height: AppSpacing.xl),
                     SurfaceCard(
@@ -230,6 +215,118 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Subject-wise books grouping ───────────────────────────────────────────────
+
+class _SubjectBooksSection extends StatefulWidget {
+  const _SubjectBooksSection({
+    required this.books,
+    required this.onBookTap,
+  });
+
+  final List<Map<String, dynamic>> books;
+  final void Function(Map<String, dynamic> book) onBookTap;
+
+  @override
+  State<_SubjectBooksSection> createState() => _SubjectBooksSectionState();
+}
+
+class _SubjectBooksSectionState extends State<_SubjectBooksSection> {
+  late final Map<String, List<Map<String, dynamic>>> _grouped;
+  final Set<String> _expanded = {};
+
+  static IconData _iconFor(String subject) {
+    final s = subject.toLowerCase();
+    if (s.contains('physics')) return Icons.rocket_launch_rounded;
+    if (s.contains('chem')) return Icons.science_rounded;
+    if (s.contains('bot')) return Icons.spa_rounded;
+    if (s.contains('zoo')) return Icons.pets_rounded;
+    if (s.contains('bio')) return Icons.biotech_rounded;
+    return Icons.menu_book_rounded;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _grouped = {};
+    for (final book in widget.books) {
+      final raw = book['subject']?.toString().trim() ?? '';
+      final subject = raw.isNotEmpty ? raw : 'General';
+      _grouped.putIfAbsent(subject, () => []).add(book);
+    }
+    if (_grouped.isNotEmpty) _expanded.add(_grouped.keys.first);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: _grouped.entries.map((entry) {
+        final subject = entry.key;
+        final books = entry.value;
+        final isOpen = _expanded.contains(subject);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: SurfaceCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                InkWell(
+                  onTap: () => setState(() {
+                    if (isOpen) {
+                      _expanded.remove(subject);
+                    } else {
+                      _expanded.add(subject);
+                    }
+                  }),
+                  borderRadius: BorderRadius.circular(AppRadii.lg),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: AppColors.indigoSoft,
+                          child: Icon(_iconFor(subject), color: AppColors.indigo),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(subject,
+                                  style: const TextStyle(fontWeight: FontWeight.w600)),
+                              Text('${books.length} book${books.length == 1 ? '' : 's'}'),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          isOpen
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (isOpen) ...[
+                  const Divider(height: 1),
+                  ...books.map(
+                    (book) => ListTile(
+                      leading: const Icon(Icons.auto_stories_rounded),
+                      title: Text(book['title']?.toString() ?? ''),
+                      subtitle: Text(book['topic']?.toString() ?? ''),
+                      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                      onTap: () => widget.onBookTap(book),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

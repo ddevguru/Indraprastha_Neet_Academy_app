@@ -522,4 +522,27 @@ router.get('/analytics/latest', userAuth, async (req, res) => {
   });
 });
 
+// ── FCM token registration ────────────────────────────────────────────────────
+
+router.post('/fcm-token', userAuth, async (req, res) => {
+  const { token } = req.body;
+  if (!token || typeof token !== 'string' || token.trim().length === 0) {
+    return res.status(400).json({ error: 'token is required' });
+  }
+  try {
+    await pool.query(
+      `INSERT INTO fcm_tokens (user_id, token, updated_at)
+       VALUES ($1, $2, CURRENT_TIMESTAMP)
+       ON CONFLICT (token) DO UPDATE
+         SET user_id = EXCLUDED.user_id,
+             updated_at = CURRENT_TIMESTAMP`,
+      [req.user.id, token.trim()]
+    );
+    return res.json({ success: true });
+  } catch (e) {
+    console.error('[FCM] token register error:', e.message);
+    return res.status(500).json({ error: 'Failed to register token' });
+  }
+});
+
 module.exports = router;

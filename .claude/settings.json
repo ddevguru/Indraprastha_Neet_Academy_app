@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(grep -E \"\\\\.\\(js|jsx|ts|tsx|dart\\)$\")",
-      "Bash(Get-ChildItem -Path \"c:\\\\indraprastha\\\\lib\" -Recurse -Filter \"*.dart\")"
+      "Bash(Get-ChildItem -Path \"c:\\\\indraprastha\\\\lib\" -Recurse -Filter \"*.dart\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\indraprastha\" -Directory)",
+      "Bash(Select-Object Name)",
+      "PowerShell(head -30)",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\indraprastha\\\\android\\\\app\\\\src\\\\main\\\\kotlin\\\\com\\\\indraprastha\\\\student\")",
+      "PowerShell(Copy-Item \"c:\\\\indraprastha\\\\android\\\\app\\\\src\\\\main\\\\kotlin\\\\com\\\\example\\\\indraprastha\\\\MainActivity.kt\" \"c:\\\\indraprastha\\\\android\\\\app\\\\src\\\\main\\\\kotlin\\\\com\\\\indraprastha\\\\student\\\\MainActivity.kt\")",
+      "PowerShell(keytool -genkey -v -keystore \"c:\\\\indraprastha\\\\android\\\\app\\\\neet-academy.jks\" -alias \"indraprastha-neet-academy\" -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname \"CN=Deepak Mishra, OU=Developer, O=Developer, L=Boisar, ST=Maharashtra, C=IN\" 2>&1)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

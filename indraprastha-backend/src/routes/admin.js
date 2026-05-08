@@ -9,6 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const { pool } = require('../db');
+const { sendNotificationToAll } = require('../services/notifications');
 const {
   uploadBufferToDrive,
   uploadFilePathToDrive,
@@ -452,6 +453,11 @@ router.post('/books', adminAuth, async (req, res) => {
      RETURNING *`,
     [batchId, classLabel, title, subject, topic, level || 'Core', category || 'NCERT books']
   );
+  sendNotificationToAll(pool, {
+    title: '📚 New Book Added',
+    body: `${title}${subject ? ` — ${subject}` : ''}`,
+    data: { type: 'book', id: String(result.rows[0].id) },
+  });
   res.json({ success: true, book: result.rows[0] });
 });
 
@@ -974,6 +980,11 @@ router.post('/practice-sets', adminAuth, async (req, res) => {
      RETURNING *`,
     [batchId, classLabel, subject, title, topic, difficulty || 'Moderate', estimatedMinutes || 20]
   );
+  sendNotificationToAll(pool, {
+    title: '⚡ New Practice Set',
+    body: `${title}${topic ? ` — ${topic}` : ''}`,
+    data: { type: 'practice', id: String(result.rows[0].id) },
+  });
   res.json({ success: true, practiceSet: result.rows[0] });
 });
 
@@ -1117,6 +1128,11 @@ router.post('/tests', adminAuth, async (req, res) => {
       scheduleLabel || '',
     ]
   );
+  sendNotificationToAll(pool, {
+    title: '📝 New Test Available',
+    body: `${title}${category ? ` — ${category}` : ''}`,
+    data: { type: 'test', id: String(result.rows[0].id) },
+  });
   res.json({ success: true, test: result.rows[0] });
 });
 
@@ -1521,6 +1537,11 @@ router.post('/videos', adminAuth, async (req, res) => {
         driveLink,
       ]
     );
+    sendNotificationToAll(pool, {
+      title: '🎥 New Video Lecture',
+      body: `${title}${subject ? ` — ${subject}` : ''}`,
+      data: { type: 'video', id: String(dbResult.rows[0].id) },
+    });
     return res.json({ success: true, video: dbResult.rows[0] });
   } catch (error) {
     logAdminRouteError('/videos', error);
@@ -1663,7 +1684,13 @@ router.post('/mcqs', adminAuth, async (req, res) => {
         '',
       ]
     );
-    return res.json({ success: true, mcq: mapQuestionImageLink(result.rows[0]) });
+    const mcq = mapQuestionImageLink(result.rows[0]);
+    sendNotificationToAll(pool, {
+      title: '🧠 New MCQ of the Day',
+      body: `${subject ? `${subject} — ` : ''}Solve today's MCQ now!`,
+      data: { type: 'mcq', id: String(mcq.id) },
+    });
+    return res.json({ success: true, mcq });
   } catch (e) {
     logAdminRouteError('/mcqs POST', e);
     return res.status(500).json({ error: e.message || 'Failed to add MCQ' });

@@ -428,6 +428,17 @@ async function ensureDatabaseSchema() {
     );
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS fcm_tokens (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT UNIQUE NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_fcm_tokens_user_id ON fcm_tokens(user_id);`);
+
   // Performance indexes for frequent mobile/admin listing filters.
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_batch_id ON users(batch_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_books_batch_class_subject_topic ON books(batch_id, class_label, subject, topic);`);

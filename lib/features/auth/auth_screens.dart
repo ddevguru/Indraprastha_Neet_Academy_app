@@ -44,34 +44,26 @@ class _SplashScreenState extends State<SplashScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const AppLogo(size: 118, showGlow: true, padding: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(32),
+                      child: Image.asset(
+                        'assets/images/splash_logo.png',
+                        width: 140,
+                        height: 140,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.xl),
                     Text(
                       'Indraprastha NEET Academy',
                       style: Theme.of(context).textTheme.headlineSmall,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    const Text(
-                      'Structured preparation with OTP-first onboarding.',
-                      textAlign: TextAlign.center,
-                    ),
                     const SizedBox(height: AppSpacing.xl),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.82),
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const SizedBox(
-                        width: 34,
-                        height: 34,
-                        child: CircularProgressIndicator(strokeWidth: 3),
-                      ),
+                    const SizedBox(
+                      width: 34,
+                      height: 34,
+                      child: CircularProgressIndicator(strokeWidth: 3),
                     ),
                   ],
                 ),
@@ -183,9 +175,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             );
                             return;
                           }
+                          final router = GoRouter.of(context);
                           await context.read<AuthBloc>().markOnboardingSeen();
                           if (!mounted) return;
-                          context.go('/login');
+                          router.go('/login');
                         },
                       ),
                     ],

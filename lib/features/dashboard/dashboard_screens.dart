@@ -76,12 +76,18 @@ class DashboardHomeScreen extends ConsumerWidget {
       ContentRepository().fetchDailyMcqCount(),
     ]);
 
+    final testingDay = ref.watch(testingDayProvider);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: CenteredContent(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (testingDay != null) ...[
+              _TestingDayBanner(day: testingDay),
+              const SizedBox(height: AppSpacing.md),
+            ],
             // ── Greeting card ──────────────────────────────────────────────
             SurfaceCard(
               borderRadius: AppRadii.xl,
@@ -689,6 +695,73 @@ class _PlanMiniStat extends StatelessWidget {
               color: Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 18,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TestingDayBanner extends StatelessWidget {
+  const _TestingDayBanner({required this.day});
+
+  final int day;
+
+  @override
+  Widget build(BuildContext context) {
+    final daysLeft = 14 - day;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        border: Border.all(color: const Color(0xFFFFB74D)),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.science_outlined, color: Color(0xFFE65100), size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Play Store Testing — Day $day of 14',
+                  style: const TextStyle(
+                    color: Color(0xFFE65100),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  daysLeft > 0
+                      ? '$daysLeft din baaki hain testing mein'
+                      : 'Aaj testing ka aakhri din hai!',
+                  style: const TextStyle(
+                    color: Color(0xFFBF360C),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE65100),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Text(
+              '$day/14',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
             ),
           ),
         ],

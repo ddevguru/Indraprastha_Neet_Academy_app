@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "853279094898",
+    "project_id": "indraprasthaapp",
+    "storage_bucket": "indraprasthaapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:853279094898:android:d65a895d7d5a1066a82aeb",
+        "android_client_info": {
+          "package_name": "com.indraprastha.neetacademy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDmU8_jD_YpNWoyVtpxkk1-xKwi8KSJV_4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

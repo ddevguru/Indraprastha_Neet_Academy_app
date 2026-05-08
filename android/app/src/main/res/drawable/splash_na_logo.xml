@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="110dp"
+    android:viewportWidth="200"
+    android:viewportHeight="110">
+
+    <!-- Letter N -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M4,100 L4,10 L22,10 L22,42 L70,10 L88,10 L88,100 L70,100 L70,68 L22,100 Z" />
+
+    <!-- Letter A - main body (two diagonal strokes) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M144,10 L156,10 L196,100 L178,100 L150,34 L122,100 L104,100 Z" />
+
+    <!-- Letter A - crossbar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M116,72 L184,72 L184,84 L116,84 Z" />
+</vector>

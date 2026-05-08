@@ -42,7 +42,7 @@ Widget _buildQuestionImage(String rawUrl) {
           child: const CircularProgressIndicator(strokeWidth: 2),
         );
       },
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (ctx, err, st) => Container(
         height: 120,
         alignment: Alignment.center,
         color: AppColors.surfaceMuted,
@@ -66,6 +66,18 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
   void initState() {
     super.initState();
     _practiceFuture = ContentRepository().fetchPracticeSets();
+  }
+
+  void _onCategoryTap(BuildContext context, String label, List<Map<String, dynamic>> allSets) {
+    if (label == 'Topic-wise MCQs') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => TopicWiseMcqsScreen(allSets: allSets)),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$label — coming soon')),
+    );
   }
 
   @override
@@ -92,35 +104,45 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(hint: 'Search topics, PYQ packs, and practice sets'),
             const SizedBox(height: AppSpacing.lg),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final twoColumnWidth = (constraints.maxWidth - AppSpacing.md) / 2;
-                final itemWidth = constraints.maxWidth >= 460
-                    ? twoColumnWidth
-                    : constraints.maxWidth;
-                return Wrap(
-                  spacing: AppSpacing.md,
-                  runSpacing: AppSpacing.md,
-                  children: categories
-                      .map(
-                        (category) => SizedBox(
-                          width: itemWidth,
-                          child: SurfaceCard(
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: AppColors.indigoSoft,
-                                  child:
-                                      Icon(category.$2, color: AppColors.indigo),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _practiceFuture,
+              builder: (context, snapshot) {
+                final allSets = snapshot.data ?? const [];
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final twoColumnWidth = (constraints.maxWidth - AppSpacing.md) / 2;
+                    final itemWidth = constraints.maxWidth >= 460
+                        ? twoColumnWidth
+                        : constraints.maxWidth;
+                    return Wrap(
+                      spacing: AppSpacing.md,
+                      runSpacing: AppSpacing.md,
+                      children: categories
+                          .map(
+                            (category) => SizedBox(
+                              width: itemWidth,
+                              child: InkWell(
+                                onTap: () => _onCategoryTap(context, category.$1, allSets),
+                                borderRadius: BorderRadius.circular(AppRadii.lg),
+                                child: SurfaceCard(
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundColor: AppColors.indigoSoft,
+                                        child: Icon(category.$2, color: AppColors.indigo),
+                                      ),
+                                      const SizedBox(width: AppSpacing.md),
+                                      Expanded(child: Text(category.$1)),
+                                      const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(width: AppSpacing.md),
-                                Expanded(child: Text(category.$1)),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                          )
+                          .toList(),
+                    );
+                  },
                 );
               },
             ),
@@ -458,6 +480,139 @@ class _MetaPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(label),
+    );
+  }
+}
+
+// ── Topic-wise MCQs drill-down ────────────────────────────────────────────────
+
+class TopicWiseMcqsScreen extends StatelessWidget {
+  const TopicWiseMcqsScreen({super.key, required this.allSets});
+
+  final List<Map<String, dynamic>> allSets;
+
+  Map<String, List<Map<String, dynamic>>> _groupBySubject() {
+    final map = <String, List<Map<String, dynamic>>>{};
+    for (final set in allSets) {
+      final subject = set['subject']?.toString().trim() ?? '';
+      final standard = set['standard_label']?.toString().trim() ?? '';
+      final key = (standard.isNotEmpty && subject.isNotEmpty)
+          ? '$standard $subject'
+          : subject.isNotEmpty
+              ? subject
+              : 'General';
+      map.putIfAbsent(key, () => []).add(set);
+    }
+    return map;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = _groupBySubject();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Topic-wise MCQs')),
+      body: groups.isEmpty
+          ? const Center(
+              child: EmptyStateWidget(
+                title: 'No practice sets yet',
+                subtitle: 'Admin panel se practice sets add karne ke baad yahan dikhenge.',
+                icon: Icons.grid_view_rounded,
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              itemCount: groups.length,
+              separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+              itemBuilder: (context, i) {
+                final subject = groups.keys.elementAt(i);
+                final sets = groups[subject]!;
+                return _SubjectGroupCard(subject: subject, sets: sets);
+              },
+            ),
+    );
+  }
+}
+
+class _SubjectGroupCard extends StatelessWidget {
+  const _SubjectGroupCard({required this.subject, required this.sets});
+
+  final String subject;
+  final List<Map<String, dynamic>> sets;
+
+  IconData _iconFor(String s) {
+    final lower = s.toLowerCase();
+    if (lower.contains('physics')) return Icons.rocket_launch_rounded;
+    if (lower.contains('chem')) return Icons.science_rounded;
+    if (lower.contains('bot')) return Icons.spa_rounded;
+    if (lower.contains('zoo')) return Icons.pets_rounded;
+    return Icons.menu_book_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => _SubjectTopicsScreen(subject: subject, sets: sets),
+        ),
+      ),
+      borderRadius: BorderRadius.circular(AppRadii.lg),
+      child: SurfaceCard(
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: AppColors.indigoSoft,
+              child: Icon(_iconFor(subject), color: AppColors.indigo),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(subject,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text('${sets.length} practice set${sets.length == 1 ? '' : 's'}'),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SubjectTopicsScreen extends StatelessWidget {
+  const _SubjectTopicsScreen({required this.subject, required this.sets});
+
+  final String subject;
+  final List<Map<String, dynamic>> sets;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(subject)),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        itemCount: sets.length,
+        separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+        itemBuilder: (context, i) {
+          final set = sets[i];
+          return _PracticeSetCard(
+            set: PracticeSet(
+              id: '${set['id']}',
+              title: set['title']?.toString() ?? 'Practice Set',
+              topic: set['topic']?.toString() ?? '',
+              questionCount: (set['question_count'] as num?)?.toInt() ?? 0,
+              difficulty: set['difficulty']?.toString() ?? 'Moderate',
+              estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
+              accuracy: 0,
+              tag: set['standard_label']?.toString() ?? 'Topic',
+            ),
+          );
+        },
+      ),
     );
   }
 }

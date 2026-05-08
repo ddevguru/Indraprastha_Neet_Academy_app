@@ -1,13 +1,27 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
 import 'core/providers/app_state.dart';
+import 'core/services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase must be initialized before anything else.
+  // Reads config from android/app/google-services.json automatically.
+  await Firebase.initializeApp();
+
   final prefs = await SharedPreferences.getInstance();
+
+  // Notification init runs after Firebase — errors are swallowed so the
+  // app still launches even if google-services.json is missing in dev.
+  try {
+    await NotificationService.instance.initialize();
+  } catch (_) {}
+
   runApp(
     ProviderScope(
       overrides: [

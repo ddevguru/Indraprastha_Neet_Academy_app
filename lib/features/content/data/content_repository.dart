@@ -13,20 +13,20 @@ class ContentRepository {
   static final http.Client _sharedClient = http.Client();
   static const _secureStorage = FlutterSecureStorage();
   static final Map<String, ({DateTime at, Map<String, dynamic> data})> _cache = {};
-  static const Duration _cacheTtl = Duration(seconds: 20);
+  static const Duration _cacheTtl = Duration(minutes: 5);
 
   Future<String?> get _token async => _secureStorage.read(key: 'auth_token');
 
   Future<Map<String, dynamic>> fetchCourse() =>
-      _get('/content/course', bypassCache: true);
+      _get('/content/course');
 
   Future<List<Map<String, dynamic>>> fetchBooks() async {
-    final data = await _get('/content/books', bypassCache: true);
+    final data = await _get('/content/books');
     return List<Map<String, dynamic>>.from(data['books'] as List<dynamic>);
   }
 
   Future<List<Map<String, dynamic>>> fetchChapters(int bookId) async {
-    final data = await _get('/content/books/$bookId/chapters', bypassCache: true);
+    final data = await _get('/content/books/$bookId/chapters');
     return List<Map<String, dynamic>>.from(data['chapters'] as List<dynamic>);
   }
 
@@ -103,6 +103,23 @@ class ContentRepository {
   Future<List<Map<String, dynamic>>> fetchPackages() async {
     final data = await _get('/content/packages');
     return List<Map<String, dynamic>>.from(data['packages'] as List<dynamic>);
+  }
+
+  Future<void> registerFcmToken(String token) async {
+    final authToken = await _token;
+    if (authToken == null || token.isEmpty) return;
+    try {
+      await _client.post(
+        Uri.parse('$baseUrl/content/fcm-token'),
+        headers: {
+          'Authorization': 'Bearer $authToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'token': token}),
+      );
+    } catch (_) {
+      // Non-critical — ignore network errors
+    }
   }
 
   Future<List<DailyMcqItem>> fetchDailyMcqs() async {

@@ -123,3 +123,21 @@ class AppUiController extends Notifier<AppUiState> {
 final appUiControllerProvider = NotifierProvider<AppUiController, AppUiState>(
   AppUiController.new,
 );
+
+/// Returns the current testing day (1–14) since first app install.
+/// Returns null once the 14-day testing window is over.
+final testingDayProvider = Provider<int?>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  const key = 'testing_start_date';
+
+  if (!prefs.containsKey(key)) {
+    prefs.setInt(key, DateTime.now().millisecondsSinceEpoch);
+  }
+
+  final startMs = prefs.getInt(key)!;
+  final start = DateTime.fromMillisecondsSinceEpoch(startMs);
+  final daysElapsed = DateTime.now().difference(start).inDays;
+  final day = daysElapsed + 1;
+
+  return day <= 14 ? day : null;
+});
