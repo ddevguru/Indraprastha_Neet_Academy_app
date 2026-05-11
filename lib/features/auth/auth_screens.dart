@@ -265,8 +265,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final String _course = 'Neet Dropper Batch';
   int? _batchId;
   String _state = '';
-  String _year = '';
-  String _college = '';
+  String _board = '';
 
   @override
   void initState() {
@@ -322,15 +321,28 @@ class _SignupScreenState extends State<SignupScreen> {
                 decoration: const InputDecoration(labelText: 'Batch'),
               ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(initialValue: _state.isEmpty ? null : _state, items: state.availableStates.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) {
-                if (v == null) return;
-                setState(() => _state = v);
-                context.read<AuthBloc>().loadColleges(v);
-              }, decoration: const InputDecoration(labelText: 'State')),
+              DropdownButtonFormField<String>(
+                initialValue: _state.isEmpty ? null : _state,
+                items: state.availableStates
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _state = v);
+                },
+                decoration: const InputDecoration(labelText: 'State'),
+              ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(initialValue: _year.isEmpty ? null : _year, items: List.generate(16, (i) => (2010 + i).toString()).reversed.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setState(() => _year = v ?? ''), decoration: const InputDecoration(labelText: 'MBBS year')),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(initialValue: _college.isEmpty ? null : _college, items: state.availableColleges.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setState(() => _college = v ?? ''), decoration: const InputDecoration(labelText: 'College')),
+              DropdownButtonFormField<String>(
+                initialValue: _board.isEmpty ? null : _board,
+                items: const [
+                  DropdownMenuItem(value: 'ISC', child: Text('ISC')),
+                  DropdownMenuItem(value: 'CBSE', child: Text('CBSE')),
+                  DropdownMenuItem(value: 'State board', child: Text('State board')),
+                ],
+                onChanged: (v) => setState(() => _board = v ?? ''),
+                decoration: const InputDecoration(labelText: 'Board'),
+              ),
               const SizedBox(height: 14),
               ElevatedButton(
                 onPressed: () {
@@ -343,10 +355,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   context.read<AuthBloc>().completeSignup(
                         fullName: _name.text.trim(),
                         batchId: _batchId!,
-                        courseCategory: _course,
+                        courseCategory: _board.isNotEmpty ? _board : _course,
                         collegeState: _state,
-                        mbbsYear: _year,
-                        medicalCollege: _college,
+                        mbbsYear: '',
+                        medicalCollege: '',
                       );
                 },
                 child: const Text('Complete Signup'),

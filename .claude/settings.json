@@ -9,7 +9,14 @@
       "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\indraprastha\\\\android\\\\app\\\\src\\\\main\\\\kotlin\\\\com\\\\indraprastha\\\\student\")",
       "PowerShell(Copy-Item \"c:\\\\indraprastha\\\\android\\\\app\\\\src\\\\main\\\\kotlin\\\\com\\\\example\\\\indraprastha\\\\MainActivity.kt\" \"c:\\\\indraprastha\\\\android\\\\app\\\\src\\\\main\\\\kotlin\\\\com\\\\indraprastha\\\\student\\\\MainActivity.kt\")",
       "PowerShell(keytool -genkey -v -keystore \"c:\\\\indraprastha\\\\android\\\\app\\\\neet-academy.jks\" -alias \"indraprastha-neet-academy\" -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname \"CN=Deepak Mishra, OU=Developer, O=Developer, L=Boisar, ST=Maharashtra, C=IN\" 2>&1)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\indraprastha\" | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"Directory\"}else{\"File\"}}} | Format-Table -AutoSize)",
+      "PowerShell(ls c:\\\\indraprastha\\\\lib | % { $_.Name })",
+      "PowerShell(ls c:\\\\indraprastha\\\\assets | % { $_.Name })",
+      "PowerShell(ls c:\\\\indraprastha\\\\assets\\\\images | % { $_.Name })",
+      "Bash(ls /mnt/c/indraprastha/android/app/src/main/res/)",
+      "Read(//mnt/c/indraprastha/android/app/src/main/**)",
+      "Bash(Get-ChildItem -Path \"c:\\\\indraprastha\\\\lib\" -Recurse -Directory)"
     ]
   }
 }

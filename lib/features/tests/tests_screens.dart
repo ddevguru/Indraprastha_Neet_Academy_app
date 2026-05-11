@@ -66,11 +66,58 @@ class TestsScreen extends StatefulWidget {
 
 class _TestsScreenState extends State<TestsScreen> {
   late final Future<List<Map<String, dynamic>>> _testsFuture;
+  String? _activeFilter;
+
+  static const _filters = [
+    'Grand tests',
+    'Subject tests',
+    'Chapter tests',
+    'Upcoming',
+    'Completed',
+  ];
 
   @override
   void initState() {
     super.initState();
     _testsFuture = ContentRepository().fetchTests();
+  }
+
+  List<Map<String, dynamic>> _applyFilter(List<Map<String, dynamic>> tests) {
+    if (_activeFilter == null) return tests;
+    return tests.where((t) {
+      final category = (t['category']?.toString() ?? '').toLowerCase();
+      final isCompleted = t['is_completed'] == true;
+      return switch (_activeFilter) {
+        'Grand tests' => category.contains('grand'),
+        'Subject tests' => category.contains('subject'),
+        'Chapter tests' => category.contains('chapter'),
+        'Upcoming' => !isCompleted,
+        'Completed' => isCompleted,
+        _ => true,
+      };
+    }).toList();
+  }
+
+  String _sectionTitle() {
+    return switch (_activeFilter) {
+      'Grand tests' => 'Grand tests',
+      'Subject tests' => 'Subject tests',
+      'Chapter tests' => 'Chapter tests',
+      'Upcoming' => 'Upcoming tests',
+      'Completed' => 'Completed tests',
+      _ => 'All tests',
+    };
+  }
+
+  String _sectionSubtitle() {
+    return switch (_activeFilter) {
+      'Grand tests' => 'Full-syllabus grand mock tests.',
+      'Subject tests' => 'Subject-wise mock tests.',
+      'Chapter tests' => 'Chapter-wise tests for focused practice.',
+      'Upcoming' => 'Prepare your next assessment windows with clarity.',
+      'Completed' => 'Review your submitted tests and scores.',
+      _ => 'Grand tests, subject tests, chapter tests, and more.',
+    };
   }
 
   @override
@@ -92,32 +139,44 @@ class _TestsScreenState extends State<TestsScreen> {
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
-              children: const [
-                _FilterChip('Grand tests'),
-                _FilterChip('Subject tests'),
-                _FilterChip('Chapter tests'),
-                _FilterChip('Upcoming'),
-                _FilterChip('Completed'),
-              ],
+              children: _filters
+                  .map(
+                    (label) => _FilterChip(
+                      label: label,
+                      selected: _activeFilter == label,
+                      onTap: () => setState(() {
+                        _activeFilter = _activeFilter == label ? null : label;
+                      }),
+                    ),
+                  )
+                  .toList(),
             ),
             const SizedBox(height: AppSpacing.xl),
-            const SectionHeader(
-              title: 'Upcoming tests',
-              subtitle: 'Prepare your next assessment windows with clarity.',
+            SectionHeader(
+              title: _sectionTitle(),
+              subtitle: _sectionSubtitle(),
             ),
             const SizedBox(height: AppSpacing.md),
             FutureBuilder<List<Map<String, dynamic>>>(
               future: _testsFuture,
               builder: (context, snapshot) {
-                final tests = snapshot.data ?? const [];
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (tests.isEmpty) {
+                final allTests = snapshot.data ?? const [];
+                final tests = _applyFilter(allTests);
+                if (allTests.isEmpty) {
                   return const EmptyStateWidget(
                     title: 'No tests yet',
                     subtitle: 'Admin panel se test series add hone ke baad yahan list dikhegi.',
                     icon: Icons.assignment_rounded,
+                  );
+                }
+                if (tests.isEmpty) {
+                  return EmptyStateWidget(
+                    title: 'No ${_activeFilter?.toLowerCase() ?? 'tests'} found',
+                    subtitle: 'Is category mein abhi koi test available nahi hai.',
+                    icon: Icons.filter_list_rounded,
                   );
                 }
                 return Column(
@@ -126,7 +185,6 @@ class _TestsScreenState extends State<TestsScreen> {
                         (t) => Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.md),
                           child: TestCard(
-                            // completed status from backend latest attempts
                             test: TestItem(
                               id: '${t['id']}',
                               title: t['title']?.toString() ?? 'Test',
@@ -457,7 +515,9 @@ class _TestResultScreenState extends State<TestResultScreen> {
                                 fontWeight: selected == e.key
                                     ? FontWeight.w700
                                     : FontWeight.w500,
-                                color: AppColors.textPrimary,
+                                color: selected == e.key
+                                    ? AppColors.primaryDark
+                                    : Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                           ),
@@ -552,25 +612,48 @@ class _TestResultScreenState extends State<TestResultScreen> {
 }
 
 class _FilterChip extends StatelessWidget {
-  const _FilterChip(this.label);
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary
+              : isDark
+                  ? AppColors.surfaceMuted.withValues(alpha: 0.22)
+                  : AppColors.surface,
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
       ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? AppColors.surfaceMuted.withValues(alpha: 0.22)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(label),
     );
   }
 }
@@ -854,8 +937,38 @@ class _AnswerReviewPanel extends StatelessWidget {
                           : (isCorrect ? AppColors.success : AppColors.danger),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text('Explanation: ${q['explanation'] ?? ''}'),
+                  const SizedBox(height: AppSpacing.sm),
+                  if ((q['explanation']?.toString() ?? '').isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0x1AF59E0B)
+                            : const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        border: Border.all(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.lightbulb_rounded,
+                                  color: Color(0xFFF59E0B), size: 16),
+                              SizedBox(width: 6),
+                              Text('Explanation',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFF59E0B))),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(q['explanation'].toString()),
+                        ],
+                      ),
+                    ),
                   const Divider(height: 24),
                 ],
               ),

@@ -572,7 +572,7 @@ class PlanCard extends StatelessWidget {
                         feature,
                         style: TextStyle(
                           color:
-                              plan.isRecommended ? Colors.white : AppColors.textPrimary,
+                              plan.isRecommended ? Colors.white : Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),

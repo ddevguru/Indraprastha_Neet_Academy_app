@@ -352,7 +352,21 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                             : AppColors.border,
                                   ),
                                 ),
-                                child: Text(options[index]),
+                                child: Text(
+                                  options[index],
+                                  style: TextStyle(
+                                    color: revealState
+                                        ? (index == correctIndex
+                                            ? AppColors.success
+                                            : AppColors.danger)
+                                        : selected
+                                            ? AppColors.primaryDark
+                                            : Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: selected || revealState
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                  ),
+                                ),
                               ),
                             ),
                           );
@@ -390,10 +404,33 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Explanation',
-                              style: Theme.of(context).textTheme.titleLarge),
-                          const SizedBox(height: AppSpacing.sm),
-                          Text(question['explanation']?.toString() ?? ''),
+                          Row(
+                            children: [
+                              const Icon(Icons.lightbulb_rounded,
+                                  color: Color(0xFFF59E0B), size: 22),
+                              const SizedBox(width: AppSpacing.sm),
+                              Text('Explanation',
+                                  style: Theme.of(context).textTheme.titleLarge),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0x1AF59E0B)
+                                  : const Color(0xFFFFFBEB),
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
+                            ),
+                            child: Text(
+                              question['explanation']?.toString().isNotEmpty == true
+                                  ? question['explanation'].toString()
+                                  : 'No explanation provided for this question.',
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
                         ],
                       ),
                     ),

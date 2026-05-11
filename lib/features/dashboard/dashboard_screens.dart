@@ -98,7 +98,7 @@ class DashboardHomeScreen extends ConsumerWidget {
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceMuted,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -119,7 +119,7 @@ class DashboardHomeScreen extends ConsumerWidget {
                       // ── Theme toggle ───────────────────────────────────
                       Container(
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceMuted,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: IconButton(
@@ -595,9 +595,11 @@ class _WeakTopicsPanel extends StatelessWidget {
                 children: insights.take(3).map((insight) {
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const CircleAvatar(
-                      backgroundColor: AppColors.indigoSoft,
-                      child: Icon(Icons.lightbulb_rounded, color: AppColors.indigo),
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.primary.withValues(alpha: 0.18)
+                          : AppColors.indigoSoft,
+                      child: const Icon(Icons.lightbulb_rounded, color: AppColors.indigo),
                     ),
                     title: Text(insight['insight_title']?.toString() ?? ''),
                     subtitle: Text(insight['insight_body']?.toString() ?? ''),
@@ -648,7 +650,9 @@ class _QuickActionsPanel extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             CircleAvatar(
-                              backgroundColor: AppColors.indigoSoft,
+                              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                                  ? AppColors.primary.withValues(alpha: 0.18)
+                                  : AppColors.indigoSoft,
                               child: Icon(action.$2, color: AppColors.indigo),
                             ),
                             const SizedBox(height: AppSpacing.md),
@@ -711,14 +715,17 @@ class _TestingDayBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final daysLeft = 14 - day;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.lg,
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3E0),
-        border: Border.all(color: const Color(0xFFFFB74D)),
+        color: isDark ? const Color(0xFF2A1A00) : const Color(0xFFFFF3E0),
+        border: Border.all(
+          color: isDark ? const Color(0xFFBF6B00) : const Color(0xFFFFB74D),
+        ),
         borderRadius: BorderRadius.circular(AppRadii.lg),
       ),
       child: Row(

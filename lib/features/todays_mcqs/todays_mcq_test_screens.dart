@@ -40,7 +40,7 @@ class TodaysMcqTestPreviewScreen extends ConsumerWidget {
                       'Review which test is scheduled for today and which subjects it covers. '
                       'Tap Start when you are ready.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondary,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                     ),
                     const SizedBox(height: AppSpacing.xl),
@@ -177,7 +177,7 @@ class _PreviewRow extends StatelessWidget {
               Text(
                 label,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
               ),
               Text(
@@ -750,7 +750,7 @@ class _ReviewRow extends StatelessWidget {
           style: Theme.of(context)
               .textTheme
               .bodySmall
-              ?.copyWith(color: AppColors.textSecondary),
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         Expanded(
           child: Text(

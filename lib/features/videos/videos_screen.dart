@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
@@ -12,12 +10,8 @@ import 'video_player_screen.dart';
 class VideosScreen extends ConsumerWidget {
   const VideosScreen({super.key});
 
-  static const _rankProPlan = 'Rank Pro';
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final plan = ref.watch(appUiControllerProvider).selectedPlan;
-    final isRankPro = plan == _rankProPlan;
     final videosFuture = ContentRepository().fetchVideos();
 
     return SingleChildScrollView(
@@ -26,51 +20,15 @@ class VideosScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SectionHeader(
+            const SectionHeader(
               title: 'Videos',
-              subtitle: isRankPro
-                  ? 'Rank Pro: Full NEET Video Library'
-                  : 'Unlock complete video library with Rank Pro',
+              subtitle: 'Full NEET video library — all batches.',
             ),
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(hint: 'Search chapters and video topics'),
             const SizedBox(height: AppSpacing.xl),
 
-            if (!isRankPro) ...[
-              // Upgrade Prompt
-              SurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.lock_outline_rounded,
-                            color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(width: AppSpacing.sm),
-                        const Expanded(
-                          child: Text(
-                            'Rank Pro Required',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    const Text(
-                      'Subscribe to Rank Pro to unlock all videos including Embryology, Anatomy, etc.',
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    PrimaryButton(
-                      label: 'View Rank Pro Plans',
-                      expanded: true,
-                      icon: Icons.workspace_premium_rounded,
-                      onPressed: () => context.push('/subscriptions'),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              FutureBuilder<List<Map<String, dynamic>>>(
+            FutureBuilder<List<Map<String, dynamic>>>(
                 future: videosFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -140,7 +98,7 @@ class VideosScreen extends ConsumerWidget {
                                       Text(
                                         section,
                                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                              color: AppColors.textSecondary,
+                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                                             ),
                                       ),
                                     ],
@@ -165,7 +123,6 @@ class VideosScreen extends ConsumerWidget {
                   );
                 },
               ),
-            ],
 
             const SizedBox(height: AppSpacing.xl),
             const EmptyStateWidget(

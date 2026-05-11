@@ -329,6 +329,41 @@ class _SavedRevisionScreenState extends ConsumerState<SavedRevisionScreen> {
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
+  Future<List<Map<String, dynamic>>> _fetchNotifications() async {
+    final repo = ContentRepository();
+    final results = await Future.wait([
+      repo.fetchBooks(),
+      repo.fetchTests(),
+      repo.fetchVideos(),
+    ]);
+    final books = results[0];
+    final tests = results[1];
+    final videos = results[2];
+
+    return [
+      ...books.map((b) => {
+            'title': 'New book added: ${b['title'] ?? 'Book'}',
+            'message': b['subject']?.toString() ?? 'Study material available',
+            'icon': Icons.menu_book_rounded,
+            'unread': true,
+          }),
+      ...tests.map((t) => {
+            'title': 'Test available: ${t['title'] ?? 'Test'}',
+            'message':
+                '${t['category'] ?? 'Test'} — ${t['schedule_label']?.toString().isNotEmpty == true ? t['schedule_label'] : 'Open now'}',
+            'icon': Icons.assignment_rounded,
+            'unread': !(t['is_completed'] == true),
+          }),
+      ...videos.map((v) => {
+            'title': 'New video: ${v['title'] ?? 'Video'}',
+            'message':
+                '${v['subject'] ?? 'Subject'} — ${v['duration_label'] ?? ''}',
+            'icon': Icons.play_circle_rounded,
+            'unread': false,
+          }),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -337,102 +372,111 @@ class NotificationsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: CenteredContent(
           maxWidth: 900,
-          child: FutureBuilder<Map<String, dynamic>>(
-            future: Future.wait([
-              ContentRepository().fetchTests(),
-              ContentRepository().fetchLatestAnalytics(),
-            ]).then((v) => {'tests': v[0], 'analytics': v[1]}),
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _fetchNotifications(),
             builder: (context, snapshot) {
-              final tests = List<Map<String, dynamic>>.from(
-                snapshot.data?['tests'] as List<dynamic>? ?? const [],
-              );
-              final analytics =
-                  Map<String, dynamic>.from(snapshot.data?['analytics'] as Map? ?? const {});
-              final insights = List<Map<String, dynamic>>.from(
-                analytics['insights'] as List<dynamic>? ?? const [],
-              );
-              final notifications = <Map<String, dynamic>>[
-                ...tests.take(3).map(
-                  (t) => {
-                    'title': 'Test available: ${t['title']}',
-                    'message':
-                        '${t['category'] ?? 'Test'} . ${t['subject'] ?? ''} . ${t['schedule_label'] ?? ''}',
-                    'time': 'Now',
-                    'unread': true,
-                  },
-                ),
-                ...insights.take(3).map(
-                  (i) => {
-                    'title': i['insight_title']?.toString() ?? 'AI insight',
-                    'message': i['insight_body']?.toString() ?? '',
-                    'time': 'Latest',
-                    'unread': false,
-                  },
-                ),
-              ];
-
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final notifications = snapshot.data ?? const [];
               return SurfaceCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SectionHeader(
-                      title: 'Activity feed',
-                      subtitle:
-                          'Backend-driven test reminders and AI performance updates.',
+                      title: 'Notifications',
+                      subtitle: 'Books, tests, and videos added by your institute.',
                     ),
                     const SizedBox(height: AppSpacing.md),
                     if (notifications.isEmpty)
                       const EmptyStateWidget(
                         title: 'No notifications yet',
-                        subtitle: 'Tests ya analytics generate hone par updates yahan aayengi.',
+                        subtitle: 'Books, tests ya videos add hone par yahan dikhenge.',
                         icon: Icons.notifications_off_outlined,
                       )
                     else
                       ...notifications.map(
-                        (item) => Container(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: (item['unread'] as bool)
-                                ? AppColors.indigoSoft
-                                : AppColors.surfaceMuted,
-                            borderRadius: BorderRadius.circular(AppRadii.md),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const CircleAvatar(
-                                backgroundColor: Colors.white,
-                                child: Icon(Icons.notifications_active_rounded,
-                                    color: AppColors.indigo),
-                              ),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item['title']?.toString() ?? '',
-                                      style: Theme.of(context).textTheme.titleMedium,
-                                    ),
-                                    const SizedBox(height: AppSpacing.xs),
-                                    Text(item['message']?.toString() ?? ''),
-                                  ],
+                        (item) {
+                          final unread = item['unread'] as bool? ?? false;
+                          final icon = item['icon'] as IconData? ??
+                              Icons.notifications_rounded;
+                          final isDark =
+                              Theme.of(context).brightness == Brightness.dark;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: unread
+                                  ? (isDark
+                                      ? AppColors.primary.withValues(alpha: 0.12)
+                                      : AppColors.primarySoft)
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                      .withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                              border: unread
+                                  ? Border.all(
+                                      color: AppColors.primary.withValues(alpha: 0.3))
+                                  : null,
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: isDark
+                                      ? AppColors.primary.withValues(alpha: 0.18)
+                                      : AppColors.primarySoft,
+                                  child: Icon(icon, color: AppColors.primary, size: 20),
                                 ),
-                              ),
-                              const SizedBox(width: AppSpacing.md),
-                              Text(item['time']?.toString() ?? ''),
-                            ],
-                          ),
-                        ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item['title']?.toString() ?? '',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: unread
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                            ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        item['message']?.toString() ?? '',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (unread)
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    margin: const EdgeInsets.only(top: 6),
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                   ],
                 ),
               );
             },
-            ),
           ),
         ),
+      ),
     );
   }
 }

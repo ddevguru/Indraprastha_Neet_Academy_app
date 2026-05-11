@@ -30,7 +30,7 @@ class NotificationService {
     );
 
     // Configure local notifications (needed for foreground display)
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@drawable/splash_logo');
     await _local.initialize(const InitializationSettings(android: androidInit));
 
     // Create high-importance Android channel
@@ -82,6 +82,8 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           enableVibration: true,
+          icon: '@drawable/splash_logo',
+          largeIcon: DrawableResourceAndroidBitmap('@drawable/splash_logo'),
         ),
       ),
     );
