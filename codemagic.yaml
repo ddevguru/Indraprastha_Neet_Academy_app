@@ -1,0 +1,53 @@
+workflows:
+  ios-release:
+    name: iOS Release Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store        # change to 'ad_hoc' for testing
+        bundle_identifier: com.rahulkumar.indraprastha
+      vars:
+        BUNDLE_ID: com.rahulkumar.indraprastha
+        APP_STORE_APPLE_ID: YOUR_APP_STORE_APP_ID   # fill after creating app in App Store Connect
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Generate splash screen
+        script: dart run flutter_native_splash:create
+
+      - name: Generate launcher icons
+        script: dart run flutter_launcher_icons
+
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+
+      - name: Build iOS release
+        script: |
+          flutter build ios --release --no-codesign
+
+      - name: Package IPA
+        script: |
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace ios/Runner.xcworkspace \
+            --scheme Runner
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY       # set in Codemagic environment
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true

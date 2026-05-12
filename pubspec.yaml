@@ -83,7 +83,7 @@ flutter:
 flutter_native_splash:
   color: "#FFF8F2"
   android: true
-  ios: false
+  ios: true
 
 flutter_launcher_icons:
   android: true
