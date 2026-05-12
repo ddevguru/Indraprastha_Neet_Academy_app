@@ -16,7 +16,10 @@
       "PowerShell(ls c:\\\\indraprastha\\\\assets\\\\images | % { $_.Name })",
       "Bash(ls /mnt/c/indraprastha/android/app/src/main/res/)",
       "Read(//mnt/c/indraprastha/android/app/src/main/**)",
-      "Bash(Get-ChildItem -Path \"c:\\\\indraprastha\\\\lib\" -Recurse -Directory)"
+      "Bash(Get-ChildItem -Path \"c:\\\\indraprastha\\\\lib\" -Recurse -Directory)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
