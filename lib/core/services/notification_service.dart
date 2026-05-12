@@ -31,7 +31,14 @@ class NotificationService {
 
     // Configure local notifications (needed for foreground display)
     const androidInit = AndroidInitializationSettings('@drawable/splash_logo');
-    await _local.initialize(const InitializationSettings(android: androidInit));
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    await _local.initialize(
+      const InitializationSettings(android: androidInit, iOS: iosInit),
+    );
 
     // Create high-importance Android channel
     await _local
@@ -84,6 +91,11 @@ class NotificationService {
           enableVibration: true,
           icon: '@drawable/splash_logo',
           largeIcon: DrawableResourceAndroidBitmap('@drawable/splash_logo'),
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
         ),
       ),
     );
