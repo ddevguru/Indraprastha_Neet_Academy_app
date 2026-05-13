@@ -112,6 +112,15 @@ class AuthRepository {
     return batches.map(BatchOption.fromJson).toList();
   }
 
+  Future<void> deleteAccount(String token) async {
+    final response = await _client.delete(
+      Uri.parse('$baseUrl/auth/delete-account'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    _decodeResponse(response);
+    await clearSession();
+  }
+
   Future<String?> readSecureToken() => _secureStorage.read(key: _tokenKey);
 
   Future<AppUser?> readSecureUser() async {

@@ -25,8 +25,8 @@ final authBlocProvider = Provider<AuthBloc>((ref) {
 class AppUiState {
   const AppUiState({
     this.themeMode = ThemeMode.light,
-    this.hasActiveSubscription = false,
-    this.selectedPlan = 'Starter',
+    this.hasActiveSubscription = true, // TEMP: subscription gate disabled
+    this.selectedPlan = 'Rank Pro', // TEMP: all users get top plan
     this.bookmarkedBookIds = const {'book_notes_bio'},
     this.bookmarkedQuestionIds = const {'pq2'},
     this.savedChapterIds = const {'plant_kingdom', 'chemical_bonding'},

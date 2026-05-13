@@ -22,7 +22,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   final authBloc = ref.read(authBlocProvider);
   String? redirect(BuildContext context, GoRouterState state) {
     final auth = authBloc.state;
-    final ui = ref.read(appUiControllerProvider);
+    // final ui = ref.read(appUiControllerProvider); // TEMP: unused while subscription gate is disabled
     final loc = state.uri.path;
 
     const publicPaths = <String>{
@@ -32,19 +32,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       '/signup',
       '/forgot-password',
     };
-    const purchasePaths = {'/paywall', '/subscriptions'};
+    // const purchasePaths = {'/paywall', '/subscriptions'}; // TEMP: unused while subscription gate is disabled
 
     if (!auth.isLoggedIn) {
       if (publicPaths.contains(loc)) return null;
       return '/login';
     }
 
-    if (!ui.hasActiveSubscription) {
-      if (purchasePaths.contains(loc)) return null;
-      if (loc == '/') return null;
-      if (publicPaths.contains(loc)) return '/paywall';
-      return '/paywall';
-    }
+    // TEMP: subscription gate disabled — all users get full access
+    // if (!ui.hasActiveSubscription) {
+    //   if (purchasePaths.contains(loc)) return null;
+    //   if (loc == '/') return null;
+    //   if (publicPaths.contains(loc)) return '/paywall';
+    //   return '/paywall';
+    // }
 
     if (loc == '/paywall') return '/dashboard/0';
     if (loc == '/login' ||

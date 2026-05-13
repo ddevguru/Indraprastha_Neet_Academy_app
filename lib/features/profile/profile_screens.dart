@@ -716,6 +716,45 @@ class _AccountActionsPanel extends ConsumerWidget {
               context.go('/login');
             },
           ),
+          const SizedBox(height: AppSpacing.sm),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+              minimumSize: const Size.fromHeight(48),
+            ),
+            icon: const Icon(Icons.delete_forever_rounded),
+            label: const Text('Delete Account'),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Delete Account?'),
+                  content: const Text(
+                    'This will permanently delete your account and all data. This action cannot be undone.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(ctx).colorScheme.error,
+                        foregroundColor: Theme.of(ctx).colorScheme.onError,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true && context.mounted) {
+                final success = await context.read<AuthBloc>().deleteAccount();
+                if (success && context.mounted) context.go('/login');
+              }
+            },
+          ),
         ],
       ),
     );

@@ -262,4 +262,18 @@ class AuthBloc extends Cubit<AuthState> {
       ),
     );
   }
+
+  Future<bool> deleteAccount() async {
+    final token = state.token;
+    if (token == null) return false;
+    emit(state.copyWith(loading: true, clearError: true));
+    try {
+      await _repository.deleteAccount(token);
+      emit(state.copyWith(clearSession: true, loading: false, otpSent: false, isOtpVerified: false, isNewUser: false, phoneNumber: ''));
+      return true;
+    } catch (e) {
+      emit(state.copyWith(loading: false, errorMessage: e.toString()));
+      return false;
+    }
+  }
 }
