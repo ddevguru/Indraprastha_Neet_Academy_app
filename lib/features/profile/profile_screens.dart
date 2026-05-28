@@ -240,7 +240,7 @@ class _SavedRevisionScreenState extends ConsumerState<SavedRevisionScreen> {
                 future: _savedFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const SkeletonLoader(cardCount: 3);
                   }
                   final books = List<Map<String, dynamic>>.from(
                     snapshot.data?['books'] as List<dynamic>? ?? const [],
@@ -376,7 +376,7 @@ class NotificationsScreen extends StatelessWidget {
             future: _fetchNotifications(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const SkeletonLoader(cardCount: 5);
               }
               final notifications = snapshot.data ?? const [];
               return SurfaceCard(

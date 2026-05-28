@@ -344,7 +344,7 @@ class _RoundControlButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withOpacity(0.2),
+      color: Colors.white.withValues(alpha: 0.2),
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),

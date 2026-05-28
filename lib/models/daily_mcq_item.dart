@@ -15,6 +15,7 @@ class DailyMcqItem {
     this.optionD,
     this.correctOption,
     this.explanation,
+    this.explanationImageLink,
   });
 
   final String id;
@@ -30,6 +31,7 @@ class DailyMcqItem {
   final String? optionD;
   final int? correctOption; // 0=A, 1=B, 2=C, 3=D
   final String? explanation;
+  final String? explanationImageLink;
 
   List<String> get options => [optionA, optionB, optionC, optionD]
       .whereType<String>()
@@ -78,6 +80,7 @@ class DailyMcqItem {
       optionD: m['option_d'] as String?,
       correctOption: correctOption,
       explanation: m['explanation'] as String?,
+      explanationImageLink: m['explanation_image_link'] as String?,
     );
   }
 }

@@ -19,7 +19,7 @@ class TodaysMcqsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("Today's MCQs")),
       body: asyncItems.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonLoader(cardCount: 5),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),

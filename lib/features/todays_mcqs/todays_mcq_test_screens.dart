@@ -9,6 +9,47 @@ import '../../models/daily_mcq_item.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 
+String _resolveDriveUrl(String raw) {
+  final uri = Uri.tryParse(raw.trim());
+  if (uri == null) return raw;
+  String? id = uri.queryParameters['id'];
+  if (id == null || id.isEmpty) {
+    final parts = uri.pathSegments;
+    final idx = parts.indexOf('file');
+    if (idx >= 0 && idx + 2 < parts.length && parts[idx + 1] == 'd') {
+      id = parts[idx + 2];
+    }
+  }
+  if (id == null || id.isEmpty) return raw;
+  return 'https://drive.google.com/uc?export=view&id=$id';
+}
+
+Widget _buildExplanationImage(String rawUrl) {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(AppRadii.md),
+    child: Image.network(
+      _resolveDriveUrl(rawUrl),
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.low,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          height: 160,
+          alignment: Alignment.center,
+          color: AppColors.surfaceMuted,
+          child: const CircularProgressIndicator(strokeWidth: 2),
+        );
+      },
+      errorBuilder: (ctx, err, st) => Container(
+        height: 80,
+        alignment: Alignment.center,
+        color: AppColors.surfaceMuted,
+        child: const Text('Image unavailable'),
+      ),
+    ),
+  );
+}
+
 class TodaysMcqTestPreviewScreen extends ConsumerWidget {
   const TodaysMcqTestPreviewScreen({super.key});
 
@@ -440,8 +481,8 @@ class _TodaysMcqTestAttemptScreenState
                       );
                     }),
                     if (_submitted &&
-                        item.explanation != null &&
-                        item.explanation!.isNotEmpty) ...[
+                        ((item.explanation != null && item.explanation!.isNotEmpty) ||
+                         (item.explanationImageLink != null && item.explanationImageLink!.isNotEmpty))) ...[
                       const Divider(height: AppSpacing.xl),
                       Row(
                         children: [
@@ -457,14 +498,20 @@ class _TodaysMcqTestAttemptScreenState
                           ),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        item.explanation!,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(height: 1.5),
-                      ),
+                      if (item.explanation != null && item.explanation!.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          item.explanation!,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(height: 1.5),
+                        ),
+                      ],
+                      if (item.explanationImageLink != null && item.explanationImageLink!.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        _buildExplanationImage(item.explanationImageLink!),
+                      ],
                     ],
                   ],
                 ),
@@ -681,8 +728,8 @@ class _McqResultScreen extends StatelessWidget {
                           color: Colors.green,
                           icon: Icons.check_rounded,
                         ),
-                        if (rec.item.explanation != null &&
-                            rec.item.explanation!.isNotEmpty) ...[
+                        if ((rec.item.explanation != null && rec.item.explanation!.isNotEmpty) ||
+                            (rec.item.explanationImageLink != null && rec.item.explanationImageLink!.isNotEmpty)) ...[
                           const SizedBox(height: AppSpacing.sm),
                           const Divider(height: 1),
                           const SizedBox(height: AppSpacing.sm),
@@ -692,17 +739,22 @@ class _McqResultScreen extends StatelessWidget {
                               const Icon(Icons.lightbulb_outline_rounded,
                                   size: 16, color: AppColors.indigo),
                               const SizedBox(width: AppSpacing.xs),
-                              Expanded(
-                                child: Text(
-                                  rec.item.explanation!,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(height: 1.45),
+                              if (rec.item.explanation != null && rec.item.explanation!.isNotEmpty)
+                                Expanded(
+                                  child: Text(
+                                    rec.item.explanation!,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(height: 1.45),
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
+                          if (rec.item.explanationImageLink != null && rec.item.explanationImageLink!.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            _buildExplanationImage(rec.item.explanationImageLink!),
+                          ],
                         ],
                       ],
                     ),

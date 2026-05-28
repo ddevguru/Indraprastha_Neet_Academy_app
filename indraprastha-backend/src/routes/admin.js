@@ -1583,6 +1583,55 @@ router.delete('/videos/:id', adminAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+router.get('/users', adminAuth, async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const limit = Math.min(Number(req.query.limit) || 100, 200);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const offset = (page - 1) * limit;
+
+    let rows, total;
+    if (search) {
+      const like = `%${search}%`;
+      const result = await pool.query(
+        `SELECT id, full_name, phone, email, preferred_plan, target_exam_year, batch_id, created_at
+         FROM users
+         WHERE full_name ILIKE $1 OR phone ILIKE $1 OR COALESCE(email,'') ILIKE $1
+         ORDER BY created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [like, limit, offset]
+      );
+      const countRes = await pool.query(
+        `SELECT COUNT(*)::int AS count FROM users
+         WHERE full_name ILIKE $1 OR phone ILIKE $1 OR COALESCE(email,'') ILIKE $1`,
+        [like]
+      );
+      rows = result.rows;
+      total = countRes.rows[0].count;
+    } else {
+      const result = await pool.query(
+        `SELECT u.id, u.full_name, u.phone, u.email, u.preferred_plan, u.target_exam_year,
+                u.batch_id, u.created_at, b.name AS batch_name
+         FROM users u
+         LEFT JOIN batches b ON b.id = u.batch_id
+         ORDER BY u.created_at DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      );
+      const countRes = await pool.query('SELECT COUNT(*)::int AS count FROM users');
+      rows = result.rows;
+      total = countRes.rows[0].count;
+    }
+
+    return res.json({ success: true, users: rows, total, page, limit });
+  } catch (e) {
+    logAdminRouteError('/users GET', e);
+    return res.status(500).json({ error: e.message || 'Failed to fetch users' });
+  }
+});
+
 router.get('/packages', adminAuth, async (_req, res) => {
   const result = await pool.query(
     `SELECT id, name, price_label, validity, highlight, features_json, is_active

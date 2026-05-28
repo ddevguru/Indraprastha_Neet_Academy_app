@@ -320,6 +320,7 @@ class _AdminHomeState extends State<AdminHome> {
       PackagesPage(api: _api),
       UsersPage(api: _api),
     ];
+    final title = _titles[_tab.clamp(0, _titles.length - 1)];
     final isLoggedIn = _api.token != null;
     if (isLoggedIn && !_checkedDriveAfterLogin) {
       _checkedDriveAfterLogin = true;
@@ -429,29 +430,20 @@ class _AdminHomeState extends State<AdminHome> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text('Indraprastha Admin'),
             Text(
-              _tab < _titles.length ? _titles[_tab] : 'Admin',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+              isLoggedIn && _driveConnected == false
+                  ? '$title • Connect Drive required'
+                  : title,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-            if (isLoggedIn && _driveConnected == false)
-              Text(
-                'Drive not connected — go to Setup',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              ),
           ],
         ),
         actions: [
           IconButton(
             onPressed: widget.onToggleTheme,
-            icon: Icon(
-              Theme.of(context).brightness == Brightness.dark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
-              size: 22,
-            ),
-            tooltip: 'Toggle theme',
+            icon: const Icon(Icons.dark_mode_outlined, size: 22),
+            tooltip: 'Dark/Light',
           ),
           if (isLoggedIn)
             IconButton(
@@ -619,6 +611,8 @@ class OverviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return FutureBuilder<Map<String, dynamic>>(
       future: api.dashboard(),
       builder: (context, snapshot) {
@@ -3524,7 +3518,7 @@ class _PackagesPageState extends State<PackagesPage> {
           ),
         ..._items.map((e) {
           final item = e as Map<String, dynamic>;
-          final featureList = (item['features_json'] as List<dynamic>? ?? []);
+          final featureList = item['features_json'] as List<dynamic>? ?? [];
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
@@ -3536,82 +3530,46 @@ class _PackagesPageState extends State<PackagesPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFC99A33).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFC99A33), size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(item['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                        const SizedBox(height: 3),
-                        Row(children: [
-                          const Icon(Icons.currency_rupee, size: 13, color: Color(0xFFE85A1C)),
-                          Text(item['price_label']?.toString() ?? '', style: const TextStyle(fontSize: 13, color: Color(0xFFE85A1C), fontWeight: FontWeight.w600)),
-                          const SizedBox(width: 8),
-                          Text('• ${item['validity'] ?? ''}', style: const TextStyle(fontSize: 12, color: Color(0xFF757575))),
-                        ]),
-                      ]),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 20),
-                      onPressed: () => setState(() {
-                        _editingId = item['id'] as int;
-                        _name.text = item['name']?.toString() ?? '';
-                        _price.text = item['price_label']?.toString() ?? '';
-                        _validity.text = item['validity']?.toString() ?? '';
-                        _highlight.text = item['highlight']?.toString() ?? '';
-                        _features.text = (item['features_json'] as List<dynamic>? ?? []).join('\n');
-                      }),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFD92D20)),
-                      onPressed: () async {
-                        final ok = await _confirmDeleteDialog(context, title: 'Delete Package?', body: 'This package will be removed permanently.');
-                        if (!ok) return;
-                        try {
-                          await widget.api.deletePackage(item['id'] as int);
-                          await _load();
-                          if (context.mounted) _showActionSnackBar(context, 'Package deleted successfully');
-                        } catch (_) {
-                          if (context.mounted) _showActionSnackBar(context, 'Package delete failed', isError: true);
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                if ((item['highlight']?.toString() ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                Row(children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFC99A33).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(item['highlight'].toString(), style: const TextStyle(fontSize: 12, color: Color(0xFF8B6914), fontWeight: FontWeight.w500)),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: const Color(0xFFC99A33).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFC99A33), size: 22),
                   ),
-                ],
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(item['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    const SizedBox(height: 2),
+                    Text('${item['price_label'] ?? ''} • ${item['validity'] ?? ''}', style: const TextStyle(fontSize: 13, color: Color(0xFF757575))),
+                  ])),
+                  IconButton(icon: const Icon(Icons.edit_outlined, size: 20), onPressed: () {
+                    setState(() {
+                      _editingId = item['id'] as int;
+                      _name.text = item['name']?.toString() ?? '';
+                      _price.text = item['price_label']?.toString() ?? '';
+                      _validity.text = item['validity']?.toString() ?? '';
+                      _highlight.text = item['highlight']?.toString() ?? '';
+                      _features.text = featureList.join('\n');
+                    });
+                  }),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFD92D20)),
+                    onPressed: () async {
+                      final ok = await _confirmDeleteDialog(context, title: 'Delete Package?', body: 'This package will be removed permanently.');
+                      if (!ok) return;
+                      try {
+                        await widget.api.deletePackage(item['id'] as int);
+                        await _load();
+                        if (context.mounted) _showActionSnackBar(context, 'Package deleted successfully');
+                      } catch (_) {
+                        if (context.mounted) _showActionSnackBar(context, 'Package delete failed', isError: true);
+                      }
+                    },
+                  ),
+                ]),
                 if (featureList.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6, runSpacing: 4,
-                    children: featureList.take(4).map((f) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: const Color(0xFF1976D2).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                      child: Text(f.toString(), style: const TextStyle(fontSize: 11, color: Color(0xFF1976D2))),
-                    )).toList(),
-                  ),
-                  if (featureList.length > 4)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text('+${featureList.length - 4} more', style: const TextStyle(fontSize: 11, color: Color(0xFF757575))),
-                    ),
+                  const SizedBox(height: 10),
+                  Wrap(spacing: 6, runSpacing: 4, children: featureList.take(4).map((f) => _ChipBadge(label: f.toString(), color: const Color(0xFF2E7D32))).toList()),
                 ],
               ],
             ),
@@ -3759,10 +3717,9 @@ class _UsersPageState extends State<UsersPage> {
                     final u = filtered[i] as Map<String, dynamic>;
                     final name = u['full_name']?.toString() ?? u['name']?.toString() ?? 'Unknown';
                     final email = u['email']?.toString() ?? '';
-                    final phone = u['phone']?.toString() ?? '';
+                    final phone = u['phone']?.toString() ?? u['mobile']?.toString() ?? '';
                     final batch = u['batch_name']?.toString() ?? '';
-                    final plan = u['preferred_plan']?.toString() ?? '';
-                    final year = u['target_exam_year']?.toString() ?? '';
+                    final plan = u['preferred_plan']?.toString() ?? u['plan']?.toString() ?? '';
                     final initials = name.trim().isNotEmpty
                         ? name.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
                         : '?';
@@ -3815,11 +3772,10 @@ class _UsersPageState extends State<UsersPage> {
                                     Text(phone, style: const TextStyle(fontSize: 13, color: Color(0xFF757575))),
                                   ]),
                                 ],
-                                if (batch.isNotEmpty || plan.isNotEmpty || year.isNotEmpty) ...[
+                                if (batch.isNotEmpty || plan.isNotEmpty) ...[
                                   const SizedBox(height: 6),
                                   Wrap(
                                     spacing: 6,
-                                    runSpacing: 4,
                                     children: [
                                       if (batch.isNotEmpty)
                                         Container(
@@ -3829,15 +3785,6 @@ class _UsersPageState extends State<UsersPage> {
                                             borderRadius: BorderRadius.circular(20),
                                           ),
                                           child: Text(batch, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: scheme.onSecondaryContainer)),
-                                        ),
-                                      if (year.isNotEmpty)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF1976D2).withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          child: Text('Target $year', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1976D2))),
                                         ),
                                       if (plan.isNotEmpty)
                                         Container(
@@ -4557,14 +4504,9 @@ class AdminApi {
       Uri.parse('$baseUrl$path'),
       headers: {'Authorization': 'Bearer $token'},
     );
-    final raw = response.body;
-    // Guard against HTML error pages (404/502 from Render)
-    if (raw.trimLeft().startsWith('<')) {
-      throw Exception('Server error ${response.statusCode}: endpoint not available');
-    }
-    final body = jsonDecode(raw) as Map<String, dynamic>;
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(body['error'] ?? 'request failed (${response.statusCode})');
+      throw Exception(body['error'] ?? 'request failed');
     }
     return body;
   }

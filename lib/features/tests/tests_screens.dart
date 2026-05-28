@@ -47,7 +47,7 @@ Widget _buildQuestionImage(String rawUrl) {
           child: const CircularProgressIndicator(strokeWidth: 2),
         );
       },
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (ctx, err, stack) => Container(
         height: 120,
         alignment: Alignment.center,
         color: AppColors.surfaceMuted,
@@ -161,7 +161,7 @@ class _TestsScreenState extends State<TestsScreen> {
               future: _testsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const SkeletonLoader(cardCount: 4);
                 }
                 final allTests = snapshot.data ?? const [];
                 final tests = _applyFilter(allTests);
@@ -938,7 +938,8 @@ class _AnswerReviewPanel extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  if ((q['explanation']?.toString() ?? '').isNotEmpty)
+                  if ((q['explanation']?.toString() ?? '').isNotEmpty ||
+                      (q['explanation_image_link']?.toString() ?? '').isNotEmpty)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(AppSpacing.md),
@@ -964,8 +965,14 @@ class _AnswerReviewPanel extends StatelessWidget {
                                       color: Color(0xFFF59E0B))),
                             ],
                           ),
-                          const SizedBox(height: 6),
-                          Text(q['explanation'].toString()),
+                          if ((q['explanation']?.toString() ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(q['explanation'].toString()),
+                          ],
+                          if ((q['explanation_image_link']?.toString() ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            _buildQuestionImage(q['explanation_image_link'].toString()),
+                          ],
                         ],
                       ),
                     ),

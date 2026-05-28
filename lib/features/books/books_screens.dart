@@ -130,7 +130,7 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
               future: _dataFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const SkeletonLoader(cardCount: 4);
                 }
                 final course =
                     (snapshot.data?['course'] as Map<String, dynamic>?) ?? {};
@@ -579,10 +579,15 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                 ),
                 if (revealed) ...[
                   const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Explanation: ${q['explanation'] ?? ''}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  if ((q['explanation']?.toString() ?? '').isNotEmpty)
+                    Text(
+                      'Explanation: ${q['explanation']}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  if ((q['explanation_image_link']?.toString() ?? '').isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _buildQuestionImage(q['explanation_image_link'].toString()),
+                  ],
                 ],
               ],
             ),

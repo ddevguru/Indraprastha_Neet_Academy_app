@@ -32,7 +32,7 @@ class VideosScreen extends ConsumerWidget {
                 future: videosFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const SkeletonLoader(cardCount: 4);
                   }
                   final videos = snapshot.data ?? const [];
                   if (videos.isEmpty) {

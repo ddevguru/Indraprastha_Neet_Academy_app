@@ -36,7 +36,7 @@ class SubscriptionsScreen extends ConsumerWidget {
                 future: plansFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const SkeletonLoader(cardCount: 3);
                   }
                   final plans = (snapshot.data ?? const [])
                       .map(

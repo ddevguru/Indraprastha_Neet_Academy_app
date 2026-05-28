@@ -158,7 +158,7 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
               builder: (context, snapshot) {
                 final sets = snapshot.data ?? const [];
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const SkeletonLoader(cardCount: 3);
                 }
                 if (sets.isEmpty) {
                   return const EmptyStateWidget(
@@ -424,11 +424,20 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                               borderRadius: BorderRadius.circular(AppRadii.md),
                               border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
                             ),
-                            child: Text(
-                              question['explanation']?.toString().isNotEmpty == true
-                                  ? question['explanation'].toString()
-                                  : 'No explanation provided for this question.',
-                              style: Theme.of(context).textTheme.bodyLarge,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  question['explanation']?.toString().isNotEmpty == true
+                                      ? question['explanation'].toString()
+                                      : 'No explanation provided for this question.',
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                                if ((question['explanation_image_link']?.toString() ?? '').isNotEmpty) ...[
+                                  const SizedBox(height: AppSpacing.md),
+                                  _buildQuestionImage(question['explanation_image_link'].toString()),
+                                ],
+                              ],
                             ),
                           ),
                         ],

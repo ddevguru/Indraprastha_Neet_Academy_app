@@ -4,6 +4,98 @@ import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../theme/app_tokens.dart';
 
+class SkeletonLoader extends StatefulWidget {
+  const SkeletonLoader({super.key, this.cardCount = 3});
+  final int cardCount;
+
+  @override
+  State<SkeletonLoader> createState() => _SkeletonLoaderState();
+}
+
+class _SkeletonLoaderState extends State<SkeletonLoader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, _) {
+        final base = isDark ? const Color(0xFF252A35) : const Color(0xFFEEEEEE);
+        final highlight = isDark ? const Color(0xFF313744) : const Color(0xFFF5F5F5);
+        final color = Color.lerp(base, highlight, _anim.value)!;
+        return Column(
+          children: List.generate(widget.cardCount, (i) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(AppRadii.lg),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF313744) : const Color(0xFFE0E0E0),
+                  ),
+                ),
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SkeletonLine(color: color, width: 100, height: 12),
+                    const SizedBox(height: 10),
+                    _SkeletonLine(color: color, width: double.infinity, height: 16),
+                    const SizedBox(height: 8),
+                    _SkeletonLine(color: color, width: 200, height: 12),
+                    const SizedBox(height: 16),
+                    _SkeletonLine(color: color, width: double.infinity, height: 8),
+                  ],
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
+class _SkeletonLine extends StatelessWidget {
+  const _SkeletonLine({required this.color, required this.width, required this.height});
+  final Color color;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF3A4050) : const Color(0xFFDDDDDD),
+        borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
+}
+
 class CenteredContent extends StatelessWidget {
   const CenteredContent({
     super.key,

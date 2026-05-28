@@ -59,22 +59,39 @@ class DashboardShellScreen extends StatelessWidget {
   }
 }
 
-class DashboardHomeScreen extends ConsumerWidget {
+class DashboardHomeScreen extends ConsumerStatefulWidget {
   const DashboardHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardHomeScreen> createState() => _DashboardHomeScreenState();
+}
+
+class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
+  late final Future<List<dynamic>> _statsFuture;
+  late final Future<List<Map<String, dynamic>>> _recentTestsFuture;
+  late final Future<Map<String, dynamic>> _analyticsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    final repo = ContentRepository();
+    _recentTestsFuture = repo.fetchTests();
+    _analyticsFuture = repo.fetchLatestAnalytics();
+    _statsFuture = Future.wait([
+      _recentTestsFuture,
+      _analyticsFuture,
+      repo.fetchDailyMcqCount(),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = context.watch<AuthBloc>().state.user;
     if (user == null) {
       return const Center(child: CircularProgressIndicator());
     }
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 720;
-    final statsFuture = Future.wait([
-      ContentRepository().fetchTests(),
-      ContentRepository().fetchLatestAnalytics(),
-      ContentRepository().fetchDailyMcqCount(),
-    ]);
 
     final testingDay = ref.watch(testingDayProvider);
 
@@ -241,7 +258,7 @@ class DashboardHomeScreen extends ConsumerWidget {
             const SearchBarWidget(),
             const SizedBox(height: AppSpacing.lg),
             FutureBuilder<List<dynamic>>(
-              future: statsFuture,
+              future: _statsFuture,
               builder: (context, snapshot) {
                 final tests = snapshot.data != null
                     ? List<Map<String, dynamic>>.from(snapshot.data![0] as List)
@@ -350,9 +367,9 @@ class DashboardHomeScreen extends ConsumerWidget {
                 if (constraints.maxWidth < 820) {
                   return Column(
                     children: [
-                      _RecentTestsPanel(testsFuture: ContentRepository().fetchTests()),
+                      _RecentTestsPanel(testsFuture: _recentTestsFuture),
                       SizedBox(height: AppSpacing.lg),
-                      _WeakTopicsPanel(analyticsFuture: ContentRepository().fetchLatestAnalytics()),
+                      _WeakTopicsPanel(analyticsFuture: _analyticsFuture),
                     ],
                   );
                 }
@@ -363,14 +380,14 @@ class DashboardHomeScreen extends ConsumerWidget {
                     Expanded(
                       flex: 3,
                       child: _RecentTestsPanel(
-                        testsFuture: ContentRepository().fetchTests(),
+                        testsFuture: _recentTestsFuture,
                       ),
                     ),
                     SizedBox(width: AppSpacing.lg),
                     Expanded(
                       flex: 2,
                       child: _WeakTopicsPanel(
-                        analyticsFuture: ContentRepository().fetchLatestAnalytics(),
+                        analyticsFuture: _analyticsFuture,
                       ),
                     ),
                   ],
@@ -532,7 +549,7 @@ class _RecentTestsPanel extends StatelessWidget {
             builder: (context, snapshot) {
               final tests = snapshot.data ?? const [];
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const SkeletonLoader(cardCount: 3);
               }
               if (tests.isEmpty) {
                 return const EmptyStateWidget(
@@ -582,7 +599,7 @@ class _WeakTopicsPanel extends StatelessWidget {
                 snapshot.data?['insights'] as List<dynamic>? ?? const [],
               );
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const SkeletonLoader(cardCount: 3);
               }
               if (insights.isEmpty) {
                 return const EmptyStateWidget(
