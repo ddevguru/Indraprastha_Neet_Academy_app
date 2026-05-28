@@ -1596,23 +1596,23 @@ router.get('/users', adminAuth, async (req, res) => {
     if (search) {
       const like = `%${search}%`;
       const result = await pool.query(
-        `SELECT id, full_name, phone, email, preferred_plan, target_exam_year, batch_id, created_at
+        `SELECT id, full_name, phone, preferred_plan, target_exam_year, batch_id, created_at
          FROM users
-         WHERE full_name ILIKE $1 OR phone ILIKE $1 OR COALESCE(email,'') ILIKE $1
+         WHERE full_name ILIKE $1 OR phone ILIKE $1
          ORDER BY created_at DESC
          LIMIT $2 OFFSET $3`,
         [like, limit, offset]
       );
       const countRes = await pool.query(
         `SELECT COUNT(*)::int AS count FROM users
-         WHERE full_name ILIKE $1 OR phone ILIKE $1 OR COALESCE(email,'') ILIKE $1`,
+         WHERE full_name ILIKE $1 OR phone ILIKE $1`,
         [like]
       );
       rows = result.rows;
       total = countRes.rows[0].count;
     } else {
       const result = await pool.query(
-        `SELECT u.id, u.full_name, u.phone, u.email, u.preferred_plan, u.target_exam_year,
+        `SELECT u.id, u.full_name, u.phone, u.preferred_plan, u.target_exam_year,
                 u.batch_id, u.created_at, b.name AS batch_name
          FROM users u
          LEFT JOIN batches b ON b.id = u.batch_id

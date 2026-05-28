@@ -3757,8 +3757,7 @@ class _UsersPageState extends State<UsersPage> {
                   separatorBuilder: (context2, i2) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final u = filtered[i] as Map<String, dynamic>;
-                    final name = u['full_name']?.toString() ?? u['name']?.toString() ?? 'Unknown';
-                    final email = u['email']?.toString() ?? '';
+                    final name = u['full_name']?.toString() ?? 'Unknown';
                     final phone = u['phone']?.toString() ?? '';
                     final batch = u['batch_name']?.toString() ?? '';
                     final plan = u['preferred_plan']?.toString() ?? '';
@@ -3799,14 +3798,6 @@ class _UsersPageState extends State<UsersPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                                if (email.isNotEmpty) ...[
-                                  const SizedBox(height: 3),
-                                  Row(children: [
-                                    const Icon(Icons.email_outlined, size: 13, color: Color(0xFF757575)),
-                                    const SizedBox(width: 4),
-                                    Expanded(child: Text(email, style: const TextStyle(fontSize: 13, color: Color(0xFF757575)), overflow: TextOverflow.ellipsis)),
-                                  ]),
-                                ],
                                 if (phone.isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Row(children: [
