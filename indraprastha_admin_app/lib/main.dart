@@ -331,96 +331,201 @@ class _AdminHomeState extends State<AdminHome> {
       _checkedDriveAfterLogin = false;
       _driveConnected = null;
     }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final isWide = MediaQuery.sizeOf(context).width >= 900;
+    final title = _tab < _titles.length ? _titles[_tab] : 'Admin';
+
+    // Shared body content widget
+    final bodyContent = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            scheme.primaryContainer.withValues(alpha: 0.22),
+            Theme.of(context).scaffoldBackgroundColor,
+          ],
+        ),
+      ),
+      child: _api.token == null
+          ? LoginPage(
+              api: _api,
+              onLoginSuccess: () async {
+                setState(() => _checkedDriveAfterLogin = false);
+                await _checkDriveConnection(showPrompt: true);
+                if (mounted) setState(() {});
+              },
+            )
+          : pages[_tab],
+    );
+
+    // Sidebar nav list (shared between drawer and desktop rail)
+    Widget buildNavList({bool inDrawer = false}) {
+      return Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: _navItems.length,
+              itemBuilder: (context, index) {
+                final item = _navItems[index];
+                final selected = _tab == index;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  child: ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    selected: selected,
+                    selectedTileColor: scheme.primaryContainer,
+                    leading: Icon(item.$1, color: selected ? scheme.primary : null, size: 20),
+                    title: Text(
+                      item.$2,
+                      style: TextStyle(
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected ? scheme.primary : null,
+                        fontSize: 14,
+                      ),
+                    ),
+                    onTap: () {
+                      setState(() => _tab = index);
+                      if (inDrawer) Navigator.of(context).pop();
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+          Divider(height: 1, color: scheme.outlineVariant),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+            child: ListTile(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              leading: const Icon(Icons.logout_rounded, size: 20),
+              title: const Text('Logout', style: TextStyle(fontSize: 14)),
+              onTap: () async {
+                if (inDrawer) Navigator.of(context).pop();
+                await _api.clearSession();
+                if (!mounted) return;
+                setState(() => _tab = 0);
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Gradient sidebar header
+    final sidebarHeader = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFB8440E), Color(0xFFE85A1C)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset('assets/images/app_icon.png', fit: BoxFit.cover),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Indraprastha', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                Text('Admin Panel', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // ── Desktop layout (wide): permanent sidebar + content ──────────────────
+    if (isLoggedIn && isWide) {
+      return Scaffold(
+        body: Row(
+          children: [
+            // Permanent sidebar
+            Container(
+              width: 240,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1A1D26) : Colors.white,
+                border: Border(right: BorderSide(color: scheme.outlineVariant)),
+              ),
+              child: Column(
+                children: [
+                  sidebarHeader,
+                  Expanded(child: buildNavList()),
+                ],
+              ),
+            ),
+            // Content area
+            Expanded(
+              child: Column(
+                children: [
+                  // Top bar
+                  Container(
+                    height: 56,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1A1D26) : Colors.white,
+                      border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                              if (_driveConnected == false)
+                                Text('Drive not connected — go to Setup',
+                                    style: TextStyle(fontSize: 11, color: scheme.error)),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: widget.onToggleTheme,
+                          icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 20),
+                          tooltip: 'Toggle theme',
+                        ),
+                        IconButton(
+                          onPressed: () async {
+                            await _api.clearSession();
+                            if (!mounted) return;
+                            setState(() => _tab = 0);
+                          },
+                          icon: const Icon(Icons.logout_rounded, size: 20),
+                          tooltip: 'Logout',
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(child: bodyContent),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ── Mobile / narrow layout: hamburger drawer ──────────────────────────────
     return Scaffold(
       drawer: isLoggedIn
           ? Drawer(
               child: Column(
                 children: [
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 16, 16, 20),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFFB8440E), Color(0xFFE85A1C)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Image.asset('assets/images/app_icon.png', fit: BoxFit.cover),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Indraprastha', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
-                              Text('Admin Panel', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: _navItems.length,
-                      itemBuilder: (context, index) {
-                        final item = _navItems[index];
-                        final selected = _tab == index;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          child: ListTile(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            selected: selected,
-                            selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
-                            leading: Icon(
-                              item.$1,
-                              color: selected ? Theme.of(context).colorScheme.primary : null,
-                            ),
-                            title: Text(
-                              item.$2,
-                              style: TextStyle(
-                                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                                color: selected ? Theme.of(context).colorScheme.primary : null,
-                              ),
-                            ),
-                            onTap: () {
-                              setState(() => _tab = index);
-                              Navigator.of(context).pop();
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  Divider(height: 1, color: Theme.of(context).colorScheme.outlineVariant),
-                  SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                      child: ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        leading: const Icon(Icons.logout_rounded),
-                        title: const Text('Logout'),
-                        onTap: () async {
-                          Navigator.of(context).pop();
-                          await _api.clearSession();
-                          if (!mounted) return;
-                          setState(() => _tab = 0);
-                        },
-                      ),
-                    ),
-                  ),
+                  sidebarHeader,
+                  Expanded(child: buildNavList(inDrawer: true)),
                 ],
               ),
             )
@@ -429,28 +534,16 @@ class _AdminHomeState extends State<AdminHome> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _tab < _titles.length ? _titles[_tab] : 'Admin',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-            ),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
             if (isLoggedIn && _driveConnected == false)
-              Text(
-                'Drive not connected — go to Setup',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              ),
+              Text('Drive not connected',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.error)),
           ],
         ),
         actions: [
           IconButton(
             onPressed: widget.onToggleTheme,
-            icon: Icon(
-              Theme.of(context).brightness == Brightness.dark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
-              size: 22,
-            ),
+            icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 22),
             tooltip: 'Toggle theme',
           ),
           if (isLoggedIn)
@@ -466,30 +559,7 @@ class _AdminHomeState extends State<AdminHome> {
           const SizedBox(width: 4),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.28),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
-          ),
-        ),
-        child: _api.token == null
-            ? LoginPage(
-                api: _api,
-                onLoginSuccess: () async {
-                  setState(() {
-                    _checkedDriveAfterLogin = false;
-                  });
-                  await _checkDriveConnection(showPrompt: true);
-                  if (mounted) setState(() {});
-                },
-              )
-            : pages[_tab],
-      ),
+      body: bodyContent,
     );
   }
 }

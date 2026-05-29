@@ -264,13 +264,13 @@ class _SignupScreenState extends State<SignupScreen> {
   final _name = TextEditingController();
   final String _course = 'Neet Dropper Batch';
   int? _batchId;
-  String _state = '';
   String _board = '';
+
+  static const _boards = ['ISC', 'CBSE', 'State Boards', 'Open School'];
 
   @override
   void initState() {
     super.initState();
-    context.read<AuthBloc>().loadStates();
     context.read<AuthBloc>().loadBatches();
   }
 
@@ -279,7 +279,9 @@ class _SignupScreenState extends State<SignupScreen> {
     return BlocConsumer<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state.errorMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.errorMessage!)),
+          );
         }
         if (state.isLoggedIn) context.go('/dashboard/0');
       },
@@ -289,17 +291,34 @@ class _SignupScreenState extends State<SignupScreen> {
           title: 'Signup with OTP',
           child: Column(children: [
             if (step == 0) ...[
-              TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone number')),
+              TextField(
+                controller: _phone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Phone number'),
+              ),
               const SizedBox(height: 12),
-              ElevatedButton(onPressed: () => context.read<AuthBloc>().sendOtp(_phone.text.trim()), child: const Text('Send OTP')),
+              ElevatedButton(
+                onPressed: () => context.read<AuthBloc>().sendOtp(_phone.text.trim()),
+                child: const Text('Send OTP'),
+              ),
             ],
             if (step == 1) ...[
-              TextField(controller: _otp, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'OTP')),
+              TextField(
+                controller: _otp,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'OTP'),
+              ),
               const SizedBox(height: 12),
-              ElevatedButton(onPressed: () => context.read<AuthBloc>().verifyOtp(_otp.text.trim()), child: const Text('Verify OTP')),
+              ElevatedButton(
+                onPressed: () => context.read<AuthBloc>().verifyOtp(_otp.text.trim()),
+                child: const Text('Verify OTP'),
+              ),
             ],
             if (step == 2) ...[
-              TextField(controller: _name, decoration: const InputDecoration(labelText: 'Full name')),
+              TextField(
+                controller: _name,
+                decoration: const InputDecoration(labelText: 'Full name'),
+              ),
               const SizedBox(height: 12),
               TextFormField(
                 initialValue: _course,
@@ -310,36 +329,17 @@ class _SignupScreenState extends State<SignupScreen> {
               DropdownButtonFormField<int>(
                 initialValue: _batchId,
                 items: state.availableBatches
-                    .map(
-                      (b) => DropdownMenuItem(
-                        value: b.id,
-                        child: Text(b.name),
-                      ),
-                    )
+                    .map((b) => DropdownMenuItem(value: b.id, child: Text(b.name)))
                     .toList(),
                 onChanged: (v) => setState(() => _batchId = v),
                 decoration: const InputDecoration(labelText: 'Batch'),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                initialValue: _state.isEmpty ? null : _state,
-                items: state.availableStates
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) {
-                  if (v == null) return;
-                  setState(() => _state = v);
-                },
-                decoration: const InputDecoration(labelText: 'State'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
                 initialValue: _board.isEmpty ? null : _board,
-                items: const [
-                  DropdownMenuItem(value: 'ISC', child: Text('ISC')),
-                  DropdownMenuItem(value: 'CBSE', child: Text('CBSE')),
-                  DropdownMenuItem(value: 'State board', child: Text('State board')),
-                ],
+                items: _boards
+                    .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                    .toList(),
                 onChanged: (v) => setState(() => _board = v ?? ''),
                 decoration: const InputDecoration(labelText: 'Board'),
               ),
@@ -356,7 +356,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         fullName: _name.text.trim(),
                         batchId: _batchId!,
                         courseCategory: _board.isNotEmpty ? _board : _course,
-                        collegeState: _state,
+                        collegeState: '',
                         mbbsYear: '',
                         medicalCollege: '',
                       );
