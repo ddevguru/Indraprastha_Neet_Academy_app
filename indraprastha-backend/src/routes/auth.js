@@ -180,8 +180,8 @@ router.post('/complete-signup', async (req, res) => {
   if (!fullName || String(fullName).trim().length < 2) {
     return res.status(400).json({ error: 'Full name is required' });
   }
-  if (!batchId || !collegeState || !mbbsYear || !medicalCollege) {
-    return res.status(400).json({ error: 'Please fill all onboarding fields' });
+  if (!batchId) {
+    return res.status(400).json({ error: 'Please select a batch' });
   }
 
   try {
