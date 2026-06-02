@@ -50,7 +50,7 @@ function parseSqlFile(filePath) {
       continue;
     }
 
-    if (inCopy && currentTable && stripped) {
+    if (inCopy && currentTable && stripped && !stripped.startsWith('--')) {
       const values = stripped.split('\t').map(v => v === '\\N' ? null : v);
       const row = {};
       currentCols.forEach((col, i) => { row[col] = values[i] ?? null; });
@@ -228,13 +228,14 @@ async function migrateTests(tables, batchMap) {
     testCount++;
 
     for (const q of questions) {
-      const qText = q.questionText || q.question_text || q.question || '';
+      const qText = q.text || q.questionText || q.question_text || q.question || '';
       if (!qText) continue;
       const opts = q.options || [];
-      const correctOption = findCorrectOption(
-        [opts[0], opts[1], opts[2], opts[3]],
-        q.correctAnswer || q.correct_answer || ''
-      );
+      const rawCorrect = q.correctAnswer || q.correct_answer || '';
+      // correctAnswer is already A/B/C/D in this format
+      const correctOption = /^[A-Da-d]$/.test(rawCorrect)
+        ? rawCorrect.toUpperCase()
+        : findCorrectOption([opts[0], opts[1], opts[2], opts[3]], rawCorrect);
       try {
         await NEW_DB.query(
           `INSERT INTO test_questions
