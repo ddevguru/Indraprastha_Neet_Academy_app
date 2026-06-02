@@ -1,1 +1,1 @@
-const String baseUrl = 'https://indraprastha-backend.onrender.com/api';
+const String baseUrl = 'https://api.indraprasthaneetacademy.com/api';

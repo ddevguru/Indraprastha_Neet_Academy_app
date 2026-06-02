@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const String baseUrl = 'https://indraprastha-backend.onrender.com/api';
+const String baseUrl = 'https://api.indraprasthaneetacademy.com/api';
 
 void _showActionSnackBar(
   BuildContext context,
