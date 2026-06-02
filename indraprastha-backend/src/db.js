@@ -25,7 +25,7 @@ const pool = new Pool(
 async function ensureDatabaseSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       phone VARCHAR(15) UNIQUE NOT NULL,
       full_name VARCHAR(100),
       preferred_language VARCHAR(40) DEFAULT 'English',
@@ -53,7 +53,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS courses (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       name VARCHAR(120) UNIQUE NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -61,8 +61,8 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS batches (
-      id SERIAL PRIMARY KEY,
-      course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
       name VARCHAR(180) NOT NULL UNIQUE,
       target_year VARCHAR(20),
       class_label VARCHAR(40),
@@ -72,7 +72,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS classes (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       name VARCHAR(60) UNIQUE NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -80,7 +80,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS subjects (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL,
       name VARCHAR(80) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -95,7 +95,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS otp_sessions (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       phone VARCHAR(15) UNIQUE NOT NULL,
       otp_code VARCHAR(6) NOT NULL,
       expires_at TIMESTAMP NOT NULL,
@@ -106,7 +106,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS colleges (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       state VARCHAR(100) NOT NULL,
       name VARCHAR(200) NOT NULL
     );
@@ -114,7 +114,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS books (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
       class_label VARCHAR(40),
       title VARCHAR(200) NOT NULL,
@@ -138,7 +138,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS book_chapters (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
       title VARCHAR(200) NOT NULL,
       overview TEXT DEFAULT '',
@@ -179,7 +179,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS pyqs (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       chapter_id INTEGER NOT NULL REFERENCES book_chapters(id) ON DELETE CASCADE,
       question TEXT NOT NULL,
       option_a TEXT NOT NULL,
@@ -208,7 +208,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS practice_sets (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
       class_label VARCHAR(40),
       subject VARCHAR(80) DEFAULT '',
@@ -232,7 +232,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS practice_questions (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       practice_set_id INTEGER NOT NULL REFERENCES practice_sets(id) ON DELETE CASCADE,
       question TEXT NOT NULL,
       option_a TEXT NOT NULL,
@@ -260,7 +260,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tests (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
       class_label VARCHAR(40),
       subject VARCHAR(80) DEFAULT '',
@@ -293,8 +293,8 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS test_questions (
-      id SERIAL PRIMARY KEY,
-      test_id INTEGER NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      test_id UUID NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
       subject VARCHAR(80) DEFAULT 'Biology',
       question TEXT NOT NULL,
       option_a TEXT NOT NULL,
@@ -322,9 +322,9 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS test_attempts (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      test_id INTEGER NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      test_id UUID NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
       score INTEGER NOT NULL,
       accuracy NUMERIC(5,2) NOT NULL DEFAULT 0,
       attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -333,7 +333,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS videos (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
       class_label VARCHAR(40),
       title VARCHAR(220) NOT NULL,
@@ -359,7 +359,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_users (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       username VARCHAR(80) UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -368,7 +368,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS packages (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       name VARCHAR(120) UNIQUE NOT NULL,
       price_label VARCHAR(60) NOT NULL,
       validity VARCHAR(60) NOT NULL,
@@ -381,9 +381,9 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS exam_analytics (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      test_id INTEGER REFERENCES tests(id) ON DELETE SET NULL,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      test_id UUID REFERENCES tests(id) ON DELETE SET NULL,
       overall_accuracy NUMERIC(5,2) DEFAULT 0,
       correct_count INTEGER DEFAULT 0,
       wrong_count INTEGER DEFAULT 0,
@@ -394,7 +394,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ai_insights (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       analytics_id INTEGER NOT NULL REFERENCES exam_analytics(id) ON DELETE CASCADE,
       insight_title VARCHAR(200) NOT NULL,
       insight_body TEXT NOT NULL,
@@ -413,7 +413,7 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS daily_mcqs (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
       class_label VARCHAR(40),
       subject VARCHAR(80) DEFAULT '',
@@ -435,8 +435,8 @@ async function ensureDatabaseSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS fcm_tokens (
-      id SERIAL PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
       token TEXT UNIQUE NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
