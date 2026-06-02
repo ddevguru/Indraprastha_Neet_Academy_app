@@ -395,7 +395,7 @@ async function ensureDatabaseSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ai_insights (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      analytics_id INTEGER NOT NULL REFERENCES exam_analytics(id) ON DELETE CASCADE,
+      analytics_id UUID NOT NULL REFERENCES exam_analytics(id) ON DELETE CASCADE,
       insight_title VARCHAR(200) NOT NULL,
       insight_body TEXT NOT NULL,
       priority VARCHAR(20) DEFAULT 'medium',
