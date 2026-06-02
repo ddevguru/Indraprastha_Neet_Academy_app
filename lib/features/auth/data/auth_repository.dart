@@ -140,9 +140,28 @@ class AuthRepository {
   }
 
   Map<String, dynamic> _decodeResponse(http.Response response) {
-    final jsonBody = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.body.isEmpty) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return <String, dynamic>{};
+      }
+      throw AuthException('Server error (${response.statusCode})');
+    }
+
+    // If response is HTML (nginx error page), give a clear message
+    final body = response.body.trim();
+    if (body.startsWith('<')) {
+      throw AuthException(
+        'Server unavailable (${response.statusCode}). Please try again.',
+      );
+    }
+
+    late final Map<String, dynamic> jsonBody;
+    try {
+      jsonBody = jsonDecode(body) as Map<String, dynamic>;
+    } catch (_) {
+      throw AuthException('Unexpected server response. Please try again.');
+    }
+
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonBody;
     }
