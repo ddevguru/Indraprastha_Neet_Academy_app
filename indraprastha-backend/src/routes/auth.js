@@ -3,11 +3,9 @@ const router = express.Router();
 const { pool } = require('../db');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const admin = require('../services/firebase');
 
-const TEMP_OTP = "111111";
-const OTP_EXPIRY_MINUTES = 10;
-const DEFAULT_EXAM = 'NEET';
-const DEFAULT_PLAN = 'Starter';
 const COURSE_NAME = 'Neet Dropper Batch';
 
 function normalizePhone(phone) {
@@ -17,12 +15,9 @@ function normalizePhone(phone) {
 async function issueUserSession(user) {
   const sessionId = crypto.randomUUID();
   await pool.query(
-    `UPDATE users
-     SET active_session_id = $2
-     WHERE id = $1`,
+    `UPDATE users SET active_session_id = $2 WHERE id = $1`,
     [user.id, sessionId]
   );
-
   const token = jwt.sign(
     { id: user.id, phone: user.phone, sessionId },
     process.env.JWT_SECRET,
@@ -31,63 +26,25 @@ async function issueUserSession(user) {
   return { token, sessionId };
 }
 
-async function saveOtp(phone, otp) {
-  await pool.query(
-    `INSERT INTO otp_sessions (phone, otp_code, expires_at)
-     VALUES ($1, $2, NOW() + ($3 || ' minutes')::interval)
-     ON CONFLICT (phone)
-     DO UPDATE SET otp_code = EXCLUDED.otp_code, expires_at = EXCLUDED.expires_at, verified_at = NULL`,
-    [phone, otp, OTP_EXPIRY_MINUTES]
-  );
-}
-
-async function verifyOtp(phone, otp) {
-  const result = await pool.query(
-    `SELECT otp_code, expires_at
-     FROM otp_sessions
-     WHERE phone = $1`,
-    [phone]
-  );
-  if (result.rows.length === 0) return false;
-  const row = result.rows[0];
-  const now = new Date();
-  if (row.otp_code !== otp) return false;
-  if (new Date(row.expires_at) < now) return false;
-
-  await pool.query(
-    `UPDATE otp_sessions SET verified_at = NOW() WHERE phone = $1`,
-    [phone]
-  );
-  return true;
-}
-
 async function authMiddleware(req, res, next) {
   const header = req.headers.authorization || '';
   if (!header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-
   try {
     const token = header.replace('Bearer ', '').trim();
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     const result = await pool.query(
-      `SELECT active_session_id
-       FROM users
-       WHERE id = $1`,
+      `SELECT active_session_id FROM users WHERE id = $1`,
       [payload.id]
     );
-
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid session' });
     }
-
     const activeSessionId = result.rows[0].active_session_id;
     if (!activeSessionId || payload.sessionId !== activeSessionId) {
-      return res.status(401).json({
-        error: 'Session expired. Logged in on another device.',
-      });
+      return res.status(401).json({ error: 'Session expired. Logged in on another device.' });
     }
-
     req.user = payload;
     next();
   } catch (_) {
@@ -95,99 +52,65 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-// Send OTP (Temporary)
-router.post('/send-otp', async (req, res) => {
-  const phone = normalizePhone(req.body.phone);
-  if (!phone || phone.length < 10) {
-    return res.status(400).json({ error: "Valid phone number required" });
+// Verify Firebase ID token → check if user is new or existing (for signup flow)
+router.post('/verify-firebase-token', async (req, res) => {
+  const { idToken } = req.body;
+  if (!idToken) {
+    return res.status(400).json({ error: 'Firebase ID token is required' });
   }
 
   try {
-    await saveOtp(phone, TEMP_OTP);
-    console.log(`\n📱 OTP for ${phone} → ${TEMP_OTP} (Temporary)\n`);
-    res.json({
-      success: true,
-      message: "OTP sent",
-      phone,
-      otpForTesting: TEMP_OTP,
-      expiresInSeconds: OTP_EXPIRY_MINUTES * 60,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// Verify OTP
-router.post('/verify-otp', async (req, res) => {
-  const phone = normalizePhone(req.body.phone);
-  const otp = String(req.body.otp || '');
-  if (!phone || phone.length < 10 || otp.length != 6) {
-    return res.status(400).json({ error: "Phone and 6-digit OTP are required" });
-  }
-
-  try {
-    const otpOk = await verifyOtp(phone, otp);
-    if (!otpOk) {
-      return res.status(400).json({ error: "Invalid or expired OTP" });
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const phone = normalizePhone(decoded.phone_number);
+    if (!phone || phone.length < 10) {
+      return res.status(400).json({ error: 'Invalid phone number in token' });
     }
 
     const userResult = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
+    const isNewUser = userResult.rows.length === 0;
 
-    if (userResult.rows.length > 0) {
-      const user = userResult.rows[0];
-      const { token } = await issueUserSession(user);
-      return res.json({
-        success: true,
-        token,
-        user,
-        isNewUser: false,
-        onboardingComplete: Boolean(user.is_profile_complete),
-      });
-    }
-
-    return res.json({
-      success: true,
-      isNewUser: true,
-      phone,
-      message: "OTP verified. Complete signup.",
-    });
+    return res.json({ success: true, isNewUser, phone });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error('verify-firebase-token error:', err);
+    return res.status(401).json({ error: 'Invalid or expired Firebase token' });
   }
 });
 
-// Complete Signup
+// Complete Signup — called after Firebase OTP verification
+// Creates user with password hash
 router.post('/complete-signup', async (req, res) => {
   const {
-    phone: rawPhone,
+    idToken,
     fullName,
-    preferredLanguage = 'English',
-    targetExamYear = DEFAULT_EXAM,
-    preferredPlan = DEFAULT_PLAN,
+    password,
     batchId,
     courseCategory,
-    collegeState,
-    mbbsYear,
-    medicalCollege
+    preferredLanguage = 'English',
   } = req.body;
-  const phone = normalizePhone(rawPhone);
 
-  if (!phone || phone.length < 10) {
-    return res.status(400).json({ error: 'Valid phone number required' });
+  if (!idToken) {
+    return res.status(400).json({ error: 'Firebase ID token is required' });
   }
   if (!fullName || String(fullName).trim().length < 2) {
     return res.status(400).json({ error: 'Full name is required' });
+  }
+  if (!password || String(password).length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
   if (!batchId) {
     return res.status(400).json({ error: 'Please select a batch' });
   }
 
   try {
+    // Verify Firebase token to get phone
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const phone = normalizePhone(decoded.phone_number);
+    if (!phone || phone.length < 10) {
+      return res.status(400).json({ error: 'Invalid phone number in token' });
+    }
+
     const batchCheck = await pool.query(
-      `SELECT b.id
-       FROM batches b
+      `SELECT b.id FROM batches b
        JOIN courses c ON c.id = b.course_id
        WHERE b.id = $1 AND c.name = $2`,
       [batchId, COURSE_NAME]
@@ -196,6 +119,7 @@ router.post('/complete-signup', async (req, res) => {
       return res.status(400).json({ error: 'Invalid batch selected' });
     }
 
+    const passwordHash = await bcrypt.hash(password, 10);
     const existing = await pool.query('SELECT id FROM users WHERE phone = $1', [phone]);
     let result;
 
@@ -203,60 +127,69 @@ router.post('/complete-signup', async (req, res) => {
       result = await pool.query(
         `UPDATE users
          SET full_name = $2,
-             preferred_language = $3,
-             target_exam_year = $4,
-             preferred_plan = $5,
-             course_category = $6,
-             college_state = $7,
-             mbbs_admission_year = $8,
-             medical_college = $9,
-             batch_id = $10,
+             password_hash = $3,
+             preferred_language = $4,
+             course_category = $5,
+             batch_id = $6,
              is_profile_complete = TRUE
          WHERE phone = $1
          RETURNING *`,
-        [
-          phone,
-          fullName,
-          preferredLanguage,
-          targetExamYear,
-          preferredPlan,
-          courseCategory || COURSE_NAME,
-          collegeState,
-          mbbsYear,
-          medicalCollege,
-          batchId
-        ]
+        [phone, fullName, passwordHash, preferredLanguage, courseCategory || COURSE_NAME, batchId]
       );
     } else {
       result = await pool.query(
-        `INSERT INTO users (
-          phone, full_name, preferred_language, target_exam_year, preferred_plan,
-          course_category, college_state, mbbs_admission_year, medical_college, batch_id, is_profile_complete
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE)
+        `INSERT INTO users (phone, full_name, password_hash, preferred_language, course_category, batch_id, is_profile_complete)
+         VALUES ($1, $2, $3, $4, $5, $6, TRUE)
          RETURNING *`,
-        [
-          phone,
-          fullName,
-          preferredLanguage,
-          targetExamYear,
-          preferredPlan,
-          courseCategory || COURSE_NAME,
-          collegeState,
-          mbbsYear,
-          medicalCollege,
-          batchId
-        ]
+        [phone, fullName, passwordHash, preferredLanguage, courseCategory || COURSE_NAME, batchId]
       );
     }
 
     const user = result.rows[0];
     const { token } = await issueUserSession(user);
-
     res.json({ success: true, token, user });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error('complete-signup error:', err);
+    if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error') {
+      return res.status(401).json({ error: 'Firebase token expired. Please verify OTP again.' });
+    }
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Login with phone + password (no OTP needed)
+router.post('/login', async (req, res) => {
+  const phone = normalizePhone(req.body.phone);
+  const { password } = req.body;
+
+  if (!phone || phone.length < 10) {
+    return res.status(400).json({ error: 'Valid phone number required' });
+  }
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required' });
+  }
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'No account found. Please sign up first.' });
+    }
+
+    const user = result.rows[0];
+    if (!user.password_hash) {
+      return res.status(401).json({ error: 'Account not set up with password. Please sign up again.' });
+    }
+
+    const passwordOk = await bcrypt.compare(password, user.password_hash);
+    if (!passwordOk) {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+
+    const { token } = await issueUserSession(user);
+    res.json({ success: true, token, user });
+  } catch (err) {
+    console.error('login error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -279,16 +212,6 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/states', async (_req, res) => {
-  try {
-    const result = await pool.query('SELECT DISTINCT state FROM colleges ORDER BY state ASC');
-    res.json({ success: true, states: result.rows.map((row) => row.state) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 router.get('/batches', async (_req, res) => {
   try {
     const result = await pool.query(
@@ -299,11 +222,17 @@ router.get('/batches', async (_req, res) => {
        ORDER BY b.id ASC`,
       [COURSE_NAME]
     );
-    res.json({
-      success: true,
-      course: COURSE_NAME,
-      batches: result.rows,
-    });
+    res.json({ success: true, course: COURSE_NAME, batches: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/states', async (_req, res) => {
+  try {
+    const result = await pool.query('SELECT DISTINCT state FROM colleges ORDER BY state ASC');
+    res.json({ success: true, states: result.rows.map((row) => row.state) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -313,7 +242,6 @@ router.get('/batches', async (_req, res) => {
 router.get('/colleges', async (req, res) => {
   const state = String(req.query.state || '').trim();
   if (!state) return res.status(400).json({ error: 'State is required' });
-
   try {
     const result = await pool.query(
       'SELECT name FROM colleges WHERE state = $1 ORDER BY name ASC',
@@ -326,4 +254,15 @@ router.get('/colleges', async (req, res) => {
   }
 });
 
+router.delete('/delete-account', authMiddleware, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1', [req.user.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;
+module.exports.authMiddleware = authMiddleware;

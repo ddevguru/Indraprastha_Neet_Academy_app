@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../models/app_models.dart';
@@ -14,9 +15,8 @@ class AuthState {
     this.isOtpVerified = false,
     this.isNewUser = false,
     this.phoneNumber = '',
-    this.otpDebugCode,
-    this.availableStates = const [],
-    this.availableColleges = const [],
+    this.verificationId,
+    this.firebaseIdToken,
     this.availableBatches = const [],
   });
 
@@ -29,9 +29,13 @@ class AuthState {
   final bool isOtpVerified;
   final bool isNewUser;
   final String phoneNumber;
-  final String? otpDebugCode;
-  final List<String> availableStates;
-  final List<String> availableColleges;
+
+  /// Firebase verificationId — used to confirm OTP
+  final String? verificationId;
+
+  /// Firebase ID token — sent to backend during completeSignup
+  final String? firebaseIdToken;
+
   final List<BatchOption> availableBatches;
 
   bool get isLoggedIn => user != null && token != null;
@@ -47,9 +51,8 @@ class AuthState {
     bool? isOtpVerified,
     bool? isNewUser,
     String? phoneNumber,
-    String? otpDebugCode,
-    List<String>? availableStates,
-    List<String>? availableColleges,
+    String? verificationId,
+    String? firebaseIdToken,
     List<BatchOption>? availableBatches,
     bool clearSession = false,
   }) {
@@ -63,16 +66,16 @@ class AuthState {
       isOtpVerified: isOtpVerified ?? this.isOtpVerified,
       isNewUser: isNewUser ?? this.isNewUser,
       phoneNumber: phoneNumber ?? this.phoneNumber,
-      otpDebugCode: otpDebugCode ?? this.otpDebugCode,
-      availableStates: availableStates ?? this.availableStates,
-      availableColleges: availableColleges ?? this.availableColleges,
+      verificationId: verificationId ?? this.verificationId,
+      firebaseIdToken: firebaseIdToken ?? this.firebaseIdToken,
       availableBatches: availableBatches ?? this.availableBatches,
     );
   }
 }
 
 class AuthBloc extends Cubit<AuthState> {
-  AuthBloc(this._repository) : super(AuthState(onboardingSeen: _repository.onboardingSeen));
+  AuthBloc(this._repository)
+      : super(AuthState(onboardingSeen: _repository.onboardingSeen));
 
   final AuthRepository _repository;
   bool _bootstrapped = false;
@@ -99,6 +102,43 @@ class AuthBloc extends Cubit<AuthState> {
     emit(state.copyWith(onboardingSeen: true));
   }
 
+  // ─── Login (phone + password, no OTP) ────────────────────────────────────
+
+  Future<void> login(String rawPhone, String password) async {
+    final phone = rawPhone.replaceAll(RegExp(r'\D'), '');
+    if (phone.length < 10) {
+      emit(state.copyWith(errorMessage: 'Enter valid 10-digit phone number'));
+      return;
+    }
+    if (password.isEmpty) {
+      emit(state.copyWith(errorMessage: 'Enter your password'));
+      return;
+    }
+
+    emit(state.copyWith(loading: true, clearError: true));
+    try {
+      final data = await _repository.login(phone: phone, password: password);
+      final token = data['token']?.toString();
+      final userJson = data['user'] as Map<String, dynamic>?;
+      if (token == null || userJson == null) {
+        throw AuthException('Invalid response from server');
+      }
+      final user = AppUser.fromJson(userJson);
+      await _repository.saveSession(token: token, user: user);
+      await _repository.setOnboardingSeen();
+      emit(state.copyWith(
+        loading: false,
+        user: user,
+        token: token,
+        onboardingSeen: true,
+      ));
+    } catch (e) {
+      emit(state.copyWith(loading: false, errorMessage: e.toString()));
+    }
+  }
+
+  // ─── Signup: Step 1 — Send OTP via Firebase ──────────────────────────────
+
   Future<void> sendOtp(String rawPhone) async {
     final phone = rawPhone.replaceAll(RegExp(r'\D'), '');
     if (phone.length < 10) {
@@ -107,61 +147,72 @@ class AuthBloc extends Cubit<AuthState> {
     }
 
     emit(state.copyWith(loading: true, clearError: true, phoneNumber: phone));
-    try {
-      final data = await _repository.sendOtp(phone);
-      emit(
-        state.copyWith(
+
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: '+91$phone',
+      timeout: const Duration(seconds: 60),
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        // Auto-verified on Android — sign in directly
+        await _signInWithCredential(credential);
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        emit(state.copyWith(
+          loading: false,
+          errorMessage: e.message ?? 'Failed to send OTP',
+        ));
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        emit(state.copyWith(
           loading: false,
           otpSent: true,
-          phoneNumber: phone,
-          otpDebugCode: data['otpForTesting']?.toString(),
-        ),
-      );
-    } catch (e) {
-      emit(state.copyWith(loading: false, errorMessage: e.toString()));
-    }
+          verificationId: verificationId,
+        ));
+      },
+      codeAutoRetrievalTimeout: (_) {},
+    );
   }
 
+  // ─── Signup: Step 2 — Verify OTP, get Firebase ID token ──────────────────
+
   Future<bool> verifyOtp(String otp) async {
-    if (state.phoneNumber.isEmpty) {
+    final verificationId = state.verificationId;
+    if (verificationId == null) {
       emit(state.copyWith(errorMessage: 'Send OTP first'));
       return false;
     }
+
     emit(state.copyWith(loading: true, clearError: true));
     try {
-      final data = await _repository.verifyOtp(
-        phone: state.phoneNumber,
-        otp: otp.trim(),
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: otp.trim(),
       );
-      final isNewUser = data['isNewUser'] == true;
-      if (!isNewUser) {
-        final token = data['token']?.toString();
-        final userJson = data['user'] as Map<String, dynamic>?;
-        if (token != null && userJson != null) {
-          final user = AppUser.fromJson(userJson);
-          await _repository.saveSession(token: token, user: user);
-          await _repository.setOnboardingSeen();
-          emit(
-            state.copyWith(
-              loading: false,
-              user: user,
-              token: token,
-              onboardingSeen: true,
-              isOtpVerified: true,
-              isNewUser: false,
-            ),
-          );
-          return true;
-        }
-      }
+      return await _signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      emit(state.copyWith(
+        loading: false,
+        errorMessage: e.message ?? 'Invalid OTP',
+      ));
+      return false;
+    }
+  }
 
-      emit(
-        state.copyWith(
-          loading: false,
-          isOtpVerified: true,
-          isNewUser: true,
-        ),
-      );
+  Future<bool> _signInWithCredential(PhoneAuthCredential credential) async {
+    try {
+      final userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+      final idToken = await userCredential.user!.getIdToken();
+
+      // Ask backend if this phone is a new user
+      final data = await _repository.verifyFirebaseToken(idToken!);
+      final isNewUser = data['isNewUser'] == true;
+
+      emit(state.copyWith(
+        loading: false,
+        isOtpVerified: true,
+        isNewUser: isNewUser,
+        firebaseIdToken: idToken,
+      ));
       return true;
     } catch (e) {
       emit(state.copyWith(loading: false, errorMessage: e.toString()));
@@ -169,52 +220,28 @@ class AuthBloc extends Cubit<AuthState> {
     }
   }
 
-  Future<void> loadStates() async {
-    try {
-      final states = await _repository.fetchStates();
-      emit(state.copyWith(availableStates: states));
-    } catch (_) {
-      // no-op
-    }
-  }
-
-  Future<void> loadBatches() async {
-    try {
-      final batches = await _repository.fetchBatches();
-      emit(state.copyWith(availableBatches: batches));
-    } catch (_) {
-      // no-op
-    }
-  }
-
-  Future<void> loadColleges(String stateName) async {
-    emit(state.copyWith(availableColleges: const []));
-    try {
-      final colleges = await _repository.fetchColleges(stateName);
-      emit(state.copyWith(availableColleges: colleges));
-    } catch (_) {
-      // no-op
-    }
-  }
+  // ─── Signup: Step 3 — Complete signup with password + details ────────────
 
   Future<bool> completeSignup({
     required String fullName,
+    required String password,
     required int batchId,
     required String courseCategory,
-    required String collegeState,
-    required String mbbsYear,
-    required String medicalCollege,
   }) async {
+    final idToken = state.firebaseIdToken;
+    if (idToken == null) {
+      emit(state.copyWith(errorMessage: 'OTP verification required'));
+      return false;
+    }
+
     emit(state.copyWith(loading: true, clearError: true));
     try {
       final data = await _repository.completeSignup(
-        phone: state.phoneNumber,
+        idToken: idToken,
         fullName: fullName,
+        password: password,
         batchId: batchId,
         courseCategory: courseCategory,
-        collegeState: collegeState,
-        mbbsYear: mbbsYear,
-        medicalCollege: medicalCollege,
       );
 
       final token = data['token']?.toString();
@@ -226,20 +253,26 @@ class AuthBloc extends Cubit<AuthState> {
       final user = AppUser.fromJson(userJson);
       await _repository.saveSession(token: token, user: user);
       await _repository.setOnboardingSeen();
-      emit(
-        state.copyWith(
-          loading: false,
-          user: user,
-          token: token,
-          onboardingSeen: true,
-          isNewUser: false,
-        ),
-      );
+      emit(state.copyWith(
+        loading: false,
+        user: user,
+        token: token,
+        onboardingSeen: true,
+        isNewUser: false,
+        firebaseIdToken: null,
+      ));
       return true;
     } catch (e) {
       emit(state.copyWith(loading: false, errorMessage: e.toString()));
       return false;
     }
+  }
+
+  Future<void> loadBatches() async {
+    try {
+      final batches = await _repository.fetchBatches();
+      emit(state.copyWith(availableBatches: batches));
+    } catch (_) {}
   }
 
   Future<void> updateProfile(AppUser user) async {
@@ -252,15 +285,14 @@ class AuthBloc extends Cubit<AuthState> {
 
   Future<void> logout() async {
     await _repository.clearSession();
-    emit(
-      state.copyWith(
-        clearSession: true,
-        otpSent: false,
-        isOtpVerified: false,
-        isNewUser: false,
-        phoneNumber: '',
-      ),
-    );
+    await FirebaseAuth.instance.signOut();
+    emit(state.copyWith(
+      clearSession: true,
+      otpSent: false,
+      isOtpVerified: false,
+      isNewUser: false,
+      phoneNumber: '',
+    ));
   }
 
   Future<bool> deleteAccount() async {
@@ -269,7 +301,15 @@ class AuthBloc extends Cubit<AuthState> {
     emit(state.copyWith(loading: true, clearError: true));
     try {
       await _repository.deleteAccount(token);
-      emit(state.copyWith(clearSession: true, loading: false, otpSent: false, isOtpVerified: false, isNewUser: false, phoneNumber: ''));
+      await FirebaseAuth.instance.signOut();
+      emit(state.copyWith(
+        clearSession: true,
+        loading: false,
+        otpSent: false,
+        isOtpVerified: false,
+        isNewUser: false,
+        phoneNumber: '',
+      ));
       return true;
     } catch (e) {
       emit(state.copyWith(loading: false, errorMessage: e.toString()));

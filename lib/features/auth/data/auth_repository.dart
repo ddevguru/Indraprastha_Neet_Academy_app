@@ -53,51 +53,48 @@ class AuthRepository {
     await _secureStorage.delete(key: _userKey);
   }
 
-  Future<Map<String, dynamic>> sendOtp(String phone) async {
+  /// Verifies Firebase ID token on backend — returns whether user is new.
+  Future<Map<String, dynamic>> verifyFirebaseToken(String idToken) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/auth/send-otp'),
+      Uri.parse('$baseUrl/auth/verify-firebase-token'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'phone': phone}),
+      body: jsonEncode({'idToken': idToken}),
     );
     return _decodeResponse(response);
   }
 
-  Future<Map<String, dynamic>> verifyOtp({
+  /// Login with phone + password (no OTP required).
+  Future<Map<String, dynamic>> login({
     required String phone,
-    required String otp,
+    required String password,
   }) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/auth/verify-otp'),
+      Uri.parse('$baseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'phone': phone, 'otp': otp}),
+      body: jsonEncode({'phone': phone, 'password': password}),
     );
     return _decodeResponse(response);
   }
 
+  /// Complete signup — sends Firebase ID token + password + details.
   Future<Map<String, dynamic>> completeSignup({
-    required String phone,
+    required String idToken,
     required String fullName,
+    required String password,
     required int batchId,
     required String courseCategory,
-    required String collegeState,
-    required String mbbsYear,
-    required String medicalCollege,
     String preferredLanguage = 'English',
   }) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/auth/complete-signup'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'phone': phone,
+        'idToken': idToken,
         'fullName': fullName,
-        'targetExamYear': 'NEET',
-        'preferredPlan': 'Starter',
+        'password': password,
         'batchId': batchId,
-        'preferredLanguage': preferredLanguage,
         'courseCategory': courseCategory,
-        'collegeState': collegeState,
-        'mbbsYear': mbbsYear,
-        'medicalCollege': medicalCollege,
+        'preferredLanguage': preferredLanguage,
       }),
     );
     return _decodeResponse(response);
@@ -142,19 +139,6 @@ class AuthRepository {
     return AppUser.fromJson(data['user'] as Map<String, dynamic>);
   }
 
-  Future<List<String>> fetchStates() async {
-    final response = await _client.get(Uri.parse('$baseUrl/auth/states'));
-    final data = _decodeResponse(response);
-    return List<String>.from(data['states'] as List<dynamic>);
-  }
-
-  Future<List<String>> fetchColleges(String state) async {
-    final response =
-        await _client.get(Uri.parse('$baseUrl/auth/colleges?state=$state'));
-    final data = _decodeResponse(response);
-    return List<String>.from(data['colleges'] as List<dynamic>);
-  }
-
   Map<String, dynamic> _decodeResponse(http.Response response) {
     final jsonBody = response.body.isEmpty
         ? <String, dynamic>{}
@@ -168,9 +152,7 @@ class AuthRepository {
 
 class AuthException implements Exception {
   AuthException(this.message);
-
   final String message;
-
   @override
   String toString() => message;
 }
