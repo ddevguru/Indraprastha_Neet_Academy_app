@@ -460,6 +460,40 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
       }));
     }
 
+    // Fetch test questions with explanation images
+    const questionsWithExplanations = await pool.query(
+      `SELECT
+        tq.id,
+        tq.question,
+        tq.option_a,
+        tq.option_b,
+        tq.option_c,
+        tq.option_d,
+        tq.correct_option,
+        tq.explanation,
+        tq.explanation_image_link,
+        tq.explanation_image_drive_file_id,
+        tq.explanation_image_drive_folder_id,
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', ei.id,
+              'image_url', ei.image_url,
+              'image_drive_file_id', ei.image_drive_file_id,
+              'image_drive_link', ei.image_drive_link,
+              'caption', ei.caption,
+              'order_index', ei.order_index
+            ) ORDER BY ei.order_index
+          )
+          FROM explanation_images ei
+          WHERE ei.test_question_id = tq.id
+        ) as explanation_images_list
+       FROM test_questions tq
+       WHERE tq.test_id = $1
+       ORDER BY tq.id ASC`,
+      [testId]
+    );
+
     return res.json({
       success: true,
       attempt: attempt.rows[0],
@@ -470,6 +504,17 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
         unattempted: analytics.rows[0].unattempted_count,
       },
       insights: insightsRows,
+      questionsWithExplanations: questionsWithExplanations.rows,
+      aiAnalytics: {
+        test_id: testId,
+        user_id: req.user.id,
+        score: score,
+        accuracy: accuracy,
+        subject: testMeta.subject,
+        topic: testMeta.topic,
+        insights: insightsRows,
+        message: 'AI analytics calculated. Review insights above.'
+      }
     });
   } catch (e) {
     console.error('[CONTENT_SUBMIT_ERROR]', {

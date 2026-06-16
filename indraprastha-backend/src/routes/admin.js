@@ -10,6 +10,7 @@ const crypto = require('crypto');
 
 const { pool } = require('../db');
 const { sendNotificationToAll } = require('../services/notifications');
+const logger = require('../services/logger');
 const {
   uploadBufferToDrive,
   uploadFilePathToDrive,
@@ -1034,27 +1035,70 @@ router.get('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
 });
 
 router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
-  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink } =
-    req.body;
-  const result = await pool.query(
-    `INSERT INTO practice_questions (
-      practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-    [
-      req.params.setId,
-      question,
-      optionA,
-      optionB,
-      optionC,
-      optionD,
-      correctOption,
-      explanation || '',
-      normalizeDriveLink(questionImageLink || '', 'image'),
-      extractDriveFileId(questionImageLink || ''),
-      '',
-    ]
-  );
-  return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
+  try {
+    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink } =
+      req.body;
+
+    // Validation
+    if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
+      await logger.logError({
+        errorType: 'VALIDATION_ERROR',
+        message: 'Missing required fields for practice question',
+        operation: 'ADD_PRACTICE_QUESTION',
+        endpoint: '/practice-sets/:setId/questions',
+        adminId: req.admin?.id,
+        requestBody: req.body,
+        statusCode: 400,
+        details: { missingFields: ['question', 'optionA', 'optionB', 'optionC', 'optionD', 'correctOption'].filter(f => !req.body[f]) }
+      });
+      return res.status(400).json({ error: 'Missing required fields', details: 'question, optionA, optionB, optionC, optionD, correctOption are required' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO practice_questions (
+        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [
+        req.params.setId,
+        question,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        explanation || '',
+        normalizeDriveLink(questionImageLink || '', 'image'),
+        extractDriveFileId(questionImageLink || ''),
+        '',
+      ]
+    );
+
+    await logger.logSuccess({
+      operationType: 'ADD_PRACTICE_QUESTION_SUCCESS',
+      message: 'Practice question added successfully',
+      operation: 'ADD_PRACTICE_QUESTION',
+      endpoint: '/practice-sets/:setId/questions',
+      adminId: req.admin?.id,
+      statusCode: 200,
+      details: { questionId: result.rows[0].id, practiceSetId: req.params.setId }
+    });
+
+    return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
+  } catch (error) {
+    await logger.logError({
+      errorType: 'ADD_PRACTICE_QUESTION_ERROR',
+      message: error.message,
+      stack: error.stack,
+      operation: 'ADD_PRACTICE_QUESTION',
+      endpoint: '/practice-sets/:setId/questions',
+      adminId: req.admin?.id,
+      requestBody: req.body,
+      statusCode: 500,
+      details: { practiceSetId: req.params.setId }
+    });
+    logAdminRouteError('/practice-sets/:setId/questions', error, { adminId: req.admin?.id });
+    return res.status(500).json({ error: 'Failed to add practice question', details: error.message });
+  }
 });
 
 router.put('/practice-questions/:id', adminAuth, async (req, res) => {
