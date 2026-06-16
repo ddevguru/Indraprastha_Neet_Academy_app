@@ -1,13 +1,4 @@
-﻿--
--- PostgreSQL database dump
---
-
- WZas8mHNTwDrRkak4woyRd0MwaaEhargig8xlRde48vNbmvdGXzg7kl6wyUK41W
-
--- Dumped from database version 18.1 (Debian 18.1-1.pgdg12+2)
--- Dumped by pg_dump version 18.3
-
-SET statement_timeout = 0;
+﻿
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
 SET transaction_timeout = 0;
