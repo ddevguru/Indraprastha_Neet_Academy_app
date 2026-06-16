@@ -1034,6 +1034,72 @@ router.get('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
   return res.json({ success: true, questions: result.rows.map(mapQuestionImageLink) });
 });
 
+// Batch insert questions (FAST - for bulk uploads)
+router.post('/practice-sets/:setId/questions/batch', adminAuth, async (req, res) => {
+  try {
+    const { questions } = req.body;
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ error: 'questions array required' });
+    }
+
+    // Build batch insert query
+    const values = questions.map((q, i) => {
+      const idx = i * 11;
+      return `($${idx+1},$${idx+2},$${idx+3},$${idx+4},$${idx+5},$${idx+6},$${idx+7},$${idx+8},$${idx+9},$${idx+10},$${idx+11})`;
+    }).join(',');
+
+    const allParams = questions.flatMap(q => [
+      req.params.setId,
+      q.question,
+      q.optionA,
+      q.optionB,
+      q.optionC,
+      q.optionD,
+      q.correctOption,
+      q.explanation || '',
+      normalizeDriveLink(q.questionImageLink || '', 'image'),
+      extractDriveFileId(q.questionImageLink || ''),
+      ''
+    ]);
+
+    const result = await pool.query(
+      `INSERT INTO practice_questions (practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id)
+       VALUES ${values}
+       RETURNING *`,
+      allParams
+    );
+
+    await logger.logSuccess({
+      operationType: 'BATCH_ADD_QUESTIONS_SUCCESS',
+      message: `Added ${questions.length} questions successfully`,
+      operation: 'BATCH_ADD_QUESTIONS',
+      endpoint: '/practice-sets/:setId/questions/batch',
+      adminId: req.admin?.id,
+      statusCode: 200,
+      details: { count: questions.length, practiceSetId: req.params.setId }
+    });
+
+    return res.json({
+      success: true,
+      count: result.rows.length,
+      questions: result.rows.map(mapQuestionImageLink)
+    });
+  } catch (error) {
+    await logger.logError({
+      errorType: 'BATCH_ADD_QUESTIONS_ERROR',
+      message: error.message,
+      stack: error.stack,
+      operation: 'BATCH_ADD_QUESTIONS',
+      endpoint: '/practice-sets/:setId/questions/batch',
+      adminId: req.admin?.id,
+      statusCode: 500,
+      details: { practiceSetId: req.params.setId }
+    });
+    return res.status(500).json({ error: 'Failed to add questions in batch' });
+  }
+});
+
+// Single insert (keep existing for backward compatibility)
 router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
   try {
     const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink } =
