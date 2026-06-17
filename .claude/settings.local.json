@@ -3,7 +3,16 @@
     "allow": [
       "Bash(Get-ChildItem -Recurse -Include \"*admin*.js\", \"*admin*.jsx\", \"*admin*.tsx\", \"*admin*.ts\" -ErrorAction SilentlyContinue)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(psql -h localhost -p 5432 -d indraprastha_db -U neetadmin)"
+      "Bash(psql -h localhost -p 5432 -d indraprastha_db -U neetadmin)",
+      "Read(//c/indraprastha_admin_app/lib/**)",
+      "Read(//c/indraprastha-backend/src/routes/**)",
+      "Bash(cat)",
+      "Read(//tmp/**)",
+      "Bash(cd /c/indraprastha/indraprastha-backend && cat src/db.js | head -60)",
+      "Read(//c/c/indraprastha/indraprastha-backend/src/**)",
+      "Bash(cd /c/indraprastha/indraprastha-backend && grep -n \"average_score\\\\|average_accuracy\\\\|daily_study_hours\\\\|current_study_streak\\\\|physics_accuracy\\\\|chemistry_accuracy\\\\|biology_accuracy\\\\|total_tests_taken\" migrations/*.sql)",
+      "Read(//c/c/indraprastha/indraprastha-backend/**)",
+      "Bash(xargs grep -l \"PYQ\\\\|pyq\\\\|previous.*year\")"
     ]
   }
 }

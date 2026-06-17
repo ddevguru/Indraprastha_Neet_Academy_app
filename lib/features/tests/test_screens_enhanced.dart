@@ -241,7 +241,7 @@ class _EnhancedTestScreenState extends State<EnhancedTestScreen> {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
-                                        '${option}) ${currentQuestion.options[index]}',
+                                        '$option) ${currentQuestion.options[index]}',
                                         style: const TextStyle(
                                           fontSize: 14,
                                         ),
@@ -832,11 +832,19 @@ class TestResultsScreen extends StatefulWidget {
 
 class _TestResultsScreenState extends State<TestResultsScreen> {
   late Future<Map<String, dynamic>> _resultsFuture;
+  late PageController _reviewController;
 
   @override
   void initState() {
     super.initState();
     _resultsFuture = _fetchResults();
+    _reviewController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _reviewController.dispose();
+    super.dispose();
   }
 
   Future<Map<String, dynamic>> _fetchResults() async {
@@ -902,6 +910,11 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
 
                 // Performance Comparison Graph
                 _buildPerformanceComparison(results['comparison'] ?? {}),
+
+                const SizedBox(height: 32),
+
+                // Review Section with Page Dots
+                _buildReviewSection(),
 
                 const SizedBox(height: 24),
 
@@ -1055,6 +1068,161 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildReviewSection() {
+    final questionCount = widget.totalQuestions;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Answer Review',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 16),
+        // PageView for review questions
+        SizedBox(
+          height: 380,
+          child: PageView.builder(
+            controller: _reviewController,
+            onPageChanged: (index) {
+              setState(() {});
+            },
+            itemCount: questionCount,
+            itemBuilder: (context, index) => _buildReviewCard(index),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Page dots indicator
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            questionCount,
+            (index) => Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _reviewController.hasClients &&
+                       _reviewController.page!.round() == index
+                    ? AppColors.primary
+                    : AppColors.border,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewCard(int index) {
+    // Mock question data - in production fetch from results
+    final isCorrect = index % 3 != 0; // Mock: 2/3 correct
+    final userAnswer = ['A', 'B', 'C', 'D'][index % 4];
+    final correctAnswer = ['B', 'C', 'D', 'A'][index % 4];
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Question ${index + 1}',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                Icon(
+                  isCorrect ? Icons.check_circle : Icons.cancel,
+                  color: isCorrect ? Colors.green : Colors.red,
+                  size: 20,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Sample Question ${index + 1}: What is the correct answer?',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.close, color: Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Your Answer', style: TextStyle(fontSize: 11, color: Colors.red)),
+                        Text('Option $userAnswer', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check, color: Colors.green, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Correct Answer', style: TextStyle(fontSize: 11, color: Colors.green)),
+                        Text('Option $correctAnswer', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (!isCorrect) ...[
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.lightbulb_outline, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('Explanation', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'This is the explanation for why this answer is correct. Study this carefully.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

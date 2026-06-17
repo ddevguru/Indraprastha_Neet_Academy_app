@@ -24,11 +24,20 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
   int currentQuestionIndex = 0;
   Set<int> answeredQuestions = {};
   Map<int, String> userAnswers = {};
+  bool _showResults = false;
+  late PageController _reviewController;
 
   @override
   void initState() {
     super.initState();
     _loadQuestions();
+    _reviewController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _reviewController.dispose();
+    super.dispose();
   }
 
   void _loadQuestions() {
@@ -83,6 +92,10 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showResults) {
+      return _buildResultsScreen();
+    }
+
     final currentQuestion = practiceQuestions[currentQuestionIndex];
     final isAnswered = answeredQuestions.contains(currentQuestionIndex);
 
@@ -386,6 +399,7 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
   }
 
   Widget _buildNavigationBar() {
+    final isLastQuestion = currentQuestionIndex == widget.questions.length - 1;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -405,13 +419,345 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: FilledButton(
-              onPressed: currentQuestionIndex < widget.questions.length - 1
-                  ? _goToNextQuestion
-                  : null,
-              child: const Text('Next →'),
+              onPressed: isLastQuestion
+                  ? () => setState(() => _showResults = true)
+                  : _goToNextQuestion,
+              child: Text(isLastQuestion ? 'Finish & View Score' : 'Next →'),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildResultsScreen() {
+    int correct = 0;
+    for (int i = 0; i < practiceQuestions.length; i++) {
+      if (userAnswers[i] == practiceQuestions[i].correctAnswer) {
+        correct++;
+      }
+    }
+    final wrong = userAnswers.length - correct;
+    final unattempted = practiceQuestions.length - userAnswers.length;
+    final accuracy = userAnswers.isEmpty ? 0.0 : (correct / userAnswers.length) * 100;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Practice Results'),
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Score Card
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primaryDark,
+                    AppColors.primary,
+                    AppColors.accentLight,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    'Your Score',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '$correct / ${practiceQuestions.length}',
+                    style: const TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${accuracy.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Performance Stats
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Performance Breakdown',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          Text(
+                            correct.toString(),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.green,
+                            ),
+                          ),
+                          const Text(
+                            'Correct',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            wrong.toString(),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.red,
+                            ),
+                          ),
+                          const Text(
+                            'Wrong',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            unattempted.toString(),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const Text(
+                            'Unattempted',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Review Section with Page Dots
+            _buildReviewSection(),
+
+            const SizedBox(height: 24),
+
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Back'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => setState(() => _showResults = false),
+                    child: const Text('Review Answers'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Answer Review',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 380,
+          child: PageView.builder(
+            controller: _reviewController,
+            onPageChanged: (_) => setState(() {}),
+            itemCount: practiceQuestions.length,
+            itemBuilder: (context, index) => _buildPracticeReviewCard(index),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            practiceQuestions.length,
+            (index) => Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _reviewController.hasClients &&
+                       _reviewController.page!.round() == index
+                    ? AppColors.primary
+                    : AppColors.border,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPracticeReviewCard(int index) {
+    final question = practiceQuestions[index];
+    final userAnswer = userAnswers[index];
+    final isCorrect = userAnswer == question.correctAnswer;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Question ${index + 1}',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                Icon(
+                  isCorrect ? Icons.check_circle : Icons.cancel,
+                  color: isCorrect ? Colors.green : Colors.red,
+                  size: 20,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              question.questionText,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            if (userAnswer != null)
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.close, color: Colors.red, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Your Answer', style: TextStyle(fontSize: 11, color: Colors.red)),
+                          Text(userAnswer, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check, color: Colors.green, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Correct Answer', style: TextStyle(fontSize: 11, color: Colors.green)),
+                        Text(question.correctAnswer, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (question.explanation != null && question.explanation!.isNotEmpty) ...[
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.lightbulb_outline, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  const Text('Explanation', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                question.explanation!,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -595,13 +941,67 @@ class PracticeExplanationScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Text(
-                question.explanation ?? 'No explanation available',
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.6,
-                  color: AppColors.textPrimary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    question.explanation ?? 'No explanation available',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.6,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  // Display multiple explanation images
+                  if (question.explanationImages.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    ...question.explanationImages.map((img) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (img.caption?.isNotEmpty ?? false) ...[
+                              Text(
+                                img.caption!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                            ],
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                img.imageUrl,
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.low,
+                                loadingBuilder: (context, child, progress) {
+                                  if (progress == null) return child;
+                                  return Container(
+                                    height: 200,
+                                    alignment: Alignment.center,
+                                    color: Colors.grey.shade200,
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (ctx, err, stack) => Container(
+                                  height: 120,
+                                  alignment: Alignment.center,
+                                  color: Colors.grey.shade100,
+                                  child: const Text('Image unavailable'),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ],
               ),
             ),
 
@@ -673,6 +1073,7 @@ class PracticeQuestion {
   final String correctAnswer;
   final String topic;
   final String? explanation;
+  final List<ExplanationImage> explanationImages;
 
   PracticeQuestion({
     required this.id,
@@ -681,5 +1082,30 @@ class PracticeQuestion {
     required this.correctAnswer,
     required this.topic,
     this.explanation,
+    this.explanationImages = const [],
   });
+}
+
+/// Model for Explanation Images
+class ExplanationImage {
+  final int id;
+  final String imageUrl;
+  final String? caption;
+  final int orderIndex;
+
+  ExplanationImage({
+    required this.id,
+    required this.imageUrl,
+    this.caption,
+    required this.orderIndex,
+  });
+
+  factory ExplanationImage.fromJson(Map<String, dynamic> json) {
+    return ExplanationImage(
+      id: json['id'] ?? 0,
+      imageUrl: json['image_url'] ?? json['image_drive_link'] ?? '',
+      caption: json['caption'],
+      orderIndex: json['order_index'] ?? 0,
+    );
+  }
 }

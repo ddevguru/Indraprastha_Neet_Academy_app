@@ -1907,4 +1907,140 @@ router.delete('/mcqs/:id', adminAuth, async (req, res) => {
   }
 });
 
+// ============================================================
+// EXPLANATION IMAGES ROUTES - Multiple images per question
+// ============================================================
+
+router.post('/explanation-images', adminAuth, upload.single('image'), async (req, res) => {
+  try {
+    const { questionType, questionId, caption, batchId, classLabel, subject, topic } = req.body;
+
+    if (!questionType || !questionId) {
+      return res.status(400).json({ error: 'questionType and questionId are required' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'image file is required' });
+    }
+
+    const uploaded = await uploadQuestionImageByHierarchy({
+      file: req.file,
+      batchId: parseInt(batchId) || 1,
+      classLabel: classLabel || '',
+      subject: subject || '',
+      topic: topic || 'Explanations',
+      contentType: 'explanation',
+      contentId: questionId,
+    });
+
+    // Determine which column to update based on question type
+    const columnMapping = {
+      'pyq': 'pyq_id',
+      'practice_question': 'practice_question_id',
+      'test_question': 'test_question_id',
+      'daily_mcq': 'daily_mcq_id',
+    };
+
+    const foreignKeyColumn = columnMapping[questionType];
+    if (!foreignKeyColumn) {
+      return res.status(400).json({ error: 'Invalid questionType' });
+    }
+
+    // Get max order index
+    const orderResult = await pool.query(
+      `SELECT COALESCE(MAX(order_index), 0) + 1 as next_order FROM explanation_images WHERE ${foreignKeyColumn} = $1`,
+      [questionId]
+    );
+    const nextOrder = orderResult.rows[0]?.next_order || 1;
+
+    // Insert explanation image
+    const result = await pool.query(
+      `INSERT INTO explanation_images (${foreignKeyColumn}, image_url, image_drive_file_id, image_drive_link, caption, order_index)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, image_url, image_drive_file_id, image_drive_link, caption, order_index`,
+      [
+        questionId,
+        uploaded.driveLink,
+        uploaded.driveFileId,
+        uploaded.driveLink,
+        caption || '',
+        nextOrder,
+      ]
+    );
+
+    return res.json({ success: true, explanationImage: result.rows[0] });
+  } catch (e) {
+    logAdminRouteError('/explanation-images POST', e, { adminId: req.admin?.id });
+    return res.status(500).json({ error: e.message || 'Failed to add explanation image' });
+  }
+});
+
+router.get('/questions/:questionType/:questionId/explanations', adminAuth, async (req, res) => {
+  try {
+    const { questionType, questionId } = req.params;
+
+    const columnMapping = {
+      'pyq': 'pyq_id',
+      'practice_question': 'practice_question_id',
+      'test_question': 'test_question_id',
+      'daily_mcq': 'daily_mcq_id',
+    };
+
+    const foreignKeyColumn = columnMapping[questionType];
+    if (!foreignKeyColumn) {
+      return res.status(400).json({ error: 'Invalid questionType' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, image_url, image_drive_file_id, image_drive_link, caption, order_index
+       FROM explanation_images
+       WHERE ${foreignKeyColumn} = $1
+       ORDER BY order_index ASC`,
+      [questionId]
+    );
+
+    return res.json({ success: true, explanationImages: result.rows });
+  } catch (e) {
+    logAdminRouteError('/questions/:questionType/:questionId/explanations GET', e);
+    return res.status(500).json({ error: e.message || 'Failed to fetch explanation images' });
+  }
+});
+
+router.delete('/explanation-images/:imageId', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM explanation_images WHERE id = $1 RETURNING id',
+      [req.params.imageId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Explanation image not found' });
+    }
+
+    return res.json({ success: true, message: 'Explanation image deleted successfully' });
+  } catch (e) {
+    logAdminRouteError('/explanation-images/:imageId DELETE', e, { adminId: req.admin?.id });
+    return res.status(500).json({ error: e.message || 'Failed to delete explanation image' });
+  }
+});
+
+router.put('/explanation-images/:imageId', adminAuth, async (req, res) => {
+  try {
+    const { caption } = req.body;
+    const result = await pool.query(
+      'UPDATE explanation_images SET caption = COALESCE($2, caption), updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+      [req.params.imageId, caption]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Explanation image not found' });
+    }
+
+    return res.json({ success: true, explanationImage: result.rows[0] });
+  } catch (e) {
+    logAdminRouteError('/explanation-images/:imageId PUT', e, { adminId: req.admin?.id });
+    return res.status(500).json({ error: e.message || 'Failed to update explanation image' });
+  }
+});
+
 module.exports = router;
