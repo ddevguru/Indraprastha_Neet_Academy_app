@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool } = require('../db');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware } = require('./auth');
 const {
   RAZORPAY_KEY_ID,
   createRazorpayOrder,
