@@ -872,6 +872,7 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
     explanation,
     yearLabel,
     questionImageLink,
+    explanationImageLink,
   } =
     req.body;
   const chapterCheck = await pool.query(
@@ -888,8 +889,8 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
   }
   const result = await pool.query(
     `INSERT INTO pyqs (
-      chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
     [
       chapterId,
       question,
@@ -902,6 +903,9 @@ router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
       yearLabel || 'NEET',
       normalizeDriveLink(questionImageLink || '', 'image'),
       extractDriveFileId(questionImageLink || ''),
+      '',
+      normalizeDriveLink(explanationImageLink || '', 'image'),
+      extractDriveFileId(explanationImageLink || ''),
       '',
     ]
   );
@@ -930,6 +934,7 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
     explanation,
     yearLabel,
     questionImageLink,
+    explanationImageLink,
   } = req.body;
   const result = await pool.query(
     `UPDATE pyqs
@@ -943,7 +948,10 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
          year_label = COALESCE($9, year_label),
          question_image_link = COALESCE($10, question_image_link),
          question_image_drive_file_id = COALESCE($11, question_image_drive_file_id),
-         question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id)
+         question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id),
+         explanation_image_link = COALESCE($13, explanation_image_link),
+         explanation_image_drive_file_id = COALESCE($14, explanation_image_drive_file_id),
+         explanation_image_drive_folder_id = COALESCE($15, explanation_image_drive_folder_id)
      WHERE id = $1
      RETURNING *`,
     [
@@ -958,6 +966,9 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
       yearLabel,
       questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
       questionImageLink == null ? null : extractDriveFileId(questionImageLink),
+      null,
+      explanationImageLink == null ? null : normalizeDriveLink(explanationImageLink, 'image'),
+      explanationImageLink == null ? null : extractDriveFileId(explanationImageLink),
       null,
     ]
   );
@@ -976,8 +987,8 @@ router.post('/practice-sets', adminAuth, async (req, res) => {
   const { title, difficulty, estimatedMinutes } = req.body;
   const { batchId, classLabel, subject, topic } = hierarchyFromBody(req.body);
   const result = await pool.query(
-    `INSERT INTO practice_sets (batch_id, class_label, subject, title, topic, difficulty, estimated_minutes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO practice_sets (batch_id, class_label, subject, title, topic, difficulty, estimated_minutes, source_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'topic_mcq')
      RETURNING *`,
     [batchId, classLabel, subject, title, topic, difficulty || 'Moderate', estimatedMinutes || 20]
   );
@@ -1102,7 +1113,7 @@ router.post('/practice-sets/:setId/questions/batch', adminAuth, async (req, res)
 // Single insert (keep existing for backward compatibility)
 router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
   try {
-    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink } =
+    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink } =
       req.body;
 
     // Validation
@@ -1122,8 +1133,8 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO practice_questions (
-        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [
         req.params.setId,
         question,
@@ -1135,6 +1146,9 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
         explanation || '',
         normalizeDriveLink(questionImageLink || '', 'image'),
         extractDriveFileId(questionImageLink || ''),
+        '',
+        normalizeDriveLink(explanationImageLink || '', 'image'),
+        extractDriveFileId(explanationImageLink || ''),
         '',
       ]
     );
@@ -1168,7 +1182,7 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
 });
 
 router.put('/practice-questions/:id', adminAuth, async (req, res) => {
-  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink } =
+  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink } =
     req.body;
   const result = await pool.query(
     `UPDATE practice_questions
@@ -1181,7 +1195,10 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
          explanation = COALESCE($8, explanation),
          question_image_link = COALESCE($9, question_image_link),
          question_image_drive_file_id = COALESCE($10, question_image_drive_file_id),
-         question_image_drive_folder_id = COALESCE($11, question_image_drive_folder_id)
+         question_image_drive_folder_id = COALESCE($11, question_image_drive_folder_id),
+         explanation_image_link = COALESCE($12, explanation_image_link),
+         explanation_image_drive_file_id = COALESCE($13, explanation_image_drive_file_id),
+         explanation_image_drive_folder_id = COALESCE($14, explanation_image_drive_folder_id)
      WHERE id = $1
      RETURNING *`,
     [
@@ -1195,6 +1212,9 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
       explanation,
       questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
       questionImageLink == null ? null : extractDriveFileId(questionImageLink),
+      null,
+      explanationImageLink == null ? null : normalizeDriveLink(explanationImageLink, 'image'),
+      explanationImageLink == null ? null : extractDriveFileId(explanationImageLink),
       null,
     ]
   );
@@ -1307,12 +1327,13 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
     correctOption,
     explanation,
     questionImageLink,
+    explanationImageLink,
   } =
     req.body;
   const result = await pool.query(
     `INSERT INTO test_questions (
-      test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
     [
       req.params.testId,
       subject || 'Biology',
@@ -1325,6 +1346,9 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
       explanation || '',
       normalizeDriveLink(questionImageLink || '', 'image'),
       extractDriveFileId(questionImageLink || ''),
+      '',
+      normalizeDriveLink(explanationImageLink || '', 'image'),
+      extractDriveFileId(explanationImageLink || ''),
       '',
     ]
   );
@@ -1342,6 +1366,7 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
     correctOption,
     explanation,
     questionImageLink,
+    explanationImageLink,
   } =
     req.body;
   const result = await pool.query(
@@ -1356,7 +1381,10 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
          explanation = COALESCE($9, explanation),
          question_image_link = COALESCE($10, question_image_link),
          question_image_drive_file_id = COALESCE($11, question_image_drive_file_id),
-         question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id)
+         question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id),
+         explanation_image_link = COALESCE($13, explanation_image_link),
+         explanation_image_drive_file_id = COALESCE($14, explanation_image_drive_file_id),
+         explanation_image_drive_folder_id = COALESCE($15, explanation_image_drive_folder_id)
      WHERE id = $1
      RETURNING *`,
     [
@@ -1371,6 +1399,9 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
       explanation,
       questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
       questionImageLink == null ? null : extractDriveFileId(questionImageLink),
+      null,
+      explanationImageLink == null ? null : normalizeDriveLink(explanationImageLink, 'image'),
+      explanationImageLink == null ? null : extractDriveFileId(explanationImageLink),
       null,
     ]
   );

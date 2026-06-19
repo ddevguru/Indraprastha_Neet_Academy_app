@@ -8,47 +8,7 @@ import '../../models/app_models.dart';
 import '../../models/daily_mcq_item.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
-
-String _resolveDriveUrl(String raw) {
-  final uri = Uri.tryParse(raw.trim());
-  if (uri == null) return raw;
-  String? id = uri.queryParameters['id'];
-  if (id == null || id.isEmpty) {
-    final parts = uri.pathSegments;
-    final idx = parts.indexOf('file');
-    if (idx >= 0 && idx + 2 < parts.length && parts[idx + 1] == 'd') {
-      id = parts[idx + 2];
-    }
-  }
-  if (id == null || id.isEmpty) return raw;
-  return 'https://drive.google.com/uc?export=view&id=$id';
-}
-
-Widget _buildExplanationImage(String rawUrl) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(AppRadii.md),
-    child: Image.network(
-      _resolveDriveUrl(rawUrl),
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.low,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(
-          height: 160,
-          alignment: Alignment.center,
-          color: AppColors.surfaceMuted,
-          child: const CircularProgressIndicator(strokeWidth: 2),
-        );
-      },
-      errorBuilder: (ctx, err, st) => Container(
-        height: 80,
-        alignment: Alignment.center,
-        color: AppColors.surfaceMuted,
-        child: const Text('Image unavailable'),
-      ),
-    ),
-  );
-}
+import '../../widgets/paginated_answer_review.dart';
 
 class TodaysMcqTestPreviewScreen extends ConsumerWidget {
   const TodaysMcqTestPreviewScreen({super.key});
@@ -237,6 +197,31 @@ class _PreviewRow extends StatelessWidget {
 
 typedef _AttemptRecord = ({DailyMcqItem item, int? selected, int correct});
 
+const _mcqFallbackOptions = [
+  'Only the first statement is correct',
+  'Only the second statement is correct',
+  'Both statements are correct',
+  'Neither statement is correct',
+];
+
+List<AnswerReviewEntry> _mcqReviewEntries(List<_AttemptRecord> history) {
+  return history.map((rec) {
+    final options =
+        rec.item.hasRealOptions ? rec.item.options : _mcqFallbackOptions;
+    final subtitle = rec.item.subject.label +
+        (rec.item.chapterTitle.isNotEmpty ? ' · ${rec.item.chapterTitle}' : '');
+    return AnswerReviewEntry(
+      questionText: rec.item.preview,
+      options: options,
+      correctIndex: rec.correct,
+      selectedIndex: rec.selected,
+      explanation: rec.item.explanation,
+      explanationImageUrl: rec.item.explanationImageLink,
+      subtitle: subtitle,
+    );
+  }).toList();
+}
+
 class TodaysMcqTestAttemptScreen extends ConsumerStatefulWidget {
   const TodaysMcqTestAttemptScreen({super.key});
 
@@ -255,12 +240,7 @@ class _TodaysMcqTestAttemptScreenState
   bool _finished = false;
   final List<_AttemptRecord> _history = [];
 
-  static const _fallbackOptions = [
-    'Only the first statement is correct',
-    'Only the second statement is correct',
-    'Both statements are correct',
-    'Neither statement is correct',
-  ];
+  static const _fallbackOptions = _mcqFallbackOptions;
 
   List<String> _optionsFor(DailyMcqItem item) =>
       item.hasRealOptions ? item.options : _fallbackOptions;
@@ -480,39 +460,6 @@ class _TodaysMcqTestAttemptScreenState
                         ),
                       );
                     }),
-                    if (_submitted &&
-                        ((item.explanation != null && item.explanation!.isNotEmpty) ||
-                         (item.explanationImageLink != null && item.explanationImageLink!.isNotEmpty))) ...[
-                      const Divider(height: AppSpacing.xl),
-                      Row(
-                        children: [
-                          const Icon(Icons.lightbulb_outline_rounded,
-                              size: 18, color: AppColors.indigo),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            'Explanation',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(color: AppColors.indigo),
-                          ),
-                        ],
-                      ),
-                      if (item.explanation != null && item.explanation!.isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          item.explanation!,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(height: 1.5),
-                        ),
-                      ],
-                      if (item.explanationImageLink != null && item.explanationImageLink!.isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        _buildExplanationImage(item.explanationImageLink!),
-                      ],
-                    ],
                   ],
                 ),
               ),
@@ -636,132 +583,23 @@ class _McqResultScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.xl),
-              Text(
-                'Answer Review',
-                style: Theme.of(context).textTheme.titleLarge,
+              PrimaryButton(
+                label: 'Review answers',
+                expanded: true,
+                icon: Icons.fact_check_rounded,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PaginatedAnswerReviewScreen(
+                        title: 'MCQ Review',
+                        items: _mcqReviewEntries(history),
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: AppSpacing.md),
-              ...history.asMap().entries.map((e) {
-                final idx = e.key;
-                final rec = e.value;
-                final isCorrect = rec.selected == rec.correct;
-                final wasAttempted = rec.selected != null;
-                final options = rec.item.hasRealOptions
-                    ? rec.item.options
-                    : const [
-                        'Only the first statement is correct',
-                        'Only the second statement is correct',
-                        'Both statements are correct',
-                        'Neither statement is correct',
-                      ];
-                final correctLabel = rec.correct < options.length
-                    ? options[rec.correct]
-                    : '—';
-                final selectedLabel = wasAttempted && rec.selected! < options.length
-                    ? options[rec.selected!]
-                    : '—';
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: SurfaceCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.sm,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.indigoSoft,
-                                borderRadius: BorderRadius.circular(99),
-                              ),
-                              child: Text(
-                                'Q${idx + 1}',
-                                style: const TextStyle(
-                                  color: AppColors.indigo,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Text(
-                                rec.item.subject.label +
-                                    (rec.item.chapterTitle.isNotEmpty
-                                        ? ' · ${rec.item.chapterTitle}'
-                                        : ''),
-                                style: Theme.of(context).textTheme.labelMedium,
-                              ),
-                            ),
-                            Icon(
-                              isCorrect
-                                  ? Icons.check_circle_rounded
-                                  : Icons.cancel_rounded,
-                              color: isCorrect ? Colors.green : Colors.red,
-                              size: 20,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          rec.item.preview,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        if (!isCorrect) ...[
-                          _ReviewRow(
-                            label: 'Your answer',
-                            value: selectedLabel,
-                            color: Colors.red,
-                            icon: Icons.close_rounded,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                        ],
-                        _ReviewRow(
-                          label: 'Correct answer',
-                          value: correctLabel,
-                          color: Colors.green,
-                          icon: Icons.check_rounded,
-                        ),
-                        if ((rec.item.explanation != null && rec.item.explanation!.isNotEmpty) ||
-                            (rec.item.explanationImageLink != null && rec.item.explanationImageLink!.isNotEmpty)) ...[
-                          const SizedBox(height: AppSpacing.sm),
-                          const Divider(height: 1),
-                          const SizedBox(height: AppSpacing.sm),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(Icons.lightbulb_outline_rounded,
-                                  size: 16, color: AppColors.indigo),
-                              const SizedBox(width: AppSpacing.xs),
-                              if (rec.item.explanation != null && rec.item.explanation!.isNotEmpty)
-                                Expanded(
-                                  child: Text(
-                                    rec.item.explanation!,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(height: 1.45),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          if (rec.item.explanationImageLink != null && rec.item.explanationImageLink!.isNotEmpty) ...[
-                            const SizedBox(height: AppSpacing.sm),
-                            _buildExplanationImage(rec.item.explanationImageLink!),
-                          ],
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              }),
-              const SizedBox(height: AppSpacing.lg),
               PrimaryButton(
                 label: 'Back to Home',
                 expanded: true,
@@ -773,47 +611,6 @@ class _McqResultScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ReviewRow extends StatelessWidget {
-  const _ReviewRow({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: AppSpacing.xs),
-        Text(
-          '$label: ',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600, color: color),
-          ),
-        ),
-      ],
     );
   }
 }

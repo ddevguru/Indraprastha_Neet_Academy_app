@@ -7,9 +7,66 @@ import '../../models/app_models.dart';
 import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import 'payment_checkout_screen.dart';
 
 class SubscriptionsScreen extends ConsumerWidget {
   const SubscriptionsScreen({super.key});
+
+  Future<void> _startCheckout(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> raw,
+    SubscriptionPlan plan,
+  ) async {
+    final packageId = (raw['id'] as num?)?.toInt();
+    if (packageId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid package.')),
+      );
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Creating payment order...')),
+      );
+      final order = await ContentRepository().createPaymentOrder(packageId);
+      final orderId = order['orderId']?.toString() ?? '';
+      final razorpayOrderId = order['razorpayOrderId']?.toString() ?? '';
+      final keyId = order['keyId']?.toString() ?? '';
+      if (orderId.isEmpty || razorpayOrderId.isEmpty || keyId.isEmpty) {
+        throw Exception('Payment order not created');
+      }
+      if (!context.mounted) return;
+      final verifyResult = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentCheckoutScreen(
+            packageName: plan.name,
+            amountInr: (order['amountInr'] as num?)?.toDouble() ?? 0,
+            orderId: orderId,
+            razorpayOrderId: razorpayOrderId,
+            keyId: keyId,
+            customerPhone: order['customerPhone']?.toString() ?? '',
+            customerName: order['customerName']?.toString() ?? 'Student',
+          ),
+        ),
+      );
+      if (verifyResult?['paid'] == true) {
+        ref.read(appUiControllerProvider.notifier).activateSubscription(plan.name);
+        if (!context.mounted) return;
+        messenger.showSnackBar(
+          SnackBar(content: Text('${plan.name} activated successfully.')),
+        );
+        context.go('/dashboard/0');
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Payment failed: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -29,7 +86,7 @@ class SubscriptionsScreen extends ConsumerWidget {
               const SectionHeader(
                 title: 'Choose your plan',
                 subtitle:
-                    'Tap a plan to activate it (demo). Only subscribed users can use the rest of the app.',
+                    'Secure payment via Razorpay. After payment, your subscription activates automatically.',
               ),
               const SizedBox(height: AppSpacing.xl),
               FutureBuilder<List<Map<String, dynamic>>>(
@@ -38,7 +95,8 @@ class SubscriptionsScreen extends ConsumerWidget {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const SkeletonLoader(cardCount: 3);
                   }
-                  final plans = (snapshot.data ?? const [])
+                  final rawPlans = snapshot.data ?? const [];
+                  final plans = rawPlans
                       .map(
                         (item) => SubscriptionPlan(
                           name: item['name']?.toString() ?? 'Plan',
@@ -81,20 +139,11 @@ class SubscriptionsScreen extends ConsumerWidget {
                         ),
                         itemBuilder: (context, index) {
                           final plan = plans[index];
+                          final raw = rawPlans[index];
                           return PlanCard(
                             plan: plan,
                             active: ui.hasActiveSubscription && activePlan == plan.name,
-                            onSelect: () {
-                              ref
-                                  .read(appUiControllerProvider.notifier)
-                                  .activateSubscription(plan.name);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${plan.name} activated.'),
-                                ),
-                              );
-                              context.go('/dashboard/0');
-                            },
+                            onSelect: () => _startCheckout(context, ref, raw, plan),
                           );
                         },
                       );
@@ -123,7 +172,6 @@ class SubscriptionsScreen extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 class _ComparePlansTable extends StatelessWidget {

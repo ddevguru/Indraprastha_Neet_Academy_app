@@ -9,6 +9,7 @@ import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/paginated_answer_review.dart';
 
 String _resolveDriveImageUrl(String raw) {
   final value = raw.trim();
@@ -485,8 +486,28 @@ class _PyqSolvePanel extends StatefulWidget {
 }
 
 class _PyqSolvePanelState extends State<_PyqSolvePanel> {
-  final Map<int, String> _selected = {};
-  final Set<int> _revealed = {};
+  int _index = 0;
+  final Map<int, String> _answers = {};
+  bool _submitted = false;
+
+  void _openReview() {
+    final items = List.generate(
+      widget.pyqs.length,
+      (i) => AnswerReviewEntry.fromAbcdMap(
+        question: widget.pyqs[i],
+        index: i,
+        selectedOption: _answers[i],
+      ),
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PaginatedAnswerReviewScreen(
+          title: 'PYQ Review',
+          items: items,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -497,102 +518,200 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
         bullets: ['Admin panel se PYQs add hone ke baad yahan solve kar sakte ho.'],
       );
     }
-    return SizedBox.expand(
-      child: SurfaceCard(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: ListView.builder(
-          itemCount: widget.pyqs.length,
-        itemBuilder: (context, index) {
-          final q = widget.pyqs[index];
-          final correct = (q['correct_option']?.toString() ?? 'A').toUpperCase();
-          final opts = {
-            'A': q['option_a']?.toString() ?? '',
-            'B': q['option_b']?.toString() ?? '',
-            'C': q['option_c']?.toString() ?? '',
-            'D': q['option_d']?.toString() ?? '',
-          };
-          final selected = _selected[index];
-          final revealed = _revealed.contains(index);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Q${index + 1}. ${q['question'] ?? ''}',
-                    style: Theme.of(context).textTheme.titleMedium),
-                if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  _buildQuestionImage(q['question_image_link'].toString()),
-                ],
-                const SizedBox(height: AppSpacing.sm),
-                ...opts.entries.map((e) {
-                  final isSel = selected == e.key;
-                  final isCorrect = revealed && e.key == correct;
-                  final isWrong = revealed && isSel && e.key != correct;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: InkWell(
-                      onTap: () => setState(() => _selected[index] = e.key),
-                      borderRadius: BorderRadius.circular(AppRadii.md),
-                      child: Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        decoration: BoxDecoration(
-                          color: isCorrect
-                              ? const Color(0xFFE7F8EF)
-                              : isWrong
-                                  ? const Color(0xFFFCEAEA)
-                                  : isSel
-                                      ? AppColors.indigoSoft
-                                      : Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(AppRadii.md),
-                          border: Border.all(
-                            color: isCorrect
-                                ? AppColors.success
-                                : isWrong
-                                    ? AppColors.danger
-                                    : isSel
-                                        ? AppColors.indigo
-                                        : AppColors.border,
-                          ),
-                        ),
-                        child: Text('${e.key}) ${e.value}'),
+
+    if (_submitted) {
+      var correct = 0;
+      for (var i = 0; i < widget.pyqs.length; i++) {
+        final marked = _answers[i]?.toUpperCase();
+        final actual =
+            widget.pyqs[i]['correct_option']?.toString().toUpperCase() ?? '';
+        if (marked == actual) correct++;
+      }
+      final wrong = _answers.length - correct;
+      final unattempted = widget.pyqs.length - _answers.length;
+      final accuracy =
+          widget.pyqs.isEmpty ? 0.0 : (correct / widget.pyqs.length) * 100;
+
+      return SizedBox.expand(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                decoration: BoxDecoration(
+                  gradient: AppGradients.primary,
+                  borderRadius: BorderRadius.circular(AppRadii.xl),
+                  boxShadow: AppShadows.soft,
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      '$correct/${widget.pyqs.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 48,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
                       ),
                     ),
-                  );
-                }),
-                const SizedBox(height: AppSpacing.xs),
-                Row(
-                  children: [
-                    Expanded(
-                      child: PrimaryButton(
-                        label: revealed ? 'Hide answer' : 'Check answer',
-                        onPressed: () => setState(() {
-                          if (revealed) {
-                            _revealed.remove(index);
-                          } else {
-                            _revealed.add(index);
-                          }
-                        }),
-                      ),
+                    const SizedBox(height: AppSpacing.xs),
+                    const Text(
+                      'Correct answers',
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
                     ),
                   ],
                 ),
-                if (revealed) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  if ((q['explanation']?.toString() ?? '').isNotEmpty)
-                    Text(
-                      'Explanation: ${q['explanation']}',
-                      style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatCard(
+                      title: 'Correct',
+                      value: '$correct',
+                      subtitle: 'questions',
+                      icon: Icons.check_circle_outline_rounded,
                     ),
-                  if ((q['explanation_image_link']?.toString() ?? '').isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildQuestionImage(q['explanation_image_link'].toString()),
-                  ],
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: StatCard(
+                      title: 'Wrong',
+                      value: '$wrong',
+                      subtitle: 'questions',
+                      icon: Icons.cancel_outlined,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: StatCard(
+                      title: 'Accuracy',
+                      value: '${accuracy.toStringAsFixed(0)}%',
+                      subtitle: 'overall',
+                      icon: Icons.percent_rounded,
+                    ),
+                  ),
                 ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Correct: $correct  •  Wrong: $wrong  •  Skipped: $unattempted',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              PrimaryButton(
+                label: 'Review answers',
+                expanded: true,
+                icon: Icons.fact_check_rounded,
+                onPressed: _openReview,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SecondaryButton(
+                label: 'Solve again',
+                expanded: true,
+                onPressed: () => setState(() {
+                  _submitted = false;
+                  _index = 0;
+                  _answers.clear();
+                }),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final q = widget.pyqs[_index.clamp(0, widget.pyqs.length - 1)];
+    final selected = _answers[_index];
+    final options = <String, String>{
+      'A': q['option_a']?.toString() ?? '',
+      'B': q['option_b']?.toString() ?? '',
+      'C': q['option_c']?.toString() ?? '',
+      'D': q['option_d']?.toString() ?? '',
+    };
+
+    return SizedBox.expand(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            StatCard(
+              title: 'Progress',
+              value: '${_index + 1}/${widget.pyqs.length}',
+              subtitle: 'Chapter PYQs',
+              icon: Icons.timelapse_rounded,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Q${_index + 1}. ${q['question'] ?? ''}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _buildQuestionImage(q['question_image_link'].toString()),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  ...options.entries.map((e) {
+                    final isSel = selected == e.key;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: InkWell(
+                        onTap: () => setState(() => _answers[_index] = e.key),
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: isSel
+                                ? AppColors.indigoSoft
+                                : Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            border: Border.all(
+                              color: isSel ? AppColors.indigo : AppColors.border,
+                            ),
+                          ),
+                          child: Text('${e.key}) ${e.value}'),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: SecondaryButton(
+                    label: 'Previous',
+                    onPressed: _index == 0 ? null : () => setState(() => _index--),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: PrimaryButton(
+                    label: _index == widget.pyqs.length - 1
+                        ? 'Submit PYQs'
+                        : 'Next',
+                    onPressed: () {
+                      if (_index < widget.pyqs.length - 1) {
+                        setState(() => _index++);
+                      } else {
+                        setState(() => _submitted = true);
+                      }
+                    },
+                  ),
+                ),
               ],
             ),
-          );
-        },
+          ],
         ),
       ),
     );

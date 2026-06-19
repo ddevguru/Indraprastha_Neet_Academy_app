@@ -105,6 +105,56 @@ class ContentRepository {
     return List<Map<String, dynamic>>.from(data['packages'] as List<dynamic>);
   }
 
+  Future<Map<String, dynamic>> createPaymentOrder(int packageId) async {
+    final token = await _token;
+    if (token == null) throw Exception('Not logged in. Please login again.');
+    final response = await _client.post(
+      Uri.parse('$baseUrl/payments/create-order'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'packageId': packageId}),
+    );
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return body;
+    }
+    throw Exception(body['error']?.toString() ?? 'Failed to create payment order');
+  }
+
+  Future<Map<String, dynamic>> verifyPayment({
+    required String orderId,
+    String? razorpayPaymentId,
+    String? razorpayOrderId,
+    String? razorpaySignature,
+  }) async {
+    final token = await _token;
+    if (token == null) throw Exception('Not logged in. Please login again.');
+    final response = await _client.post(
+      Uri.parse('$baseUrl/payments/verify'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'orderId': orderId,
+        if (razorpayPaymentId != null) 'razorpayPaymentId': razorpayPaymentId,
+        if (razorpayOrderId != null) 'razorpayOrderId': razorpayOrderId,
+        if (razorpaySignature != null) 'razorpaySignature': razorpaySignature,
+      }),
+    );
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return body;
+    }
+    throw Exception(body['error']?.toString() ?? 'Payment verification failed');
+  }
+
   Future<void> registerFcmToken(String token) async {
     final authToken = await _token;
     if (authToken == null || token.isEmpty) return;

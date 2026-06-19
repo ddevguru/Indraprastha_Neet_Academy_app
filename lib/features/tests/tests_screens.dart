@@ -7,6 +7,7 @@ import '../content/data/content_repository.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/paginated_answer_review.dart';
 
 String _resolveDriveImageUrl(String raw) {
   final value = raw.trim();
@@ -434,16 +435,25 @@ class _TestResultScreenState extends State<TestResultScreen> {
                             label: 'Review answers',
                             expanded: true,
                             icon: Icons.fact_check_rounded,
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => _AnswerReviewScreen(
-                                  questions: questions,
-                                  answers: _answers,
-                                  testTitle: test['title']?.toString() ?? 'Test',
+                            onPressed: () {
+                              final items = List.generate(
+                                questions.length,
+                                (i) => AnswerReviewEntry.fromAbcdMap(
+                                  question: questions[i],
+                                  index: i,
+                                  selectedOption: _answers[i],
                                 ),
-                              ),
-                            ),
+                              );
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PaginatedAnswerReviewScreen(
+                                    title: 'Review Answers',
+                                    items: items,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -855,179 +865,6 @@ class _AiInsightsPanel extends StatelessWidget {
             );
           }),
         ],
-      ),
-    );
-  }
-}
-
-class _AnswerReviewScreen extends StatelessWidget {
-  const _AnswerReviewScreen({
-    required this.questions,
-    required this.answers,
-    required this.testTitle,
-  });
-
-  final List<Map<String, dynamic>> questions;
-  final Map<int, String> answers;
-  final String testTitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Review Answers'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: CenteredContent(
-          maxWidth: 980,
-          child: SurfaceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Answer Review', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: AppSpacing.sm),
-                Text(testTitle, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: AppSpacing.lg),
-                ...List.generate(questions.length, (i) {
-                  final q = questions[i];
-                  final selected = answers[i]?.toUpperCase();
-                  final correct = q['correct_option']?.toString().toUpperCase() ?? '';
-                  final options = <String, String>{
-                    'A': q['option_a']?.toString() ?? '',
-                    'B': q['option_b']?.toString() ?? '',
-                    'C': q['option_c']?.toString() ?? '',
-                    'D': q['option_d']?.toString() ?? '',
-                  };
-                  final isCorrect = selected != null && selected == correct;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Q${i + 1}. ${q['question'] ?? ''}',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: options.entries.map((e) {
-                            final key = e.key;
-                            final val = e.value;
-                            final isSel = selected == key;
-                            final isRight = key == correct;
-                            Color bg = Theme.of(context).cardColor;
-                            Color border = AppColors.border;
-                            if (isRight) {
-                              bg = const Color(0xFFE7F8EF);
-                              border = AppColors.success;
-                            } else if (isSel && !isRight) {
-                              bg = const Color(0xFFFCEAEA);
-                              border = AppColors.danger;
-                            }
-                            return Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: bg,
-                                borderRadius: BorderRadius.circular(AppRadii.md),
-                                border: Border.all(color: border),
-                              ),
-                              child: Text('$key) $val'),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          selected == null
-                              ? 'Your answer: Not attempted'
-                              : 'Your answer: $selected  •  ${isCorrect ? "Correct" : "Wrong"}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: selected == null
-                                ? AppColors.textSecondary
-                                : (isCorrect ? AppColors.success : AppColors.danger),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        if ((q['explanation']?.toString() ?? '').isNotEmpty ||
-                            (q['explanation_image_link']?.toString() ?? '').isNotEmpty ||
-                            ((q['explanation_images_list'] as List?)?.isNotEmpty ?? false))
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0x1AF59E0B)
-                                  : const Color(0xFFFFFBEB),
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                              border: Border.all(
-                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Row(
-                                  children: [
-                                    Icon(Icons.lightbulb_rounded,
-                                        color: Color(0xFFF59E0B), size: 16),
-                                    SizedBox(width: 6),
-                                    Text('Explanation',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            color: Color(0xFFF59E0B))),
-                                  ],
-                                ),
-                                if ((q['explanation']?.toString() ?? '').isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  Text(q['explanation'].toString()),
-                                ],
-                                if ((q['explanation_image_link']?.toString() ?? '').isNotEmpty) ...[
-                                  const SizedBox(height: 10),
-                                  _buildQuestionImage(q['explanation_image_link'].toString()),
-                                ],
-                                // Display multiple explanation images
-                                if ((q['explanation_images_list'] as List?)?.isNotEmpty ?? false) ...[
-                                  const SizedBox(height: 10),
-                                  ...((q['explanation_images_list'] as List?) ?? []).map((imgData) {
-                                    final img = imgData as Map<dynamic, dynamic>?;
-                                    final caption = img?['caption']?.toString() ?? '';
-                                    final imageUrl = img?['image_url']?.toString() ?? img?['image_drive_link']?.toString() ?? '';
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 10),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (caption.isNotEmpty) ...[
-                                            Text(
-                                              caption,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 6),
-                                          ],
-                                          if (imageUrl.isNotEmpty)
-                                            _buildQuestionImage(imageUrl),
-                                        ],
-                                      ),
-                                    );
-                                  }),
-                                ],
-                              ],
-                            ),
-                          ),
-                        const Divider(height: 24),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

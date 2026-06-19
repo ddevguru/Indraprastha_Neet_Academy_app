@@ -8,6 +8,7 @@ import '../content/data/content_repository.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/paginated_answer_review.dart';
 
 String _resolveDriveImageUrl(String raw) {
   final value = raw.trim();
@@ -214,40 +215,193 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   int _currentIndex = 0;
   int? _selectedOption;
   bool _submitted = false;
-  late final Future<Map<String, dynamic>> _attemptFuture;
+  bool _finished = false;
+  bool _loading = true;
+  String? _loadError;
+  int _correctCount = 0;
+  int _wrongCount = 0;
+  final Map<int, String> _answers = {};
+  Map<String, dynamic> _set = {};
+  List<Map<String, dynamic>> _questions = [];
 
   @override
   void initState() {
     super.initState();
-    _attemptFuture = ContentRepository().fetchPracticeAttemptData(widget.setId);
+    _loadAttempt();
+  }
+
+  Future<void> _loadAttempt() async {
+    try {
+      final data = await ContentRepository().fetchPracticeAttemptData(widget.setId);
+      _set = Map<String, dynamic>.from(data['practiceSet'] as Map? ?? {});
+      _questions = List<Map<String, dynamic>>.from(
+        data['questions'] as List<dynamic>? ?? const [],
+      );
+      _loadError = null;
+    } catch (e) {
+      _loadError = e.toString();
+      rethrow;
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _checkAnswer(Map<String, dynamic> question) {
+    if (_selectedOption == null) return;
+    final correctOption = (question['correct_option']?.toString() ?? 'A').toUpperCase();
+    final keys = ['A', 'B', 'C', 'D'];
+    final selectedKey = keys[_selectedOption!.clamp(0, 3)];
+    _answers[_currentIndex] = selectedKey;
+    if (selectedKey == correctOption) {
+      _correctCount++;
+    } else {
+      _wrongCount++;
+    }
+    setState(() => _submitted = true);
+  }
+
+  void _nextQuestion() {
+    if (_currentIndex >= _questions.length - 1) {
+      setState(() => _finished = true);
+      return;
+    }
+    setState(() {
+      _currentIndex++;
+      _selectedOption = null;
+      _submitted = false;
+    });
+  }
+
+  List<AnswerReviewEntry> _reviewEntries() {
+    return List.generate(
+      _questions.length,
+      (i) => AnswerReviewEntry.fromAbcdMap(
+        question: _questions[i],
+        index: i,
+        selectedOption: _answers[i],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _attemptFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        }
-        final set = Map<String, dynamic>.from(snapshot.data?['practiceSet'] as Map? ?? {});
-        final questions = List<Map<String, dynamic>>.from(
-          snapshot.data?['questions'] as List<dynamic>? ?? const [],
-        );
-        if (questions.isEmpty) {
-          return Scaffold(
-            appBar: AppBar(title: Text(set['title']?.toString() ?? 'Practice')),
-            body: const Center(
-              child: EmptyStateWidget(
-                title: 'No questions found',
-                subtitle: 'Is set ke liye abhi questions add nahi hue.',
-                icon: Icons.help_outline_rounded,
-              ),
-            ),
-          );
-        }
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_loadError != null || _questions.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: Text(_set['title']?.toString() ?? 'Practice')),
+        body: Center(
+          child: EmptyStateWidget(
+            title: 'No questions found',
+            subtitle: _loadError ?? 'Is set ke liye abhi questions add nahi hue.',
+            icon: Icons.help_outline_rounded,
+          ),
+        ),
+      );
+    }
 
-        final question = questions[_currentIndex.clamp(0, questions.length - 1)];
+    if (_finished) {
+      final total = _questions.length;
+      final accuracy = total > 0 ? (_correctCount / total * 100) : 0.0;
+      return Scaffold(
+        appBar: AppBar(title: Text(_set['title']?.toString() ?? 'Practice Result')),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: CenteredContent(
+            maxWidth: 720,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.primary,
+                    borderRadius: BorderRadius.circular(AppRadii.xl),
+                    boxShadow: AppShadows.soft,
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '$_correctCount/$total',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 52,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      const Text(
+                        'Correct answers',
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: StatCard(
+                        title: 'Correct',
+                        value: '$_correctCount',
+                        subtitle: 'questions',
+                        icon: Icons.check_circle_outline_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: StatCard(
+                        title: 'Wrong',
+                        value: '$_wrongCount',
+                        subtitle: 'questions',
+                        icon: Icons.cancel_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: StatCard(
+                        title: 'Accuracy',
+                        value: '${accuracy.toStringAsFixed(0)}%',
+                        subtitle: 'overall',
+                        icon: Icons.percent_rounded,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                PrimaryButton(
+                  label: 'Review answers',
+                  expanded: true,
+                  icon: Icons.fact_check_rounded,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PaginatedAnswerReviewScreen(
+                          title: 'Practice Review',
+                          items: _reviewEntries(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                SecondaryButton(
+                  label: 'Back to topics',
+                  expanded: true,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final question = _questions[_currentIndex];
         final options = [
           question['option_a']?.toString() ?? '',
           question['option_b']?.toString() ?? '',
@@ -262,7 +416,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(set['title']?.toString() ?? 'Practice'),
+            title: Text(_set['title']?.toString() ?? 'Practice'),
             actions: [
               IconButton(
                 onPressed: () {
@@ -305,8 +459,8 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                 children: [
                   StatCard(
                     title: 'Set progress',
-                    value: '${_currentIndex + 1}/${questions.length}',
-                    subtitle: '${set['estimated_minutes'] ?? 20} min estimated',
+                    value: '${_currentIndex + 1}/${_questions.length}',
+                    subtitle: '${_set['estimated_minutes'] ?? 20} min estimated',
                     icon: Icons.timelapse_rounded,
                   ),
                   const SizedBox(height: AppSpacing.lg),
@@ -373,84 +527,33 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                         }),
                         const SizedBox(height: AppSpacing.sm),
                         PrimaryButton(
-                          label: _submitted ? 'Next question' : 'Submit answer',
-                          icon: Icons.arrow_forward_rounded,
+                          label: _submitted
+                              ? (_currentIndex >= _questions.length - 1
+                                  ? 'Finish & see results'
+                                  : 'Next question')
+                              : 'Submit answer',
+                          icon: _submitted
+                              ? Icons.arrow_forward_rounded
+                              : Icons.check_rounded,
                           expanded: true,
-                          onPressed: () {
-                            if (!_submitted) {
-                              if (_selectedOption == null) return;
-                              setState(() => _submitted = true);
-                              return;
-                            }
-                            if (_currentIndex < questions.length - 1) {
-                              setState(() {
-                                _currentIndex++;
-                                _selectedOption = null;
-                                _submitted = false;
-                              });
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Practice set completed.')),
-                              );
-                            }
-                          },
+                          onPressed: (_submitted || _selectedOption != null)
+                              ? () {
+                                  if (!_submitted) {
+                                    _checkAnswer(question);
+                                    return;
+                                  }
+                                  _nextQuestion();
+                                }
+                              : null,
                         ),
                       ],
                     ),
                   ),
-                  if (_submitted) ...[
-                    const SizedBox(height: AppSpacing.lg),
-                    SurfaceCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.lightbulb_rounded,
-                                  color: Color(0xFFF59E0B), size: 22),
-                              const SizedBox(width: AppSpacing.sm),
-                              Text('Explanation',
-                                  style: Theme.of(context).textTheme.titleLarge),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0x1AF59E0B)
-                                  : const Color(0xFFFFFBEB),
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  question['explanation']?.toString().isNotEmpty == true
-                                      ? question['explanation'].toString()
-                                      : 'No explanation provided for this question.',
-                                  style: Theme.of(context).textTheme.bodyLarge,
-                                ),
-                                if ((question['explanation_image_link']?.toString() ?? '').isNotEmpty) ...[
-                                  const SizedBox(height: AppSpacing.md),
-                                  _buildQuestionImage(question['explanation_image_link'].toString()),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
           ),
         );
-      },
-    );
   }
 }
 
@@ -541,7 +644,9 @@ class TopicWiseMcqsScreen extends StatelessWidget {
     final map = <String, List<Map<String, dynamic>>>{};
     for (final set in allSets) {
       final subject = set['subject']?.toString().trim() ?? '';
-      final standard = set['standard_label']?.toString().trim() ?? '';
+      final standard = set['class_label']?.toString().trim() ??
+          set['standard_label']?.toString().trim() ??
+          '';
       final key = (standard.isNotEmpty && subject.isNotEmpty)
           ? '$standard $subject'
           : subject.isNotEmpty
@@ -654,7 +759,7 @@ class _SubjectTopicsScreen extends StatelessWidget {
               difficulty: set['difficulty']?.toString() ?? 'Moderate',
               estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
               accuracy: 0,
-              tag: set['standard_label']?.toString() ?? 'Topic',
+              tag: set['class_label']?.toString() ?? set['standard_label']?.toString() ?? 'Topic',
             ),
           );
         },

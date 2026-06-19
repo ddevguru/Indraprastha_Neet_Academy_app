@@ -454,6 +454,52 @@ async function ensureDatabaseSchema() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_fcm_tokens_user_id ON fcm_tokens(user_id);`);
 
+  await pool.query(`
+    ALTER TABLE packages
+    ADD COLUMN IF NOT EXISTS amount_inr NUMERIC(10,2) DEFAULT 0;
+  `);
+
+  await pool.query(`
+    ALTER TABLE practice_sets
+    ADD COLUMN IF NOT EXISTS source_type VARCHAR(40) DEFAULT 'topic_mcq';
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS payment_orders (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      package_id INTEGER NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+      order_id VARCHAR(120) UNIQUE NOT NULL,
+      cf_order_id VARCHAR(120),
+      payment_session_id TEXT,
+      amount_inr NUMERIC(10,2) NOT NULL DEFAULT 0,
+      currency VARCHAR(10) DEFAULT 'INR',
+      status VARCHAR(40) DEFAULT 'CREATED',
+      gateway_response JSONB,
+      paid_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_subscriptions (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      package_id INTEGER REFERENCES packages(id) ON DELETE SET NULL,
+      payment_order_id INTEGER REFERENCES payment_orders(id) ON DELETE SET NULL,
+      plan_name VARCHAR(120) DEFAULT '',
+      status VARCHAR(40) DEFAULT 'inactive',
+      starts_at TIMESTAMP,
+      expires_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_payment_orders_user_id ON payment_orders(user_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id ON user_subscriptions(user_id);`);
+
   // Performance indexes for frequent mobile/admin listing filters.
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_batch_id ON users(batch_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_books_batch_class_subject_topic ON books(batch_id, class_label, subject, topic);`);

@@ -236,7 +236,8 @@ router.get('/practice-sets', userAuth, async (req, res) => {
     `SELECT ps.id, ps.title, ps.topic, ps.subject, ps.class_label, ps.difficulty, ps.estimated_minutes,
         (SELECT COUNT(*)::int FROM practice_questions pq WHERE pq.practice_set_id = ps.id) AS question_count
      FROM practice_sets ps
-     WHERE ($1 = '' OR ps.subject = $1)
+     WHERE (ps.source_type IS NULL OR ps.source_type = 'topic_mcq')
+       AND ($1 = '' OR ps.subject = $1)
        AND ($2 = '' OR ps.topic = $2)
      ORDER BY id DESC`,
     [subject, topic]
@@ -256,10 +257,26 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
     return res.status(404).json({ error: 'Practice set not found' });
   }
   const questions = await pool.query(
-    `SELECT id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
-     FROM practice_questions
-     WHERE practice_set_id = $1
-     ORDER BY id ASC`,
+    `SELECT pq.id, pq.question, pq.option_a, pq.option_b, pq.option_c, pq.option_d, pq.correct_option, pq.explanation,
+        pq.question_image_link, pq.question_image_drive_file_id, pq.question_image_drive_folder_id,
+        pq.explanation_image_link, pq.explanation_image_drive_file_id, pq.explanation_image_drive_folder_id,
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', ei.id,
+              'image_url', ei.image_url,
+              'image_drive_file_id', ei.image_drive_file_id,
+              'image_drive_link', ei.image_drive_link,
+              'caption', ei.caption,
+              'order_index', ei.order_index
+            ) ORDER BY ei.order_index
+          )
+          FROM explanation_images ei
+          WHERE ei.practice_question_id = pq.id
+        ) as explanation_images_list
+     FROM practice_questions pq
+     WHERE pq.practice_set_id = $1
+     ORDER BY pq.id ASC`,
     [req.params.setId]
   );
   res.json({
@@ -350,7 +367,7 @@ router.get('/mcqs', userAuth, async (req, res) => {
 
 router.get('/packages', userAuth, async (_req, res) => {
   const result = await pool.query(
-    `SELECT id, name, price_label, validity, highlight, features_json, is_active
+    `SELECT id, name, price_label, validity, highlight, features_json, is_active, amount_inr
      FROM packages
      WHERE is_active = true
      ORDER BY id ASC`

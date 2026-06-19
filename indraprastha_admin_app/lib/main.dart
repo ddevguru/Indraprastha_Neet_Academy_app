@@ -1483,7 +1483,12 @@ class _BooksPageState extends State<BooksPage> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: _pyqExplanation,
-                  decoration: const InputDecoration(labelText: 'Explanation'),
+                  minLines: 3,
+                  maxLines: 8,
+                  decoration: const InputDecoration(
+                    labelText: 'Explanation (paragraph)',
+                    alignLabelWithHint: true,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -1959,6 +1964,11 @@ class _PracticePageState extends State<PracticePage> {
                   alignment: Alignment.centerLeft,
                   child: Text('Add questions to practice', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Topic-wise MCQs yahan add karein. Chapter PYQs ke liye Books tab use karein — dono alag sections hain.',
+                  style: TextStyle(fontSize: 12),
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
                   initialValue: _selectedSetId,
@@ -2001,7 +2011,15 @@ class _PracticePageState extends State<PracticePage> {
                   decoration: const InputDecoration(labelText: 'Correct option'),
                 ),
                 const SizedBox(height: 8),
-                TextField(controller: _pqExplanation, decoration: const InputDecoration(labelText: 'Explanation')),
+                TextField(
+                  controller: _pqExplanation,
+                  minLines: 3,
+                  maxLines: 8,
+                  decoration: const InputDecoration(
+                    labelText: 'Explanation (paragraph)',
+                    alignLabelWithHint: true,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -2398,12 +2416,40 @@ class _TestsPageState extends State<TestsPage> {
   String _testQuestionImageLink = '';
   File? _testExplanationImage;
   String _testExplanationImageLink = '';
+  final List<File> _pendingExtraExplanationImages = [];
+  List<dynamic> _savedExplanationImages = const [];
   int? _batchId;
   int? _editingId;
   int? _selectedTestId;
   List<dynamic> _batches = const [];
   List<dynamic> _items = const [];
   String? _status;
+
+  Future<void> _loadTestExplanationImages(int questionId) async {
+    final images = await widget.api.fetchExplanationImages(
+      questionType: 'test_question',
+      questionId: questionId,
+    );
+    if (!mounted) return;
+    setState(() => _savedExplanationImages = images);
+  }
+
+  Future<void> _uploadPendingTestExplanationImages(int questionId) async {
+    if (_batchId == null || _pendingExtraExplanationImages.isEmpty) return;
+    for (final file in _pendingExtraExplanationImages) {
+      await widget.api.addExplanationImage(
+        questionType: 'test_question',
+        questionId: questionId,
+        batchId: _batchId!,
+        classLabel: _classLabel.text.trim(),
+        subject: _subject.text.trim(),
+        topic: _topic.text.trim().isEmpty ? 'Test Questions' : _topic.text.trim(),
+        file: file,
+      );
+    }
+    _pendingExtraExplanationImages.clear();
+    await _loadTestExplanationImages(questionId);
+  }
 
   @override
   void initState() {
@@ -2545,7 +2591,15 @@ class _TestsPageState extends State<TestsPage> {
                   decoration: const InputDecoration(labelText: 'Correct option'),
                 ),
                 const SizedBox(height: 8),
-                TextField(controller: _testExplanation, decoration: const InputDecoration(labelText: 'Explanation')),
+                TextField(
+                  controller: _testExplanation,
+                  minLines: 3,
+                  maxLines: 8,
+                  decoration: const InputDecoration(
+                    labelText: 'Explanation (paragraph)',
+                    alignLabelWithHint: true,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 // Question image
                 Row(
@@ -2603,6 +2657,70 @@ class _TestsPageState extends State<TestsPage> {
                   ],
                 ),
                 const SizedBox(height: 8),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Additional explanation images (save question first, then add more)',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _pendingExtraExplanationImages.isEmpty
+                            ? 'No extra images selected'
+                            : '${_pendingExtraExplanationImages.length} image(s) ready to upload',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.image,
+                          allowMultiple: true,
+                        );
+                        if (result == null) return;
+                        setState(() {
+                          for (final f in result.files) {
+                            if (f.path != null) {
+                              _pendingExtraExplanationImages.add(File(f.path!));
+                            }
+                          }
+                        });
+                      },
+                      child: const Text('Add more images'),
+                    ),
+                  ],
+                ),
+                if (_savedExplanationImages.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  ..._savedExplanationImages.map(
+                    (img) => ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        (img as Map)['caption']?.toString().isNotEmpty == true
+                            ? img['caption'].toString()
+                            : 'Explanation image #${img['order_index'] ?? ''}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                        onPressed: () async {
+                          final id = (img)['id'] as int?;
+                          if (id == null) return;
+                          await widget.api.deleteExplanationImage(id);
+                          if (_editingQuestionId != null) {
+                            await _loadTestExplanationImages(_editingQuestionId!);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
                 FilledButton.tonal(
                   onPressed: _selectedTestId == null
                       ? null
@@ -2632,8 +2750,9 @@ class _TestsPageState extends State<TestsPage> {
                                 contentId: _selectedTestId,
                               );
                             }
+                            var savedQuestionId = _editingQuestionId;
                             if (_editingQuestionId == null) {
-                              await widget.api.addTestQuestion(
+                              savedQuestionId = await widget.api.addTestQuestion(
                                 testId: _selectedTestId!,
                                 question: _testQuestion.text.trim(),
                                 optionA: _testOptionA.text.trim(),
@@ -2661,9 +2780,12 @@ class _TestsPageState extends State<TestsPage> {
                                 explanationImageLink: expLink,
                               );
                             }
+                            if (savedQuestionId != null) {
+                              await _uploadPendingTestExplanationImages(savedQuestionId);
+                            }
                             setState(() {
                               _status = 'Question saved';
-                              _editingQuestionId = null;
+                              _editingQuestionId = savedQuestionId;
                               _testQuestionImage = null;
                               _testQuestionImageLink = imageLink;
                               _testExplanationImage = null;
@@ -2771,9 +2893,10 @@ class _TestsPageState extends State<TestsPage> {
                                             runSpacing: 6,
                                             children: [
                                               OutlinedButton.icon(
-                                                onPressed: () {
+                                                onPressed: () async {
+                                                  final questionId = q['id'] as int;
                                                   setState(() {
-                                                    _editingQuestionId = q['id'] as int;
+                                                    _editingQuestionId = questionId;
                                                     _testQuestion.text = q['question']?.toString() ?? '';
                                                     _testOptionA.text = q['option_a']?.toString() ?? '';
                                                     _testOptionB.text = q['option_b']?.toString() ?? '';
@@ -2783,9 +2906,14 @@ class _TestsPageState extends State<TestsPage> {
                                                     _testExplanation.text = q['explanation']?.toString() ?? '';
                                                     _testQuestionImageLink =
                                                         q['question_image_link']?.toString() ?? '';
+                                                    _testExplanationImageLink =
+                                                        q['explanation_image_link']?.toString() ?? '';
                                                     _testQuestionImage = null;
+                                                    _testExplanationImage = null;
+                                                    _pendingExtraExplanationImages.clear();
                                                   });
-                                                  Navigator.of(context).pop();
+                                                  await _loadTestExplanationImages(questionId);
+                                                  if (context.mounted) Navigator.of(context).pop();
                                                 },
                                                 icon: const Icon(Icons.edit_outlined),
                                                 label: const Text('Edit'),
@@ -3025,7 +3153,15 @@ class _McqsPageState extends State<McqsPage> {
                   decoration: const InputDecoration(labelText: 'Correct option'),
                 ),
                 const SizedBox(height: 8),
-                TextField(controller: _explanation, decoration: const InputDecoration(labelText: 'Explanation')),
+                TextField(
+                  controller: _explanation,
+                  minLines: 3,
+                  maxLines: 8,
+                  decoration: const InputDecoration(
+                    labelText: 'Explanation (paragraph)',
+                    alignLabelWithHint: true,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 // Question image
                 Row(
@@ -4190,7 +4326,7 @@ class AdminApi {
 
   Future<void> deleteTest(int id) => _delete('/admin/tests/$id');
 
-  Future<void> addTestQuestion({
+  Future<int> addTestQuestion({
     required int testId,
     required String question,
     required String optionA,
@@ -4203,7 +4339,7 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
   }) async {
-    await _post('/admin/tests/$testId/questions', {
+    final body = await _postMap('/admin/tests/$testId/questions', {
       'question': question,
       'optionA': optionA,
       'optionB': optionB,
@@ -4215,6 +4351,7 @@ class AdminApi {
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
     });
+    return (body['question'] as Map<String, dynamic>)['id'] as int;
   }
 
   Future<List<dynamic>> testQuestions(int testId) async =>
@@ -4427,6 +4564,46 @@ class AdminApi {
   }
 
   Future<void> deleteMcq(int id) => _delete('/admin/mcqs/$id');
+
+  Future<List<dynamic>> fetchExplanationImages({
+    required String questionType,
+    required int questionId,
+  }) async {
+    final body = await _get('/admin/questions/$questionType/$questionId/explanations');
+    return body['explanationImages'] as List<dynamic>? ?? const [];
+  }
+
+  Future<void> addExplanationImage({
+    required String questionType,
+    required int questionId,
+    required int batchId,
+    required String classLabel,
+    required String subject,
+    required String topic,
+    required File file,
+    String caption = '',
+  }) async {
+    if (token == null) throw Exception('Login first');
+    final req = http.MultipartRequest('POST', Uri.parse('$baseUrl/admin/explanation-images'));
+    req.headers['Authorization'] = 'Bearer $token';
+    req.fields['questionType'] = questionType;
+    req.fields['questionId'] = '$questionId';
+    req.fields['batchId'] = '$batchId';
+    req.fields['classLabel'] = classLabel;
+    req.fields['subject'] = subject;
+    req.fields['topic'] = topic;
+    req.fields['caption'] = caption;
+    final bytes = await file.readAsBytes();
+    final name = file.path.split(Platform.pathSeparator).last;
+    req.files.add(http.MultipartFile.fromBytes('image', bytes, filename: name));
+    final streamed = await req.send();
+    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+      throw Exception(await streamed.stream.bytesToString());
+    }
+  }
+
+  Future<void> deleteExplanationImage(int imageId) =>
+      _delete('/admin/explanation-images/$imageId');
 
   Future<String> uploadQuestionImage({
     required int batchId,

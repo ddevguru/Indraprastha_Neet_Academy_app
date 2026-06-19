@@ -196,9 +196,15 @@ router.post('/login', async (req, res) => {
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.*, b.name AS batch_name
+      `SELECT u.*, b.name AS batch_name,
+        us.plan_name AS subscription_plan,
+        us.status AS subscription_status,
+        us.starts_at AS subscription_starts_at,
+        us.expires_at AS subscription_expires_at,
+        (us.status = 'active' AND us.expires_at > CURRENT_TIMESTAMP) AS has_active_subscription
        FROM users u
        LEFT JOIN batches b ON b.id = u.batch_id
+       LEFT JOIN user_subscriptions us ON us.user_id = u.id
        WHERE u.id = $1`,
       [req.user.id]
     );
