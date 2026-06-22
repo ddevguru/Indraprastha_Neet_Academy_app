@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/access/content_access.dart';
+import '../../core/providers/app_state.dart';
 import '../../core/providers/daily_mcqs_provider.dart';
 import '../../models/app_models.dart';
 import '../../models/daily_mcq_item.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/content_lock.dart';
 
 class TodaysMcqsScreen extends ConsumerWidget {
   const TodaysMcqsScreen({super.key});
@@ -15,6 +18,7 @@ class TodaysMcqsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncItems = ref.watch(dailyMcqsProvider);
+    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
 
     return Scaffold(
       appBar: AppBar(title: const Text("Today's MCQs")),
@@ -41,7 +45,7 @@ class TodaysMcqsScreen extends ConsumerWidget {
           final archived = items.archivedToChapters;
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: mobileScrollPadding(context),
             child: CenteredContent(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,6 +56,10 @@ class TodaysMcqsScreen extends ConsumerWidget {
                         'Questions stay here for 24 hours from issue time, then move into '
                         'Books → chapter → PYQs / practice for that standard.',
                   ),
+                  if (!hasSubscription) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    const FreePreviewBanner(),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   if (active.isEmpty)
                     const EmptyStateWidget(
@@ -62,10 +70,21 @@ class TodaysMcqsScreen extends ConsumerWidget {
                       icon: Icons.quiz_outlined,
                     )
                   else
-                    ...active.map((e) => Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: _McqCard(item: e, showTimer: true),
-                        )),
+                    ...active.asMap().entries.map((entry) {
+                      final locked = !ContentAccess.isItemUnlocked(
+                        index: entry.key,
+                        hasActiveSubscription: hasSubscription,
+                      );
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: _McqCard(
+                          item: entry.value,
+                          showTimer: true,
+                          locked: locked,
+                          onLockedTap: () => ContentAccess.openSubscriptions(context),
+                        ),
+                      );
+                    }),
                   if (archived.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.xl),
                     SectionHeader(
@@ -74,15 +93,26 @@ class TodaysMcqsScreen extends ConsumerWidget {
                           'These now appear under the matching subject and chapter in Books and Practice.',
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    ...archived.map((e) => Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: _McqCard(
-                            item: e,
-                            showTimer: false,
-                            onOpenChapter: () =>
-                                context.push('/books/chapter/${e.chapterId}'),
-                          ),
-                        )),
+                    ...archived.asMap().entries.map((entry) {
+                      final locked = !ContentAccess.isItemUnlocked(
+                        index: active.length + entry.key,
+                        hasActiveSubscription: hasSubscription,
+                      );
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: _McqCard(
+                          item: entry.value,
+                          showTimer: false,
+                          locked: locked,
+                          onLockedTap: () => ContentAccess.openSubscriptions(context),
+                          onOpenChapter: locked
+                              ? null
+                              : () => context.push(
+                                    '/books/chapter/${entry.value.chapterId}',
+                                  ),
+                        ),
+                      );
+                    }),
                   ],
                 ],
               ),
@@ -99,76 +129,94 @@ class _McqCard extends StatelessWidget {
     required this.item,
     this.showTimer = false,
     this.onOpenChapter,
+    this.locked = false,
+    this.onLockedTap,
   });
 
   final DailyMcqItem item;
   final bool showTimer;
   final VoidCallback? onOpenChapter;
+  final bool locked;
+  final VoidCallback? onLockedTap;
 
   @override
   Widget build(BuildContext context) {
     final timeFmt = DateFormat('MMM d, h:mm a');
     final remaining = item.expiresAt.difference(DateTime.now());
 
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Opacity(
+      opacity: locked ? 0.72 : 1,
+      child: InkWell(
+        onTap: locked ? onLockedTap : null,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        child: SurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                backgroundColor: AppColors.indigoSoft,
-                child: Icon(item.subject.icon, color: AppColors.indigo, size: 20),
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: locked
+                        ? AppColors.goldSoft
+                        : AppColors.indigoSoft,
+                    child: Icon(
+                      locked ? Icons.lock_rounded : item.subject.icon,
+                      color: locked ? AppColors.gold : AppColors.indigo,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${item.subject.label} · ${item.standardLabel}',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        Text(
+                          item.chapterTitle,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (locked) const LockedContentBadge(),
+                ],
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${item.subject.label} · ${item.standardLabel}',
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                    Text(
-                      item.chapterTitle,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
+              const SizedBox(height: AppSpacing.md),
+              Text(item.preview),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Issued ${timeFmt.format(item.issuedAt)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (showTimer && item.isInTodaysWindow) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  remaining.inMinutes > 0
+                      ? "Leaves Today's MCQs in ${_formatRemaining(remaining)}"
+                      : 'Moving to chapter library shortly',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.indigo,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-              ),
+              ],
+              if (onOpenChapter != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onOpenChapter,
+                    icon: const Icon(Icons.menu_book_rounded, size: 18),
+                    label: const Text('Open chapter'),
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text(item.preview),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Issued ${timeFmt.format(item.issuedAt)}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          if (showTimer && item.isInTodaysWindow) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              remaining.inMinutes > 0
-                  ? "Leaves Today's MCQs in ${_formatRemaining(remaining)}"
-                  : 'Moving to chapter library shortly',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.indigo,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ],
-          if (onOpenChapter != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: onOpenChapter,
-                icon: const Icon(Icons.menu_book_rounded, size: 18),
-                label: const Text('Open chapter'),
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }

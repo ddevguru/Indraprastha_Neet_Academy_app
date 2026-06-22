@@ -32,6 +32,8 @@ class AppUser {
     this.medicalCollege,
     this.batchId,
     this.batchName,
+    this.hasActiveSubscription = false,
+    this.subscriptionPlan,
   });
 
   final String fullName;
@@ -46,6 +48,8 @@ class AppUser {
   final String? medicalCollege;
   final int? batchId;
   final String? batchName;
+  final bool hasActiveSubscription;
+  final String? subscriptionPlan;
 
   AppUser copyWith({
     String? fullName,
@@ -60,6 +64,8 @@ class AppUser {
     String? medicalCollege,
     int? batchId,
     String? batchName,
+    bool? hasActiveSubscription,
+    String? subscriptionPlan,
   }) {
     return AppUser(
       fullName: fullName ?? this.fullName,
@@ -74,6 +80,9 @@ class AppUser {
       medicalCollege: medicalCollege ?? this.medicalCollege,
       batchId: batchId ?? this.batchId,
       batchName: batchName ?? this.batchName,
+      hasActiveSubscription:
+          hasActiveSubscription ?? this.hasActiveSubscription,
+      subscriptionPlan: subscriptionPlan ?? this.subscriptionPlan,
     );
   }
 
@@ -100,7 +109,23 @@ class AppUser {
           (json['medical_college'] ?? json['medicalCollege']) as String?,
       batchId: (json['batch_id'] ?? json['batchId']) as int?,
       batchName: (json['batch_name'] ?? json['batchName']) as String?,
+      hasActiveSubscription: _parseBool(
+        json['has_active_subscription'] ?? json['hasActiveSubscription'],
+      ),
+      subscriptionPlan: (json['subscription_plan'] ??
+              json['subscriptionPlan'])
+          as String?,
     );
+  }
+
+  static bool _parseBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final v = value.toLowerCase();
+      return v == 'true' || v == 't' || v == '1';
+    }
+    return false;
   }
 
   Map<String, dynamic> toJson() {
@@ -117,6 +142,8 @@ class AppUser {
       'medical_college': medicalCollege,
       'batch_id': batchId,
       'batch_name': batchName,
+      'has_active_subscription': hasActiveSubscription,
+      'subscription_plan': subscriptionPlan,
     };
   }
 }

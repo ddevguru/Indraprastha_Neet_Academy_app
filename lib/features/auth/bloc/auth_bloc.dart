@@ -80,6 +80,14 @@ class AuthBloc extends Cubit<AuthState> {
   final AuthRepository _repository;
   bool _bootstrapped = false;
 
+  Future<AppUser> _userWithSubscription(String token, AppUser fallback) async {
+    try {
+      return await _repository.fetchMe(token);
+    } catch (_) {
+      return fallback;
+    }
+  }
+
   Future<void> bootstrapSession() async {
     if (_bootstrapped) return;
     _bootstrapped = true;
@@ -124,11 +132,12 @@ class AuthBloc extends Cubit<AuthState> {
         throw AuthException('Invalid response from server');
       }
       final user = AppUser.fromJson(userJson);
-      await _repository.saveSession(token: token, user: user);
+      final enrichedUser = await _userWithSubscription(token, user);
+      await _repository.saveSession(token: token, user: enrichedUser);
       await _repository.setOnboardingSeen();
       emit(state.copyWith(
         loading: false,
-        user: user,
+        user: enrichedUser,
         token: token,
         onboardingSeen: true,
       ));
@@ -251,11 +260,12 @@ class AuthBloc extends Cubit<AuthState> {
       }
 
       final user = AppUser.fromJson(userJson);
-      await _repository.saveSession(token: token, user: user);
+      final enrichedUser = await _userWithSubscription(token, user);
+      await _repository.saveSession(token: token, user: enrichedUser);
       await _repository.setOnboardingSeen();
       emit(state.copyWith(
         loading: false,
-        user: user,
+        user: enrichedUser,
         token: token,
         onboardingSeen: true,
         isNewUser: false,

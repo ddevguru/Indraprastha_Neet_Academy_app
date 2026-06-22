@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 
 String _resolveDriveImageUrl(String raw) {
@@ -53,14 +55,14 @@ Widget _buildQuestionImage(String rawUrl) {
   );
 }
 
-class PracticeHomeScreen extends StatefulWidget {
+class PracticeHomeScreen extends ConsumerStatefulWidget {
   const PracticeHomeScreen({super.key});
 
   @override
-  State<PracticeHomeScreen> createState() => _PracticeHomeScreenState();
+  ConsumerState<PracticeHomeScreen> createState() => _PracticeHomeScreenState();
 }
 
-class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
+class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
   late final Future<List<Map<String, dynamic>>> _practiceFuture;
 
   @override
@@ -69,10 +71,20 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
     _practiceFuture = ContentRepository().fetchPracticeSets();
   }
 
-  void _onCategoryTap(BuildContext context, String label, List<Map<String, dynamic>> allSets) {
+  void _onCategoryTap(
+    BuildContext context,
+    String label,
+    List<Map<String, dynamic>> allSets,
+    bool hasSubscription,
+  ) {
     if (label == 'Topic-wise MCQs') {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => TopicWiseMcqsScreen(allSets: allSets)),
+        MaterialPageRoute(
+          builder: (_) => TopicWiseMcqsScreen(
+            allSets: allSets,
+            hasActiveSubscription: hasSubscription,
+          ),
+        ),
       );
       return;
     }
@@ -83,6 +95,7 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
     const categories = [
       ('Topic-wise MCQs', Icons.grid_view_rounded),
       ('PYQs', Icons.history_edu_rounded),
@@ -92,7 +105,7 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
     ];
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: mobileScrollPadding(context),
       child: CenteredContent(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,6 +115,10 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
               subtitle:
                   'Daily drills, PYQs, custom sets, incorrect question review, and question bookmarks.',
             ),
+            if (!hasSubscription) ...[
+              const SizedBox(height: AppSpacing.md),
+              const FreePreviewBanner(),
+            ],
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(hint: 'Search topics, PYQ packs, and practice sets'),
             const SizedBox(height: AppSpacing.lg),
@@ -123,7 +140,12 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
                             (category) => SizedBox(
                               width: itemWidth,
                               child: InkWell(
-                                onTap: () => _onCategoryTap(context, category.$1, allSets),
+                                onTap: () => _onCategoryTap(
+                                  context,
+                                  category.$1,
+                                  allSets,
+                                  hasSubscription,
+                                ),
                                 borderRadius: BorderRadius.circular(AppRadii.lg),
                                 child: SurfaceCard(
                                   child: Row(
@@ -169,23 +191,33 @@ class _PracticeHomeScreenState extends State<PracticeHomeScreen> {
                   );
                 }
                 return Column(
-                  children: sets
-                      .map(
-                        (set) => Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: _PracticeSetCard(
-                            set: PracticeSet(
-                              id: '${set['id']}',
-                              title: set['title']?.toString() ?? 'Practice Set',
-                              topic: set['topic']?.toString() ?? '',
-                              questionCount: (set['question_count'] as num?)?.toInt() ?? 0,
-                              difficulty: set['difficulty']?.toString() ?? 'Moderate',
-                              estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
-                              accuracy: 0,
-                              tag: 'Batch-wise',
+                  children: sets.asMap().entries.map(
+                        (entry) {
+                          final locked = !ContentAccess.isItemUnlocked(
+                            index: entry.key,
+                            hasActiveSubscription: hasSubscription,
+                          );
+                          final set = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                            child: _PracticeSetCard(
+                              set: PracticeSet(
+                                id: '${set['id']}',
+                                title: set['title']?.toString() ?? 'Practice Set',
+                                topic: set['topic']?.toString() ?? '',
+                                questionCount:
+                                    (set['question_count'] as num?)?.toInt() ?? 0,
+                                difficulty:
+                                    set['difficulty']?.toString() ?? 'Moderate',
+                                estimatedMinutes:
+                                    (set['estimated_minutes'] as num?)?.toInt() ?? 20,
+                                accuracy: 0,
+                                tag: 'Batch-wise',
+                              ),
+                              locked: locked,
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       )
                       .toList(),
                 );
@@ -228,6 +260,25 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   void initState() {
     super.initState();
     _loadAttempt();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _guardAccess());
+  }
+
+  Future<void> _guardAccess() async {
+    final hasSubscription =
+        ref.read(appUiControllerProvider).hasActiveSubscription;
+    if (hasSubscription || !mounted) return;
+    final sets = await ContentRepository().fetchPracticeSets();
+    if (!mounted) return;
+    final ids = sets.map((s) => '${s['id']}').toList();
+    final unlocked = ContentAccess.isIdUnlocked(
+      itemId: '${widget.setId}',
+      orderedIds: ids,
+      hasActiveSubscription: false,
+    );
+    if (!unlocked && mounted) {
+      ContentAccess.openSubscriptions(context);
+      Navigator.of(context).maybePop();
+    }
   }
 
   Future<void> _loadAttempt() async {
@@ -558,27 +609,41 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 }
 
 class _PracticeSetCard extends StatelessWidget {
-  const _PracticeSetCard({required this.set});
+  const _PracticeSetCard({
+    required this.set,
+    this.locked = false,
+  });
 
   final PracticeSet set;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => context.push('/practice/attempt/${set.id}'),
+      onTap: () => ContentAccess.handleTap(
+        context: context,
+        locked: locked,
+        onUnlocked: () => context.push('/practice/attempt/${set.id}'),
+      ),
       borderRadius: BorderRadius.circular(AppRadii.lg),
-      child: SurfaceCard(
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                gradient: AppGradients.primary,
-                borderRadius: BorderRadius.circular(18),
+      child: Opacity(
+        opacity: locked ? 0.72 : 1,
+        child: SurfaceCard(
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: locked ? null : AppGradients.primary,
+                  color: locked ? AppColors.goldSoft : null,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  locked ? Icons.lock_rounded : Icons.bolt_rounded,
+                  color: locked ? AppColors.gold : Colors.white,
+                ),
               ),
-              child: const Icon(Icons.bolt_rounded, color: Colors.white),
-            ),
             const SizedBox(width: AppSpacing.lg),
             Expanded(
               child: Column(
@@ -601,10 +666,10 @@ class _PracticeSetCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: AppSpacing.md),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+            buildContentTrailing(locked: locked),
           ],
         ),
+      ),
       ),
     );
   }
@@ -636,9 +701,14 @@ class _MetaPill extends StatelessWidget {
 // ── Topic-wise MCQs drill-down ────────────────────────────────────────────────
 
 class TopicWiseMcqsScreen extends StatelessWidget {
-  const TopicWiseMcqsScreen({super.key, required this.allSets});
+  const TopicWiseMcqsScreen({
+    super.key,
+    required this.allSets,
+    required this.hasActiveSubscription,
+  });
 
   final List<Map<String, dynamic>> allSets;
+  final bool hasActiveSubscription;
 
   Map<String, List<Map<String, dynamic>>> _groupBySubject() {
     final map = <String, List<Map<String, dynamic>>>{};
@@ -677,7 +747,12 @@ class TopicWiseMcqsScreen extends StatelessWidget {
               itemBuilder: (context, i) {
                 final subject = groups.keys.elementAt(i);
                 final sets = groups[subject]!;
-                return _SubjectGroupCard(subject: subject, sets: sets);
+                return _SubjectGroupCard(
+                  subject: subject,
+                  sets: sets,
+                  allSets: allSets,
+                  hasActiveSubscription: hasActiveSubscription,
+                );
               },
             ),
     );
@@ -685,10 +760,17 @@ class TopicWiseMcqsScreen extends StatelessWidget {
 }
 
 class _SubjectGroupCard extends StatelessWidget {
-  const _SubjectGroupCard({required this.subject, required this.sets});
+  const _SubjectGroupCard({
+    required this.subject,
+    required this.sets,
+    required this.allSets,
+    required this.hasActiveSubscription,
+  });
 
   final String subject;
   final List<Map<String, dynamic>> sets;
+  final List<Map<String, dynamic>> allSets;
+  final bool hasActiveSubscription;
 
   IconData _iconFor(String s) {
     final lower = s.toLowerCase();
@@ -704,7 +786,12 @@ class _SubjectGroupCard extends StatelessWidget {
     return InkWell(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => _SubjectTopicsScreen(subject: subject, sets: sets),
+          builder: (_) => _SubjectTopicsScreen(
+            subject: subject,
+            sets: sets,
+            allSets: allSets,
+            hasActiveSubscription: hasActiveSubscription,
+          ),
         ),
       ),
       borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -735,10 +822,17 @@ class _SubjectGroupCard extends StatelessWidget {
 }
 
 class _SubjectTopicsScreen extends StatelessWidget {
-  const _SubjectTopicsScreen({required this.subject, required this.sets});
+  const _SubjectTopicsScreen({
+    required this.subject,
+    required this.sets,
+    required this.allSets,
+    required this.hasActiveSubscription,
+  });
 
   final String subject;
   final List<Map<String, dynamic>> sets;
+  final List<Map<String, dynamic>> allSets;
+  final bool hasActiveSubscription;
 
   @override
   Widget build(BuildContext context) {
@@ -750,7 +844,15 @@ class _SubjectTopicsScreen extends StatelessWidget {
         separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
         itemBuilder: (context, i) {
           final set = sets[i];
+          final globalIndex = allSets.indexWhere(
+            (s) => '${s['id']}' == '${set['id']}',
+          );
+          final locked = !ContentAccess.isItemUnlocked(
+            index: globalIndex < 0 ? i : globalIndex,
+            hasActiveSubscription: hasActiveSubscription,
+          );
           return _PracticeSetCard(
+            locked: locked,
             set: PracticeSet(
               id: '${set['id']}',
               title: set['title']?.toString() ?? 'Practice Set',

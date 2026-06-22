@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 
 String _resolveDriveImageUrl(String raw) {
@@ -113,8 +115,9 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
   @override
   Widget build(BuildContext context) {
     final uiState = ref.watch(appUiControllerProvider);
+    final hasSubscription = uiState.hasActiveSubscription;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: mobileScrollPadding(context),
       child: CenteredContent(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,6 +127,10 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
               subtitle:
                   'Structured reading for NCERT, handwritten notes, formula sheets, diagrams, and bookmarks.',
             ),
+            if (!hasSubscription) ...[
+              const SizedBox(height: AppSpacing.md),
+              const FreePreviewBanner(),
+            ],
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(hint: 'Search books, notes, chapters, diagrams'),
             const SizedBox(height: AppSpacing.lg),
@@ -172,7 +179,12 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                     else
                       _SubjectBooksSection(
                         books: books,
-                        onBookTap: (book) => _openBookChapter(context, book),
+                        hasActiveSubscription: hasSubscription,
+                        onBookTap: (book, locked) => ContentAccess.handleTap(
+                          context: context,
+                          locked: locked,
+                          onUnlocked: () => _openBookChapter(context, book),
+                        ),
                       ),
                     const SizedBox(height: AppSpacing.xl),
                     SurfaceCard(
@@ -193,18 +205,40 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                               icon: Icons.bookmark_border_rounded,
                             )
                           else
-                            ...bookmarkedBooks.map(
-                              (book) => Padding(
-                                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                                child: ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: const Icon(Icons.bookmark_rounded),
-                                  title: Text(book['title']?.toString() ?? ''),
-                                  subtitle: Text('${book['subject'] ?? ''} • ${book['topic'] ?? ''}'),
-                                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                                  onTap: () => _openBookChapter(context, book),
-                                ),
-                              ),
+                            ...bookmarkedBooks.asMap().entries.map(
+                              (entry) {
+                                final book = entry.value;
+                                final bookId = book['id']?.toString() ?? '';
+                                final locked = !ContentAccess.isItemUnlocked(
+                                  index: books.indexWhere(
+                                    (b) => b['id']?.toString() == bookId,
+                                  ),
+                                  hasActiveSubscription: hasSubscription,
+                                );
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                                  child: ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: Icon(
+                                      locked
+                                          ? Icons.lock_rounded
+                                          : Icons.bookmark_rounded,
+                                      color: locked ? AppColors.gold : null,
+                                    ),
+                                    title: Text(book['title']?.toString() ?? ''),
+                                    subtitle: Text(
+                                      '${book['subject'] ?? ''} • ${book['topic'] ?? ''}',
+                                    ),
+                                    trailing: buildContentTrailing(locked: locked),
+                                    onTap: () => ContentAccess.handleTap(
+                                      context: context,
+                                      locked: locked,
+                                      onUnlocked: () =>
+                                          _openBookChapter(context, book),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                         ],
                       ),
@@ -225,11 +259,13 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
 class _SubjectBooksSection extends StatefulWidget {
   const _SubjectBooksSection({
     required this.books,
+    required this.hasActiveSubscription,
     required this.onBookTap,
   });
 
   final List<Map<String, dynamic>> books;
-  final void Function(Map<String, dynamic> book) onBookTap;
+  final bool hasActiveSubscription;
+  final void Function(Map<String, dynamic> book, bool locked) onBookTap;
 
   @override
   State<_SubjectBooksSection> createState() => _SubjectBooksSectionState();
@@ -263,6 +299,11 @@ class _SubjectBooksSectionState extends State<_SubjectBooksSection> {
 
   @override
   Widget build(BuildContext context) {
+    final bookIndexById = <String, int>{
+      for (var i = 0; i < widget.books.length; i++)
+        widget.books[i]['id']?.toString() ?? '$i': i,
+    };
+
     return Column(
       children: _grouped.entries.map((entry) {
         final subject = entry.key;
@@ -314,13 +355,26 @@ class _SubjectBooksSectionState extends State<_SubjectBooksSection> {
                 if (isOpen) ...[
                   const Divider(height: 1),
                   ...books.map(
-                    (book) => ListTile(
-                      leading: const Icon(Icons.auto_stories_rounded),
-                      title: Text(book['title']?.toString() ?? ''),
-                      subtitle: Text(book['topic']?.toString() ?? ''),
-                      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                      onTap: () => widget.onBookTap(book),
-                    ),
+                    (book) {
+                      final bookId = book['id']?.toString() ?? '';
+                      final index = bookIndexById[bookId] ?? 0;
+                      final locked = !ContentAccess.isItemUnlocked(
+                        index: index,
+                        hasActiveSubscription: widget.hasActiveSubscription,
+                      );
+                      return ListTile(
+                        leading: Icon(
+                          locked
+                              ? Icons.lock_rounded
+                              : Icons.auto_stories_rounded,
+                          color: locked ? AppColors.gold : null,
+                        ),
+                        title: Text(book['title']?.toString() ?? ''),
+                        subtitle: Text(book['topic']?.toString() ?? ''),
+                        trailing: buildContentTrailing(locked: locked),
+                        onTap: () => widget.onBookTap(book, locked),
+                      );
+                    },
                   ),
                 ],
               ],
@@ -979,6 +1033,17 @@ class _DetailPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formatted = _formatReadableContent(content);
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final panelColor = highlight
+        ? (isDark
+            ? scheme.primaryContainer.withValues(alpha: 0.55)
+            : AppColors.indigoSoft)
+        : scheme.surfaceContainerHighest;
+    final textStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          height: 1.45,
+          color: highlight && isDark ? scheme.onPrimaryContainer : null,
+        );
     // SizedBox.expand ensures this panel fills its Expanded slot in TabBarView.
     return SizedBox.expand(
       child: SurfaceCard(
@@ -993,12 +1058,15 @@ class _DetailPanel extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   decoration: BoxDecoration(
-                    color: highlight ? AppColors.indigoSoft : AppColors.surfaceMuted,
+                    color: panelColor,
                     borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: highlight && isDark
+                        ? Border.all(color: scheme.outlineVariant)
+                        : null,
                   ),
                   child: SelectableText(
                     formatted.isEmpty ? 'No content available yet.' : formatted,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
+                    style: textStyle,
                   ),
                 ),
               ),
@@ -1010,10 +1078,13 @@ class _DetailPanel extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: Icon(Icons.check_circle_rounded,
-                          size: 18, color: AppColors.indigo),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Icon(
+                        Icons.check_circle_rounded,
+                        size: 18,
+                        color: isDark ? scheme.primary : AppColors.indigo,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(child: Text(bullet)),

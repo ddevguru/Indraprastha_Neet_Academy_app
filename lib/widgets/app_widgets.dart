@@ -484,32 +484,40 @@ class TestCard extends StatelessWidget {
     super.key,
     required this.test,
     required this.onTap,
+    this.locked = false,
   });
 
   final TestItem test;
   final VoidCallback onTap;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadii.lg),
-      child: SurfaceCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _Tag(text: test.category),
-                const Spacer(),
-                Icon(
-                  test.completed
-                      ? Icons.check_circle_rounded
-                      : Icons.schedule_rounded,
-                  color: test.completed ? AppColors.success : AppColors.indigo,
-                ),
-              ],
-            ),
+      child: Opacity(
+        opacity: locked ? 0.72 : 1,
+        child: SurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _Tag(text: test.category),
+                  const Spacer(),
+                  Icon(
+                    locked
+                        ? Icons.lock_rounded
+                        : (test.completed
+                            ? Icons.check_circle_rounded
+                            : Icons.schedule_rounded),
+                    color: locked
+                        ? AppColors.gold
+                        : (test.completed ? AppColors.success : AppColors.indigo),
+                  ),
+                ],
+              ),
             const SizedBox(height: AppSpacing.sm),
             Text(test.title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.xs),
@@ -525,6 +533,7 @@ class TestCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

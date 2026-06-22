@@ -146,13 +146,19 @@ class AdaptiveScaffold extends ConsumerWidget {
     return Scaffold(
       appBar: appBar,
       drawer: const AppDrawer(),
-      body: SafeArea(child: body),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        destinations: _destinations,
-        onDestinationSelected: onDestinationSelected,
-        indicatorColor: scheme.secondaryContainer,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      body: SafeArea(
+        bottom: false,
+        child: body,
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: NavigationBar(
+          selectedIndex: currentIndex,
+          destinations: _destinations,
+          onDestinationSelected: onDestinationSelected,
+          indicatorColor: scheme.secondaryContainer,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        ),
       ),
     );
   }

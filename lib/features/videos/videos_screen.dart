@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../content/data/content_repository.dart';
+import '../../core/access/content_access.dart';
+import '../../core/providers/app_state.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/content_lock.dart';
 import 'video_player_screen.dart';
 
 class VideosScreen extends ConsumerWidget {
@@ -12,10 +15,11 @@ class VideosScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
     final videosFuture = ContentRepository().fetchVideos();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: mobileScrollPadding(context),
       child: CenteredContent(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -24,6 +28,10 @@ class VideosScreen extends ConsumerWidget {
               title: 'Videos',
               subtitle: 'Full NEET video library — all batches.',
             ),
+            if (!hasSubscription) ...[
+              const SizedBox(height: AppSpacing.md),
+              const FreePreviewBanner(),
+            ],
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(hint: 'Search chapters and video topics'),
             const SizedBox(height: AppSpacing.xl),
@@ -43,7 +51,12 @@ class VideosScreen extends ConsumerWidget {
                     );
                   }
                   return Column(
-                    children: videos.map((video) {
+                    children: videos.asMap().entries.map((entry) {
+                      final video = entry.value;
+                      final locked = !ContentAccess.isItemUnlocked(
+                        index: entry.key,
+                        hasActiveSubscription: hasSubscription,
+                      );
                       final subject = video['subject']?.toString() ?? 'Faculty';
                       final chapterHint =
                           (video['chapter_hint']?.toString().isNotEmpty ?? false)
@@ -57,11 +70,18 @@ class VideosScreen extends ConsumerWidget {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: InkWell(
-                          onTap: () => _openVideo(context, video, driveLink),
+                          onTap: () => ContentAccess.handleTap(
+                            context: context,
+                            locked: locked,
+                            onUnlocked: () =>
+                                _openVideo(context, video, driveLink),
+                          ),
                           borderRadius: BorderRadius.circular(AppRadii.lg),
-                          child: SurfaceCard(
-                            child: Row(
-                              children: [
+                          child: Opacity(
+                            opacity: locked ? 0.72 : 1,
+                            child: SurfaceCard(
+                              child: Row(
+                                children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
                                   child: Image.network(
@@ -106,11 +126,13 @@ class VideosScreen extends ConsumerWidget {
                                 ),
                                 Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
+                                  children: [
                                     Icon(
-                                      Icons.play_circle_fill_rounded,
+                                      locked
+                                          ? Icons.lock_rounded
+                                          : Icons.play_circle_fill_rounded,
                                       size: 42,
-                                      color: AppColors.indigo,
+                                      color: locked ? AppColors.gold : AppColors.indigo,
                                     ),
                                   ],
                                 ),
@@ -118,7 +140,8 @@ class VideosScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
-                      );
+                      ),
+                    );
                     }).toList(),
                   );
                 },

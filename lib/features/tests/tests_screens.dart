@@ -1,12 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/access/content_access.dart';
+import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 
 String _resolveDriveImageUrl(String raw) {
@@ -58,14 +62,14 @@ Widget _buildQuestionImage(String rawUrl) {
   );
 }
 
-class TestsScreen extends StatefulWidget {
+class TestsScreen extends ConsumerStatefulWidget {
   const TestsScreen({super.key});
 
   @override
-  State<TestsScreen> createState() => _TestsScreenState();
+  ConsumerState<TestsScreen> createState() => _TestsScreenState();
 }
 
-class _TestsScreenState extends State<TestsScreen> {
+class _TestsScreenState extends ConsumerState<TestsScreen> {
   late final Future<List<Map<String, dynamic>>> _testsFuture;
   String? _activeFilter;
 
@@ -123,8 +127,9 @@ class _TestsScreenState extends State<TestsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: mobileScrollPadding(context),
       child: CenteredContent(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,6 +139,10 @@ class _TestsScreenState extends State<TestsScreen> {
               subtitle:
                   'Grand tests, subject tests, chapter tests, upcoming schedules, and result reviews.',
             ),
+            if (!hasSubscription) ...[
+              const SizedBox(height: AppSpacing.md),
+              const FreePreviewBanner(),
+            ],
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(hint: 'Search mocks, subject tests, and chapters'),
             const SizedBox(height: AppSpacing.lg),
@@ -181,26 +190,44 @@ class _TestsScreenState extends State<TestsScreen> {
                   );
                 }
                 return Column(
-                  children: tests
-                      .map(
-                        (t) => Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: TestCard(
-                            test: TestItem(
-                              id: '${t['id']}',
-                              title: t['title']?.toString() ?? 'Test',
-                              category: t['category']?.toString() ?? 'Grand test',
-                              durationMinutes: (t['duration_minutes'] as num?)?.toInt() ?? 180,
-                              marks: (t['marks'] as num?)?.toInt() ?? 720,
-                              questions: (t['question_count'] as num?)?.toInt() ?? 180,
-                              syllabusCoverage: t['syllabus_coverage']?.toString() ?? '',
-                              scheduleLabel: t['schedule_label']?.toString() ?? '',
-                              completed: t['is_completed'] == true,
-                              scoreLabel: (t['last_score']?.toString() ?? '--'),
+                  children: tests.asMap().entries.map(
+                        (entry) {
+                          final index = allTests.indexWhere(
+                            (t) => '${t['id']}' == '${entry.value['id']}',
+                          );
+                          final locked = !ContentAccess.isItemUnlocked(
+                            index: index < 0 ? entry.key : index,
+                            hasActiveSubscription: hasSubscription,
+                          );
+                          final t = entry.value;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                            child: TestCard(
+                              locked: locked,
+                              test: TestItem(
+                                id: '${t['id']}',
+                                title: t['title']?.toString() ?? 'Test',
+                                category: t['category']?.toString() ?? 'Grand test',
+                                durationMinutes:
+                                    (t['duration_minutes'] as num?)?.toInt() ?? 180,
+                                marks: (t['marks'] as num?)?.toInt() ?? 720,
+                                questions:
+                                    (t['question_count'] as num?)?.toInt() ?? 180,
+                                syllabusCoverage:
+                                    t['syllabus_coverage']?.toString() ?? '',
+                                scheduleLabel: t['schedule_label']?.toString() ?? '',
+                                completed: t['is_completed'] == true,
+                                scoreLabel: (t['last_score']?.toString() ?? '--'),
+                              ),
+                              onTap: () => ContentAccess.handleTap(
+                                context: context,
+                                locked: locked,
+                                onUnlocked: () =>
+                                    context.push('/tests/detail/${t['id']}'),
+                              ),
                             ),
-                            onTap: () => context.push('/tests/detail/${t['id']}'),
-                          ),
-                        ),
+                          );
+                        },
                       )
                       .toList(),
                 );
@@ -213,7 +240,7 @@ class _TestsScreenState extends State<TestsScreen> {
   }
 }
 
-class TestDetailScreen extends StatelessWidget {
+class TestDetailScreen extends ConsumerWidget {
   const TestDetailScreen({
     super.key,
     required this.testId,
@@ -222,15 +249,34 @@ class TestDetailScreen extends StatelessWidget {
   final int testId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
+    final accessFuture = ContentRepository().fetchTests().then((tests) {
+      final ids = tests.map((t) => '${t['id']}').toList();
+      return ContentAccess.isIdUnlocked(
+        itemId: '$testId',
+        orderedIds: ids,
+        hasActiveSubscription: hasSubscription,
+      );
+    });
     final future = ContentRepository().fetchTestQuestions(testId);
-    return FutureBuilder<Map<String, dynamic>>(
-      future: future,
+    return FutureBuilder<List<dynamic>>(
+      future: Future.wait([future, accessFuture]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-        final test = Map<String, dynamic>.from(snapshot.data?['test'] as Map? ?? const {});
+        final unlocked = snapshot.data?[1] as bool? ?? hasSubscription;
+        if (!unlocked) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) ContentAccess.openSubscriptions(context);
+          });
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final testData = snapshot.data?[0] as Map<String, dynamic>?;
+        final test = Map<String, dynamic>.from(testData?['test'] as Map? ?? const {});
         return Scaffold(
           appBar: AppBar(title: Text(test['title']?.toString() ?? 'Test')),
           body: SingleChildScrollView(

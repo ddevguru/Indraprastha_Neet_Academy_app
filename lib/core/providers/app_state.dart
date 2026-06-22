@@ -25,8 +25,8 @@ final authBlocProvider = Provider<AuthBloc>((ref) {
 class AppUiState {
   const AppUiState({
     this.themeMode = ThemeMode.light,
-    this.hasActiveSubscription = true, // TEMP: subscription gate disabled
-    this.selectedPlan = 'Rank Pro', // TEMP: all users get top plan
+    this.hasActiveSubscription = false,
+    this.selectedPlan = 'Starter',
     this.bookmarkedBookIds = const {'book_notes_bio'},
     this.bookmarkedQuestionIds = const {'pq2'},
     this.savedChapterIds = const {'plant_kingdom', 'chemical_bonding'},
@@ -80,7 +80,7 @@ class AppUiController extends Notifier<AppUiState> {
     state = state.copyWith(selectedPlan: planName);
   }
 
-  /// Call when user completes a plan purchase in the Subscriptions UI (dummy).
+  /// Call when user completes a plan purchase.
   void activateSubscription(String planName) {
     state = state.copyWith(
       hasActiveSubscription: true,
@@ -88,9 +88,20 @@ class AppUiController extends Notifier<AppUiState> {
     );
   }
 
-  /// Reset when logging out so the next session can demo non-subscriber flow.
+  /// Sync from backend `/me` or login payload.
+  void syncSubscriptionStatus(bool active, {String? planName}) {
+    state = state.copyWith(
+      hasActiveSubscription: active,
+      selectedPlan: planName ?? state.selectedPlan,
+    );
+  }
+
+  /// Reset when logging out so the next session starts as non-subscriber.
   void resetSubscriptionGate() {
-    state = state.copyWith(hasActiveSubscription: false);
+    state = state.copyWith(
+      hasActiveSubscription: false,
+      selectedPlan: 'Starter',
+    );
   }
 
   void toggleBookBookmark(String bookId) {

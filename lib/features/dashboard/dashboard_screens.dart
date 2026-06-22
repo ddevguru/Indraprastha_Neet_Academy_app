@@ -9,6 +9,7 @@ import '../../core/providers/app_state.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/adaptive_scaffold.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/content_lock.dart';
 import '../books/books_screens.dart';
 import '../practice/practice_screens.dart';
 import '../tests/tests_screens.dart';
@@ -96,7 +97,7 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
     final testingDay = ref.watch(testingDayProvider);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: mobileScrollPadding(context),
       child: CenteredContent(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
