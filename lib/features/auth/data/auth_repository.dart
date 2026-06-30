@@ -109,6 +109,36 @@ class AuthRepository {
     return batches.map(BatchOption.fromJson).toList();
   }
 
+  Future<Map<String, dynamic>> appleSignIn(String idToken) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/auth/apple-signin'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken}),
+    );
+    return _decodeResponse(response);
+  }
+
+  Future<Map<String, dynamic>> appleCompleteSignup({
+    required String idToken,
+    required String fullName,
+    required int batchId,
+    required String courseCategory,
+    String preferredLanguage = 'English',
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/auth/apple-complete-signup'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idToken': idToken,
+        'fullName': fullName,
+        'batchId': batchId,
+        'courseCategory': courseCategory,
+        'preferredLanguage': preferredLanguage,
+      }),
+    );
+    return _decodeResponse(response);
+  }
+
   Future<void> deleteAccount(String token) async {
     final response = await _client.delete(
       Uri.parse('$baseUrl/auth/delete-account'),

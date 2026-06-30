@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +10,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
+import '../onboarding/onboarding_checklist_widget.dart';
+import '../../core/services/onboarding_checklist_service.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/content_lock.dart';
@@ -105,6 +109,10 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
     );
     final chapterId = int.tryParse(target['id']?.toString() ?? '');
     if (!context.mounted || chapterId == null) return;
+    unawaited(completeOnboardingStep(
+      ref,
+      OnboardingChecklistStep.openFirstChapter,
+    ));
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ChapterDetailScreen(chapterId: chapterId),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,7 +7,9 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
+import '../../core/services/onboarding_checklist_service.dart';
 import '../content/data/content_repository.dart';
+import '../onboarding/onboarding_checklist_widget.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
@@ -69,6 +73,12 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
   void initState() {
     super.initState();
     _practiceFuture = ContentRepository().fetchPracticeSets();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(completeOnboardingStep(
+        ref,
+        OnboardingChecklistStep.attemptFirstPractice,
+      ));
+    });
   }
 
   void _onCategoryTap(
@@ -844,13 +854,7 @@ class _SubjectTopicsScreen extends StatelessWidget {
         separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
         itemBuilder: (context, i) {
           final set = sets[i];
-          final globalIndex = allSets.indexWhere(
-            (s) => '${s['id']}' == '${set['id']}',
-          );
-          final locked = !ContentAccess.isItemUnlocked(
-            index: globalIndex < 0 ? i : globalIndex,
-            hasActiveSubscription: hasActiveSubscription,
-          );
+          final locked = hasActiveSubscription ? false : i > 0;
           return _PracticeSetCard(
             locked: locked,
             set: PracticeSet(

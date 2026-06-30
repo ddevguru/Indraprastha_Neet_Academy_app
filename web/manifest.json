@@ -1,11 +1,11 @@
 {
-    "name": "indraprastha",
-    "short_name": "indraprastha",
+    "name": "Indraprastha NEET Academy",
+    "short_name": "Indraprastha",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#ffffff",
+    "background_color": "#FFF8F2",
     "theme_color": "#4F5DE4",
-    "description": "A new Flutter project.",
+    "description": "Structured NEET preparation with chapter-wise books, PYQs, practice sets, test series, and performance analytics.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

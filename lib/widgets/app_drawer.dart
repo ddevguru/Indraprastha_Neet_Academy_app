@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../core/constants/website_constants.dart';
 import '../features/auth/bloc/auth_bloc.dart';
 import '../theme/app_tokens.dart';
 import 'app_widgets.dart';
@@ -156,6 +158,47 @@ class AppDrawer extends ConsumerWidget {
                       onTap: () {
                         Navigator.of(context).pop();
                         context.push('/info/report-piracy');
+                      },
+                    ),
+                    const Divider(color: Color(0x22FFFFFF)),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        AppSpacing.md,
+                        AppSpacing.sm,
+                        AppSpacing.md,
+                        AppSpacing.xs,
+                      ),
+                      child: Text(
+                        'Website',
+                        style: TextStyle(
+                          color: AppColors.onDrawer,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    _DrawerLink(
+                      title: 'Official website',
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        final uri = Uri.parse(WebsiteConstants.homepage);
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      },
+                    ),
+                    _DrawerLink(
+                      title: 'NEET rank predictor',
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        final uri = Uri.parse(WebsiteConstants.rankPredictor);
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      },
+                    ),
+                    _DrawerLink(
+                      title: 'Privacy policy',
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        final uri = Uri.parse(WebsiteConstants.privacyPolicy);
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
                       },
                     ),
                     const Divider(color: Color(0x33FFFFFF)),

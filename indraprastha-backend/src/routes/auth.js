@@ -262,7 +262,188 @@ router.get('/colleges', async (req, res) => {
 
 router.delete('/delete-account', authMiddleware, async (req, res) => {
   try {
+    const userResult = await pool.query(
+      'SELECT firebase_uid FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const firebaseUid = userResult.rows[0].firebase_uid;
     await pool.query('DELETE FROM users WHERE id = $1', [req.user.id]);
+
+    if (firebaseUid) {
+      try {
+        await admin.auth().deleteUser(firebaseUid);
+      } catch (firebaseErr) {
+        console.warn('Firebase user delete skipped:', firebaseErr.message);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Apple Sign In — verify Firebase token from apple.com provider
+router.post('/apple-signin', async (req, res) => {
+  const { idToken } = req.body;
+  if (!idToken) {
+    return res.status(400).json({ error: 'Firebase ID token is required' });
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const firebaseUid = decoded.uid;
+    const provider = decoded.firebase?.sign_in_provider;
+
+    if (provider !== 'apple.com') {
+      return res.status(400).json({ error: 'Apple sign-in token required' });
+    }
+
+    let userResult = await pool.query(
+      'SELECT * FROM users WHERE firebase_uid = $1',
+      [firebaseUid]
+    );
+
+    if (userResult.rows.length === 0 && decoded.email) {
+      userResult = await pool.query(
+        'SELECT * FROM users WHERE email = $1',
+        [decoded.email]
+      );
+      if (userResult.rows.length > 0) {
+        await pool.query(
+          'UPDATE users SET firebase_uid = $2 WHERE id = $1',
+          [userResult.rows[0].id, firebaseUid]
+        );
+      }
+    }
+
+    if (userResult.rows.length === 0) {
+      return res.json({ success: true, isNewUser: true });
+    }
+
+    const user = userResult.rows[0];
+    if (!user.is_profile_complete || !user.batch_id) {
+      return res.json({ success: true, isNewUser: true });
+    }
+
+    const { token } = await issueUserSession(user);
+    res.json({ success: true, isNewUser: false, token, user });
+  } catch (err) {
+    console.error('apple-signin error:', err);
+    res.status(401).json({ error: 'Invalid or expired Apple sign-in token' });
+  }
+});
+
+// Complete profile for new Apple Sign In users
+router.post('/apple-complete-signup', async (req, res) => {
+  const {
+    idToken,
+    fullName,
+    batchId,
+    courseCategory,
+    preferredLanguage = 'English',
+  } = req.body;
+
+  if (!idToken || !fullName || !batchId) {
+    return res.status(400).json({ error: 'Name, batch, and token are required' });
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const firebaseUid = decoded.uid;
+    const email = decoded.email || null;
+
+    const batchCheck = await pool.query(
+      `SELECT b.id FROM batches b
+       JOIN courses c ON c.id = b.course_id
+       WHERE b.id = $1 AND c.name = $2`,
+      [batchId, COURSE_NAME]
+    );
+    if (batchCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid batch selected' });
+    }
+
+    const existing = await pool.query(
+      'SELECT id FROM users WHERE firebase_uid = $1',
+      [firebaseUid]
+    );
+
+    let result;
+    if (existing.rows.length > 0) {
+      result = await pool.query(
+        `UPDATE users
+         SET full_name = $2,
+             email = COALESCE($3, email),
+             preferred_language = $4,
+             course_category = $5,
+             batch_id = $6,
+             is_profile_complete = TRUE
+         WHERE firebase_uid = $1
+         RETURNING *`,
+        [firebaseUid, fullName, email, preferredLanguage, courseCategory || COURSE_NAME, batchId]
+      );
+    } else {
+      result = await pool.query(
+        `INSERT INTO users (firebase_uid, email, full_name, preferred_language, course_category, batch_id, is_profile_complete)
+         VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+         RETURNING *`,
+        [firebaseUid, email, fullName, preferredLanguage, courseCategory || COURSE_NAME, batchId]
+      );
+    }
+
+    const user = result.rows[0];
+    const { token } = await issueUserSession(user);
+    res.json({ success: true, token, user });
+  } catch (err) {
+    console.error('apple-complete-signup error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/onboarding-checklist', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT onboarding_checklist, onboarding_checklist_dismissed
+       FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const row = result.rows[0];
+    res.json({
+      success: true,
+      checklist: row.onboarding_checklist || {},
+      dismissed: row.onboarding_checklist_dismissed === true,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.patch('/onboarding-checklist', authMiddleware, async (req, res) => {
+  const { checklist, dismissed } = req.body;
+  try {
+    if (checklist && typeof checklist === 'object') {
+      await pool.query(
+        `UPDATE users
+         SET onboarding_checklist = COALESCE(onboarding_checklist, '{}'::jsonb) || $2::jsonb
+         WHERE id = $1`,
+        [req.user.id, JSON.stringify(checklist)]
+      );
+    }
+    if (dismissed === true) {
+      await pool.query(
+        'UPDATE users SET onboarding_checklist_dismissed = TRUE WHERE id = $1',
+        [req.user.id]
+      );
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);

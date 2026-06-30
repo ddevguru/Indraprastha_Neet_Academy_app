@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers/app_state.dart';
 import '../features/auth/bloc/auth_bloc.dart';
 import '../theme/app_theme.dart';
+import '../widgets/cookie_consent_banner.dart';
 import 'router.dart';
 
 class IndraprasthaApp extends ConsumerStatefulWidget {
@@ -55,13 +56,15 @@ class _IndraprasthaAppState extends ConsumerState<IndraprasthaApp> {
 
     return BlocProvider.value(
       value: authBloc,
-      child: MaterialApp.router(
-        title: 'Indraprastha NEET Academy',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        themeMode: uiState.themeMode,
-        routerConfig: router,
+      child: CookieConsentBanner(
+        child: MaterialApp.router(
+          title: 'Indraprastha NEET Academy',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: uiState.themeMode,
+          routerConfig: router,
+        ),
       ),
     );
   }

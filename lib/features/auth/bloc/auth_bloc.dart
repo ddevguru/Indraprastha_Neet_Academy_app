@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+import '../../../core/services/analytics_service.dart';
 import '../../../models/app_models.dart';
+import '../apple_auth_helper.dart';
 import '../data/auth_repository.dart';
 
 class AuthState {
@@ -135,6 +138,8 @@ class AuthBloc extends Cubit<AuthState> {
       final enrichedUser = await _userWithSubscription(token, user);
       await _repository.saveSession(token: token, user: enrichedUser);
       await _repository.setOnboardingSeen();
+      AnalyticsService.instance.identify(enrichedUser.mobileNumber);
+      AnalyticsService.instance.trackFunnelEvent('logged_in');
       emit(state.copyWith(
         loading: false,
         user: enrichedUser,
@@ -263,6 +268,8 @@ class AuthBloc extends Cubit<AuthState> {
       final enrichedUser = await _userWithSubscription(token, user);
       await _repository.saveSession(token: token, user: enrichedUser);
       await _repository.setOnboardingSeen();
+      AnalyticsService.instance.identify(enrichedUser.mobileNumber);
+      AnalyticsService.instance.trackSignedUp(method: 'phone');
       emit(state.copyWith(
         loading: false,
         user: enrichedUser,
@@ -283,6 +290,137 @@ class AuthBloc extends Cubit<AuthState> {
       final batches = await _repository.fetchBatches();
       emit(state.copyWith(availableBatches: batches));
     } catch (_) {}
+  }
+
+  // ─── Apple Sign In (iOS) ─────────────────────────────────────────────────
+
+  Future<bool> signInWithApple() async {
+    emit(state.copyWith(loading: true, clearError: true));
+    try {
+      final rawNonce = generateAppleSignInNonce();
+      final nonce = sha256ofString(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce,
+      );
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+      );
+
+      final userCredential =
+          await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+      final idToken = await userCredential.user!.getIdToken();
+      if (idToken == null) {
+        throw AuthException('Could not verify Apple sign-in');
+      }
+
+      final data = await _repository.appleSignIn(idToken);
+      final isNewUser = data['isNewUser'] == true;
+
+      if (isNewUser) {
+        emit(state.copyWith(
+          loading: false,
+          isNewUser: true,
+          firebaseIdToken: idToken,
+        ));
+        return false;
+      }
+
+      final token = data['token']?.toString();
+      final userJson = data['user'] as Map<String, dynamic>?;
+      if (token == null || userJson == null) {
+        throw AuthException('Invalid Apple sign-in response');
+      }
+
+      final user = AppUser.fromJson(userJson);
+      final enrichedUser = await _userWithSubscription(token, user);
+      await _repository.saveSession(token: token, user: enrichedUser);
+      await _repository.setOnboardingSeen();
+      AnalyticsService.instance.identify(
+        enrichedUser.email.isNotEmpty
+            ? enrichedUser.email
+            : enrichedUser.fullName,
+      );
+      AnalyticsService.instance.trackFunnelEvent('logged_in');
+      emit(state.copyWith(
+        loading: false,
+        user: enrichedUser,
+        token: token,
+        onboardingSeen: true,
+        firebaseIdToken: null,
+      ));
+      return true;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        emit(state.copyWith(loading: false, clearError: true));
+        return false;
+      }
+      emit(state.copyWith(
+        loading: false,
+        errorMessage: e.message,
+      ));
+      return false;
+    } catch (e) {
+      emit(state.copyWith(loading: false, errorMessage: e.toString()));
+      return false;
+    }
+  }
+
+  Future<bool> completeAppleSignup({
+    required String fullName,
+    required int batchId,
+    required String courseCategory,
+  }) async {
+    final idToken = state.firebaseIdToken;
+    if (idToken == null) {
+      emit(state.copyWith(errorMessage: 'Apple sign-in session expired'));
+      return false;
+    }
+
+    emit(state.copyWith(loading: true, clearError: true));
+    try {
+      final data = await _repository.appleCompleteSignup(
+        idToken: idToken,
+        fullName: fullName,
+        batchId: batchId,
+        courseCategory: courseCategory,
+      );
+
+      final token = data['token']?.toString();
+      final userJson = data['user'] as Map<String, dynamic>?;
+      if (token == null || userJson == null) {
+        throw AuthException('Invalid signup response');
+      }
+
+      final user = AppUser.fromJson(userJson);
+      final enrichedUser = await _userWithSubscription(token, user);
+      await _repository.saveSession(token: token, user: enrichedUser);
+      await _repository.setOnboardingSeen();
+      AnalyticsService.instance.identify(
+        enrichedUser.email.isNotEmpty
+            ? enrichedUser.email
+            : enrichedUser.fullName,
+      );
+      AnalyticsService.instance.trackSignedUp(method: 'apple');
+      emit(state.copyWith(
+        loading: false,
+        user: enrichedUser,
+        token: token,
+        onboardingSeen: true,
+        isNewUser: false,
+        firebaseIdToken: null,
+      ));
+      return true;
+    } catch (e) {
+      emit(state.copyWith(loading: false, errorMessage: e.toString()));
+      return false;
+    }
   }
 
   Future<void> updateProfile(AppUser user) async {

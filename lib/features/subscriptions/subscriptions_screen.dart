@@ -12,6 +12,11 @@ import 'payment_checkout_screen.dart';
 class SubscriptionsScreen extends ConsumerWidget {
   const SubscriptionsScreen({super.key});
 
+  bool _isSingleAllowedPlan(Map<String, dynamic> item) {
+    final price = item['price_label']?.toString().replaceAll(',', '') ?? '';
+    return price.contains('999') && !price.contains('4999');
+  }
+
   Future<void> _startCheckout(
     BuildContext context,
     WidgetRef ref,
@@ -95,7 +100,8 @@ class SubscriptionsScreen extends ConsumerWidget {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const SkeletonLoader(cardCount: 3);
                   }
-                  final rawPlans = snapshot.data ?? const [];
+                  final allRawPlans = snapshot.data ?? const [];
+                  final rawPlans = allRawPlans.where(_isSingleAllowedPlan).toList();
                   final plans = rawPlans
                       .map(
                         (item) => SubscriptionPlan(
@@ -187,16 +193,13 @@ class _ComparePlansTable extends StatelessWidget {
           headingRowColor: WidgetStatePropertyAll(AppColors.surfaceMuted),
           columns: const [
             DataColumn(label: Text('Feature')),
-            DataColumn(label: Text('Starter')),
-            DataColumn(label: Text('Practice')),
-            DataColumn(label: Text('Rank Pro')),
-            DataColumn(label: Text('Test Series Plus')),
+            DataColumn(label: Text('Rs 999 Plan')),
           ],
           rows: [
-            _row('NCERT smart reading', 'Yes', 'Yes', 'Yes', 'Limited', textStyle),
-            _row('Practice modules', 'Limited', 'Unlimited', 'Unlimited', 'No', textStyle),
-            _row('Full test series', 'No', 'Selected', 'Yes', 'Yes', textStyle),
-            _row('Advanced analytics', 'Basic', 'Standard', 'Premium', 'Standard', textStyle),
+            _row('NCERT smart reading', 'Yes', textStyle),
+            _row('Practice modules', 'Limited', textStyle),
+            _row('Full test series', 'Selected', textStyle),
+            _row('Advanced analytics', 'Basic', textStyle),
           ],
         ),
       ),
@@ -205,19 +208,13 @@ class _ComparePlansTable extends StatelessWidget {
 
   DataRow _row(
     String feature,
-    String starter,
-    String practice,
-    String rankPro,
-    String testSeries,
+    String available,
     TextStyle? textStyle,
   ) {
     return DataRow(
       cells: [
         DataCell(Text(feature, style: textStyle)),
-        DataCell(Text(starter, style: textStyle)),
-        DataCell(Text(practice, style: textStyle)),
-        DataCell(Text(rankPro, style: textStyle)),
-        DataCell(Text(testSeries, style: textStyle)),
+        DataCell(Text(available, style: textStyle)),
       ],
     );
   }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/constants/website_constants.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../widgets/website_links.dart';
 
 /// Static info pages for drawer links (`/info/:slug`).
 class InfoDetailScreen extends StatelessWidget {
@@ -90,13 +92,15 @@ class _Meta {
               'For technical issues, include your registered mobile number and a screenshot.',
         );
       case 'about':
-        return const _Meta(
+        return _Meta(
           title: 'About us',
           body:
               'Indraprastha NEET Academy focuses on disciplined preparation for NEET through '
               'concept clarity, daily practice, and test-based improvement.\n\n'
               'Our approach: structured study plans, chapter-wise testing, and revision loops '
-              'that turn mistakes into score growth.',
+              'that turn mistakes into score growth.\n\n'
+              'Visit our official website for courses, rank predictor tools, and academy updates.',
+          extra: (context) => const WebsiteLinksSection(),
         );
       case 'rate-us':
         return _Meta(
@@ -121,32 +125,40 @@ class _Meta {
               ),
         );
       case 'terms':
-        return const _Meta(
+        return _Meta(
           title: 'Terms & conditions',
           body:
               '1) Course access is for the registered student account only.\n'
               '2) Sharing app content, videos, or PDFs without permission is prohibited.\n'
               '3) Test performance data is used to generate learning analytics inside the app.\n'
               '4) Subscription and access policies may be updated by the academy.\n\n'
-              'Please read complete policy details from official support before purchase.',
+              'Read the full privacy and cookies policies on our website.',
+          extra: (context) => const WebsiteLinksSection(),
         );
       case 'share':
         return _Meta(
           title: 'Share the app',
           body:
-              'Copy a placeholder store link to share with friends. Integrate Share.sheet or '
-              'branch links in production.',
-          extra: (context) => FilledButton.icon(
-                onPressed: () async {
-                  const link = 'https://indraprastha-neet.example.app';
-                  await Clipboard.setData(const ClipboardData(text: link));
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Link copied to clipboard.')),
-                  );
-                },
-                icon: const Icon(Icons.link_rounded),
-                label: const Text('Copy demo link'),
+              'Share Indraprastha NEET Academy with friends preparing for NEET. '
+              'Copy the link below or visit our website for the rank predictor.',
+          extra: (context) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () async {
+                      const link = WebsiteConstants.homepage;
+                      await Clipboard.setData(const ClipboardData(text: link));
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Link copied to clipboard.')),
+                      );
+                    },
+                    icon: const Icon(Icons.link_rounded),
+                    label: const Text('Copy website link'),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  const WebsiteLinksSection(),
+                ],
               ),
         );
       case 'report-piracy':

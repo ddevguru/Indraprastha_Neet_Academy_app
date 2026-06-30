@@ -8,6 +8,7 @@ import '../../core/data/dummy_data.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import 'bloc/auth_bloc.dart';
+import 'widgets/apple_sign_in_button.dart';
 
 // ─── Splash ──────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,8 @@ class _SplashScreenState extends State<SplashScreen> {
       final state = context.read<AuthBloc>().state;
       if (state.isLoggedIn) {
         context.go('/dashboard/0');
+      } else if (state.onboardingSeen) {
+        context.go('/login');
       } else {
         context.go('/onboarding');
       }
@@ -90,6 +93,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _currentPage = 0;
 
   @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _advanceOnboarding() async {
+    if (_currentPage < DummyData.onboarding.length - 1) {
+      final nextPage = _currentPage + 1;
+      await _controller.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
+    final router = GoRouter.of(context);
+    await context.read<AuthBloc>().markOnboardingSeen();
+    if (!mounted) return;
+    router.go('/login');
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
@@ -98,101 +123,105 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.lg),
-              child: CenteredContent(
-                maxWidth: 900,
-                child: SurfaceCard(
-                  borderRadius: AppRadii.xl,
-                  child: Column(
-                    children: [
-                      const AppLogo(size: 56, showGlow: true, padding: 4),
-                      const SizedBox(height: AppSpacing.md),
-                      Expanded(
-                        child: PageView.builder(
-                          controller: _controller,
-                          itemCount: DummyData.onboarding.length,
-                          onPageChanged: (value) =>
-                              setState(() => _currentPage = value),
-                          itemBuilder: (context, index) {
-                            final item = DummyData.onboarding[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.md,
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(item.icon,
-                                      size: 52, color: AppColors.indigo),
-                                  const SizedBox(height: AppSpacing.lg),
-                                  Text(
-                                    item.title,
-                                    textAlign: TextAlign.center,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineSmall,
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Text(
-                                    item.subtitle,
-                                    textAlign: TextAlign.center,
-                                    style:
-                                        Theme.of(context).textTheme.titleMedium,
-                                  ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  Text(item.caption,
-                                      textAlign: TextAlign.center),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Align(
+                    alignment: Alignment.center,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 900,
+                        maxHeight: constraints.maxHeight,
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(
-                          DummyData.onboarding.length,
-                          (index) => AnimatedContainer(
-                            duration: const Duration(milliseconds: 220),
-                            margin:
-                                const EdgeInsets.only(right: AppSpacing.xs),
-                            width: _currentPage == index ? 28 : 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              gradient: _currentPage == index
-                                  ? AppGradients.primary
-                                  : null,
-                              color: _currentPage == index
-                                  ? null
-                                  : AppColors.border,
-                              borderRadius: BorderRadius.circular(99),
+                      child: SurfaceCard(
+                        borderRadius: AppRadii.xl,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const AppLogo(size: 56, showGlow: true, padding: 4),
+                            const SizedBox(height: AppSpacing.md),
+                            Expanded(
+                              child: PageView.builder(
+                                controller: _controller,
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: DummyData.onboarding.length,
+                                onPageChanged: (value) =>
+                                    setState(() => _currentPage = value),
+                                itemBuilder: (context, index) {
+                                  final item = DummyData.onboarding[index];
+                                  return SingleChildScrollView(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.md,
+                                      vertical: AppSpacing.sm,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(item.icon,
+                                            size: 52, color: AppColors.indigo),
+                                        const SizedBox(height: AppSpacing.lg),
+                                        Text(
+                                          item.title,
+                                          textAlign: TextAlign.center,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .headlineSmall,
+                                        ),
+                                        const SizedBox(height: AppSpacing.sm),
+                                        Text(
+                                          item.subtitle,
+                                          textAlign: TextAlign.center,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium,
+                                        ),
+                                        const SizedBox(height: AppSpacing.md),
+                                        Text(item.caption,
+                                            textAlign: TextAlign.center),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
-                          ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                DummyData.onboarding.length,
+                                (index) => AnimatedContainer(
+                                  duration: const Duration(milliseconds: 220),
+                                  margin: const EdgeInsets.only(
+                                      right: AppSpacing.xs),
+                                  width: _currentPage == index ? 28 : 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    gradient: _currentPage == index
+                                        ? AppGradients.primary
+                                        : null,
+                                    color: _currentPage == index
+                                        ? null
+                                        : AppColors.border,
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            PrimaryButton(
+                              label: _currentPage ==
+                                      DummyData.onboarding.length - 1
+                                  ? 'Get Started'
+                                  : 'Continue',
+                              expanded: true,
+                              icon: Icons.arrow_forward_rounded,
+                              onPressed: _advanceOnboarding,
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.lg),
-                      PrimaryButton(
-                        label: _currentPage == DummyData.onboarding.length - 1
-                            ? 'Get Started'
-                            : 'Continue',
-                        expanded: true,
-                        icon: Icons.arrow_forward_rounded,
-                        onPressed: () async {
-                          if (_currentPage < DummyData.onboarding.length - 1) {
-                            _controller.nextPage(
-                              duration: const Duration(milliseconds: 320),
-                              curve: Curves.easeOutCubic,
-                            );
-                            return;
-                          }
-                          final router = GoRouter.of(context);
-                          await context.read<AuthBloc>().markOnboardingSeen();
-                          if (!mounted) return;
-                          router.go('/login');
-                        },
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -231,7 +260,11 @@ class _LoginScreenState extends State<LoginScreen> {
             SnackBar(content: Text(state.errorMessage!)),
           );
         }
-        if (state.isLoggedIn) context.go('/dashboard/0');
+        if (state.isLoggedIn) {
+          context.go('/dashboard/0');
+        } else if (state.firebaseIdToken != null && state.isNewUser) {
+          context.go('/signup/apple-complete');
+        }
       },
       builder: (context, state) {
         return _AuthBody(
@@ -239,6 +272,19 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const AppleSignInButton(label: 'Sign in with Apple'),
+              const SizedBox(height: 12),
+              const Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('or'),
+                  ),
+                  Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: _phone,
                 keyboardType: TextInputType.phone,
@@ -337,7 +383,13 @@ class _SignupScreenState extends State<SignupScreen> {
             SnackBar(content: Text(state.errorMessage!)),
           );
         }
-        if (state.isLoggedIn) context.go('/dashboard/0');
+        if (state.isLoggedIn) {
+          context.go('/dashboard/0');
+        } else if (state.firebaseIdToken != null &&
+            state.isNewUser &&
+            state.otpSent == false) {
+          context.go('/signup/apple-complete');
+        }
       },
       builder: (context, state) {
         // step 0 = enter phone, step 1 = enter OTP, step 2 = password + details
@@ -348,6 +400,21 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (step == 0) ...[
+                const AppleSignInButton(label: 'Sign up with Apple'),
+                const SizedBox(height: 12),
+                const Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('or use phone'),
+                    ),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
               // ── Step 0: Phone ──────────────────────────────────────────
               if (step == 0) ...[
                 TextField(

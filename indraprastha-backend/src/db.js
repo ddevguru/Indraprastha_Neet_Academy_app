@@ -104,6 +104,31 @@ async function ensureDatabaseSchema() {
   `);
 
   await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS firebase_uid TEXT UNIQUE;
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS onboarding_checklist JSONB DEFAULT '{}'::jsonb;
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS onboarding_checklist_dismissed BOOLEAN DEFAULT FALSE;
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ALTER COLUMN phone DROP NOT NULL;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS otp_sessions (
       id SERIAL PRIMARY KEY,
       phone VARCHAR(15) UNIQUE NOT NULL,

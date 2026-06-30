@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/onboarding_checklist_service.dart';
 import '../content/data/content_repository.dart';
+import '../onboarding/onboarding_checklist_widget.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 
-class AnalyticsScreen extends StatefulWidget {
+class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
 
   @override
-  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+  ConsumerState<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
-class _AnalyticsScreenState extends State<AnalyticsScreen> {
+class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   late final Future<Map<String, dynamic>> _analyticsFuture;
 
   @override
   void initState() {
     super.initState();
     _analyticsFuture = _loadAnalytics();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      completeOnboardingStep(ref, OnboardingChecklistStep.viewAnalytics);
+    });
   }
 
   Future<Map<String, dynamic>> _loadAnalytics() async {

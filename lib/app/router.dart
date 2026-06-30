@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../core/providers/app_state.dart';
 import '../features/analytics/analytics_screen.dart';
 import '../features/auth/auth_screens.dart';
+import '../features/auth/apple_signup_complete_screen.dart';
 import '../features/books/books_screens.dart';
 import '../features/dashboard/dashboard_screens.dart';
 import '../features/info/info_screens.dart';
@@ -30,6 +31,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       '/onboarding',
       '/login',
       '/signup',
+      '/signup/apple-complete',
       '/forgot-password',
     };
     // const purchasePaths = {'/paywall', '/subscriptions'}; // TEMP: unused while subscription gate is disabled
@@ -50,6 +52,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     if (loc == '/paywall') return '/dashboard/0';
     if (loc == '/login' ||
         loc == '/signup' ||
+        loc == '/signup/apple-complete' ||
         loc == '/onboarding' ||
         loc == '/forgot-password') {
       return '/dashboard/0';
@@ -77,6 +80,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/signup',
         builder: (context, state) => const SignupScreen(),
+      ),
+      GoRoute(
+        path: '/signup/apple-complete',
+        builder: (context, state) => const AppleSignupCompleteScreen(),
       ),
       GoRoute(
         path: '/forgot-password',

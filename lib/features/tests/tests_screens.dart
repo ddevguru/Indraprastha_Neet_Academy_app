@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
+import '../../core/services/onboarding_checklist_service.dart';
 import '../content/data/content_repository.dart';
+import '../onboarding/onboarding_checklist_widget.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
@@ -72,6 +74,7 @@ class TestsScreen extends ConsumerStatefulWidget {
 class _TestsScreenState extends ConsumerState<TestsScreen> {
   late final Future<List<Map<String, dynamic>>> _testsFuture;
   String? _activeFilter;
+  static const int _freeUnlockedTestCount = 3;
 
   static const _filters = [
     'Grand tests',
@@ -85,6 +88,12 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
   void initState() {
     super.initState();
     _testsFuture = ContentRepository().fetchTests();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(completeOnboardingStep(
+        ref,
+        OnboardingChecklistStep.takeFirstTest,
+      ));
+    });
   }
 
   List<Map<String, dynamic>> _applyFilter(List<Map<String, dynamic>> tests) {
@@ -195,10 +204,10 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                           final index = allTests.indexWhere(
                             (t) => '${t['id']}' == '${entry.value['id']}',
                           );
-                          final locked = !ContentAccess.isItemUnlocked(
-                            index: index < 0 ? entry.key : index,
-                            hasActiveSubscription: hasSubscription,
-                          );
+                          final testIndex = index < 0 ? entry.key : index;
+                          final locked = hasSubscription
+                              ? false
+                              : testIndex >= _freeUnlockedTestCount;
                           final t = entry.value;
                           return Padding(
                             padding: const EdgeInsets.only(bottom: AppSpacing.md),

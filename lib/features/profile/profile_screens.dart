@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers/app_state.dart';
+import '../../widgets/website_links.dart';
 import '../auth/bloc/auth_bloc.dart';
 import '../content/data/content_repository.dart';
+import '../../core/services/onboarding_checklist_service.dart';
+import '../onboarding/onboarding_checklist_widget.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
@@ -198,6 +201,9 @@ class _SavedRevisionScreenState extends ConsumerState<SavedRevisionScreen> {
   void initState() {
     super.initState();
     _savedFuture = _loadSaved();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      completeOnboardingStep(ref, OnboardingChecklistStep.saveForRevision);
+    });
   }
 
   Future<Map<String, dynamic>> _loadSaved() async {
@@ -661,6 +667,8 @@ class _SettingsPanel extends ConsumerWidget {
             title: const Text('Download settings'),
             subtitle: const Text('Download notes on Wi-Fi only.'),
           ),
+          const SizedBox(height: AppSpacing.lg),
+          const WebsiteLinksSection(compact: true),
         ],
       ),
     );
@@ -706,6 +714,21 @@ class _AccountActionsPanel extends ConsumerWidget {
             subtitle: const Text('See latest updates'),
             onTap: () => context.push('/notifications'),
           ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.delete_forever_outlined,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            title: Text(
+              'Delete student account',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            subtitle: const Text(
+              'Permanently remove your account and all associated data',
+            ),
+            onTap: () => _confirmDeleteAccount(context),
+          ),
           const SizedBox(height: AppSpacing.md),
           SecondaryButton(
             label: 'Logout',
@@ -724,40 +747,53 @@ class _AccountActionsPanel extends ConsumerWidget {
               minimumSize: const Size.fromHeight(48),
             ),
             icon: const Icon(Icons.delete_forever_rounded),
-            label: const Text('Delete Account'),
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Delete Account?'),
-                  content: const Text(
-                    'This will permanently delete your account and all data. This action cannot be undone.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Cancel'),
-                    ),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Theme.of(ctx).colorScheme.error,
-                        foregroundColor: Theme.of(ctx).colorScheme.onError,
-                      ),
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Delete'),
-                    ),
-                  ],
-                ),
-              );
-              if (confirm == true && context.mounted) {
-                final success = await context.read<AuthBloc>().deleteAccount();
-                if (success && context.mounted) context.go('/login');
-              }
-            },
+            label: const Text('Delete student account'),
+            onPressed: () => _confirmDeleteAccount(context),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete student account?'),
+        content: const Text(
+          'This permanently deletes your student account, test history, '
+          'saved content, and subscription records. This cannot be undone.\n\n'
+          'You will need to sign up again to use the app.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete my account'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && context.mounted) {
+      final success = await context.read<AuthBloc>().deleteAccount();
+      if (success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Your account has been deleted.')),
+        );
+        context.go('/login');
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not delete account. Try again.')),
+        );
+      }
+    }
   }
 }
 
