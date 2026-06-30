@@ -6,13 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app.dart';
 import 'core/providers/app_state.dart';
 import 'core/services/notification_service.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Firebase must be initialized before anything else.
-  // Reads config from android/app/google-services.json automatically.
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   final prefs = await SharedPreferences.getInstance();
 

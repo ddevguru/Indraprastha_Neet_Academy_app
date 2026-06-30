@@ -20,6 +20,49 @@ String resolveDriveImageUrl(String raw) {
   return 'https://drive.google.com/uc?export=view&id=$id';
 }
 
+class _ReviewOptionStyle {
+  const _ReviewOptionStyle({
+    required this.background,
+    required this.border,
+    required this.text,
+  });
+
+  final Color background;
+  final Color border;
+  final Color text;
+
+  static _ReviewOptionStyle neutral(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _ReviewOptionStyle(
+      background: Theme.of(context).cardColor,
+      border: isDark ? const Color(0xFF343B49) : AppColors.border,
+      text: Theme.of(context).colorScheme.onSurface,
+    );
+  }
+
+  static _ReviewOptionStyle correct(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _ReviewOptionStyle(
+      background: isDark
+          ? AppColors.success.withValues(alpha: 0.18)
+          : const Color(0xFFE7F8EF),
+      border: AppColors.success,
+      text: isDark ? const Color(0xFF6EE7A0) : AppColors.textPrimary,
+    );
+  }
+
+  static _ReviewOptionStyle wrong(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _ReviewOptionStyle(
+      background: isDark
+          ? AppColors.danger.withValues(alpha: 0.18)
+          : const Color(0xFFFCEAEA),
+      border: AppColors.danger,
+      text: isDark ? const Color(0xFFFF9B8F) : AppColors.textPrimary,
+    );
+  }
+}
+
 Widget buildReviewImage(String rawUrl) {
   return ClipRRect(
     borderRadius: BorderRadius.circular(AppRadii.md),
@@ -390,6 +433,7 @@ class _ReviewQuestionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasExplanation = (entry.explanation?.isNotEmpty ?? false) ||
         (entry.explanationImageUrl?.isNotEmpty ?? false) ||
         (entry.explanationImagesList?.isNotEmpty ?? false);
@@ -410,13 +454,15 @@ class _ReviewQuestionPage extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.indigoSoft,
+                      color: isDark
+                          ? AppColors.primary.withValues(alpha: 0.2)
+                          : AppColors.indigoSoft,
                       borderRadius: BorderRadius.circular(99),
                     ),
                     child: Text(
                       'Q${index + 1}',
                       style: const TextStyle(
-                        color: AppColors.indigo,
+                        color: AppColors.primary,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
@@ -461,15 +507,11 @@ class _ReviewQuestionPage extends StatelessWidget {
               ...List.generate(entry.options.length, (i) {
                 final isCorrect = i == entry.correctIndex;
                 final isSelected = entry.selectedIndex == i;
-                Color bg = Theme.of(context).cardColor;
-                Color border = AppColors.border;
-                if (isCorrect) {
-                  bg = const Color(0xFFE7F8EF);
-                  border = AppColors.success;
-                } else if (isSelected && !isCorrect) {
-                  bg = const Color(0xFFFCEAEA);
-                  border = AppColors.danger;
-                }
+                final style = isCorrect
+                    ? _ReviewOptionStyle.correct(context)
+                    : isSelected && !isCorrect
+                        ? _ReviewOptionStyle.wrong(context)
+                        : _ReviewOptionStyle.neutral(context);
                 final prefix = entry.optionPrefix && i < _optionLetters.length
                     ? '${_optionLetters[i]}) '
                     : '';
@@ -479,11 +521,19 @@ class _ReviewQuestionPage extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
-                      color: bg,
+                      color: style.background,
                       borderRadius: BorderRadius.circular(AppRadii.md),
-                      border: Border.all(color: border),
+                      border: Border.all(color: style.border),
                     ),
-                    child: Text('$prefix${entry.options[i]}'),
+                    child: Text(
+                      '$prefix${entry.options[i]}',
+                      style: TextStyle(
+                        color: style.text,
+                        fontWeight: isCorrect || isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
                   ),
                 );
               }),
@@ -533,7 +583,14 @@ class _ReviewQuestionPage extends StatelessWidget {
                       if (entry.explanation != null &&
                           entry.explanation!.isNotEmpty) ...[
                         const SizedBox(height: 6),
-                        Text(entry.explanation!),
+                        Text(
+                          entry.explanation!,
+                          style: TextStyle(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.9)
+                                : AppColors.textPrimary,
+                          ),
+                        ),
                       ],
                       if (entry.explanationImageUrl != null &&
                           entry.explanationImageUrl!.isNotEmpty) ...[

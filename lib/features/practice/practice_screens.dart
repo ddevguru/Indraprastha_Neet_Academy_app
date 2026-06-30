@@ -541,6 +541,42 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                         ...List.generate(options.length, (index) {
                           final selected = _selectedOption == index;
                           final revealState = _submitted && (selected || index == correctIndex);
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          final isCorrectOption = index == correctIndex;
+                          Color bg;
+                          Color border;
+                          Color textColor;
+                          if (revealState) {
+                            if (isCorrectOption) {
+                              bg = isDark
+                                  ? AppColors.success.withValues(alpha: 0.18)
+                                  : const Color(0xFFE7F8EF);
+                              border = AppColors.success;
+                              textColor = isDark
+                                  ? const Color(0xFF6EE7A0)
+                                  : AppColors.success;
+                            } else {
+                              bg = isDark
+                                  ? AppColors.danger.withValues(alpha: 0.18)
+                                  : const Color(0xFFFCEAEA);
+                              border = AppColors.danger;
+                              textColor = isDark
+                                  ? const Color(0xFFFF9B8F)
+                                  : AppColors.danger;
+                            }
+                          } else if (selected) {
+                            bg = isDark
+                                ? AppColors.primary.withValues(alpha: 0.2)
+                                : AppColors.indigoSoft;
+                            border = AppColors.indigo;
+                            textColor = AppColors.primary;
+                          } else {
+                            bg = Theme.of(context).cardColor;
+                            border = isDark
+                                ? const Color(0xFF343B49)
+                                : AppColors.border;
+                            textColor = Theme.of(context).colorScheme.onSurface;
+                          }
                           return Padding(
                             padding: const EdgeInsets.only(bottom: AppSpacing.md),
                             child: InkWell(
@@ -549,34 +585,14 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(AppSpacing.md),
                                 decoration: BoxDecoration(
-                                  color: revealState
-                                      ? (index == correctIndex
-                                          ? const Color(0xFFE7F8EF)
-                                          : const Color(0xFFFCEAEA))
-                                      : selected
-                                          ? AppColors.indigoSoft
-                                          : Theme.of(context).cardColor,
+                                  color: bg,
                                   borderRadius: BorderRadius.circular(AppRadii.md),
-                                  border: Border.all(
-                                    color: revealState
-                                        ? (index == correctIndex
-                                            ? AppColors.success
-                                            : AppColors.danger)
-                                        : selected
-                                            ? AppColors.indigo
-                                            : AppColors.border,
-                                  ),
+                                  border: Border.all(color: border),
                                 ),
                                 child: Text(
                                   options[index],
                                   style: TextStyle(
-                                    color: revealState
-                                        ? (index == correctIndex
-                                            ? AppColors.success
-                                            : AppColors.danger)
-                                        : selected
-                                            ? AppColors.primaryDark
-                                            : Theme.of(context).colorScheme.onSurface,
+                                    color: textColor,
                                     fontWeight: selected || revealState
                                         ? FontWeight.w600
                                         : FontWeight.w400,

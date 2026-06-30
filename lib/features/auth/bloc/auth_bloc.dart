@@ -297,6 +297,15 @@ class AuthBloc extends Cubit<AuthState> {
   Future<bool> signInWithApple() async {
     emit(state.copyWith(loading: true, clearError: true));
     try {
+      if (!await SignInWithApple.isAvailable()) {
+        emit(state.copyWith(
+          loading: false,
+          errorMessage:
+              'Apple Sign In is not available on this device. Use phone login instead.',
+        ));
+        return false;
+      }
+
       final rawNonce = generateAppleSignInNonce();
       final nonce = sha256ofString(rawNonce);
 
@@ -363,7 +372,13 @@ class AuthBloc extends Cubit<AuthState> {
       }
       emit(state.copyWith(
         loading: false,
-        errorMessage: e.message,
+        errorMessage: appleSignInErrorMessage(e),
+      ));
+      return false;
+    } on FirebaseAuthException catch (e) {
+      emit(state.copyWith(
+        loading: false,
+        errorMessage: e.message ?? 'Apple Sign In failed. Please try again.',
       ));
       return false;
     } catch (e) {
