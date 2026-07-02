@@ -4,7 +4,8 @@
   "main": "index.js",
  "scripts": {
   "dev": "nodemon src/index.js",
-  "start": "node src/index.js"
+  "start": "node src/index.js",
+  "db:setup": "node scripts/setup-db.js"
 },
   "keywords": [],
   "author": "",

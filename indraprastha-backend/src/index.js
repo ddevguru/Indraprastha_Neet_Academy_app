@@ -8,6 +8,7 @@ const { ensureDatabaseSchema, loadRuntimeConfigFromDb } = require('./db');
 const authRoutes = require('./routes/auth');
 const contentRoutes = require('./routes/content');
 const adminRoutes = require('./routes/admin');
+const { logError: gcpLogError, logInfo: gcpLogInfo } = require('./services/gcp_log');
 
 const app = express();
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
@@ -42,8 +43,22 @@ app.use(
 app.use(express.json());
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-app.use((req, _res, next) => {
+app.use((req, res, next) => {
   req.reqStart = Date.now();
+  next();
+});
+
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    if (res.statusCode >= 400) {
+      gcpLogError('HTTP request failed', {
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: res.statusCode,
+        durationMs: req.reqStart ? Date.now() - req.reqStart : null,
+      });
+    }
+  });
   next();
 });
 
@@ -54,7 +69,7 @@ app.use('/api/payments', require('./routes/payments'));
 
 app.use((err, req, res, _next) => {
   const elapsed = req.reqStart ? `${Date.now() - req.reqStart}ms` : 'n/a';
-  console.error('[API_ERROR]', {
+  gcpLogError('Unhandled API error', {
     method: req.method,
     path: req.originalUrl,
     elapsed,
@@ -69,13 +84,18 @@ const PORT = process.env.PORT || 3000;
 
 async function startServer() {
   try {
+    gcpLogInfo('Initializing database schema');
     await ensureDatabaseSchema();
+    gcpLogInfo('Database schema ready');
     await loadRuntimeConfigFromDb();
     app.listen(PORT, () => {
-      console.log(`🚀 Backend running on http://localhost:${PORT}`);
+      gcpLogInfo('Backend server started', { port: PORT });
     });
   } catch (error) {
-    console.error('Failed to initialize database schema:', error);
+    gcpLogError('Failed to initialize database schema', {
+      message: error.message,
+      stack: error.stack,
+    });
     process.exit(1);
   }
 }

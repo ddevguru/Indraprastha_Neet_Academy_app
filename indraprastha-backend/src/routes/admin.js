@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const { pool } = require('../db');
 const { sendNotificationToAll } = require('../services/notifications');
 const logger = require('../services/logger');
+const { logError: gcpLogError } = require('../services/gcp_log');
 const {
   uploadBufferToDrive,
   uploadFilePathToDrive,
@@ -35,12 +36,21 @@ function ensureUploadRoot() {
 ensureUploadRoot();
 
 function logAdminRouteError(route, error, extra = {}) {
-  console.error('[ADMIN_ROUTE_ERROR]', {
+  const payload = {
     route,
     message: error?.message || 'Unknown error',
     stack: error?.stack,
     ...extra,
-  });
+  };
+  gcpLogError(`Admin route failed: ${route}`, payload);
+  logger.logError({
+    errorType: 'ADMIN_ROUTE_ERROR',
+    message: payload.message,
+    stack: payload.stack,
+    endpoint: route,
+    adminId: extra.adminId,
+    details: extra,
+  }).catch(() => {});
 }
 
 function adminAuth(req, res, next) {

@@ -78,14 +78,16 @@ class ErrorLogger {
       this._logToGCP(logEntry);
     }
 
-    // Also log to console for development
-    console.error(`[${errorType}]`, {
-      message,
+    // Also log structured JSON for Google Cloud Console
+    const { logError: gcpLogError } = require('./gcp_log');
+    gcpLogError(message || errorType, {
+      errorType,
       operation,
       endpoint,
       statusCode,
       userId,
-      adminId
+      adminId,
+      details,
     });
 
     return logEntry;
