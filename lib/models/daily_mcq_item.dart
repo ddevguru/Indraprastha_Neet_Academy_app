@@ -9,6 +9,7 @@ class DailyMcqItem {
     required this.standardLabel,
     required this.preview,
     required this.issuedAt,
+    this.isActive = true,
     this.optionA,
     this.optionB,
     this.optionC,
@@ -25,6 +26,7 @@ class DailyMcqItem {
   final String standardLabel;
   final String preview;
   final DateTime issuedAt;
+  final bool isActive;
   final String? optionA;
   final String? optionB;
   final String? optionC;
@@ -40,8 +42,19 @@ class DailyMcqItem {
 
   bool get hasRealOptions => optionA != null && optionA!.isNotEmpty;
 
-  DateTime get expiresAt => issuedAt.add(const Duration(hours: 24));
-  bool get isInTodaysWindow => DateTime.now().isBefore(expiresAt);
+  DateTime get expiresAt {
+    final day = DateTime(issuedAt.year, issuedAt.month, issuedAt.day);
+    return day.add(const Duration(days: 1));
+  }
+
+  bool get isInTodaysWindow {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final issued = DateTime(issuedAt.year, issuedAt.month, issuedAt.day);
+    return issued == today && isActive;
+  }
+
+  bool get isArchived => !isInTodaysWindow;
 
   factory DailyMcqItem.fromApi(Map<String, dynamic> m) {
     SubjectType subject = SubjectType.physics;
@@ -66,6 +79,11 @@ class DailyMcqItem {
       correctOption = 3;
     }
 
+    final createdRaw = m['created_at']?.toString();
+    final issuedAt = createdRaw != null
+        ? (DateTime.tryParse(createdRaw)?.toLocal() ?? DateTime.now())
+        : DateTime.now();
+
     return DailyMcqItem(
       id: m['id'].toString(),
       subject: subject,
@@ -73,7 +91,8 @@ class DailyMcqItem {
       chapterTitle: m['topic'] as String? ?? '',
       standardLabel: m['class_label'] as String? ?? '',
       preview: m['question'] as String? ?? '',
-      issuedAt: DateTime.now(),
+      issuedAt: issuedAt,
+      isActive: m['is_active'] as bool? ?? true,
       optionA: m['option_a'] as String?,
       optionB: m['option_b'] as String?,
       optionC: m['option_c'] as String?,

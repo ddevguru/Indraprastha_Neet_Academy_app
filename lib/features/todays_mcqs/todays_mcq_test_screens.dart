@@ -38,8 +38,8 @@ class TodaysMcqTestPreviewScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      'Review which test is scheduled for today and which subjects it covers. '
-                      'Tap Start when you are ready.',
+                      'Aaj ke MCQ of the Day ka test yahan dikhega. '
+                      'Tests section wale alag tests hain — yahan sirf daily MCQs.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/access/content_access.dart';
@@ -51,10 +50,10 @@ class TodaysMcqsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SectionHeader(
-                    title: "Today's rotation",
+                    title: "Today's MCQs",
                     subtitle:
-                        'Questions stay here for 24 hours from issue time, then move into '
-                        'Books → chapter → PYQs / practice for that standard.',
+                        'Sirf aaj ke MCQs ka test de sakte ho. Purane MCQs neeche archive mein dikhte hain — '
+                        'unhe sirf dekh sakte ho, test nahi.',
                   ),
                   if (!hasSubscription) ...[
                     const SizedBox(height: AppSpacing.md),
@@ -63,10 +62,10 @@ class TodaysMcqsScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.lg),
                   if (active.isEmpty)
                     const EmptyStateWidget(
-                      title: 'No MCQs in the daily window',
+                      title: 'Aaj ke liye koi MCQ nahi hai',
                       subtitle:
-                          'Everything issued in the last session has moved to your chapters. '
-                          'Open a chapter below or pull to refresh after the next daily drop.',
+                          'Admin jab aaj ka MCQ of the Day add karega, yahan dikhega. '
+                          'Purane MCQs archive section mein milenge.',
                       icon: Icons.quiz_outlined,
                     )
                   else
@@ -88,28 +87,18 @@ class TodaysMcqsScreen extends ConsumerWidget {
                   if (archived.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.xl),
                     SectionHeader(
-                      title: 'Moved to your chapters (24h passed)',
+                      title: 'Archived MCQs (view only)',
                       subtitle:
-                          'These now appear under the matching subject and chapter in Books and Practice.',
+                          'Purane din ke MCQs — sirf questions dekh sakte ho, test nahi de sakte.',
                     ),
                     const SizedBox(height: AppSpacing.md),
                     ...archived.asMap().entries.map((entry) {
-                      final locked = !ContentAccess.isItemUnlocked(
-                        index: active.length + entry.key,
-                        hasActiveSubscription: hasSubscription,
-                      );
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: _McqCard(
                           item: entry.value,
                           showTimer: false,
-                          locked: locked,
-                          onLockedTap: () => ContentAccess.openSubscriptions(context),
-                          onOpenChapter: locked
-                              ? null
-                              : () => context.push(
-                                    '/books/chapter/${entry.value.chapterId}',
-                                  ),
+                          viewOnly: true,
                         ),
                       );
                     }),
@@ -128,21 +117,20 @@ class _McqCard extends StatelessWidget {
   const _McqCard({
     required this.item,
     this.showTimer = false,
-    this.onOpenChapter,
     this.locked = false,
     this.onLockedTap,
+    this.viewOnly = false,
   });
 
   final DailyMcqItem item;
   final bool showTimer;
-  final VoidCallback? onOpenChapter;
   final bool locked;
   final VoidCallback? onLockedTap;
+  final bool viewOnly;
 
   @override
   Widget build(BuildContext context) {
     final timeFmt = DateFormat('MMM d, h:mm a');
-    final remaining = item.expiresAt.difference(DateTime.now());
 
     return Opacity(
       opacity: locked ? 0.72 : 1,
@@ -186,32 +174,43 @@ class _McqCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(item.preview),
+              if (viewOnly && item.hasRealOptions) ...[
+                const SizedBox(height: AppSpacing.sm),
+                ...item.options.asMap().entries.map(
+                  (e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      '${String.fromCharCode(65 + e.key)}) ${e.value}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Issued ${timeFmt.format(item.issuedAt)}',
+                viewOnly
+                    ? 'Published ${timeFmt.format(item.issuedAt)} · View only'
+                    : 'Issued ${timeFmt.format(item.issuedAt)}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (viewOnly) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Test closed — sirf dekh sakte ho',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                ),
+              ],
               if (showTimer && item.isInTodaysWindow) ...[
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  remaining.inMinutes > 0
-                      ? "Leaves Today's MCQs in ${_formatRemaining(remaining)}"
-                      : 'Moving to chapter library shortly',
+                  'Available until midnight tonight',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.indigo,
                         fontWeight: FontWeight.w600,
                       ),
-                ),
-              ],
-              if (onOpenChapter != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: onOpenChapter,
-                    icon: const Icon(Icons.menu_book_rounded, size: 18),
-                    label: const Text('Open chapter'),
-                  ),
                 ),
               ],
             ],
@@ -219,12 +218,5 @@ class _McqCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _formatRemaining(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60);
-    if (h > 0) return '${h}h ${m}m';
-    return '${m}m';
   }
 }

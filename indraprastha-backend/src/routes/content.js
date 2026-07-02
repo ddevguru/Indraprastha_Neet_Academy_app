@@ -353,11 +353,11 @@ router.get('/mcqs', userAuth, async (req, res) => {
     const result = await pool.query(
       `SELECT id, subject, topic, question,
               option_a, option_b, option_c, option_d, correct_option,
-              explanation, question_image_link, question_image_drive_file_id, created_at
+              explanation, question_image_link, question_image_drive_file_id,
+              created_at, is_active
        FROM daily_mcqs
-       WHERE is_active = TRUE
        ORDER BY created_at DESC
-       LIMIT 30`
+       LIMIT 100`
     );
     res.json({ success: true, mcqs: result.rows.map(mapQuestionImageLink) });
   } catch (e) {

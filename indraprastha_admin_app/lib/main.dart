@@ -241,7 +241,7 @@ class _AdminHomeState extends State<AdminHome> {
     'Books',
     'Practice',
     'Tests',
-    'MCQs',
+    'MCQ of the Day',
     'Videos',
     'Packages',
     'Users',
@@ -252,7 +252,7 @@ class _AdminHomeState extends State<AdminHome> {
     (Icons.upload_file_outlined, 'Books'),
     (Icons.flash_on_outlined, 'Practice'),
     (Icons.fact_check_outlined, 'Tests'),
-    (Icons.quiz_outlined, 'MCQs'),
+    (Icons.quiz_outlined, 'MCQ of the Day'),
     (Icons.smart_display_outlined, 'Videos'),
     (Icons.workspace_premium_outlined, 'Packages'),
     (Icons.people_outline_rounded, 'Users'),
@@ -2451,6 +2451,25 @@ class _TestsPageState extends State<TestsPage> {
     await _loadTestExplanationImages(questionId);
   }
 
+  void _resetTestQuestionForm() {
+    _testQuestion.clear();
+    _testOptionA.clear();
+    _testOptionB.clear();
+    _testOptionC.clear();
+    _testOptionD.clear();
+    _testExplanation.clear();
+    setState(() {
+      _editingQuestionId = null;
+      _testCorrect = 'A';
+      _testQuestionImage = null;
+      _testQuestionImageLink = '';
+      _testExplanationImage = null;
+      _testExplanationImageLink = '';
+      _pendingExtraExplanationImages.clear();
+      _savedExplanationImages = const [];
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2721,10 +2740,14 @@ class _TestsPageState extends State<TestsPage> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                FilledButton.tonal(
-                  onPressed: _selectedTestId == null
-                      ? null
-                      : () async {
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: _selectedTestId == null
+                          ? null
+                          : () async {
                           try {
                             var imageLink = _testQuestionImageLink;
                             if (_testQuestionImage != null && _batchId != null) {
@@ -2783,21 +2806,26 @@ class _TestsPageState extends State<TestsPage> {
                             if (savedQuestionId != null) {
                               await _uploadPendingTestExplanationImages(savedQuestionId);
                             }
-                            setState(() {
-                              _status = 'Question saved';
-                              _editingQuestionId = savedQuestionId;
-                              _testQuestionImage = null;
-                              _testQuestionImageLink = imageLink;
-                              _testExplanationImage = null;
-                              _testExplanationImageLink = expLink;
-                            });
-                            if (context.mounted) _showActionSnackBar(context, 'Question saved successfully');
+                            _resetTestQuestionForm();
+                            setState(() => _status = 'Question saved');
+                            if (context.mounted) {
+                              _showActionSnackBar(context, 'Question saved successfully');
+                            }
                           } catch (e) {
                             setState(() => _status = 'Question add failed: $e');
                             if (context.mounted) _showActionSnackBar(context, 'Question add failed', isError: true);
                           }
                         },
-                  child: Text(_editingQuestionId == null ? 'Add Question' : 'Update Question'),
+                      child: Text(
+                        _editingQuestionId == null ? 'Add Question' : 'Save & add next',
+                      ),
+                    ),
+                    if (_editingQuestionId != null)
+                      OutlinedButton(
+                        onPressed: _resetTestQuestionForm,
+                        child: const Text('Cancel edit'),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -3098,16 +3126,162 @@ class _McqsPageState extends State<McqsPage> {
     });
   }
 
+  DateTime? _mcqCreatedAt(Map<String, dynamic> m) {
+    final raw = m['created_at']?.toString();
+    if (raw == null || raw.isEmpty) return null;
+    return DateTime.tryParse(raw)?.toLocal();
+  }
+
+  bool _isTodaysMcq(Map<String, dynamic> m) {
+    final created = _mcqCreatedAt(m);
+    if (created == null) return m['is_active'] == true;
+    final now = DateTime.now();
+    return created.year == now.year &&
+        created.month == now.month &&
+        created.day == now.day;
+  }
+
+  List<Map<String, dynamic>> get _todaysMcqs =>
+      _mcqs.map((e) => e as Map<String, dynamic>).where(_isTodaysMcq).toList();
+
+  List<Map<String, dynamic>> get _archivedMcqs =>
+      _mcqs.map((e) => e as Map<String, dynamic>).where((m) => !_isTodaysMcq(m)).toList();
+
+  Widget _buildMcqCard(Map<String, dynamic> m, {required bool archived}) {
+    final hasImage = (m['question_image_link']?.toString() ?? '').isNotEmpty;
+    final created = _mcqCreatedAt(m);
+    final dateLabel = created != null
+        ? '${created.day.toString().padLeft(2, '0')}/${created.month.toString().padLeft(2, '0')}/${created.year}'
+        : '';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (archived) ...[
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      'Archived · $dateLabel',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'View only for students',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            Text(m['question']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text('A: ${m['option_a'] ?? ''}  B: ${m['option_b'] ?? ''}', style: const TextStyle(fontSize: 12)),
+            Text('C: ${m['option_c'] ?? ''}  D: ${m['option_d'] ?? ''}', style: const TextStyle(fontSize: 12)),
+            Text('Correct: ${m['correct_option'] ?? '-'}  |  ${m['subject'] ?? ''}  ${m['topic'] ?? ''}',
+                style: TextStyle(fontSize: 12, color: archived ? Colors.grey : Colors.green)),
+            if (hasImage) ...[
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.network(
+                  m['question_image_link'].toString(),
+                  height: 100,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _editingId = m['id'] as int;
+                      _question.text = m['question']?.toString() ?? '';
+                      _optionA.text = m['option_a']?.toString() ?? '';
+                      _optionB.text = m['option_b']?.toString() ?? '';
+                      _optionC.text = m['option_c']?.toString() ?? '';
+                      _optionD.text = m['option_d']?.toString() ?? '';
+                      _correct = m['correct_option']?.toString() ?? 'A';
+                      _explanation.text = m['explanation']?.toString() ?? '';
+                      _imageLink = m['question_image_link']?.toString() ?? '';
+                      _image = null;
+                    });
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Edit'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final shouldDelete = await _confirmDeleteDialog(
+                      context,
+                      title: 'Delete MCQ?',
+                      body: 'This MCQ will be removed permanently.',
+                    );
+                    if (!shouldDelete) return;
+                    try {
+                      await widget.api.deleteMcq(m['id'] as int);
+                      await _load();
+                      if (context.mounted) _showActionSnackBar(context, 'MCQ deleted');
+                    } catch (_) {
+                      if (context.mounted) _showActionSnackBar(context, 'Delete failed', isError: true);
+                    }
+                  },
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: const Text('Delete'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Card(
+          color: const Color(0xFFFFF8F2),
+          child: const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text(
+              'MCQ of the Day — yahan sirf daily MCQs add hote hain. '
+              'Tests alag "Tests" tab mein hain. Naya din shuru hone par purane MCQs archive ho jayenge; '
+              'students sirf aaj ke MCQs ka test de sakte hain, purane sirf dekh sakte hain.',
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Add MCQ of the Day',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
                   initialValue: _batchId,
                   items: _batches
@@ -3295,7 +3469,7 @@ class _McqsPageState extends State<McqsPage> {
                                 }
                               }
                             },
-                      child: Text(_editingId == null ? 'Add MCQ' : 'Update MCQ'),
+                      child: Text(_editingId == null ? 'Add MCQ of the Day' : 'Update MCQ'),
                     ),
                     if (_editingId != null)
                       OutlinedButton(
@@ -3309,82 +3483,53 @@ class _McqsPageState extends State<McqsPage> {
           ),
         ),
         const SizedBox(height: 8),
-        ..._mcqs.map((e) {
-          final m = e as Map<String, dynamic>;
-          final hasImage = (m['question_image_link']?.toString() ?? '').isNotEmpty;
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(m['question']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  Text('A: ${m['option_a'] ?? ''}  B: ${m['option_b'] ?? ''}', style: const TextStyle(fontSize: 12)),
-                  Text('C: ${m['option_c'] ?? ''}  D: ${m['option_d'] ?? ''}', style: const TextStyle(fontSize: 12)),
-                  Text('Correct: ${m['correct_option'] ?? '-'}  |  ${m['subject'] ?? ''}  ${m['topic'] ?? ''}',
-                      style: const TextStyle(fontSize: 12, color: Colors.green)),
-                  if (hasImage) ...[
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Image.network(
-                        m['question_image_link'].toString(),
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _editingId = m['id'] as int;
-                            _question.text = m['question']?.toString() ?? '';
-                            _optionA.text = m['option_a']?.toString() ?? '';
-                            _optionB.text = m['option_b']?.toString() ?? '';
-                            _optionC.text = m['option_c']?.toString() ?? '';
-                            _optionD.text = m['option_d']?.toString() ?? '';
-                            _correct = m['correct_option']?.toString() ?? 'A';
-                            _explanation.text = m['explanation']?.toString() ?? '';
-                            _imageLink = m['question_image_link']?.toString() ?? '';
-                            _image = null;
-                          });
-                        },
-                        icon: const Icon(Icons.edit_outlined, size: 16),
-                        label: const Text('Edit'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final shouldDelete = await _confirmDeleteDialog(
-                            context,
-                            title: 'Delete MCQ?',
-                            body: 'This MCQ will be removed permanently.',
-                          );
-                          if (!shouldDelete) return;
-                          try {
-                            await widget.api.deleteMcq(m['id'] as int);
-                            await _load();
-                            if (context.mounted) _showActionSnackBar(context, 'MCQ deleted');
-                          } catch (_) {
-                            if (context.mounted) _showActionSnackBar(context, 'Delete failed', isError: true);
-                          }
-                        },
-                        icon: const Icon(Icons.delete_outline, size: 16),
-                        label: const Text('Delete'),
-                      ),
-                    ],
-                  ),
-                ],
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.today_rounded, size: 16, color: Color(0xFF1F8A54)),
+              const SizedBox(width: 6),
+              Text(
+                "Today's MCQs (${_todaysMcqs.length})",
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
               ),
+            ],
+          ),
+        ),
+        if (_todaysMcqs.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Aaj ke liye koi MCQ nahi hai. Upar form se add karein.',
+              style: TextStyle(color: Colors.grey),
             ),
-          );
-        }),
+          )
+        else
+          ..._todaysMcqs.map((m) => _buildMcqCard(m, archived: false)),
+        if (_archivedMcqs.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.history_rounded, size: 16, color: Colors.grey),
+                const SizedBox(width: 6),
+                Text(
+                  'Archived MCQs (${_archivedMcqs.length})',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+              ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Purane din ke MCQs — students inhe sirf dekh sakte hain, test nahi de sakte.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ),
+          ..._archivedMcqs.map((m) => _buildMcqCard(m, archived: true)),
+        ],
       ],
     );
   }

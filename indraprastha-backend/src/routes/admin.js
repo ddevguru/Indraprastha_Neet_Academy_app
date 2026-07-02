@@ -1860,6 +1860,17 @@ router.post('/mcqs', adminAuth, async (req, res) => {
     if (!batchId || !question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
       return res.status(400).json({ error: 'batchId, question, options and correctOption are required' });
     }
+
+    // First MCQ of a new calendar day — archive previous days for students.
+    const todayCount = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM daily_mcqs WHERE created_at::date = CURRENT_DATE`
+    );
+    if ((todayCount.rows[0]?.c ?? 0) === 0) {
+      await pool.query(
+        `UPDATE daily_mcqs SET is_active = FALSE WHERE created_at::date < CURRENT_DATE`
+      );
+    }
+
     const result = await pool.query(
       `INSERT INTO daily_mcqs
          (batch_id, class_label, subject, topic, question, option_a, option_b, option_c, option_d,
