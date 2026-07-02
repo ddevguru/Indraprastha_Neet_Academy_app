@@ -3,11 +3,78 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'screens/error_logs_page.dart';
+import 'services/admin_error_logger.dart';
+
 const String baseUrl = 'https://api.indraprasthaneetacademy.com/api';
+
+Map<String, dynamic> _decodeApiJson(
+  String raw, {
+  required int statusCode,
+  required String method,
+  required String path,
+}) {
+  var cleaned = raw.trim();
+  if (cleaned.startsWith('\ufeff')) cleaned = cleaned.substring(1);
+  if (cleaned.isEmpty) {
+    if (statusCode >= 200 && statusCode < 300) return {};
+    throw Exception('Empty server response ($statusCode) for $method $path');
+  }
+  if (cleaned.startsWith('<')) {
+    throw Exception(
+      'Server returned HTML ($statusCode) for $method $path. '
+      'API endpoint unavailable — backend redeploy check karo.',
+    );
+  }
+  try {
+    final decoded = jsonDecode(cleaned);
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    throw Exception('Invalid JSON object from $method $path');
+  } on FormatException catch (e) {
+    final preview = cleaned.length > 160 ? '${cleaned.substring(0, 160)}...' : cleaned;
+    throw Exception('Invalid server response ($statusCode) for $method $path: $preview ($e)');
+  }
+}
+
+String _friendlyError(Object e) {
+  final msg = e.toString().replaceFirst('Exception: ', '');
+  if (msg.contains('FormatException') || msg.contains('Invalid server response')) {
+    return 'Server ne sahi JSON nahi bheja. Backend Google Cloud par redeploy/restart karo.';
+  }
+  if (msg.contains('does not exist') && msg.contains('column')) {
+    return 'Database columns missing — backend restart karo (db.js migration).';
+  }
+  return msg;
+}
+
+Future<void> _handleTaskError(
+  BuildContext context,
+  String task,
+  Object error, {
+  StackTrace? stackTrace,
+  Map<String, dynamic>? details,
+}) async {
+  await AdminErrorLogger.instance.log(
+    task,
+    error,
+    stackTrace: stackTrace,
+    details: details,
+  );
+  if (!context.mounted) return;
+  _showActionSnackBar(context, '$task failed: ${_friendlyError(error)}', isError: true);
+}
+
+void _openErrorLogs(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const ErrorLogsPage()),
+  );
+}
 
 void _showActionSnackBar(
   BuildContext context,
@@ -48,7 +115,16 @@ Future<bool> _confirmDeleteDialog(
   return result == true;
 }
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AdminErrorLogger.instance.init();
+  FlutterError.onError = (details) {
+    AdminErrorLogger.instance.log(
+      'FlutterError',
+      details.exception,
+      stackTrace: details.stack,
+    );
+  };
   runApp(const AdminApp());
 }
 
@@ -336,6 +412,37 @@ class _AdminHomeState extends State<AdminHome> {
     final isWide = MediaQuery.sizeOf(context).width >= 900;
     final title = _tab < _titles.length ? _titles[_tab] : 'Admin';
 
+    Future<void> handleBack() async {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+        return;
+      }
+      if (_tab != 0) {
+        setState(() => _tab = 0);
+        return;
+      }
+      final shouldExit = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Exit admin app?'),
+          content: const Text('Kya aap app band karna chahte ho?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Exit'),
+            ),
+          ],
+        ),
+      );
+      if (shouldExit == true) {
+        SystemNavigator.pop();
+      }
+    }
+
     // Shared body content widget
     final bodyContent = Container(
       decoration: BoxDecoration(
@@ -449,7 +556,12 @@ class _AdminHomeState extends State<AdminHome> {
 
     // ── Desktop layout (wide): permanent sidebar + content ──────────────────
     if (isLoggedIn && isWide) {
-      return Scaffold(
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) handleBack();
+        },
+        child: Scaffold(
         body: Row(
           children: [
             // Permanent sidebar
@@ -493,6 +605,11 @@ class _AdminHomeState extends State<AdminHome> {
                           ),
                         ),
                         IconButton(
+                          onPressed: () => _openErrorLogs(context),
+                          icon: const Icon(Icons.bug_report_outlined, size: 20),
+                          tooltip: 'Error logs',
+                        ),
+                        IconButton(
                           onPressed: widget.onToggleTheme,
                           icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 20),
                           tooltip: 'Toggle theme',
@@ -515,11 +632,17 @@ class _AdminHomeState extends State<AdminHome> {
             ),
           ],
         ),
+      ),
       );
     }
 
     // ── Mobile / narrow layout: hamburger drawer ──────────────────────────────
-    return Scaffold(
+    return PopScope(
+      canPop: !isLoggedIn,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && isLoggedIn) handleBack();
+      },
+      child: Scaffold(
       drawer: isLoggedIn
           ? Drawer(
               child: Column(
@@ -541,6 +664,12 @@ class _AdminHomeState extends State<AdminHome> {
           ],
         ),
         actions: [
+          if (isLoggedIn)
+            IconButton(
+              onPressed: () => _openErrorLogs(context),
+              icon: const Icon(Icons.bug_report_outlined, size: 22),
+              tooltip: 'Error logs',
+            ),
           IconButton(
             onPressed: widget.onToggleTheme,
             icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 22),
@@ -560,6 +689,7 @@ class _AdminHomeState extends State<AdminHome> {
         ],
       ),
       body: bodyContent,
+      ),
     );
   }
 }
@@ -2143,10 +2273,13 @@ class _PracticePageState extends State<PracticePage> {
                               _pqCorrect = 'A';
                             });
                             if (context.mounted) _showActionSnackBar(context, 'Practice question saved');
-                          } catch (_) {
-                            if (context.mounted) {
-                              _showActionSnackBar(context, 'Practice question save failed', isError: true);
-                            }
+                          } catch (e, st) {
+                            await _handleTaskError(
+                              context,
+                              'Practice question save',
+                              e,
+                              stackTrace: st,
+                            );
                           }
                         },
                   child: Text(
@@ -2811,9 +2944,18 @@ class _TestsPageState extends State<TestsPage> {
                             if (context.mounted) {
                               _showActionSnackBar(context, 'Question saved successfully');
                             }
-                          } catch (e) {
-                            setState(() => _status = 'Question add failed: $e');
-                            if (context.mounted) _showActionSnackBar(context, 'Question add failed', isError: true);
+                          } catch (e, st) {
+                            setState(() => _status = 'Question add failed: ${_friendlyError(e)}');
+                            await _handleTaskError(
+                              context,
+                              'Test question save',
+                              e,
+                              stackTrace: st,
+                              details: {
+                                'testId': _selectedTestId,
+                                'editingQuestionId': _editingQuestionId,
+                              },
+                            );
                           }
                         },
                       child: Text(
@@ -4218,18 +4360,29 @@ class AdminApi {
   }
 
   Future<void> login(String username, String password) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/admin/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username, 'password': password}),
-    );
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(body['error'] ?? 'login failed');
+    const path = '/admin/login';
+    try {
+      final response = await _client.post(
+        Uri.parse('$baseUrl$path'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': username, 'password': password}),
+      );
+      final body = _decodeApiJson(
+        response.body,
+        statusCode: response.statusCode,
+        method: 'POST',
+        path: path,
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(body['error'] ?? 'login failed');
+      }
+      token = body['token']?.toString();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenKey, token ?? '');
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log('POST $path', e, stackTrace: st);
+      rethrow;
     }
-    token = body['token']?.toString();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token ?? '');
   }
 
   Future<void> clearSession() async {
@@ -4556,7 +4709,7 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
   }) async {
-    await _post('/admin/practice-sets/$setId/questions', {
+    await _postMap('/admin/practice-sets/$setId/questions', {
       'question': question,
       'optionA': optionA,
       'optionB': optionB,
@@ -4769,25 +4922,36 @@ class AdminApi {
     String contentType = '',
     int? contentId,
   }) async {
+    const path = '/admin/question-images/upload';
     if (token == null) throw Exception('Login first');
-    final req = http.MultipartRequest('POST', Uri.parse('$baseUrl/admin/question-images/upload'));
-    req.headers['Authorization'] = 'Bearer $token';
-    req.fields['batchId'] = '$batchId';
-    req.fields['classLabel'] = classLabel;
-    req.fields['subject'] = subject;
-    req.fields['topic'] = topic;
-    if (contentType.trim().isNotEmpty) req.fields['contentType'] = contentType.trim();
-    if (contentId != null) req.fields['contentId'] = '$contentId';
-    final bytes = await file.readAsBytes();
-    final name = file.path.split(Platform.pathSeparator).last;
-    req.files.add(http.MultipartFile.fromBytes('image', bytes, filename: name));
-    final streamed = await req.send();
-    final body = await streamed.stream.bytesToString();
-    final json = jsonDecode(body) as Map<String, dynamic>;
-    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
-      throw Exception(json['error'] ?? 'Image upload failed');
+    try {
+      final req = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
+      req.headers['Authorization'] = 'Bearer $token';
+      req.fields['batchId'] = '$batchId';
+      req.fields['classLabel'] = classLabel;
+      req.fields['subject'] = subject;
+      req.fields['topic'] = topic;
+      if (contentType.trim().isNotEmpty) req.fields['contentType'] = contentType.trim();
+      if (contentId != null) req.fields['contentId'] = '$contentId';
+      final bytes = await file.readAsBytes();
+      final name = file.path.split(Platform.pathSeparator).last;
+      req.files.add(http.MultipartFile.fromBytes('image', bytes, filename: name));
+      final streamed = await req.send();
+      final bodyText = await streamed.stream.bytesToString();
+      final json = _decodeApiJson(
+        bodyText,
+        statusCode: streamed.statusCode,
+        method: 'POST',
+        path: path,
+      );
+      if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+        throw Exception(json['error'] ?? 'Image upload failed');
+      }
+      return json['driveLink']?.toString() ?? json['imageLink']?.toString() ?? '';
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log('POST $path', e, stackTrace: st);
+      rethrow;
     }
-    return json['driveLink']?.toString() ?? '';
   }
 
   Future<void> uploadVideo({
@@ -4946,35 +5110,29 @@ class AdminApi {
 
   Future<Map<String, dynamic>> _get(String path) async {
     if (token == null) throw Exception('Login first');
-    final response = await _client.get(
-      Uri.parse('$baseUrl$path'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    final raw = response.body;
-    // Guard against HTML error pages (404/502 from Render)
-    if (raw.trimLeft().startsWith('<')) {
-      throw Exception('Server error ${response.statusCode}: endpoint not available');
+    try {
+      final response = await _client.get(
+        Uri.parse('$baseUrl$path'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      final body = _decodeApiJson(
+        response.body,
+        statusCode: response.statusCode,
+        method: 'GET',
+        path: path,
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(body['error'] ?? 'request failed (${response.statusCode})');
+      }
+      return body;
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log('GET $path', e, stackTrace: st);
+      rethrow;
     }
-    final body = jsonDecode(raw) as Map<String, dynamic>;
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(body['error'] ?? 'request failed (${response.statusCode})');
-    }
-    return body;
   }
 
   Future<void> _post(String path, Map<String, dynamic> payload) async {
-    if (token == null) throw Exception('Login first');
-    final response = await _client.post(
-      Uri.parse('$baseUrl$path'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(payload),
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(response.body);
-    }
+    await _postMap(path, payload);
   }
 
   Future<Map<String, dynamic>> _postMap(
@@ -4982,63 +5140,86 @@ class AdminApi {
     Map<String, dynamic> payload,
   ) async {
     if (token == null) throw Exception('Login first');
-    final response = await _client.post(
-      Uri.parse('$baseUrl$path'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(payload),
-    );
-    final raw = response.body.trim();
-    if (raw.isEmpty) {
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return <String, dynamic>{};
-      }
-      throw Exception('Empty server response (${response.statusCode})');
-    }
-    if (raw.startsWith('<')) {
-      throw Exception('Server error ${response.statusCode}: endpoint not available');
-    }
-    final Map<String, dynamic> body;
     try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('Response is not a JSON object');
+      final response = await _client.post(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+      final body = _decodeApiJson(
+        response.body,
+        statusCode: response.statusCode,
+        method: 'POST',
+        path: path,
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(body['error'] ?? body['details'] ?? response.body);
       }
-      body = decoded;
-    } on FormatException {
-      throw Exception('Invalid server response: ${raw.length > 120 ? '${raw.substring(0, 120)}...' : raw}');
+      return body;
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log(
+        'POST $path',
+        e,
+        stackTrace: st,
+        details: payload,
+      );
+      rethrow;
     }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(body['error'] ?? response.body);
-    }
-    return body;
   }
 
   Future<void> _put(String path, Map<String, dynamic> payload) async {
     if (token == null) throw Exception('Login first');
-    final response = await _client.put(
-      Uri.parse('$baseUrl$path'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(payload),
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(response.body);
+    try {
+      final response = await _client.put(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+      final body = _decodeApiJson(
+        response.body,
+        statusCode: response.statusCode,
+        method: 'PUT',
+        path: path,
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(body['error'] ?? body['details'] ?? response.body);
+      }
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log(
+        'PUT $path',
+        e,
+        stackTrace: st,
+        details: payload,
+      );
+      rethrow;
     }
   }
 
   Future<void> _delete(String path) async {
     if (token == null) throw Exception('Login first');
-    final response = await _client.delete(
-      Uri.parse('$baseUrl$path'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(response.body);
+    try {
+      final response = await _client.delete(
+        Uri.parse('$baseUrl$path'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final body = _decodeApiJson(
+          response.body,
+          statusCode: response.statusCode,
+          method: 'DELETE',
+          path: path,
+        );
+        throw Exception(body['error'] ?? response.body);
+      }
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log('DELETE $path', e, stackTrace: st);
+      rethrow;
     }
   }
 }
