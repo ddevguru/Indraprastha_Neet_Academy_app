@@ -4496,7 +4496,17 @@ class AdminApi {
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
     });
-    return (body['question'] as Map<String, dynamic>)['id'] as int;
+    final questionObj = body['question'];
+    if (questionObj is Map<String, dynamic>) {
+      final id = questionObj['id'];
+      if (id is int) return id;
+      if (id is num) return id.toInt();
+      if (id is String) {
+        final parsed = int.tryParse(id);
+        if (parsed != null) return parsed;
+      }
+    }
+    throw Exception(body['error']?.toString() ?? 'Server returned an unexpected response');
   }
 
   Future<List<dynamic>> testQuestions(int testId) async =>
@@ -4980,9 +4990,26 @@ class AdminApi {
       },
       body: jsonEncode(payload),
     );
-    final body = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body) as Map<String, dynamic>;
+    final raw = response.body.trim();
+    if (raw.isEmpty) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return <String, dynamic>{};
+      }
+      throw Exception('Empty server response (${response.statusCode})');
+    }
+    if (raw.startsWith('<')) {
+      throw Exception('Server error ${response.statusCode}: endpoint not available');
+    }
+    final Map<String, dynamic> body;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('Response is not a JSON object');
+      }
+      body = decoded;
+    } on FormatException {
+      throw Exception('Invalid server response: ${raw.length > 120 ? '${raw.substring(0, 120)}...' : raw}');
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(body['error'] ?? response.body);
     }

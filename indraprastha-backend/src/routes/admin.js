@@ -1317,42 +1317,53 @@ router.get('/tests/:testId/questions', adminAuth, async (req, res) => {
 });
 
 router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
-  const {
-    subject,
-    question,
-    optionA,
-    optionB,
-    optionC,
-    optionD,
-    correctOption,
-    explanation,
-    questionImageLink,
-    explanationImageLink,
-  } =
-    req.body;
-  const result = await pool.query(
-    `INSERT INTO test_questions (
-      test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-    [
-      req.params.testId,
-      subject || 'Biology',
+  try {
+    const {
+      subject,
       question,
       optionA,
       optionB,
       optionC,
       optionD,
       correctOption,
-      explanation || '',
-      normalizeDriveLink(questionImageLink || '', 'image'),
-      extractDriveFileId(questionImageLink || ''),
-      '',
-      normalizeDriveLink(explanationImageLink || '', 'image'),
-      extractDriveFileId(explanationImageLink || ''),
-      '',
-    ]
-  );
-  res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
+      explanation,
+      questionImageLink,
+      explanationImageLink,
+    } = req.body;
+
+    if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
+      return res.status(400).json({
+        error: 'question, optionA, optionB, optionC, optionD, correctOption are required',
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO test_questions (
+        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [
+        req.params.testId,
+        subject || 'Biology',
+        question,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        explanation || '',
+        normalizeDriveLink(questionImageLink || '', 'image'),
+        extractDriveFileId(questionImageLink || ''),
+        '',
+        normalizeDriveLink(explanationImageLink || '', 'image'),
+        extractDriveFileId(explanationImageLink || ''),
+        '',
+      ]
+    );
+    return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
+  } catch (e) {
+    logAdminRouteError('/tests/:testId/questions POST', e);
+    return res.status(500).json({ error: e.message || 'Failed to add test question' });
+  }
 });
 
 router.put('/test-questions/:id', adminAuth, async (req, res) => {

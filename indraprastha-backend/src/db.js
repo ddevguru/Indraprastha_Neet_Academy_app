@@ -292,6 +292,18 @@ async function ensureDatabaseSchema() {
     ALTER TABLE practice_questions
     ADD COLUMN IF NOT EXISTS question_image_drive_folder_id TEXT;
   `);
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS explanation_image_link TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS explanation_image_drive_file_id TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS explanation_image_drive_folder_id TEXT DEFAULT '';
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tests (
@@ -353,6 +365,18 @@ async function ensureDatabaseSchema() {
   await pool.query(`
     ALTER TABLE test_questions
     ADD COLUMN IF NOT EXISTS question_image_drive_folder_id TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS explanation_image_link TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS explanation_image_drive_file_id TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS explanation_image_drive_folder_id TEXT DEFAULT '';
   `);
 
   await pool.query(`
