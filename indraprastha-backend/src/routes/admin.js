@@ -25,7 +25,10 @@ const {
 } = require('../services/drive');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
 
 const UPLOAD_ROOT = path.join(os.tmpdir(), 'indra_uploads');
 function ensureUploadRoot() {
