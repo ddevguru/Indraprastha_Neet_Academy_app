@@ -68,7 +68,8 @@ Widget buildReviewImage(String rawUrl) {
     borderRadius: BorderRadius.circular(AppRadii.md),
     child: Image.network(
       resolveDriveImageUrl(rawUrl),
-      fit: BoxFit.cover,
+      width: double.infinity,
+      fit: BoxFit.contain,
       filterQuality: FilterQuality.low,
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
@@ -87,6 +88,18 @@ Widget buildReviewImage(String rawUrl) {
       ),
     ),
   );
+}
+
+String resolveExplanationImageUrl(Map<String, dynamic> imgData) {
+  final direct = imgData['image_url']?.toString() ??
+      imgData['image_drive_link']?.toString() ??
+      '';
+  if (direct.trim().isNotEmpty) return direct;
+  final fileId = imgData['image_drive_file_id']?.toString() ?? '';
+  if (fileId.isNotEmpty) {
+    return 'https://drive.google.com/uc?export=view&id=$fileId';
+  }
+  return '';
 }
 
 /// One question entry for paginated answer review.
@@ -159,11 +172,17 @@ class PaginatedAnswerReviewScreen extends StatefulWidget {
     required this.title,
     required this.items,
     this.initialIndex = 0,
+    this.score,
+    this.totalMarks,
+    this.accuracy,
   });
 
   final String title;
   final List<AnswerReviewEntry> items;
   final int initialIndex;
+  final int? score;
+  final int? totalMarks;
+  final double? accuracy;
 
   @override
   State<PaginatedAnswerReviewScreen> createState() =>
@@ -223,6 +242,51 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
       appBar: AppBar(title: Text(widget.title)),
       body: Column(
         children: [
+          if (widget.score != null && widget.totalMarks != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                0,
+              ),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.indigoSoft,
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Your score',
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${widget.score} / ${widget.totalMarks}',
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.indigo,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.accuracy != null)
+                      Text(
+                        '${widget.accuracy!.toStringAsFixed(1)}% accuracy',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                  ],
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
@@ -600,9 +664,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                       if (entry.explanationImagesList?.isNotEmpty ?? false)
                         ...entry.explanationImagesList!.map((imgData) {
                           final caption = imgData['caption']?.toString() ?? '';
-                          final imageUrl = imgData['image_url']?.toString() ??
-                              imgData['image_drive_link']?.toString() ??
-                              '';
+                          final imageUrl = resolveExplanationImageUrl(imgData);
                           return Padding(
                             padding: const EdgeInsets.only(top: 10),
                             child: Column(

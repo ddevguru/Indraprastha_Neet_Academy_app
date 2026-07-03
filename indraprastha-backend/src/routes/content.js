@@ -62,15 +62,41 @@ function mapChapterLinks(chapter) {
   };
 }
 
+function mapExplanationImageEntry(img) {
+  if (!img || typeof img !== 'object') return img;
+  const fileId =
+    img.image_drive_file_id || extractDriveFileId(img.image_drive_link || img.image_url);
+  const links = buildDrivePublicLinks(fileId);
+  const resolved =
+    links.imageLink || normalizeDriveLink(img.image_url || img.image_drive_link, 'image');
+  return {
+    ...img,
+    image_drive_file_id: fileId || '',
+    image_url: resolved,
+    image_drive_link: resolved,
+  };
+}
+
 function mapQuestionImageLink(question) {
   const fileId =
     question.question_image_drive_file_id || extractDriveFileId(question.question_image_link);
   const links = buildDrivePublicLinks(fileId);
+  const expFileId =
+    question.explanation_image_drive_file_id ||
+    extractDriveFileId(question.explanation_image_link);
+  const expLinks = buildDrivePublicLinks(expFileId);
+  const explanationImagesList = question.explanation_images_list;
   return {
     ...question,
     question_image_drive_file_id: fileId || '',
     question_image_link:
       links.imageLink || normalizeDriveLink(question.question_image_link, 'image'),
+    explanation_image_drive_file_id: expFileId || '',
+    explanation_image_link:
+      expLinks.imageLink || normalizeDriveLink(question.explanation_image_link, 'image'),
+    explanation_images_list: Array.isArray(explanationImagesList)
+      ? explanationImagesList.map(mapExplanationImageEntry)
+      : explanationImagesList,
   };
 }
 
@@ -321,10 +347,27 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
     return res.status(404).json({ error: 'Test not found' });
   }
   const questions = await pool.query(
-    `SELECT id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
-     FROM test_questions
-     WHERE test_id = $1
-     ORDER BY id ASC`,
+    `SELECT tq.id, tq.subject, tq.question, tq.option_a, tq.option_b, tq.option_c, tq.option_d,
+        tq.correct_option, tq.explanation,
+        tq.question_image_link, tq.question_image_drive_file_id, tq.question_image_drive_folder_id,
+        tq.explanation_image_link, tq.explanation_image_drive_file_id, tq.explanation_image_drive_folder_id,
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', ei.id,
+              'image_url', ei.image_url,
+              'image_drive_file_id', ei.image_drive_file_id,
+              'image_drive_link', ei.image_drive_link,
+              'caption', ei.caption,
+              'order_index', ei.order_index
+            ) ORDER BY ei.order_index
+          )
+          FROM explanation_images ei
+          WHERE ei.test_question_id = tq.id
+        ) as explanation_images_list
+     FROM test_questions tq
+     WHERE tq.test_id = $1
+     ORDER BY tq.id ASC`,
     [req.params.testId]
   );
   res.json({
@@ -521,7 +564,7 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
         unattempted: analytics.rows[0].unattempted_count,
       },
       insights: insightsRows,
-      questionsWithExplanations: questionsWithExplanations.rows,
+      questionsWithExplanations: questionsWithExplanations.rows.map(mapQuestionImageLink),
       aiAnalytics: {
         test_id: testId,
         user_id: req.user.id,

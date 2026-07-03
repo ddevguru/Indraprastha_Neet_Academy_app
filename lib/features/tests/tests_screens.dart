@@ -38,6 +38,51 @@ num? _asNum(dynamic value) {
   return null;
 }
 
+String _formatTestScoreLabel(Map<String, dynamic> test) {
+  final score = _asNum(test['last_score']);
+  if (score == null) return '--';
+  final marks = (_asNum(test['marks']) ?? 720).toInt();
+  return '${score.toInt()} / $marks';
+}
+
+List<Map<String, dynamic>> _questionsForReview({
+  required List<Map<String, dynamic>> questions,
+  Map<String, dynamic>? submitResponse,
+}) {
+  final enriched = submitResponse?['questionsWithExplanations'] as List<dynamic>?;
+  if (enriched != null && enriched.isNotEmpty) {
+    return List<Map<String, dynamic>>.from(
+      enriched.map((e) => Map<String, dynamic>.from(e as Map)),
+    );
+  }
+  return questions;
+}
+
+int? _scoreFromSubmitResponse(Map<String, dynamic>? response) {
+  if (response == null) return null;
+  final attempt = response['attempt'];
+  if (attempt is Map) {
+    final score = _asNum(attempt['score']);
+    if (score != null) return score.toInt();
+  }
+  final ai = response['aiAnalytics'];
+  if (ai is Map) {
+    final score = _asNum(ai['score']);
+    if (score != null) return score.toInt();
+  }
+  return null;
+}
+
+double? _accuracyFromSubmitResponse(Map<String, dynamic>? response) {
+  if (response == null) return null;
+  final analytics = response['analytics'];
+  if (analytics is Map) {
+    final accuracy = _asNum(analytics['overall_accuracy']);
+    if (accuracy != null) return accuracy.toDouble();
+  }
+  return null;
+}
+
 Widget _buildQuestionImage(String rawUrl) {
   return ClipRRect(
     borderRadius: BorderRadius.circular(AppRadii.md),
@@ -226,7 +271,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                                     t['syllabus_coverage']?.toString() ?? '',
                                 scheduleLabel: t['schedule_label']?.toString() ?? '',
                                 completed: t['is_completed'] == true,
-                                scoreLabel: (t['last_score']?.toString() ?? '--'),
+                                scoreLabel: _formatTestScoreLabel(t),
                               ),
                               onTap: () => ContentAccess.handleTap(
                                 context: context,
@@ -491,10 +536,20 @@ class _TestResultScreenState extends State<TestResultScreen> {
                             expanded: true,
                             icon: Icons.fact_check_rounded,
                             onPressed: () {
+                              final response = _submitResponse ??
+                                  _buildLocalSubmitResponse(
+                                    questions: questions,
+                                    test: test,
+                                  );
+                              final reviewQuestions = _questionsForReview(
+                                questions: questions,
+                                submitResponse: response,
+                              );
+                              final marks = (test['marks'] as num?)?.toInt() ?? 720;
                               final items = List.generate(
-                                questions.length,
+                                reviewQuestions.length,
                                 (i) => AnswerReviewEntry.fromAbcdMap(
-                                  question: questions[i],
+                                  question: reviewQuestions[i],
                                   index: i,
                                   selectedOption: _answers[i],
                                 ),
@@ -505,6 +560,9 @@ class _TestResultScreenState extends State<TestResultScreen> {
                                   builder: (context) => PaginatedAnswerReviewScreen(
                                     title: 'Review Answers',
                                     items: items,
+                                    score: _scoreFromSubmitResponse(response),
+                                    totalMarks: marks,
+                                    accuracy: _accuracyFromSubmitResponse(response),
                                   ),
                                 ),
                               );
@@ -746,7 +804,9 @@ class _ScoreSummaryCard extends StatelessWidget {
     final wrong = _asNum(donut['wrong'])?.toInt() ?? _asNum(analytics['wrong_count'])?.toInt() ?? 0;
     final unattempted =
         _asNum(donut['unattempted'])?.toInt() ?? _asNum(analytics['unattempted_count'])?.toInt() ?? 0;
-    final score = _asNum(attempt['score'])?.toInt() ?? 0;
+    final score = _asNum(attempt['score'])?.toInt() ??
+        _asNum((response['aiAnalytics'] as Map?)?['score'])?.toInt() ??
+        0;
     final accuracy = _asNum(analytics['overall_accuracy'])?.toDouble() ?? 0.0;
 
     return SurfaceCard(
