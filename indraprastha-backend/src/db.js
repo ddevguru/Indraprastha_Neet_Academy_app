@@ -606,12 +606,18 @@ async function ensureDatabaseSchema() {
   );
 
   await pool.query(
-    `INSERT INTO packages (name, price_label, validity, highlight, features_json, is_active)
+    `INSERT INTO packages (name, price_label, validity, highlight, features_json, is_active, amount_inr)
      VALUES
-      ('Starter', 'Rs 999', '1 month', 'Basic access for daily practice', '["Practice sets","Topic tests"]'::jsonb, TRUE),
-      ('Rank Pro', 'Rs 4999', '6 months', 'Advanced prep with tests and analytics', '["Full test series","Detailed analytics","Video lectures"]'::jsonb, TRUE)
+      ('Starter', 'Rs 1', '1 month', 'Basic access for daily practice', '["Practice sets","Topic tests"]'::jsonb, TRUE, 1),
+      ('Rank Pro', 'Rs 4999', '6 months', 'Advanced prep with tests and analytics', '["Full test series","Detailed analytics","Video lectures"]'::jsonb, TRUE, 4999)
      ON CONFLICT (name) DO NOTHING`
   );
+
+  await pool.query(`
+    UPDATE packages
+    SET price_label = 'Rs 1', amount_inr = 1
+    WHERE LOWER(name) = 'starter'
+  `);
 
   await pool.query(
     `INSERT INTO subjects (class_id, name)

@@ -16,47 +16,15 @@ import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
-
-String _resolveDriveImageUrl(String raw) {
-  final value = raw.trim();
-  if (value.isEmpty) return value;
-  final uri = Uri.tryParse(value);
-  if (uri == null) return value;
-  String? id = uri.queryParameters['id'];
-  if (id == null || id.isEmpty) {
-    final parts = uri.pathSegments;
-    final fileIdx = parts.indexOf('file');
-    if (fileIdx >= 0 && fileIdx + 2 < parts.length && parts[fileIdx + 1] == 'd') {
-      id = parts[fileIdx + 2];
-    }
-  }
-  if (id == null || id.isEmpty) return value;
-  return 'https://drive.google.com/uc?export=view&id=$id';
-}
+import '../../widgets/fast_network_image.dart';
 
 Widget _buildQuestionImage(String rawUrl) {
-  return ClipRRect(
+  return FastNetworkImage(
+    url: rawUrl,
+    width: double.infinity,
+    height: 180,
+    fit: BoxFit.cover,
     borderRadius: BorderRadius.circular(AppRadii.md),
-    child: Image.network(
-      _resolveDriveImageUrl(rawUrl),
-      fit: BoxFit.cover,
-      filterQuality: FilterQuality.low,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(
-          height: 180,
-          alignment: Alignment.center,
-          color: AppColors.surfaceMuted,
-          child: const CircularProgressIndicator(strokeWidth: 2),
-        );
-      },
-      errorBuilder: (ctx, err, st) => Container(
-        height: 120,
-        alignment: Alignment.center,
-        color: AppColors.surfaceMuted,
-        child: const Text('Image unavailable'),
-      ),
-    ),
   );
 }
 

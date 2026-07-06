@@ -1761,10 +1761,16 @@ router.get('/users', adminAuth, async (req, res) => {
     if (search) {
       const like = `%${search}%`;
       const result = await pool.query(
-        `SELECT id, full_name, phone, preferred_plan, target_exam_year, batch_id, created_at
-         FROM users
-         WHERE full_name ILIKE $1 OR phone ILIKE $1
-         ORDER BY created_at DESC
+        `SELECT u.id, u.full_name, u.phone, u.preferred_plan, u.target_exam_year,
+                u.batch_id, u.created_at,
+                us.plan_name AS subscription_plan,
+                us.status AS subscription_status,
+                us.expires_at AS subscription_expires_at,
+                (us.status = 'active' AND us.expires_at > CURRENT_TIMESTAMP) AS has_active_subscription
+         FROM users u
+         LEFT JOIN user_subscriptions us ON us.user_id = u.id
+         WHERE u.full_name ILIKE $1 OR u.phone ILIKE $1
+         ORDER BY u.created_at DESC
          LIMIT $2 OFFSET $3`,
         [like, limit, offset]
       );
@@ -1778,9 +1784,14 @@ router.get('/users', adminAuth, async (req, res) => {
     } else {
       const result = await pool.query(
         `SELECT u.id, u.full_name, u.phone, u.preferred_plan, u.target_exam_year,
-                u.batch_id, u.created_at, b.name AS batch_name
+                u.batch_id, u.created_at, b.name AS batch_name,
+                us.plan_name AS subscription_plan,
+                us.status AS subscription_status,
+                us.expires_at AS subscription_expires_at,
+                (us.status = 'active' AND us.expires_at > CURRENT_TIMESTAMP) AS has_active_subscription
          FROM users u
          LEFT JOIN batches b ON b.id = u.batch_id
+         LEFT JOIN user_subscriptions us ON us.user_id = u.id
          ORDER BY u.created_at DESC
          LIMIT $1 OFFSET $2`,
         [limit, offset]

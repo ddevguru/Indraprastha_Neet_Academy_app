@@ -13,8 +13,12 @@ class SubscriptionsScreen extends ConsumerWidget {
   const SubscriptionsScreen({super.key});
 
   bool _isSingleAllowedPlan(Map<String, dynamic> item) {
+    final amount = (item['amount_inr'] as num?)?.toDouble();
+    if (amount != null && amount > 0 && amount <= 100) return true;
+    final name = item['name']?.toString().toLowerCase() ?? '';
+    if (name.contains('starter')) return true;
     final price = item['price_label']?.toString().replaceAll(',', '') ?? '';
-    return price.contains('999') && !price.contains('4999');
+    return (price.contains('1') || price.contains('999')) && !price.contains('4999');
   }
 
   Future<void> _startCheckout(
@@ -193,7 +197,7 @@ class _ComparePlansTable extends StatelessWidget {
           headingRowColor: WidgetStatePropertyAll(AppColors.surfaceMuted),
           columns: const [
             DataColumn(label: Text('Feature')),
-            DataColumn(label: Text('Rs 999 Plan')),
+            DataColumn(label: Text('Rs 1 Plan')),
           ],
           rows: [
             _row('NCERT smart reading', 'Yes', textStyle),

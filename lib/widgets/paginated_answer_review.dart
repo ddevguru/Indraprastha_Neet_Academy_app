@@ -1,24 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../core/utils/drive_image_url.dart';
 import '../theme/app_tokens.dart';
 import 'app_widgets.dart';
-
-String resolveDriveImageUrl(String raw) {
-  final value = raw.trim();
-  if (value.isEmpty) return value;
-  final uri = Uri.tryParse(value);
-  if (uri == null) return value;
-  String? id = uri.queryParameters['id'];
-  if (id == null || id.isEmpty) {
-    final parts = uri.pathSegments;
-    final fileIdx = parts.indexOf('file');
-    if (fileIdx >= 0 && fileIdx + 2 < parts.length && parts[fileIdx + 1] == 'd') {
-      id = parts[fileIdx + 2];
-    }
-  }
-  if (id == null || id.isEmpty) return value;
-  return 'https://drive.google.com/uc?export=view&id=$id';
-}
+import 'fast_network_image.dart';
 
 class _ReviewOptionStyle {
   const _ReviewOptionStyle({
@@ -63,32 +48,7 @@ class _ReviewOptionStyle {
   }
 }
 
-Widget buildReviewImage(String rawUrl) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(AppRadii.md),
-    child: Image.network(
-      resolveDriveImageUrl(rawUrl),
-      width: double.infinity,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.low,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(
-          height: 180,
-          alignment: Alignment.center,
-          color: AppColors.surfaceMuted,
-          child: const CircularProgressIndicator(strokeWidth: 2),
-        );
-      },
-      errorBuilder: (ctx, err, st) => Container(
-        height: 120,
-        alignment: Alignment.center,
-        color: AppColors.surfaceMuted,
-        child: const Text('Image unavailable'),
-      ),
-    ),
-  );
-}
+Widget buildReviewImage(String rawUrl) => buildFastReviewImage(rawUrl);
 
 String resolveExplanationImageUrl(Map<String, dynamic> imgData) {
   final direct = imgData['image_url']?.toString() ??

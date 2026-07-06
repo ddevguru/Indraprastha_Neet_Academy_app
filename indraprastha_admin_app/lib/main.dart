@@ -87,6 +87,22 @@ Future<bool> _validateImageFile(BuildContext context, File file) async {
   return false;
 }
 
+Widget _busyButtonChild(bool busy, String label) {
+  if (!busy) return Text(label);
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+      const SizedBox(width: 10),
+      Text(label),
+    ],
+  );
+}
+
 Future<void> _handleTaskError(
   BuildContext context,
   String task,
@@ -2042,6 +2058,7 @@ class _PracticePageState extends State<PracticePage> {
   String _pqExplanationImageLink = '';
   List<dynamic> _batches = const [];
   List<dynamic> _items = const [];
+  bool _savingPracticeQuestion = false;
 
   @override
   void initState() {
@@ -2344,35 +2361,48 @@ class _PracticePageState extends State<PracticePage> {
                 ),
                 const SizedBox(height: 8),
                 FilledButton.tonal(
-                  onPressed: _selectedSetId == null
+                  onPressed: _selectedSetId == null || _savingPracticeQuestion
                       ? null
                       : () async {
+                          setState(() => _savingPracticeQuestion = true);
                           try {
                             var imageLink = _pqImageLink;
-                            if (_pqImage != null && _batchId != null) {
-                              if (!await _validateImageFile(context, _pqImage!)) return;
-                              imageLink = await widget.api.uploadQuestionImage(
-                                batchId: _batchId!,
-                                classLabel: _classLabel.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: _topic.text.trim().isEmpty ? 'Practice Questions' : _topic.text.trim(),
-                                file: _pqImage!,
-                                contentType: 'practice',
-                                contentId: _selectedSetId,
-                              );
-                            }
                             var expLink = _pqExplanationImageLink;
-                            if (_pqExplanationImage != null && _batchId != null) {
-                              if (!await _validateImageFile(context, _pqExplanationImage!)) return;
-                              expLink = await widget.api.uploadQuestionImage(
-                                batchId: _batchId!,
-                                classLabel: _classLabel.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: _topic.text.trim().isEmpty ? 'Practice Questions' : _topic.text.trim(),
-                                file: _pqExplanationImage!,
-                                contentType: 'practice_explanation',
-                                contentId: _selectedSetId,
-                              );
+                            if (_batchId != null) {
+                              final uploads = <Future<void>>[];
+                              if (_pqImage != null) {
+                                uploads.add(() async {
+                                  if (!await _validateImageFile(context, _pqImage!)) {
+                                    throw Exception('Question image too large');
+                                  }
+                                  imageLink = await widget.api.uploadQuestionImage(
+                                    batchId: _batchId!,
+                                    classLabel: _classLabel.text.trim(),
+                                    subject: _subject.text.trim(),
+                                    topic: _topic.text.trim().isEmpty ? 'Practice Questions' : _topic.text.trim(),
+                                    file: _pqImage!,
+                                    contentType: 'practice',
+                                    contentId: _selectedSetId,
+                                  );
+                                }());
+                              }
+                              if (_pqExplanationImage != null) {
+                                uploads.add(() async {
+                                  if (!await _validateImageFile(context, _pqExplanationImage!)) {
+                                    throw Exception('Explanation image too large');
+                                  }
+                                  expLink = await widget.api.uploadQuestionImage(
+                                    batchId: _batchId!,
+                                    classLabel: _classLabel.text.trim(),
+                                    subject: _subject.text.trim(),
+                                    topic: _topic.text.trim().isEmpty ? 'Practice Questions' : _topic.text.trim(),
+                                    file: _pqExplanationImage!,
+                                    contentType: 'practice_explanation',
+                                    contentId: _selectedSetId,
+                                  );
+                                }());
+                              }
+                              if (uploads.isNotEmpty) await Future.wait(uploads);
                             }
                             if (_editingPracticeQuestionId == null) {
                               await widget.api.addPracticeQuestion(
@@ -2423,9 +2453,12 @@ class _PracticePageState extends State<PracticePage> {
                               e,
                               stackTrace: st,
                             );
+                          } finally {
+                            if (mounted) setState(() => _savingPracticeQuestion = false);
                           }
                         },
-                  child: Text(
+                  child: _busyButtonChild(
+                    _savingPracticeQuestion,
                     _editingPracticeQuestionId == null ? 'Add Practice Question' : 'Update Practice Question',
                   ),
                 ),
@@ -2594,6 +2627,7 @@ class _TestsPageState extends State<TestsPage> {
   List<dynamic> _batches = const [];
   List<dynamic> _items = const [];
   String? _status;
+  bool _savingQuestion = false;
 
   Future<void> _loadTestExplanationImages(int questionId) async {
     final images = await widget.api.fetchExplanationImages(
@@ -2606,17 +2640,19 @@ class _TestsPageState extends State<TestsPage> {
 
   Future<void> _uploadPendingTestExplanationImages(int questionId) async {
     if (_batchId == null || _pendingExtraExplanationImages.isEmpty) return;
-    for (final file in _pendingExtraExplanationImages) {
-      await widget.api.addExplanationImage(
-        questionType: 'test_question',
-        questionId: questionId,
-        batchId: _batchId!,
-        classLabel: _classLabel.text.trim(),
-        subject: _subject.text.trim(),
-        topic: _topic.text.trim().isEmpty ? 'Test Questions' : _topic.text.trim(),
-        file: file,
-      );
-    }
+    await Future.wait(
+      _pendingExtraExplanationImages.map(
+        (file) => widget.api.addExplanationImage(
+          questionType: 'test_question',
+          questionId: questionId,
+          batchId: _batchId!,
+          classLabel: _classLabel.text.trim(),
+          subject: _subject.text.trim(),
+          topic: _topic.text.trim().isEmpty ? 'Test Questions' : _topic.text.trim(),
+          file: file,
+        ),
+      ),
+    );
     _pendingExtraExplanationImages.clear();
     await _loadTestExplanationImages(questionId);
   }
@@ -3076,35 +3112,48 @@ class _TestsPageState extends State<TestsPage> {
                   runSpacing: 8,
                   children: [
                     FilledButton.tonal(
-                      onPressed: _selectedTestId == null
+                      onPressed: _selectedTestId == null || _savingQuestion
                           ? null
                           : () async {
+                          setState(() => _savingQuestion = true);
                           try {
                             var imageLink = _testQuestionImageLink;
-                            if (_testQuestionImage != null && _batchId != null) {
-                              if (!await _validateImageFile(context, _testQuestionImage!)) return;
-                              imageLink = await widget.api.uploadQuestionImage(
-                                batchId: _batchId!,
-                                classLabel: _classLabel.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: _topic.text.trim().isEmpty ? 'Test Questions' : _topic.text.trim(),
-                                file: _testQuestionImage!,
-                                contentType: 'test',
-                                contentId: _selectedTestId,
-                              );
-                            }
                             var expLink = _testExplanationImageLink;
-                            if (_testExplanationImage != null && _batchId != null) {
-                              if (!await _validateImageFile(context, _testExplanationImage!)) return;
-                              expLink = await widget.api.uploadQuestionImage(
-                                batchId: _batchId!,
-                                classLabel: _classLabel.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: _topic.text.trim().isEmpty ? 'Test Questions' : _topic.text.trim(),
-                                file: _testExplanationImage!,
-                                contentType: 'test_explanation',
-                                contentId: _selectedTestId,
-                              );
+                            if (_batchId != null) {
+                              final uploads = <Future<void>>[];
+                              if (_testQuestionImage != null) {
+                                uploads.add(() async {
+                                  if (!await _validateImageFile(context, _testQuestionImage!)) {
+                                    throw Exception('Question image too large');
+                                  }
+                                  imageLink = await widget.api.uploadQuestionImage(
+                                    batchId: _batchId!,
+                                    classLabel: _classLabel.text.trim(),
+                                    subject: _subject.text.trim(),
+                                    topic: _topic.text.trim().isEmpty ? 'Test Questions' : _topic.text.trim(),
+                                    file: _testQuestionImage!,
+                                    contentType: 'test',
+                                    contentId: _selectedTestId,
+                                  );
+                                }());
+                              }
+                              if (_testExplanationImage != null) {
+                                uploads.add(() async {
+                                  if (!await _validateImageFile(context, _testExplanationImage!)) {
+                                    throw Exception('Explanation image too large');
+                                  }
+                                  expLink = await widget.api.uploadQuestionImage(
+                                    batchId: _batchId!,
+                                    classLabel: _classLabel.text.trim(),
+                                    subject: _subject.text.trim(),
+                                    topic: _topic.text.trim().isEmpty ? 'Test Questions' : _topic.text.trim(),
+                                    file: _testExplanationImage!,
+                                    contentType: 'test_explanation',
+                                    contentId: _selectedTestId,
+                                  );
+                                }());
+                              }
+                              if (uploads.isNotEmpty) await Future.wait(uploads);
                             }
                             var savedQuestionId = _editingQuestionId;
                             if (_editingQuestionId == null) {
@@ -3156,9 +3205,12 @@ class _TestsPageState extends State<TestsPage> {
                                 'editingQuestionId': _editingQuestionId,
                               },
                             );
+                          } finally {
+                            if (mounted) setState(() => _savingQuestion = false);
                           }
                         },
-                      child: Text(
+                      child: _busyButtonChild(
+                        _savingQuestion,
                         _editingQuestionId == null ? 'Add Question' : 'Save & add next',
                       ),
                     ),
@@ -4331,6 +4383,9 @@ class _UsersPageState extends State<UsersPage> {
                     final batch = u['batch_name']?.toString() ?? '';
                     final plan = u['preferred_plan']?.toString() ?? '';
                     final year = u['target_exam_year']?.toString() ?? '';
+                    final isPremium = u['has_active_subscription'] == true;
+                    final subscriptionPlan = u['subscription_plan']?.toString() ?? '';
+                    final expiresAt = u['subscription_expires_at']?.toString() ?? '';
                     final initials = name.trim().isNotEmpty
                         ? name.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
                         : '?';
@@ -4367,6 +4422,33 @@ class _UsersPageState extends State<UsersPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: isPremium
+                                        ? const Color(0xFF2E7D32).withValues(alpha: 0.14)
+                                        : const Color(0xFF757575).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    isPremium
+                                        ? 'Premium${subscriptionPlan.isNotEmpty ? ' • $subscriptionPlan' : ''}'
+                                        : 'Free user',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: isPremium ? const Color(0xFF2E7D32) : const Color(0xFF757575),
+                                    ),
+                                  ),
+                                ),
+                                if (isPremium && expiresAt.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Valid till ${expiresAt.split('T').first}',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF757575)),
+                                  ),
+                                ],
                                 if (phone.isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Row(children: [
