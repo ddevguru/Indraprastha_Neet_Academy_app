@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
+import '../../core/utils/payment_utils.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../content/data/content_repository.dart';
@@ -32,6 +33,7 @@ class PaymentCheckoutScreen extends StatefulWidget {
 class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
   late final Razorpay _razorpay;
   bool _processing = false;
+  bool _completed = false;
   String? _error;
 
   @override
@@ -51,6 +53,7 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
   }
 
   void _openCheckout() {
+    if (_completed || _processing) return;
     if (widget.keyId.isEmpty || widget.razorpayOrderId.isEmpty) {
       setState(() => _error = 'Payment configuration missing. Contact support.');
       return;
@@ -76,43 +79,89 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
     }
   }
 
+  Future<Map<String, dynamic>?> _verifyWithServer({
+    String? razorpayPaymentId,
+    String? razorpayOrderId,
+    String? razorpaySignature,
+  }) async {
+    final result = await ContentRepository().verifyPayment(
+      orderId: widget.orderId,
+      razorpayPaymentId: razorpayPaymentId,
+      razorpayOrderId: razorpayOrderId,
+      razorpaySignature: razorpaySignature,
+    );
+    if (isPaymentVerified(result)) return result;
+    throw Exception(
+      result['error']?.toString() ?? 'Payment verification failed. Please try confirm payment.',
+    );
+  }
+
+  Future<void> _confirmPaidAndExit(Map<String, dynamic> result) async {
+    _completed = true;
+    if (!mounted) return;
+    Navigator.of(context).pop(result);
+  }
+
   Future<void> _handleSuccess(PaymentSuccessResponse response) async {
-    if (_processing) return;
+    if (_processing || _completed) return;
     setState(() {
       _processing = true;
       _error = null;
     });
 
     try {
-      final paymentId = response.paymentId ?? '';
-      final orderId = response.orderId ?? '';
-      final signature = response.signature ?? '';
-      if (paymentId.isEmpty || orderId.isEmpty || signature.isEmpty) {
-        throw Exception('Incomplete payment response');
+      final paymentId = response.paymentId?.trim() ?? '';
+      final orderId = response.orderId?.trim() ?? '';
+      final signature = response.signature?.trim() ?? '';
+
+      Map<String, dynamic>? result;
+      if (paymentId.isNotEmpty && orderId.isNotEmpty && signature.isNotEmpty) {
+        result = await _verifyWithServer(
+          razorpayPaymentId: paymentId,
+          razorpayOrderId: orderId,
+          razorpaySignature: signature,
+        );
+      } else {
+        // Some Android builds return partial payload — fallback to order-only verify.
+        result = await _verifyWithServer();
       }
 
-      final result = await ContentRepository().verifyPayment(
-        orderId: widget.orderId,
-        razorpayPaymentId: paymentId,
-        razorpayOrderId: orderId,
-        razorpaySignature: signature,
-      );
-      if (!mounted) return;
-      if (result['paid'] == true) {
-        Navigator.of(context).pop(result);
+      if (result != null) {
+        await _confirmPaidAndExit(result);
         return;
       }
-      setState(() => _error = 'Payment verification failed. Please contact support.');
+      setState(() => _error = 'Payment verification failed. Tap confirm payment.');
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = paymentErrorMessage(e));
     } finally {
-      if (mounted) setState(() => _processing = false);
+      if (mounted && !_completed) setState(() => _processing = false);
+    }
+  }
+
+  Future<void> _confirmPaymentStatus() async {
+    if (_processing || _completed) return;
+    setState(() {
+      _processing = true;
+      _error = null;
+    });
+    try {
+      final result = await _verifyWithServer();
+      if (result != null) {
+        await _confirmPaidAndExit(result);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = paymentErrorMessage(e));
+    } finally {
+      if (mounted && !_completed) setState(() => _processing = false);
     }
   }
 
   void _handleError(PaymentFailureResponse response) {
-    if (!mounted) return;
+    if (!mounted || _completed) return;
+    // Razorpay Android sometimes fires error after success while verify is running.
+    if (_processing) return;
     setState(() {
       _error = response.message ?? 'Payment cancelled or failed.';
       _processing = false;
@@ -160,13 +209,25 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
               if (_error != null) ...[
                 const SizedBox(height: AppSpacing.md),
                 Text(_error!, style: const TextStyle(color: AppColors.danger)),
+                const SizedBox(height: AppSpacing.xs),
+                const Text(
+                  'Agar payment cut ho chuka hai to "Confirm payment" dabayein.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
               ],
               const SizedBox(height: AppSpacing.lg),
               PrimaryButton(
-                label: 'Retry payment',
+                label: _processing ? 'Verifying...' : 'Confirm payment',
+                expanded: true,
+                icon: Icons.verified_rounded,
+                onPressed: _processing ? null : _confirmPaymentStatus,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SecondaryButton(
+                label: 'Retry Razorpay',
                 expanded: true,
                 icon: Icons.payment_rounded,
-                onPressed: _processing ? null : _openCheckout,
+                onPressed: _processing || _completed ? null : _openCheckout,
               ),
               const SizedBox(height: AppSpacing.sm),
               SecondaryButton(

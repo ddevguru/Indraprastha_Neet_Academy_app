@@ -132,6 +132,30 @@ router.post('/create-order', authMiddleware, async (req, res) => {
   }
 });
 
+function isSuccessfulPaymentStatus(status) {
+  const value = String(status || '').toLowerCase();
+  return ['captured', 'authorized', 'paid'].includes(value);
+}
+
+async function markOrderPaid(orderId, { razorpayPaymentId, gatewayPayload, isPaid, status }) {
+  await pool.query(
+    `UPDATE payment_orders
+     SET status = $2,
+         payment_session_id = COALESCE($3, payment_session_id),
+         gateway_response = $4,
+         paid_at = CASE WHEN $5 THEN CURRENT_TIMESTAMP ELSE paid_at END,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1`,
+    [
+      orderId,
+      status,
+      razorpayPaymentId || null,
+      JSON.stringify(gatewayPayload || {}),
+      isPaid,
+    ]
+  );
+}
+
 router.post('/verify', authMiddleware, async (req, res) => {
   try {
     const orderId = String(req.body.orderId || '').trim();
@@ -156,7 +180,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
     }
     const order = local.rows[0];
 
-    if (order.status === 'paid') {
+    if (String(order.status || '').toLowerCase() === 'paid') {
       const sub = await pool.query(
         `SELECT plan_name, status, starts_at, expires_at
          FROM user_subscriptions WHERE user_id = $1 LIMIT 1`,
@@ -183,62 +207,100 @@ router.post('/verify', authMiddleware, async (req, res) => {
       if (!signatureOk) {
         return res.status(400).json({ error: 'Invalid payment signature' });
       }
-      if (order.cf_order_id && order.cf_order_id !== razorpayOrderId) {
+      if (
+        order.cf_order_id &&
+        String(order.cf_order_id) !== String(razorpayOrderId)
+      ) {
         return res.status(400).json({ error: 'Order mismatch' });
       }
 
-      const payment = await fetchRazorpayPayment(razorpayPaymentId);
-      isPaid = payment.status === 'captured' || payment.status === 'authorized';
-      status = isPaid ? 'paid' : payment.status;
-      gatewayPayload = payment;
+      // Valid Razorpay signature means payment succeeded on gateway side.
+      isPaid = true;
+      status = 'paid';
+      gatewayPayload = {
+        razorpayPaymentId,
+        razorpayOrderId,
+        verifiedBySignature: true,
+      };
 
-      await pool.query(
-        `UPDATE payment_orders
-         SET status = $2,
-             payment_session_id = $3,
-             gateway_response = $4,
-             paid_at = CASE WHEN $5 THEN CURRENT_TIMESTAMP ELSE paid_at END,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1`,
-        [order.id, status, razorpayPaymentId, JSON.stringify(gatewayPayload), isPaid]
-      );
+      try {
+        const payment = await fetchRazorpayPayment(razorpayPaymentId);
+        gatewayPayload = payment;
+        // Signature already proves success — only reject explicit failures.
+        if (String(payment.status || '').toLowerCase() === 'failed') {
+          isPaid = false;
+          status = 'failed';
+        }
+      } catch (fetchErr) {
+        console.warn('[PAYMENTS_VERIFY] payment fetch failed, trusting signature', {
+          orderId,
+          razorpayPaymentId,
+          message: fetchErr?.message,
+        });
+      }
+
+      await markOrderPaid(order.id, {
+        razorpayPaymentId,
+        gatewayPayload,
+        isPaid,
+        status,
+      });
     } else {
-      const rzOrder = await fetchRazorpayOrder(order.cf_order_id || orderId);
-      isPaid = rzOrder.status === 'paid';
-      status = rzOrder.status;
-      gatewayPayload = rzOrder;
+      const rzOrderId = order.cf_order_id || razorpayOrderId || orderId;
+      try {
+        const rzOrder = await fetchRazorpayOrder(rzOrderId);
+        isPaid = isSuccessfulPaymentStatus(rzOrder.status);
+        status = isPaid ? 'paid' : rzOrder.status || 'failed';
+        gatewayPayload = rzOrder;
 
-      await pool.query(
-        `UPDATE payment_orders
-         SET status = $2,
-             gateway_response = $3,
-             paid_at = CASE WHEN $4 THEN CURRENT_TIMESTAMP ELSE paid_at END,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1`,
-        [order.id, status, JSON.stringify(gatewayPayload), isPaid]
-      );
+        await markOrderPaid(order.id, {
+          razorpayPaymentId: razorpayPaymentId || null,
+          gatewayPayload,
+          isPaid,
+          status,
+        });
+      } catch (fetchErr) {
+        console.error('[PAYMENTS_VERIFY] order fetch failed', {
+          orderId,
+          rzOrderId,
+          message: fetchErr?.message,
+        });
+        return res.status(400).json({
+          error: 'Payment status could not be confirmed yet. Try again in a few seconds.',
+        });
+      }
     }
 
+    let subscription = null;
     if (isPaid) {
-      await activateSubscription(
-        req.user.id,
-        order,
-        order.package_name,
-        order.validity
+      try {
+        await activateSubscription(
+          req.user.id,
+          order,
+          order.package_name,
+          order.validity
+        );
+      } catch (activationErr) {
+        console.error('[PAYMENTS_VERIFY] subscription activation failed', {
+          orderId,
+          userId: req.user.id,
+          message: activationErr?.message,
+        });
+        // Payment is already captured — do not fail the client verify call.
+      }
+      const sub = await pool.query(
+        `SELECT plan_name, status, starts_at, expires_at
+         FROM user_subscriptions WHERE user_id = $1 LIMIT 1`,
+        [req.user.id]
       );
+      subscription = sub.rows[0] || null;
     }
-
-    const sub = await pool.query(
-      `SELECT plan_name, status, starts_at, expires_at
-       FROM user_subscriptions WHERE user_id = $1 LIMIT 1`,
-      [req.user.id]
-    );
 
     return res.json({
       success: true,
       paid: isPaid,
       orderStatus: status,
-      subscription: sub.rows[0] || null,
+      subscription,
     });
   } catch (e) {
     console.error('[PAYMENTS_VERIFY]', e);

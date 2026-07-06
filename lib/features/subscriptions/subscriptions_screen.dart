@@ -3,31 +3,42 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers/app_state.dart';
+import '../../core/utils/package_utils.dart';
+import '../../core/utils/payment_utils.dart';
 import '../../models/app_models.dart';
 import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import 'payment_checkout_screen.dart';
 
-class SubscriptionsScreen extends ConsumerWidget {
+class SubscriptionsScreen extends ConsumerStatefulWidget {
   const SubscriptionsScreen({super.key});
 
-  bool _isSingleAllowedPlan(Map<String, dynamic> item) {
-    final amount = (item['amount_inr'] as num?)?.toDouble();
-    if (amount != null && amount > 0 && amount <= 100) return true;
-    final name = item['name']?.toString().toLowerCase() ?? '';
-    if (name.contains('starter')) return true;
-    final price = item['price_label']?.toString().replaceAll(',', '') ?? '';
-    return (price.contains('1') || price.contains('999')) && !price.contains('4999');
+  @override
+  ConsumerState<SubscriptionsScreen> createState() => _SubscriptionsScreenState();
+}
+
+class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
+  late Future<List<Map<String, dynamic>>> _plansFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reloadPlans();
+  }
+
+  void _reloadPlans() {
+    setState(() {
+      _plansFuture = ContentRepository().fetchPackages();
+    });
   }
 
   Future<void> _startCheckout(
     BuildContext context,
-    WidgetRef ref,
     Map<String, dynamic> raw,
     SubscriptionPlan plan,
   ) async {
-    final packageId = (raw['id'] as num?)?.toInt();
+    final packageId = parsePackageId(raw['id']);
     if (packageId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid package.')),
@@ -53,7 +64,7 @@ class SubscriptionsScreen extends ConsumerWidget {
         MaterialPageRoute(
           builder: (_) => PaymentCheckoutScreen(
             packageName: plan.name,
-            amountInr: (order['amountInr'] as num?)?.toDouble() ?? 0,
+            amountInr: (order['amountInr'] as num?)?.toDouble() ?? 1,
             orderId: orderId,
             razorpayOrderId: razorpayOrderId,
             keyId: keyId,
@@ -62,121 +73,144 @@ class SubscriptionsScreen extends ConsumerWidget {
           ),
         ),
       );
-      if (verifyResult?['paid'] == true) {
-        ref.read(appUiControllerProvider.notifier).activateSubscription(plan.name);
+      if (verifyResult != null && isPaymentVerified(verifyResult)) {
+        final planName = verifyResult['subscription'] is Map
+            ? (verifyResult['subscription'] as Map)['plan_name']?.toString()
+            : null;
+        ref.read(appUiControllerProvider.notifier).activateSubscription(
+              planName?.isNotEmpty == true ? planName! : plan.name,
+            );
+        await ref.read(authBlocProvider).refreshProfile();
         if (!context.mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text('${plan.name} activated successfully.')),
+          SnackBar(
+            content: Text(
+              '${planName?.isNotEmpty == true ? planName : plan.name} activated successfully.',
+            ),
+          ),
         );
         context.go('/dashboard/0');
+      } else if (verifyResult != null) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Payment received but not confirmed yet. Tap Confirm payment.'),
+          ),
+        );
       }
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Payment failed: $e')),
+        SnackBar(content: Text('Payment issue: ${paymentErrorMessage(e)}')),
       );
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final ui = ref.watch(appUiControllerProvider);
     final activePlan = ui.selectedPlan;
-    final plansFuture = ContentRepository().fetchPackages();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Subscriptions')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: CenteredContent(
-          maxWidth: 1160,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SectionHeader(
-                title: 'Choose your plan',
-                subtitle:
-                    'Secure payment via Razorpay. After payment, your subscription activates automatically.',
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              FutureBuilder<List<Map<String, dynamic>>>(
-                future: plansFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const SkeletonLoader(cardCount: 3);
-                  }
-                  final allRawPlans = snapshot.data ?? const [];
-                  final rawPlans = allRawPlans.where(_isSingleAllowedPlan).toList();
-                  final plans = rawPlans
-                      .map(
-                        (item) => SubscriptionPlan(
-                          name: item['name']?.toString() ?? 'Plan',
-                          priceLabel: item['price_label']?.toString() ?? '',
-                          validity: item['validity']?.toString() ?? '',
-                          highlight: item['highlight']?.toString() ?? '',
-                          features: List<String>.from(
-                            item['features_json'] as List<dynamic>? ?? const [],
-                          ),
-                          isRecommended:
-                              (item['name']?.toString().toLowerCase().contains('rank') ?? false),
-                        ),
-                      )
-                      .toList();
-                  if (plans.isEmpty) {
-                    return const EmptyStateWidget(
-                      title: 'No plans available',
-                      subtitle: 'Admin panel se package add karne ke baad yahan dikhenge.',
-                      icon: Icons.workspace_premium_outlined,
-                    );
-                  }
-
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      final crossAxisCount = constraints.maxWidth > 1060
-                          ? 4
-                          : constraints.maxWidth > 760
-                              ? 2
-                              : 1;
-
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: plans.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: AppSpacing.md,
-                          mainAxisSpacing: AppSpacing.md,
-                          childAspectRatio: 0.82,
-                        ),
-                        itemBuilder: (context, index) {
-                          final plan = plans[index];
-                          final raw = rawPlans[index];
-                          return PlanCard(
-                            plan: plan,
-                            active: ui.hasActiveSubscription && activePlan == plan.name,
-                            onSelect: () => _startCheckout(context, ref, raw, plan),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              SurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SectionHeader(
-                      title: 'Compare plans',
-                      subtitle:
-                          'Review access differences before selecting a learning workflow.',
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    _ComparePlansTable(),
-                  ],
+      body: RefreshIndicator(
+        onRefresh: () async {
+          _reloadPlans();
+          await _plansFuture;
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: CenteredContent(
+            maxWidth: 1160,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SectionHeader(
+                  title: 'Choose your plan',
+                  subtitle:
+                      'Secure payment via Razorpay. After payment, your subscription activates automatically.',
                 ),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.xl),
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _plansFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SkeletonLoader(cardCount: 2);
+                    }
+                    if (snapshot.hasError) {
+                      return Column(
+                        children: [
+                          EmptyStateWidget(
+                            title: 'Plans load nahi ho paaye',
+                            subtitle: snapshot.error.toString(),
+                            icon: Icons.error_outline_rounded,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          PrimaryButton(
+                            label: 'Retry',
+                            expanded: true,
+                            icon: Icons.refresh_rounded,
+                            onPressed: _reloadPlans,
+                          ),
+                        ],
+                      );
+                    }
+
+                    final allRawPlans = snapshot.data ?? const [];
+                    final starterPlans = allRawPlans.where(isStarterPackage).toList();
+                    final entries = starterPlans.map(subscriptionPlanFromApi).toList();
+
+                    if (entries.isEmpty) {
+                      return Column(
+                        children: [
+                          const EmptyStateWidget(
+                            title: 'No plans available',
+                            subtitle:
+                                'Server par Starter plan active nahi hai. Admin panel se package check karein.',
+                            icon: Icons.workspace_premium_outlined,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          PrimaryButton(
+                            label: 'Refresh',
+                            expanded: true,
+                            icon: Icons.refresh_rounded,
+                            onPressed: _reloadPlans,
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        for (final entry in entries)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                            child: PlanCard(
+                              plan: entry.plan,
+                              active: ui.hasActiveSubscription && activePlan == entry.plan.name,
+                              onSelect: () => _startCheckout(context, entry.raw, entry.plan),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                SurfaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionHeader(
+                        title: 'Compare plans',
+                        subtitle:
+                            'Review access differences before selecting a learning workflow.',
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      _ComparePlansTable(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -191,7 +225,7 @@ class _ComparePlansTable extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 760),
+        constraints: const BoxConstraints(minWidth: 320),
         child: DataTable(
           columnSpacing: 22,
           headingRowColor: WidgetStatePropertyAll(AppColors.surfaceMuted),

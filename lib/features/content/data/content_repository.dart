@@ -102,7 +102,11 @@ class ContentRepository {
 
   Future<List<Map<String, dynamic>>> fetchPackages() async {
     final data = await _get('/content/packages');
-    return List<Map<String, dynamic>>.from(data['packages'] as List<dynamic>);
+    final raw = data['packages'];
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
   }
 
   Future<Map<String, dynamic>> createPaymentOrder(int packageId) async {

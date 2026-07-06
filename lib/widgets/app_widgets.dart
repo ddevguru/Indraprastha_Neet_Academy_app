@@ -605,6 +605,7 @@ class PlanCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
@@ -681,7 +682,6 @@ class PlanCard extends StatelessWidget {
                 ),
               ),
             ),
-            const Spacer(),
             const SizedBox(height: AppSpacing.md),
             SizedBox(
               width: double.infinity,
