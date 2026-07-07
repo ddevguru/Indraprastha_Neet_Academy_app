@@ -73,6 +73,7 @@ Widget _buildQuestionImage(String rawUrl) {
     width: double.infinity,
     height: 180,
     fit: BoxFit.cover,
+    thumbWidth: 700,
     borderRadius: BorderRadius.circular(AppRadii.md),
   );
 }
@@ -411,7 +412,21 @@ class _TestResultScreenState extends State<TestResultScreen> {
   @override
   void initState() {
     super.initState();
-    _attemptFuture = ContentRepository().fetchTestQuestions(widget.testId);
+    _attemptFuture = ContentRepository().fetchTestQuestions(widget.testId).then((data) {
+      final questions = List<Map<String, dynamic>>.from(
+        data['questions'] as List<dynamic>? ?? const [],
+      );
+      unawaited(
+        warmImageCacheUrls(
+          questions
+              .map((q) => q['question_image_link']?.toString() ?? '')
+              .where((url) => url.trim().isNotEmpty),
+          thumbWidth: 700,
+          maxItems: 12,
+        ),
+      );
+      return data;
+    });
   }
 
   @override

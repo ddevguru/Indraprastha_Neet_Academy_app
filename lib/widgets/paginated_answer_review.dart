@@ -54,10 +54,13 @@ String resolveExplanationImageUrl(Map<String, dynamic> imgData) {
   final direct = imgData['image_url']?.toString() ??
       imgData['image_drive_link']?.toString() ??
       '';
-  if (direct.trim().isNotEmpty) return direct;
+  if (direct.trim().isNotEmpty) return resolveDriveImageUrl(direct, thumbWidth: 900);
   final fileId = imgData['image_drive_file_id']?.toString() ?? '';
   if (fileId.isNotEmpty) {
-    return 'https://drive.google.com/uc?export=view&id=$fileId';
+    return resolveDriveImageUrl(
+      'https://drive.google.com/uc?export=view&id=$fileId',
+      thumbWidth: 900,
+    );
   }
   return '';
 }

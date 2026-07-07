@@ -23,6 +23,7 @@ Widget _buildQuestionImage(String rawUrl) {
     width: double.infinity,
     height: 180,
     fit: BoxFit.cover,
+    thumbWidth: 700,
     borderRadius: BorderRadius.circular(AppRadii.md),
   );
 }
@@ -265,6 +266,15 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       _set = Map<String, dynamic>.from(data['practiceSet'] as Map? ?? {});
       _questions = List<Map<String, dynamic>>.from(
         data['questions'] as List<dynamic>? ?? const [],
+      );
+      unawaited(
+        warmImageCacheUrls(
+          _questions
+              .map((q) => q['question_image_link']?.toString() ?? '')
+              .where((url) => url.trim().isNotEmpty),
+          thumbWidth: 700,
+          maxItems: 12,
+        ),
       );
       _loadError = null;
     } catch (e) {

@@ -15,7 +15,6 @@ String? extractDriveFileId(String raw) {
   return id;
 }
 
-/// Google Drive thumbnail loads much faster than uc?export=view on mobile.
 String resolveDriveImageUrl(String raw, {int thumbWidth = 900}) {
   final value = raw.trim();
   if (value.isEmpty) return value;

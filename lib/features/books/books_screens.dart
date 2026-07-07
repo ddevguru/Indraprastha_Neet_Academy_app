@@ -24,6 +24,7 @@ Widget _buildQuestionImage(String rawUrl) {
     width: double.infinity,
     height: 180,
     fit: BoxFit.cover,
+    thumbWidth: 700,
     borderRadius: BorderRadius.circular(AppRadii.md),
   );
 }
@@ -519,6 +520,20 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
   int _index = 0;
   final Map<int, String> _answers = {};
   bool _submitted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(
+      warmImageCacheUrls(
+        widget.pyqs
+            .map((q) => q['question_image_link']?.toString() ?? '')
+            .where((url) => url.trim().isNotEmpty),
+        thumbWidth: 700,
+        maxItems: 12,
+      ),
+    );
+  }
 
   void _openReview() {
     final items = List.generate(

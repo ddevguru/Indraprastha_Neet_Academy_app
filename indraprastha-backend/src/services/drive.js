@@ -63,7 +63,7 @@ function buildDrivePublicLinks(fileId) {
   return {
     previewLink: `https://drive.google.com/file/d/${fileId}/preview`,
     downloadLink: `https://drive.google.com/uc?export=download&id=${fileId}`,
-    imageLink: `https://drive.google.com/uc?export=view&id=${fileId}`,
+    imageLink: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`,
   };
 }
 

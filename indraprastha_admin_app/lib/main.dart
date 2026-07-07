@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'screens/error_logs_page.dart';
 import 'services/admin_error_logger.dart';
+import 'widgets/fast_network_image.dart';
 
 const String baseUrl = 'https://api.indraprasthaneetacademy.com/api';
 
@@ -1825,11 +1826,12 @@ class _BooksPageState extends State<BooksPage> {
                                                 const SizedBox(height: 8),
                                                 ClipRRect(
                                                   borderRadius: BorderRadius.circular(8),
-                                                  child: Image.network(
-                                                    q['question_image_link'].toString(),
+                                                  child: FastNetworkImage(
+                                                    url: q['question_image_link'].toString(),
                                                     height: 120,
                                                     width: double.infinity,
                                                     fit: BoxFit.cover,
+                                                    thumbWidth: 600,
                                                   ),
                                                 ),
                                               ],
@@ -2726,11 +2728,12 @@ class _TestsPageState extends State<TestsPage> {
                             const SizedBox(height: 8),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                question['question_image_link'].toString(),
+                              child: FastNetworkImage(
+                                url: question['question_image_link'].toString(),
                                 height: 120,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
+                                thumbWidth: 600,
                               ),
                             ),
                           ],
@@ -3464,11 +3467,12 @@ class _McqsPageState extends State<McqsPage> {
               const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  m['question_image_link'].toString(),
+                child: FastNetworkImage(
+                  url: m['question_image_link'].toString(),
                   height: 100,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  thumbWidth: 500,
                 ),
               ),
             ],

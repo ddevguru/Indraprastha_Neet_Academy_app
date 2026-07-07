@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_tokens.dart';
+import '../../widgets/fast_network_image.dart';
 /// Enhanced Test Taking Screen with Progress Dots
 class EnhancedTestScreen extends StatefulWidget {
   final int testId;
@@ -738,10 +739,11 @@ class ExplanationDetailScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        question.explanationImageUrl!,
+                      child: FastNetworkImage(
+                        url: question.explanationImageUrl!,
                         width: double.infinity,
                         fit: BoxFit.cover,
+                        thumbWidth: 800,
                       ),
                     ),
                   ],

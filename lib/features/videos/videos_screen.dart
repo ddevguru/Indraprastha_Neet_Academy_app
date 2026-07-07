@@ -8,6 +8,7 @@ import '../../core/providers/app_state.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/content_lock.dart';
+import '../../widgets/fast_network_image.dart';
 import 'video_player_screen.dart';
 
 class VideosScreen extends ConsumerWidget {
@@ -84,20 +85,12 @@ class VideosScreen extends ConsumerWidget {
                                 children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    teacherAvatar,
+                                  child: FastNetworkImage(
+                                    url: teacherAvatar,
                                     width: 64,
                                     height: 64,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => Container(
-                                      width: 64,
-                                      height: 64,
-                                      color: AppColors.indigoSoft,
-                                      child: const Icon(
-                                        Icons.person_rounded,
-                                        color: AppColors.indigo,
-                                      ),
-                                    ),
+                                    thumbWidth: 200,
                                   ),
                                 ),
                                 const SizedBox(width: AppSpacing.lg),

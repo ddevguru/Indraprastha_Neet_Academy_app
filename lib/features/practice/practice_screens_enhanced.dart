@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_tokens.dart';
+import '../../widgets/fast_network_image.dart';
 
 /// Enhanced Practice/PYQ Screen with Explanation Page & Progress Dots
 class EnhancedPracticeScreen extends StatefulWidget {
@@ -973,27 +974,10 @@ class PracticeExplanationScreen extends StatelessWidget {
                             ],
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                img.imageUrl,
+                              child: FastNetworkImage(
+                                url: img.imageUrl,
                                 fit: BoxFit.cover,
-                                filterQuality: FilterQuality.low,
-                                loadingBuilder: (context, child, progress) {
-                                  if (progress == null) return child;
-                                  return Container(
-                                    height: 200,
-                                    alignment: Alignment.center,
-                                    color: Colors.grey.shade200,
-                                    child: const CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (ctx, err, stack) => Container(
-                                  height: 120,
-                                  alignment: Alignment.center,
-                                  color: Colors.grey.shade100,
-                                  child: const Text('Image unavailable'),
-                                ),
+                                thumbWidth: 800,
                               ),
                             ),
                           ],

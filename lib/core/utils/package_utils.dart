@@ -24,13 +24,15 @@ List<String> parsePackageFeatures(dynamic raw) {
 }
 
 bool isStarterPackage(Map<String, dynamic> item) {
+  final name = item['name']?.toString().toLowerCase() ?? '';
+  if (name.contains('starter')) return true;
   final amountRaw = item['amount_inr'];
   final amount = amountRaw is num
       ? amountRaw.toDouble()
       : double.tryParse(amountRaw?.toString() ?? '');
-  if (amount != null && amount > 0 && amount <= 100) return true;
-  final name = item['name']?.toString().toLowerCase() ?? '';
-  return name.contains('starter');
+  if (amount != null && amount >= 99 && amount <= 1000) return true;
+  final price = item['price_label']?.toString().replaceAll(',', '') ?? '';
+  return price.contains('999') && !price.contains('4999');
 }
 
 SubscriptionPlanData subscriptionPlanFromApi(Map<String, dynamic> item) {
