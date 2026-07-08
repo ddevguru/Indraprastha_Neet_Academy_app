@@ -34,6 +34,7 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
   late final Razorpay _razorpay;
   bool _processing = false;
   bool _completed = false;
+  bool _checkoutOpened = false;
   String? _error;
 
   @override
@@ -53,9 +54,10 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
   }
 
   void _openCheckout() {
-    if (_completed || _processing) return;
+    if (_completed || _processing || _checkoutOpened) return;
     if (widget.keyId.isEmpty || widget.razorpayOrderId.isEmpty) {
-      setState(() => _error = 'Payment configuration missing. Contact support.');
+      setState(
+          () => _error = 'Payment configuration missing. Contact support.');
       return;
     }
 
@@ -73,8 +75,10 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
     };
 
     try {
+      _checkoutOpened = true;
       _razorpay.open(options);
     } catch (e) {
+      _checkoutOpened = false;
       setState(() => _error = e.toString());
     }
   }
@@ -92,7 +96,8 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
     );
     if (isPaymentVerified(result)) return result;
     throw Exception(
-      result['error']?.toString() ?? 'Payment verification failed. Please try confirm payment.',
+      result['error']?.toString() ??
+          'Payment verification failed. Please try confirm payment.',
     );
   }
 
@@ -130,7 +135,8 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
         await _confirmPaidAndExit(result);
         return;
       }
-      setState(() => _error = 'Payment verification failed. Tap confirm payment.');
+      setState(
+          () => _error = 'Payment verification failed. Tap confirm payment.');
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = paymentErrorMessage(e));
@@ -163,6 +169,7 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
     // Razorpay Android sometimes fires error after success while verify is running.
     if (_processing) return;
     setState(() {
+      _checkoutOpened = false;
       _error = response.message ?? 'Payment cancelled or failed.';
       _processing = false;
     });
@@ -212,7 +219,8 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
                 const SizedBox(height: AppSpacing.xs),
                 const Text(
                   'Agar payment cut ho chuka hai to "Confirm payment" dabayein.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
               const SizedBox(height: AppSpacing.lg),
@@ -227,13 +235,19 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
                 label: 'Retry Razorpay',
                 expanded: true,
                 icon: Icons.payment_rounded,
-                onPressed: _processing || _completed ? null : _openCheckout,
+                onPressed: _processing || _completed
+                    ? null
+                    : () {
+                        _checkoutOpened = false;
+                        _openCheckout();
+                      },
               ),
               const SizedBox(height: AppSpacing.sm),
               SecondaryButton(
                 label: 'Cancel',
                 expanded: true,
-                onPressed: _processing ? null : () => Navigator.of(context).pop(),
+                onPressed:
+                    _processing ? null : () => Navigator.of(context).pop(),
               ),
             ],
           ),

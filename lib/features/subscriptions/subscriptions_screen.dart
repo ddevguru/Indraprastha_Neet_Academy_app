@@ -15,11 +15,13 @@ class SubscriptionsScreen extends ConsumerStatefulWidget {
   const SubscriptionsScreen({super.key});
 
   @override
-  ConsumerState<SubscriptionsScreen> createState() => _SubscriptionsScreenState();
+  ConsumerState<SubscriptionsScreen> createState() =>
+      _SubscriptionsScreenState();
 }
 
 class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
   late Future<List<Map<String, dynamic>>> _plansFuture;
+  bool _checkoutInFlight = false;
 
   @override
   void initState() {
@@ -38,6 +40,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
     Map<String, dynamic> raw,
     SubscriptionPlan plan,
   ) async {
+    if (_checkoutInFlight) return;
     final packageId = parsePackageId(raw['id']);
     if (packageId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,6 +50,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
     }
 
     final messenger = ScaffoldMessenger.of(context);
+    setState(() => _checkoutInFlight = true);
     try {
       messenger.showSnackBar(
         const SnackBar(content: Text('Creating payment order...')),
@@ -77,9 +81,6 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
         final planName = verifyResult['subscription'] is Map
             ? (verifyResult['subscription'] as Map)['plan_name']?.toString()
             : null;
-        ref.read(appUiControllerProvider.notifier).activateSubscription(
-              planName?.isNotEmpty == true ? planName! : plan.name,
-            );
         await ref.read(authBlocProvider).refreshProfile();
         if (!context.mounted) return;
         messenger.showSnackBar(
@@ -93,7 +94,8 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
       } else if (verifyResult != null) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Payment received but not confirmed yet. Tap Confirm payment.'),
+            content: Text(
+                'Payment received but not confirmed yet. Tap Confirm payment.'),
           ),
         );
       }
@@ -101,6 +103,10 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
       messenger.showSnackBar(
         SnackBar(content: Text('Payment issue: ${paymentErrorMessage(e)}')),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _checkoutInFlight = false);
+      }
     }
   }
 
@@ -156,8 +162,10 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                     }
 
                     final allRawPlans = snapshot.data ?? const [];
-                    final starterPlans = allRawPlans.where(isStarterPackage).toList();
-                    final entries = starterPlans.map(subscriptionPlanFromApi).toList();
+                    final starterPlans =
+                        allRawPlans.where(isStarterPackage).toList();
+                    final entries =
+                        starterPlans.map(subscriptionPlanFromApi).toList();
 
                     if (entries.isEmpty) {
                       return Column(
@@ -183,11 +191,14 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                       children: [
                         for (final entry in entries)
                           Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.md),
                             child: PlanCard(
                               plan: entry.plan,
-                              active: ui.hasActiveSubscription && activePlan == entry.plan.name,
-                              onSelect: () => _startCheckout(context, entry.raw, entry.plan),
+                              active: ui.hasActiveSubscription &&
+                                  activePlan == entry.plan.name,
+                              onSelect: () => _startCheckout(
+                                  context, entry.raw, entry.plan),
                             ),
                           ),
                       ],

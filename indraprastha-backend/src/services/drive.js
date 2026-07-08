@@ -4,6 +4,8 @@ const { Readable } = require('stream');
 const os = require('os');
 const path = require('path');
 
+const folderPathCache = new Map();
+
 function createServiceAccountDriveClient() {
   const clientEmail = process.env.GDRIVE_CLIENT_EMAIL;
   const privateKeyRaw = process.env.GDRIVE_PRIVATE_KEY;
@@ -141,17 +143,11 @@ async function uploadBufferToDrive({
     supportsAllDrives: true,
   });
 
-  const meta = await drive.files.get({
-    fileId,
-    fields: 'id,webViewLink,webContentLink',
-    supportsAllDrives: true,
-  });
-
   return {
-    fileId: meta.data.id,
-    webViewLink: meta.data.webViewLink,
-    webContentLink: meta.data.webContentLink,
-    ...buildDrivePublicLinks(meta.data.id),
+    fileId,
+    webViewLink: response.data.webViewLink || buildDrivePublicLinks(fileId).previewLink,
+    webContentLink: response.data.webContentLink || buildDrivePublicLinks(fileId).downloadLink,
+    ...buildDrivePublicLinks(fileId),
   };
 }
 
@@ -192,17 +188,11 @@ async function uploadFilePathToDrive({
     supportsAllDrives: true,
   });
 
-  const meta = await drive.files.get({
-    fileId,
-    fields: 'id,webViewLink,webContentLink',
-    supportsAllDrives: true,
-  });
-
   return {
-    fileId: meta.data.id,
-    webViewLink: meta.data.webViewLink,
-    webContentLink: meta.data.webContentLink,
-    ...buildDrivePublicLinks(meta.data.id),
+    fileId,
+    webViewLink: response.data.webViewLink || buildDrivePublicLinks(fileId).previewLink,
+    webContentLink: response.data.webContentLink || buildDrivePublicLinks(fileId).downloadLink,
+    ...buildDrivePublicLinks(fileId),
   };
 }
 
@@ -349,6 +339,12 @@ async function ensureDriveFolderPath({
   rootFolderId,
   segments,
 }) {
+  const safeSegments = (segments || []).map((segment) => safeFolderName(segment || 'General'));
+  const cacheKey = JSON.stringify([rootFolderId || 'root', safeSegments]);
+  const cached = folderPathCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
   const drive = createDriveClient();
   let current = rootFolderId || null;
   if (current) {
@@ -363,8 +359,11 @@ async function ensureDriveFolderPath({
       current = null;
     }
   }
-  for (const segment of segments) {
+  for (const segment of safeSegments) {
     current = await ensureChildFolder(drive, current, segment);
+  }
+  if (current) {
+    folderPathCache.set(cacheKey, current);
   }
   return current;
 }

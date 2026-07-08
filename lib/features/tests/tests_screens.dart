@@ -29,11 +29,39 @@ String _formatTestScoreLabel(Map<String, dynamic> test) {
   return '${score.toInt()} / $marks';
 }
 
+String _normalizedTestCategory(Map<String, dynamic> test) {
+  final category = (test['category']?.toString() ?? '').toLowerCase();
+  final title = (test['title']?.toString() ?? '').toLowerCase();
+  final topic = (test['topic']?.toString() ?? '').toLowerCase();
+  final subject = (test['subject']?.toString() ?? '').toLowerCase();
+  final keywords = '$category $title';
+
+  if (keywords.contains('student')) {
+    return 'subject';
+  }
+  if (keywords.contains('subject')) {
+    return 'subject';
+  }
+  if (keywords.contains('chapter') || keywords.contains('topic')) {
+    return 'chapter';
+  }
+  if (keywords.contains('grand') || keywords.contains('full syllabus')) {
+    return 'grand';
+  }
+
+  // Legacy admin entries sometimes missed the category field. Infer a best-effort
+  // type from the title/topic so filters still work for already-created tests.
+  if (subject.isNotEmpty) return 'subject';
+  if (topic.isNotEmpty) return 'chapter';
+  return 'grand';
+}
+
 List<Map<String, dynamic>> _questionsForReview({
   required List<Map<String, dynamic>> questions,
   Map<String, dynamic>? submitResponse,
 }) {
-  final enriched = submitResponse?['questionsWithExplanations'] as List<dynamic>?;
+  final enriched =
+      submitResponse?['questionsWithExplanations'] as List<dynamic>?;
   if (enriched != null && enriched.isNotEmpty) {
     return List<Map<String, dynamic>>.from(
       enriched.map((e) => Map<String, dynamic>.from(e as Map)),
@@ -113,12 +141,12 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
   List<Map<String, dynamic>> _applyFilter(List<Map<String, dynamic>> tests) {
     if (_activeFilter == null) return tests;
     return tests.where((t) {
-      final category = (t['category']?.toString() ?? '').toLowerCase();
+      final category = _normalizedTestCategory(t);
       final isCompleted = t['is_completed'] == true;
       return switch (_activeFilter) {
-        'Grand tests' => category.contains('grand'),
-        'Subject tests' => category.contains('subject'),
-        'Chapter tests' => category.contains('chapter'),
+        'Grand tests' => category == 'grand',
+        'Subject tests' => category == 'subject',
+        'Chapter tests' => category == 'chapter',
         'Upcoming' => !isCompleted,
         'Completed' => isCompleted,
         _ => true,
@@ -150,7 +178,8 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
+    final hasSubscription =
+        ref.watch(appUiControllerProvider).hasActiveSubscription;
     return SingleChildScrollView(
       padding: mobileScrollPadding(context),
       child: CenteredContent(
@@ -167,7 +196,8 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
               const FreePreviewBanner(),
             ],
             const SizedBox(height: AppSpacing.lg),
-            const SearchBarWidget(hint: 'Search mocks, subject tests, and chapters'),
+            const SearchBarWidget(
+                hint: 'Search mocks, subject tests, and chapters'),
             const SizedBox(height: AppSpacing.lg),
             Wrap(
               spacing: AppSpacing.sm,
@@ -201,58 +231,61 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                 if (allTests.isEmpty) {
                   return const EmptyStateWidget(
                     title: 'No tests yet',
-                    subtitle: 'Admin panel se test series add hone ke baad yahan list dikhegi.',
+                    subtitle:
+                        'Admin panel se test series add hone ke baad yahan list dikhegi.',
                     icon: Icons.assignment_rounded,
                   );
                 }
                 if (tests.isEmpty) {
                   return EmptyStateWidget(
-                    title: 'No ${_activeFilter?.toLowerCase() ?? 'tests'} found',
-                    subtitle: 'Is category mein abhi koi test available nahi hai.',
+                    title:
+                        'No ${_activeFilter?.toLowerCase() ?? 'tests'} found',
+                    subtitle:
+                        'Is category mein abhi koi test available nahi hai.',
                     icon: Icons.filter_list_rounded,
                   );
                 }
                 return Column(
                   children: tests.asMap().entries.map(
-                        (entry) {
-                          final index = allTests.indexWhere(
-                            (t) => '${t['id']}' == '${entry.value['id']}',
-                          );
-                          final testIndex = index < 0 ? entry.key : index;
-                          final locked = hasSubscription
-                              ? false
-                              : testIndex >= _freeUnlockedTestCount;
-                          final t = entry.value;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                            child: TestCard(
-                              locked: locked,
-                              test: TestItem(
-                                id: '${t['id']}',
-                                title: t['title']?.toString() ?? 'Test',
-                                category: t['category']?.toString() ?? 'Grand test',
-                                durationMinutes:
-                                    (t['duration_minutes'] as num?)?.toInt() ?? 180,
-                                marks: (t['marks'] as num?)?.toInt() ?? 720,
-                                questions:
-                                    (t['question_count'] as num?)?.toInt() ?? 180,
-                                syllabusCoverage:
-                                    t['syllabus_coverage']?.toString() ?? '',
-                                scheduleLabel: t['schedule_label']?.toString() ?? '',
-                                completed: t['is_completed'] == true,
-                                scoreLabel: _formatTestScoreLabel(t),
-                              ),
-                              onTap: () => ContentAccess.handleTap(
-                                context: context,
-                                locked: locked,
-                                onUnlocked: () =>
-                                    context.push('/tests/detail/${t['id']}'),
-                              ),
-                            ),
-                          );
-                        },
-                      )
-                      .toList(),
+                    (entry) {
+                      final index = allTests.indexWhere(
+                        (t) => '${t['id']}' == '${entry.value['id']}',
+                      );
+                      final testIndex = index < 0 ? entry.key : index;
+                      final locked = hasSubscription
+                          ? false
+                          : testIndex >= _freeUnlockedTestCount;
+                      final t = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: TestCard(
+                          locked: locked,
+                          test: TestItem(
+                            id: '${t['id']}',
+                            title: t['title']?.toString() ?? 'Test',
+                            category: t['category']?.toString() ?? 'Grand test',
+                            durationMinutes:
+                                (t['duration_minutes'] as num?)?.toInt() ?? 180,
+                            marks: (t['marks'] as num?)?.toInt() ?? 720,
+                            questions:
+                                (t['question_count'] as num?)?.toInt() ?? 180,
+                            syllabusCoverage:
+                                t['syllabus_coverage']?.toString() ?? '',
+                            scheduleLabel:
+                                t['schedule_label']?.toString() ?? '',
+                            completed: t['is_completed'] == true,
+                            scoreLabel: _formatTestScoreLabel(t),
+                          ),
+                          onTap: () => ContentAccess.handleTap(
+                            context: context,
+                            locked: locked,
+                            onUnlocked: () =>
+                                context.push('/tests/detail/${t['id']}'),
+                          ),
+                        ),
+                      );
+                    },
+                  ).toList(),
                 );
               },
             ),
@@ -273,7 +306,8 @@ class TestDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
+    final hasSubscription =
+        ref.watch(appUiControllerProvider).hasActiveSubscription;
     final accessFuture = ContentRepository().fetchTests().then((tests) {
       final ids = tests.map((t) => '${t['id']}').toList();
       return ContentAccess.isIdUnlocked(
@@ -287,7 +321,8 @@ class TestDetailScreen extends ConsumerWidget {
       future: Future.wait([future, accessFuture]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
         final unlocked = snapshot.data?[1] as bool? ?? hasSubscription;
         if (!unlocked) {
@@ -299,7 +334,8 @@ class TestDetailScreen extends ConsumerWidget {
           );
         }
         final testData = snapshot.data?[0] as Map<String, dynamic>?;
-        final test = Map<String, dynamic>.from(testData?['test'] as Map? ?? const {});
+        final test =
+            Map<String, dynamic>.from(testData?['test'] as Map? ?? const {});
         return Scaffold(
           appBar: AppBar(title: Text(test['title']?.toString() ?? 'Test')),
           body: SingleChildScrollView(
@@ -310,9 +346,11 @@ class TestDetailScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(test['subject']?.toString() ?? '', style: Theme.of(context).textTheme.labelLarge),
+                    Text(test['subject']?.toString() ?? '',
+                        style: Theme.of(context).textTheme.labelLarge),
                     const SizedBox(height: AppSpacing.sm),
-                    Text(test['title']?.toString() ?? '', style: Theme.of(context).textTheme.headlineSmall),
+                    Text(test['title']?.toString() ?? '',
+                        style: Theme.of(context).textTheme.headlineSmall),
                     const SizedBox(height: AppSpacing.lg),
                     Row(
                       children: [
@@ -382,13 +420,15 @@ class _TestResultScreenState extends State<TestResultScreen> {
     var correct = 0;
     for (var i = 0; i < questions.length; i++) {
       final marked = _answers[i];
-      final actual = questions[i]['correct_option']?.toString().toUpperCase() ?? '';
+      final actual =
+          questions[i]['correct_option']?.toString().toUpperCase() ?? '';
       if (marked == actual) correct++;
     }
     final wrong = _answers.length - correct;
     final unattempted = questions.length - _answers.length;
     final marks = (test['marks'] as num?)?.toInt() ?? 720;
-    final score = questions.isEmpty ? 0 : ((correct / questions.length) * marks).round();
+    final score =
+        questions.isEmpty ? 0 : ((correct / questions.length) * marks).round();
     final accuracy = _answers.isEmpty ? 0.0 : (correct / _answers.length) * 100;
     return {
       'attempt': {
@@ -412,7 +452,8 @@ class _TestResultScreenState extends State<TestResultScreen> {
   @override
   void initState() {
     super.initState();
-    _attemptFuture = ContentRepository().fetchTestQuestions(widget.testId).then((data) {
+    _attemptFuture =
+        ContentRepository().fetchTestQuestions(widget.testId).then((data) {
       final questions = List<Map<String, dynamic>>.from(
         data['questions'] as List<dynamic>? ?? const [],
       );
@@ -441,9 +482,11 @@ class _TestResultScreenState extends State<TestResultScreen> {
       future: _attemptFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
-        final test = Map<String, dynamic>.from(snapshot.data?['test'] as Map? ?? const {});
+        final test = Map<String, dynamic>.from(
+            snapshot.data?['test'] as Map? ?? const {});
         final questions = List<Map<String, dynamic>>.from(
           snapshot.data?['questions'] as List<dynamic>? ?? const [],
         );
@@ -528,7 +571,8 @@ class _TestResultScreenState extends State<TestResultScreen> {
                                 questions: questions,
                                 submitResponse: response,
                               );
-                              final marks = (test['marks'] as num?)?.toInt() ?? 720;
+                              final marks =
+                                  (test['marks'] as num?)?.toInt() ?? 720;
                               final items = List.generate(
                                 reviewQuestions.length,
                                 (i) => AnswerReviewEntry.fromAbcdMap(
@@ -540,12 +584,14 @@ class _TestResultScreenState extends State<TestResultScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => PaginatedAnswerReviewScreen(
+                                  builder: (context) =>
+                                      PaginatedAnswerReviewScreen(
                                     title: 'Review Answers',
                                     items: items,
                                     score: _scoreFromSubmitResponse(response),
                                     totalMarks: marks,
-                                    accuracy: _accuracyFromSubmitResponse(response),
+                                    accuracy:
+                                        _accuracyFromSubmitResponse(response),
                                   ),
                                 ),
                               );
@@ -588,7 +634,8 @@ class _TestResultScreenState extends State<TestResultScreen> {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Text(q['question']?.toString() ?? ''),
-                    if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                    if ((q['question_image_link']?.toString() ?? '')
+                        .isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.md),
                       _buildQuestionImage(q['question_image_link'].toString()),
                     ],
@@ -637,72 +684,87 @@ class _TestResultScreenState extends State<TestResultScreen> {
                         Expanded(
                           child: SecondaryButton(
                             label: 'Previous',
-                            onPressed: _index == 0 ? null : () => setState(() => _index--),
+                            onPressed: _index == 0
+                                ? null
+                                : () => setState(() => _index--),
                           ),
                         ),
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: PrimaryButton(
-                            label: _index == questions.length - 1 ? 'Submit test' : 'Next',
+                            label: _index == questions.length - 1
+                                ? 'Submit test'
+                                : 'Next',
                             onPressed: _submitting
                                 ? null
                                 : () async {
-                              if (_index < questions.length - 1) {
-                                setState(() => _index++);
-                                return;
-                              }
-                              setState(() => _submitting = true);
-                              int correct = 0;
-                              for (var i = 0; i < questions.length; i++) {
-                                final marked = _answers[i];
-                                final actual =
-                                    questions[i]['correct_option']?.toString().toUpperCase() ?? '';
-                                if (marked == actual) correct++;
-                              }
-                              final wrong = _answers.length - correct;
-                              final unattempted = questions.length - _answers.length;
-                              final marks = (test['marks'] as num?)?.toInt() ?? 720;
-                              final score = questions.isEmpty
-                                  ? 0
-                                  : ((correct / questions.length) * marks).round();
-                              final accuracy = _answers.isEmpty
-                                  ? 0.0
-                                  : (correct / _answers.length) * 100;
-                              final messenger = ScaffoldMessenger.of(context);
-                              try {
-                                final res = await ContentRepository().submitTestAttempt(
-                                  testId: widget.testId,
-                                  score: score,
-                                  accuracy: accuracy,
-                                  correctCount: correct,
-                                  wrongCount: wrong,
-                                  unattemptedCount: unattempted,
-                                );
-                                if (!mounted) return;
-                                setState(() {
-                                  _submitted = true;
-                                  _submitResponse = res;
-                                });
-                              } catch (e) {
-                                if (!mounted) return;
-                                setState(() {
-                                  _submitted = true;
-                                  _submitResponse = _buildLocalSubmitResponse(
-                                    questions: questions,
-                                    test: test,
-                                  );
-                                });
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Server submit failed, local result shown. Error: $e',
-                                    ),
-                                  ),
-                                );
-                              } finally {
-                                if (mounted) setState(() => _submitting = false);
-                              }
-                            },
+                                    if (_index < questions.length - 1) {
+                                      setState(() => _index++);
+                                      return;
+                                    }
+                                    setState(() => _submitting = true);
+                                    int correct = 0;
+                                    for (var i = 0; i < questions.length; i++) {
+                                      final marked = _answers[i];
+                                      final actual = questions[i]
+                                                  ['correct_option']
+                                              ?.toString()
+                                              .toUpperCase() ??
+                                          '';
+                                      if (marked == actual) correct++;
+                                    }
+                                    final wrong = _answers.length - correct;
+                                    final unattempted =
+                                        questions.length - _answers.length;
+                                    final marks =
+                                        (test['marks'] as num?)?.toInt() ?? 720;
+                                    final score = questions.isEmpty
+                                        ? 0
+                                        : ((correct / questions.length) * marks)
+                                            .round();
+                                    final accuracy = _answers.isEmpty
+                                        ? 0.0
+                                        : (correct / _answers.length) * 100;
+                                    final messenger =
+                                        ScaffoldMessenger.of(context);
+                                    try {
+                                      final res = await ContentRepository()
+                                          .submitTestAttempt(
+                                        testId: widget.testId,
+                                        score: score,
+                                        accuracy: accuracy,
+                                        correctCount: correct,
+                                        wrongCount: wrong,
+                                        unattemptedCount: unattempted,
+                                      );
+                                      if (!mounted) return;
+                                      setState(() {
+                                        _submitted = true;
+                                        _submitResponse = res;
+                                      });
+                                    } catch (e) {
+                                      if (!mounted) return;
+                                      setState(() {
+                                        _submitted = true;
+                                        _submitResponse =
+                                            _buildLocalSubmitResponse(
+                                          questions: questions,
+                                          test: test,
+                                        );
+                                      });
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Server submit failed, local result shown. Error: $e',
+                                          ),
+                                        ),
+                                      );
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() => _submitting = false);
+                                      }
+                                    }
+                                  },
                           ),
                         ),
                       ],
@@ -780,13 +842,21 @@ class _ScoreSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final analytics = Map<String, dynamic>.from(response['analytics'] as Map? ?? const {});
-    final attempt = Map<String, dynamic>.from(response['attempt'] as Map? ?? const {});
-    final donut = Map<String, dynamic>.from(response['donut'] as Map? ?? const {});
-    final correct = _asNum(donut['correct'])?.toInt() ?? _asNum(analytics['correct_count'])?.toInt() ?? 0;
-    final wrong = _asNum(donut['wrong'])?.toInt() ?? _asNum(analytics['wrong_count'])?.toInt() ?? 0;
-    final unattempted =
-        _asNum(donut['unattempted'])?.toInt() ?? _asNum(analytics['unattempted_count'])?.toInt() ?? 0;
+    final analytics =
+        Map<String, dynamic>.from(response['analytics'] as Map? ?? const {});
+    final attempt =
+        Map<String, dynamic>.from(response['attempt'] as Map? ?? const {});
+    final donut =
+        Map<String, dynamic>.from(response['donut'] as Map? ?? const {});
+    final correct = _asNum(donut['correct'])?.toInt() ??
+        _asNum(analytics['correct_count'])?.toInt() ??
+        0;
+    final wrong = _asNum(donut['wrong'])?.toInt() ??
+        _asNum(analytics['wrong_count'])?.toInt() ??
+        0;
+    final unattempted = _asNum(donut['unattempted'])?.toInt() ??
+        _asNum(analytics['unattempted_count'])?.toInt() ??
+        0;
     final score = _asNum(attempt['score'])?.toInt() ??
         _asNum((response['aiAnalytics'] as Map?)?['score'])?.toInt() ??
         0;
@@ -812,11 +882,15 @@ class _ScoreSummaryCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Score', style: Theme.of(context).textTheme.labelLarge),
+                      Text('Score',
+                          style: Theme.of(context).textTheme.labelLarge),
                       const SizedBox(height: 6),
                       Text(
                         '$score / $marks',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.w800,
                               color: AppColors.indigo,
                             ),
@@ -828,11 +902,13 @@ class _ScoreSummaryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              _DonutMini(correct: correct, wrong: wrong, unattempted: unattempted),
+              _DonutMini(
+                  correct: correct, wrong: wrong, unattempted: unattempted),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Text('Correct: $correct  •  Wrong: $wrong  •  Unattempted: $unattempted'),
+          Text(
+              'Correct: $correct  •  Wrong: $wrong  •  Unattempted: $unattempted'),
         ],
       ),
     );
@@ -862,7 +938,8 @@ class _DonutMini extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Performance graph', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text('Performance graph',
+              style: TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
@@ -919,7 +996,8 @@ class _AiInsightsPanel extends StatelessWidget {
           ...insights.map((i) {
             final title = i['insight_title']?.toString() ?? 'Insight';
             final body = i['insight_body']?.toString() ?? '';
-            final priority = (i['priority']?.toString() ?? 'medium').toLowerCase();
+            final priority =
+                (i['priority']?.toString() ?? 'medium').toLowerCase();
             final color = priority == 'high'
                 ? AppColors.danger
                 : priority == 'low'

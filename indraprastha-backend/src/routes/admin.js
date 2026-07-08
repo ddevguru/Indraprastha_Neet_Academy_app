@@ -654,7 +654,7 @@ router.post('/books/pdf-upload-init', adminAuth, async (req, res) => {
     };
     if (bookId) metaObj.bookId = Number(bookId);
     fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(metaObj, null, 2));
-    return res.json({ success: true, uploadId, chunkSize: 512 * 1024 });
+    return res.json({ success: true, uploadId, chunkSize: 2 * 1024 * 1024 });
   } catch (e) {
     logAdminRouteError('/books/pdf-upload-init', e);
     return res.status(500).json({ error: e.message || 'init failed' });
