@@ -23,11 +23,17 @@ Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
     url: rawUrl,
     width: double.infinity,
-    height: 180,
-    fit: BoxFit.cover,
-    thumbWidth: 700,
+    height: 220,
+    fit: BoxFit.contain,
+    thumbWidth: 900,
     borderRadius: BorderRadius.circular(AppRadii.md),
   );
+}
+
+String _optionLabel(String key, String value) {
+  final text = value.trim();
+  if (text.isEmpty) return '$key) —';
+  return '$key) $text';
 }
 
 class BooksScreen extends ConsumerStatefulWidget {
@@ -697,7 +703,11 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Q${_index + 1}. ${q['question'] ?? ''}',
+                    (q['question']?.toString().trim().isNotEmpty ?? false)
+                        ? 'Q${_index + 1}. ${q['question']}'
+                        : (hasQuestionImage(q)
+                            ? 'Q${_index + 1}. Question image dekhein'
+                            : 'Q${_index + 1}.'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   if (hasQuestionImage(q)) ...[
@@ -723,7 +733,7 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                               color: isSel ? AppColors.indigo : AppColors.border,
                             ),
                           ),
-                          child: Text('${e.key}) ${e.value}'),
+                          child: Text(_optionLabel(e.key, e.value)),
                         ),
                       ),
                     );

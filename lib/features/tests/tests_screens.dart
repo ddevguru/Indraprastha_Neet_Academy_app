@@ -99,11 +99,17 @@ Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
     url: rawUrl,
     width: double.infinity,
-    height: 180,
-    fit: BoxFit.cover,
-    thumbWidth: 700,
+    height: 220,
+    fit: BoxFit.contain,
+    thumbWidth: 900,
     borderRadius: BorderRadius.circular(AppRadii.md),
   );
+}
+
+String _optionLabel(String key, String value) {
+  final text = value.trim();
+  if (text.isEmpty) return '$key) —';
+  return '$key) $text';
 }
 
 class TestsScreen extends ConsumerStatefulWidget {
@@ -624,7 +630,13 @@ class _TestResultScreenState extends State<TestResultScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    Text(q['question']?.toString() ?? ''),
+                    Text(
+                      (q['question']?.toString().trim().isNotEmpty ?? false)
+                          ? q['question']!.toString()
+                          : (hasQuestionImage(q)
+                              ? 'Question image ke neeche dekhein'
+                              : ''),
+                    ),
                     if (hasQuestionImage(q)) ...[
                       const SizedBox(height: AppSpacing.md),
                       _buildQuestionImage(questionImageRawUrl(q)),
@@ -654,7 +666,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
                           child: Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              '${e.key}) ${e.value}',
+                              _optionLabel(e.key, e.value),
                               style: TextStyle(
                                 fontWeight: selected == e.key
                                     ? FontWeight.w700

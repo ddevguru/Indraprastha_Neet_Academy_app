@@ -51,18 +51,8 @@ class _ReviewOptionStyle {
 Widget buildReviewImage(String rawUrl) => buildFastReviewImage(rawUrl);
 
 String resolveExplanationImageUrl(Map<String, dynamic> imgData) {
-  final direct = imgData['image_url']?.toString() ??
-      imgData['image_drive_link']?.toString() ??
-      '';
-  if (direct.trim().isNotEmpty) return resolveDriveImageUrl(direct, thumbWidth: 900);
-  final fileId = imgData['image_drive_file_id']?.toString() ?? '';
-  if (fileId.isNotEmpty) {
-    return resolveDriveImageUrl(
-      'https://drive.google.com/uc?export=view&id=$fileId',
-      thumbWidth: 900,
-    );
-  }
-  return '';
+  final resolved = explanationImageRawUrl(imgData);
+  return resolved.isEmpty ? '' : resolved;
 }
 
 /// One question entry for paginated answer review.
@@ -133,12 +123,7 @@ class AnswerReviewEntry {
 }
 
 String _explanationImageRawUrl(Map<String, dynamic> question) {
-  final fileId =
-      question['explanation_image_drive_file_id']?.toString().trim() ?? '';
-  if (fileId.isNotEmpty) {
-    return 'https://drive.google.com/file/d/$fileId/view';
-  }
-  return question['explanation_image_link']?.toString().trim() ?? '';
+  return explanationImageRawUrl(question);
 }
 
 /// Full-screen review: one question per page with progress dots and stats.

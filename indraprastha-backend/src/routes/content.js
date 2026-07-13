@@ -129,9 +129,9 @@ function mapExplanationImageEntry(img) {
   if (!img || typeof img !== 'object') return img;
   const fileId =
     img.image_drive_file_id || extractDriveFileId(img.image_drive_link || img.image_url);
-  const links = buildDrivePublicLinks(fileId);
-  const resolved =
-    links.imageLink || normalizeDriveLink(img.image_url || img.image_drive_link, 'image');
+  const resolved = fileId
+    ? buildContentImageUrl(fileId, 1000)
+    : normalizeDriveLink(img.image_url || img.image_drive_link, 'image');
   return {
     ...img,
     image_drive_file_id: fileId || '',
@@ -143,20 +143,20 @@ function mapExplanationImageEntry(img) {
 function mapQuestionImageLink(question) {
   const fileId =
     question.question_image_drive_file_id || extractDriveFileId(question.question_image_link);
-  const links = buildDrivePublicLinks(fileId);
   const expFileId =
     question.explanation_image_drive_file_id ||
     extractDriveFileId(question.explanation_image_link);
-  const expLinks = buildDrivePublicLinks(expFileId);
   const explanationImagesList = question.explanation_images_list;
   return {
     ...question,
     question_image_drive_file_id: fileId || '',
-    question_image_link:
-      links.imageLink || normalizeDriveLink(question.question_image_link, 'image'),
+    question_image_link: fileId
+      ? buildContentImageUrl(fileId, 1000)
+      : normalizeDriveLink(question.question_image_link, 'image'),
     explanation_image_drive_file_id: expFileId || '',
-    explanation_image_link:
-      expLinks.imageLink || normalizeDriveLink(question.explanation_image_link, 'image'),
+    explanation_image_link: expFileId
+      ? buildContentImageUrl(expFileId, 1000)
+      : normalizeDriveLink(question.explanation_image_link, 'image'),
     explanation_images_list: Array.isArray(explanationImagesList)
       ? explanationImagesList.map(mapExplanationImageEntry)
       : explanationImagesList,

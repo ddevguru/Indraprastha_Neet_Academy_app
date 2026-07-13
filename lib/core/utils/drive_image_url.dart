@@ -1,3 +1,5 @@
+import '../constants/api_constants.dart';
+
 String? extractDriveFileId(String raw) {
   final value = raw.trim();
   if (value.isEmpty) return null;
@@ -26,7 +28,12 @@ String? extractDriveFileId(String raw) {
 
 bool isApiImageUrl(String raw) => raw.trim().contains('/content/images/');
 
-/// Direct Google Drive thumbnail — no auth header required on the client.
+String buildApiImageUrl(String fileId, {int thumbWidth = 900}) {
+  final w = thumbWidth.clamp(200, 1600);
+  return '$baseUrl/content/images/$fileId?w=$w';
+}
+
+/// Direct Google Drive thumbnail — fallback when API proxy is unavailable.
 String buildDriveThumbnailUrl(String fileId, {int thumbWidth = 900}) {
   final w = thumbWidth.clamp(200, 1600);
   return 'https://drive.google.com/thumbnail?id=$fileId&sz=w$w';
@@ -35,13 +42,13 @@ String buildDriveThumbnailUrl(String fileId, {int thumbWidth = 900}) {
 String buildDriveViewUrl(String fileId) =>
     'https://drive.google.com/uc?export=view&id=$fileId';
 
-/// Resolve any stored Drive/API URL to a loadable Drive thumbnail URL.
+/// Resolve any stored Drive/API URL to a loadable URL (API proxy preferred).
 String resolveDriveImageUrl(String raw, {int thumbWidth = 900}) {
   final value = raw.trim();
   if (value.isEmpty) return value;
   final id = extractDriveFileId(value);
   if (id != null && id.isNotEmpty) {
-    return buildDriveThumbnailUrl(id, thumbWidth: thumbWidth);
+    return buildApiImageUrl(id, thumbWidth: thumbWidth);
   }
   if (value.contains('drive.google.com')) return value;
   return value;
@@ -56,9 +63,28 @@ String driveImageCacheKey(String raw) {
 String questionImageRawUrl(Map<String, dynamic> question) {
   final fileId = question['question_image_drive_file_id']?.toString().trim() ?? '';
   if (fileId.isNotEmpty) {
-    return 'https://drive.google.com/file/d/$fileId/view';
+    return buildApiImageUrl(fileId);
   }
-  return question['question_image_link']?.toString().trim() ?? '';
+  final link = question['question_image_link']?.toString().trim() ?? '';
+  if (link.isEmpty) return '';
+  final id = extractDriveFileId(link);
+  if (id != null && id.isNotEmpty) return buildApiImageUrl(id);
+  return link;
+}
+
+String explanationImageRawUrl(Map<String, dynamic> data) {
+  final fileId = data['image_drive_file_id']?.toString().trim() ??
+      data['explanation_image_drive_file_id']?.toString().trim() ??
+      '';
+  if (fileId.isNotEmpty) return buildApiImageUrl(fileId);
+  final link = data['image_url']?.toString().trim() ??
+      data['image_drive_link']?.toString().trim() ??
+      data['explanation_image_link']?.toString().trim() ??
+      '';
+  if (link.isEmpty) return '';
+  final id = extractDriveFileId(link);
+  if (id != null && id.isNotEmpty) return buildApiImageUrl(id);
+  return link;
 }
 
 bool hasQuestionImage(Map<String, dynamic> question) {

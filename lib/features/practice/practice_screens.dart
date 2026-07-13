@@ -18,13 +18,20 @@ import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../core/utils/drive_image_url.dart';
 
+String _optionLabel(int index, String value) {
+  final key = String.fromCharCode(65 + index);
+  final text = value.trim();
+  if (text.isEmpty) return '$key) —';
+  return '$key) $text';
+}
+
 Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
     url: rawUrl,
     width: double.infinity,
-    height: 180,
-    fit: BoxFit.cover,
-    thumbWidth: 700,
+    height: 220,
+    fit: BoxFit.contain,
+    thumbWidth: 900,
     borderRadius: BorderRadius.circular(AppRadii.md),
   );
 }
@@ -511,7 +518,11 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          question['question']?.toString() ?? '',
+                          (question['question']?.toString().trim().isNotEmpty ?? false)
+                              ? question['question']!.toString()
+                              : (hasQuestionImage(question)
+                                  ? 'Question image ke neeche dekhein'
+                                  : ''),
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         if (hasQuestionImage(question)) ...[
@@ -571,7 +582,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                   border: Border.all(color: border),
                                 ),
                                 child: Text(
-                                  options[index],
+                                  _optionLabel(index, options[index]),
                                   style: TextStyle(
                                     color: textColor,
                                     fontWeight: selected || revealState
