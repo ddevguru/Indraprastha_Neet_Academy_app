@@ -271,47 +271,35 @@ router.get('/images/:fileId', userAuth, async (req, res) => {
 
 router.get('/filters', userAuth, async (req, res) => {
   const scope = await loadContentScope(req);
-  const batchId = scope.batchId;
-  const classLabel = scope.classLabel;
-  const params = [batchId, classLabel];
-  const batchClause = batchId == null ? 'TRUE' : 'batch_id = $1';
-  const classClause =
-    classLabel === ''
-      ? 'TRUE'
-      : `(class_label IS NULL OR class_label = '' OR LOWER(class_label) = LOWER($2))`;
-
   const [subjects, topics, categories] = await Promise.all([
     pool.query(
-      `SELECT DISTINCT subject FROM (
-         SELECT subject FROM books WHERE ${batchClause} AND ${classClause} AND subject <> ''
-         UNION SELECT subject FROM practice_sets WHERE ${batchClause} AND ${classClause} AND subject <> ''
-         UNION SELECT subject FROM tests WHERE ${batchClause} AND ${classClause} AND subject <> ''
-       ) s ORDER BY subject ASC`,
-      params
+      `SELECT DISTINCT subject AS value FROM (
+         SELECT subject FROM books WHERE subject <> ''
+         UNION SELECT subject FROM practice_sets WHERE subject <> ''
+         UNION SELECT subject FROM tests WHERE subject <> ''
+       ) s ORDER BY value ASC`
     ),
     pool.query(
-      `SELECT DISTINCT topic FROM (
-         SELECT topic FROM books WHERE ${batchClause} AND ${classClause} AND topic <> ''
-         UNION SELECT topic FROM practice_sets WHERE ${batchClause} AND ${classClause} AND topic <> ''
-         UNION SELECT topic FROM tests WHERE ${batchClause} AND ${classClause} AND topic <> ''
-       ) t ORDER BY topic ASC`,
-      params
+      `SELECT DISTINCT topic AS value FROM (
+         SELECT topic FROM books WHERE topic <> ''
+         UNION SELECT topic FROM practice_sets WHERE topic <> ''
+         UNION SELECT topic FROM tests WHERE topic <> ''
+       ) t ORDER BY value ASC`
     ),
     pool.query(
-      `SELECT DISTINCT category FROM tests
-       WHERE ${batchClause} AND ${classClause} AND category <> ''
-       ORDER BY category ASC`,
-      params
+      `SELECT DISTINCT category AS value FROM tests
+       WHERE category <> ''
+       ORDER BY value ASC`
     ),
   ]);
 
   return res.json({
     success: true,
-    batchId,
-    classLabel,
-    subjects: subjects.rows.map((r) => r.subject).filter(Boolean),
-    topics: topics.rows.map((r) => r.topic).filter(Boolean),
-    testCategories: categories.rows.map((r) => r.category).filter(Boolean),
+    batchId: scope.batchId,
+    classLabel: scope.classLabel,
+    subjects: subjects.rows.map((r) => r.value).filter(Boolean),
+    topics: topics.rows.map((r) => r.value).filter(Boolean),
+    testCategories: categories.rows.map((r) => r.value).filter(Boolean),
   });
 });
 
@@ -328,18 +316,15 @@ router.get('/course', userAuth, async (req, res) => {
 });
 
 router.get('/books', userAuth, async (req, res) => {
-  const scope = await loadContentScope(req);
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
   const books = await pool.query(
     `SELECT bk.id, bk.title, bk.subject, bk.topic, bk.level, bk.category, bk.class_label
      FROM books bk
-     WHERE ($1::int IS NULL OR bk.batch_id = $1)
-       AND ($2 = '' OR bk.class_label IS NULL OR bk.class_label = '' OR LOWER(bk.class_label) = LOWER($2))
-       AND ($3 = '' OR bk.subject = $3)
-       AND ($4 = '' OR bk.topic = $4)
+     WHERE ($1 = '' OR bk.subject = $1)
+       AND ($2 = '' OR bk.topic = $2)
      ORDER BY id DESC`,
-    [scope.batchId, scope.classLabel, subject, topic]
+    [subject, topic]
   );
   res.json({ success: true, books: books.rows });
 });
@@ -354,8 +339,10 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
     [req.params.bookId]
   );
   if (chapters.rows.length > 0) {
-    const hydrated = await Promise.all(chapters.rows.map(ensureChapterExtracted));
-    return res.json({ success: true, chapters: hydrated });
+    return res.json({
+      success: true,
+      chapters: chapters.rows.map(mapChapterLinks),
+    });
   }
 
   // Backward-compatible fallback:
@@ -416,7 +403,6 @@ router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
 });
 
 router.get('/practice-sets', userAuth, async (req, res) => {
-  const scope = await loadContentScope(req);
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
   const result = await pool.query(
@@ -424,12 +410,10 @@ router.get('/practice-sets', userAuth, async (req, res) => {
         (SELECT COUNT(*)::int FROM practice_questions pq WHERE pq.practice_set_id = ps.id) AS question_count
      FROM practice_sets ps
      WHERE (ps.source_type IS NULL OR ps.source_type = 'topic_mcq')
-       AND ($1::int IS NULL OR ps.batch_id = $1)
-       AND ($2 = '' OR ps.class_label IS NULL OR ps.class_label = '' OR LOWER(ps.class_label) = LOWER($2))
-       AND ($3 = '' OR ps.subject = $3)
-       AND ($4 = '' OR ps.topic = $4)
+       AND ($1 = '' OR ps.subject = $1)
+       AND ($2 = '' OR ps.topic = $2)
      ORDER BY id DESC`,
-    [scope.batchId, scope.classLabel, subject, topic]
+    [subject, topic]
   );
   res.json({ success: true, practiceSets: result.rows });
 });
@@ -476,7 +460,6 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
 });
 
 router.get('/tests', userAuth, async (req, res) => {
-  const scope = await loadContentScope(req);
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
   const category = req.query.category?.toString() || '';
@@ -488,17 +471,15 @@ router.get('/tests', userAuth, async (req, res) => {
      LEFT JOIN LATERAL (
        SELECT id, score
        FROM test_attempts
-       WHERE user_id = $5 AND test_id = t.id
+       WHERE user_id = $3 AND test_id = t.id
        ORDER BY attempted_at DESC
        LIMIT 1
      ) ta ON true
-     WHERE ($1::int IS NULL OR t.batch_id = $1)
-       AND ($2 = '' OR t.class_label IS NULL OR t.class_label = '' OR LOWER(t.class_label) = LOWER($2))
-       AND ($3 = '' OR t.subject = $3)
-       AND ($4 = '' OR t.topic = $4)
-       AND ($6 = '' OR LOWER(t.category) LIKE '%' || LOWER($6) || '%')
+     WHERE ($1 = '' OR t.subject = $1)
+       AND ($2 = '' OR t.topic = $2)
+       AND ($4 = '' OR LOWER(t.category) LIKE '%' || LOWER($4) || '%')
      ORDER BY id DESC`,
-    [scope.batchId, scope.classLabel, subject, topic, req.user.id, category]
+    [subject, topic, req.user.id, category]
   );
   res.json({ success: true, tests: result.rows });
 });
@@ -546,25 +527,21 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
 });
 
 router.get('/videos', userAuth, async (req, res) => {
-  const scope = await loadContentScope(req);
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
   const result = await pool.query(
     `SELECT v.id, v.title, v.subject, v.topic, v.class_label, v.chapter_hint, v.section_label, v.duration_label, v.drive_link
      FROM videos v
-     WHERE ($1::int IS NULL OR v.batch_id = $1)
-       AND ($2 = '' OR v.class_label IS NULL OR v.class_label = '' OR LOWER(v.class_label) = LOWER($2))
-       AND ($3 = '' OR v.subject = $3)
-       AND ($4 = '' OR v.topic = $4)
+     WHERE ($1 = '' OR v.subject = $1)
+       AND ($2 = '' OR v.topic = $2)
      ORDER BY id DESC`,
-    [scope.batchId, scope.classLabel, subject, topic]
+    [subject, topic]
   );
   res.json({ success: true, videos: result.rows });
 });
 
 router.get('/mcqs', userAuth, async (req, res) => {
   try {
-    const scope = await loadContentScope(req);
     const result = await pool.query(
       `SELECT id, subject, topic, question,
               option_a, option_b, option_c, option_d, correct_option,
@@ -572,11 +549,8 @@ router.get('/mcqs', userAuth, async (req, res) => {
               created_at, is_active
        FROM daily_mcqs
        WHERE is_active = TRUE
-         AND ($1::int IS NULL OR batch_id = $1)
-         AND ($2 = '' OR class_label IS NULL OR class_label = '' OR LOWER(class_label) = LOWER($2))
        ORDER BY created_at DESC
-       LIMIT 100`,
-      [scope.batchId, scope.classLabel]
+       LIMIT 100`
     );
     res.json({ success: true, mcqs: result.rows.map(mapQuestionImageLink) });
   } catch (e) {

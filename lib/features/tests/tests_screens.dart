@@ -121,8 +121,6 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
     'Grand tests',
     'Subject tests',
     'Chapter tests',
-    'Upcoming',
-    'Completed',
   ];
 
   @override
@@ -141,13 +139,10 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
     if (_activeFilter == null) return tests;
     return tests.where((t) {
       final category = _normalizedTestCategory(t);
-      final isCompleted = t['is_completed'] == true;
       return switch (_activeFilter) {
         'Grand tests' => category == 'grand',
         'Subject tests' => category == 'subject',
         'Chapter tests' => category == 'chapter',
-        'Upcoming' => !isCompleted,
-        'Completed' => isCompleted,
         _ => true,
       };
     }).toList();
@@ -158,8 +153,6 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
       'Grand tests' => 'Grand tests',
       'Subject tests' => 'Subject tests',
       'Chapter tests' => 'Chapter tests',
-      'Upcoming' => 'Upcoming tests',
-      'Completed' => 'Completed tests',
       _ => 'All tests',
     };
   }
@@ -169,9 +162,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
       'Grand tests' => 'Full-syllabus grand mock tests.',
       'Subject tests' => 'Subject-wise mock tests.',
       'Chapter tests' => 'Chapter-wise tests for focused practice.',
-      'Upcoming' => 'Prepare your next assessment windows with clarity.',
-      'Completed' => 'Review your submitted tests and scores.',
-      _ => 'Grand tests, subject tests, chapter tests, and more.',
+      _ => 'Grand tests, subject tests, and chapter tests.',
     };
   }
 
@@ -188,7 +179,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
             const SectionHeader(
               title: 'Test series',
               subtitle:
-                  'Grand tests, subject tests, chapter tests, upcoming schedules, and result reviews.',
+                  'Grand tests, subject tests, and chapter-wise mock tests.',
             ),
             if (!hasSubscription) ...[
               const SizedBox(height: AppSpacing.md),

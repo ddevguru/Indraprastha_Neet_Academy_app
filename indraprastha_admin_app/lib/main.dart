@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -1896,35 +1897,41 @@ class _BooksPageState extends State<BooksPage> {
                       ? null
                       : () async {
                           var imageLink = _pyqImageLink;
-                          if (_pyqImage != null && _batchId != null) {
-                            imageLink = await widget.api.uploadQuestionImage(
-                              batchId: _batchId!,
-                              classLabel: _classLabel.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _chapter.text.trim().isEmpty
-                                  ? 'PYQ'
-                                  : _chapter.text.trim(),
-                              file: _pyqImage!,
-                              contentType: 'pyq',
-                              contentId: _selectedChapterId,
-                            );
-                          }
                           var expLink = _pyqExplanationImageLink;
-                          if (_pyqExplanationImage != null &&
-                              _batchId != null) {
-                            expLink = await widget.api.uploadQuestionImage(
-                              batchId: _batchId!,
-                              classLabel: _classLabel.text.trim(),
-                              subject: _subject.text.trim(),
-                              topic: _chapter.text.trim().isEmpty
-                                  ? 'PYQ'
-                                  : _chapter.text.trim(),
-                              file: _pyqExplanationImage!,
-                              contentType: 'pyq_explanation',
-                              contentId: _selectedChapterId,
-                            );
-                          }
                           if (_editingPyqId != null) {
+                            if (_pyqImage != null && _batchId != null) {
+                              if (!await _validateImageFile(context, _pyqImage!)) {
+                                throw Exception('Question image too large');
+                              }
+                              imageLink = await widget.api.uploadQuestionImage(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _chapter.text.trim().isEmpty
+                                    ? 'PYQ'
+                                    : _chapter.text.trim(),
+                                file: _pyqImage!,
+                                contentType: 'pyq',
+                                contentId: _selectedChapterId,
+                              );
+                            }
+                            if (_pyqExplanationImage != null && _batchId != null) {
+                              if (!await _validateImageFile(
+                                  context, _pyqExplanationImage!)) {
+                                throw Exception('Explanation image too large');
+                              }
+                              expLink = await widget.api.uploadQuestionImage(
+                                batchId: _batchId!,
+                                classLabel: _classLabel.text.trim(),
+                                subject: _subject.text.trim(),
+                                topic: _chapter.text.trim().isEmpty
+                                    ? 'PYQ'
+                                    : _chapter.text.trim(),
+                                file: _pyqExplanationImage!,
+                                contentType: 'pyq_explanation',
+                                contentId: _selectedChapterId,
+                              );
+                            }
                             await widget.api.updatePyq(
                               id: _editingPyqId!,
                               question: _pyqQuestion.text.trim(),
@@ -1939,18 +1946,44 @@ class _BooksPageState extends State<BooksPage> {
                             );
                             setState(() => _editingPyqId = null);
                           } else {
-                            await widget.api.addPyq(
-                              chapterId: _selectedChapterId!,
-                              question: _pyqQuestion.text.trim(),
-                              optionA: _pyqOptionA.text.trim(),
-                              optionB: _pyqOptionB.text.trim(),
-                              optionC: _pyqOptionC.text.trim(),
-                              optionD: _pyqOptionD.text.trim(),
-                              correctOption: _pyqCorrect,
-                              explanation: _pyqExplanation.text.trim(),
-                              questionImageLink: imageLink,
-                              explanationImageLink: expLink,
-                            );
+                            if (_pyqImage != null &&
+                                !await _validateImageFile(context, _pyqImage!)) {
+                              throw Exception('Question image too large');
+                            }
+                            if (_pyqExplanationImage != null &&
+                                !await _validateImageFile(
+                                    context, _pyqExplanationImage!)) {
+                              throw Exception('Explanation image too large');
+                            }
+                            if (_pyqImage != null || _pyqExplanationImage != null) {
+                              await widget.api.addPyqWithMedia(
+                                chapterId: _selectedChapterId!,
+                                question: _pyqQuestion.text.trim(),
+                                optionA: _pyqOptionA.text.trim(),
+                                optionB: _pyqOptionB.text.trim(),
+                                optionC: _pyqOptionC.text.trim(),
+                                optionD: _pyqOptionD.text.trim(),
+                                correctOption: _pyqCorrect,
+                                explanation: _pyqExplanation.text.trim(),
+                                questionImage: _pyqImage,
+                                explanationImage: _pyqExplanationImage,
+                                questionImageLink: imageLink,
+                                explanationImageLink: expLink,
+                              );
+                            } else {
+                              await widget.api.addPyq(
+                                chapterId: _selectedChapterId!,
+                                question: _pyqQuestion.text.trim(),
+                                optionA: _pyqOptionA.text.trim(),
+                                optionB: _pyqOptionB.text.trim(),
+                                optionC: _pyqOptionC.text.trim(),
+                                optionD: _pyqOptionD.text.trim(),
+                                correctOption: _pyqCorrect,
+                                explanation: _pyqExplanation.text.trim(),
+                                questionImageLink: imageLink,
+                                explanationImageLink: expLink,
+                              );
+                            }
                           }
                           setState(() {
                             _status = 'PYQ saved';
@@ -2733,67 +2766,93 @@ class _PracticePageState extends State<PracticePage> {
                           try {
                             var imageLink = _pqImageLink;
                             var expLink = _pqExplanationImageLink;
-                            if (_batchId != null) {
-                              final uploads = <Future<void>>[];
-                              if (_pqImage != null) {
-                                uploads.add(() async {
-                                  if (!await _validateImageFile(
-                                      context, _pqImage!)) {
-                                    throw Exception('Question image too large');
-                                  }
-                                  imageLink =
-                                      await widget.api.uploadQuestionImage(
-                                    batchId: _batchId!,
-                                    classLabel: _classLabel.text.trim(),
-                                    subject: _subject.text.trim(),
-                                    topic: _topic.text.trim().isEmpty
-                                        ? 'Practice Questions'
-                                        : _topic.text.trim(),
-                                    file: _pqImage!,
-                                    contentType: 'practice',
-                                    contentId: _selectedSetId,
-                                  );
-                                }());
-                              }
-                              if (_pqExplanationImage != null) {
-                                uploads.add(() async {
-                                  if (!await _validateImageFile(
-                                      context, _pqExplanationImage!)) {
-                                    throw Exception(
-                                        'Explanation image too large');
-                                  }
-                                  expLink =
-                                      await widget.api.uploadQuestionImage(
-                                    batchId: _batchId!,
-                                    classLabel: _classLabel.text.trim(),
-                                    subject: _subject.text.trim(),
-                                    topic: _topic.text.trim().isEmpty
-                                        ? 'Practice Questions'
-                                        : _topic.text.trim(),
-                                    file: _pqExplanationImage!,
-                                    contentType: 'practice_explanation',
-                                    contentId: _selectedSetId,
-                                  );
-                                }());
-                              }
-                              if (uploads.isNotEmpty) {
-                                await Future.wait(uploads);
-                              }
-                            }
                             if (_editingPracticeQuestionId == null) {
-                              await widget.api.addPracticeQuestion(
-                                setId: _selectedSetId!,
-                                question: _pqQuestion.text.trim(),
-                                optionA: _pqOptionA.text.trim(),
-                                optionB: _pqOptionB.text.trim(),
-                                optionC: _pqOptionC.text.trim(),
-                                optionD: _pqOptionD.text.trim(),
-                                correctOption: _pqCorrect,
-                                explanation: _pqExplanation.text.trim(),
-                                questionImageLink: imageLink,
-                                explanationImageLink: expLink,
-                              );
+                              if (_pqImage != null &&
+                                  !await _validateImageFile(context, _pqImage!)) {
+                                throw Exception('Question image too large');
+                              }
+                              if (_pqExplanationImage != null &&
+                                  !await _validateImageFile(
+                                      context, _pqExplanationImage!)) {
+                                throw Exception('Explanation image too large');
+                              }
+                              if (_pqImage != null || _pqExplanationImage != null) {
+                                await widget.api.addPracticeQuestionWithMedia(
+                                  setId: _selectedSetId!,
+                                  question: _pqQuestion.text.trim(),
+                                  optionA: _pqOptionA.text.trim(),
+                                  optionB: _pqOptionB.text.trim(),
+                                  optionC: _pqOptionC.text.trim(),
+                                  optionD: _pqOptionD.text.trim(),
+                                  correctOption: _pqCorrect,
+                                  explanation: _pqExplanation.text.trim(),
+                                  questionImage: _pqImage,
+                                  explanationImage: _pqExplanationImage,
+                                  questionImageLink: imageLink,
+                                  explanationImageLink: expLink,
+                                );
+                              } else {
+                                await widget.api.addPracticeQuestion(
+                                  setId: _selectedSetId!,
+                                  question: _pqQuestion.text.trim(),
+                                  optionA: _pqOptionA.text.trim(),
+                                  optionB: _pqOptionB.text.trim(),
+                                  optionC: _pqOptionC.text.trim(),
+                                  optionD: _pqOptionD.text.trim(),
+                                  correctOption: _pqCorrect,
+                                  explanation: _pqExplanation.text.trim(),
+                                  questionImageLink: imageLink,
+                                  explanationImageLink: expLink,
+                                );
+                              }
                             } else {
+                              if (_batchId != null) {
+                                final uploads = <Future<void>>[];
+                                if (_pqImage != null) {
+                                  uploads.add(() async {
+                                    if (!await _validateImageFile(
+                                        context, _pqImage!)) {
+                                      throw Exception('Question image too large');
+                                    }
+                                    imageLink =
+                                        await widget.api.uploadQuestionImage(
+                                      batchId: _batchId!,
+                                      classLabel: _classLabel.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      topic: _topic.text.trim().isEmpty
+                                          ? 'Practice Questions'
+                                          : _topic.text.trim(),
+                                      file: _pqImage!,
+                                      contentType: 'practice',
+                                      contentId: _selectedSetId,
+                                    );
+                                  }());
+                                }
+                                if (_pqExplanationImage != null) {
+                                  uploads.add(() async {
+                                    if (!await _validateImageFile(
+                                        context, _pqExplanationImage!)) {
+                                      throw Exception(
+                                          'Explanation image too large');
+                                    }
+                                    expLink =
+                                        await widget.api.uploadQuestionImage(
+                                      batchId: _batchId!,
+                                      classLabel: _classLabel.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      topic: _topic.text.trim().isEmpty
+                                          ? 'Practice Questions'
+                                          : _topic.text.trim(),
+                                      file: _pqExplanationImage!,
+                                      contentType: 'practice_explanation',
+                                      contentId: _selectedSetId,
+                                    );
+                                  }());
+                                }
+                                if (uploads.isNotEmpty) {
+                                  await Future.wait(uploads);
+                                }
+                              }
                               await widget.api.updatePracticeQuestion(
                                 id: _editingPracticeQuestionId!,
                                 question: _pqQuestion.text.trim(),
@@ -3074,7 +3133,7 @@ class _TestsPageState extends State<TestsPage> {
       ),
     );
     _pendingExtraExplanationImages.clear();
-    await _loadTestExplanationImages(questionId);
+    unawaited(_loadTestExplanationImages(questionId));
   }
 
   void _resetTestQuestionForm() {
@@ -3650,71 +3709,105 @@ class _TestsPageState extends State<TestsPage> {
                               try {
                                 var imageLink = _testQuestionImageLink;
                                 var expLink = _testExplanationImageLink;
-                                if (_batchId != null) {
-                                  final uploads = <Future<void>>[];
-                                  if (_testQuestionImage != null) {
-                                    uploads.add(() async {
-                                      if (!await _validateImageFile(
-                                          context, _testQuestionImage!)) {
-                                        throw Exception(
-                                            'Question image too large');
-                                      }
-                                      imageLink =
-                                          await widget.api.uploadQuestionImage(
-                                        batchId: _batchId!,
-                                        classLabel: _classLabel.text.trim(),
-                                        subject: _subject.text.trim(),
-                                        topic: _topic.text.trim().isEmpty
-                                            ? 'Test Questions'
-                                            : _topic.text.trim(),
-                                        file: _testQuestionImage!,
-                                        contentType: 'test',
-                                        contentId: _selectedTestId,
-                                      );
-                                    }());
-                                  }
-                                  if (_testExplanationImage != null) {
-                                    uploads.add(() async {
-                                      if (!await _validateImageFile(
-                                          context, _testExplanationImage!)) {
-                                        throw Exception(
-                                            'Explanation image too large');
-                                      }
-                                      expLink =
-                                          await widget.api.uploadQuestionImage(
-                                        batchId: _batchId!,
-                                        classLabel: _classLabel.text.trim(),
-                                        subject: _subject.text.trim(),
-                                        topic: _topic.text.trim().isEmpty
-                                            ? 'Test Questions'
-                                            : _topic.text.trim(),
-                                        file: _testExplanationImage!,
-                                        contentType: 'test_explanation',
-                                        contentId: _selectedTestId,
-                                      );
-                                    }());
-                                  }
-                                  if (uploads.isNotEmpty) {
-                                    await Future.wait(uploads);
-                                  }
-                                }
                                 var savedQuestionId = _editingQuestionId;
                                 if (_editingQuestionId == null) {
-                                  savedQuestionId =
-                                      await widget.api.addTestQuestion(
-                                    testId: _selectedTestId!,
-                                    question: _testQuestion.text.trim(),
-                                    optionA: _testOptionA.text.trim(),
-                                    optionB: _testOptionB.text.trim(),
-                                    optionC: _testOptionC.text.trim(),
-                                    optionD: _testOptionD.text.trim(),
-                                    correctOption: _testCorrect,
-                                    explanation: _testExplanation.text.trim(),
-                                    subject: _subject.text.trim(),
-                                    questionImageLink: imageLink,
-                                    explanationImageLink: expLink,
-                                  );
+                                  if (_testQuestionImage != null &&
+                                      !await _validateImageFile(
+                                          context, _testQuestionImage!)) {
+                                    throw Exception('Question image too large');
+                                  }
+                                  if (_testExplanationImage != null &&
+                                      !await _validateImageFile(
+                                          context, _testExplanationImage!)) {
+                                    throw Exception(
+                                        'Explanation image too large');
+                                  }
+                                  if (_testQuestionImage != null ||
+                                      _testExplanationImage != null) {
+                                    savedQuestionId =
+                                        await widget.api.addTestQuestionWithMedia(
+                                      testId: _selectedTestId!,
+                                      question: _testQuestion.text.trim(),
+                                      optionA: _testOptionA.text.trim(),
+                                      optionB: _testOptionB.text.trim(),
+                                      optionC: _testOptionC.text.trim(),
+                                      optionD: _testOptionD.text.trim(),
+                                      correctOption: _testCorrect,
+                                      explanation:
+                                          _testExplanation.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      questionImage: _testQuestionImage,
+                                      explanationImage: _testExplanationImage,
+                                      questionImageLink: imageLink,
+                                      explanationImageLink: expLink,
+                                    );
+                                  } else {
+                                    savedQuestionId =
+                                        await widget.api.addTestQuestion(
+                                      testId: _selectedTestId!,
+                                      question: _testQuestion.text.trim(),
+                                      optionA: _testOptionA.text.trim(),
+                                      optionB: _testOptionB.text.trim(),
+                                      optionC: _testOptionC.text.trim(),
+                                      optionD: _testOptionD.text.trim(),
+                                      correctOption: _testCorrect,
+                                      explanation:
+                                          _testExplanation.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      questionImageLink: imageLink,
+                                      explanationImageLink: expLink,
+                                    );
+                                  }
                                 } else {
+                                  if (_batchId != null) {
+                                    final uploads = <Future<void>>[];
+                                    if (_testQuestionImage != null) {
+                                      uploads.add(() async {
+                                        if (!await _validateImageFile(
+                                            context, _testQuestionImage!)) {
+                                          throw Exception(
+                                              'Question image too large');
+                                        }
+                                        imageLink = await widget.api
+                                            .uploadQuestionImage(
+                                          batchId: _batchId!,
+                                          classLabel: _classLabel.text.trim(),
+                                          subject: _subject.text.trim(),
+                                          topic: _topic.text.trim().isEmpty
+                                              ? 'Test Questions'
+                                              : _topic.text.trim(),
+                                          file: _testQuestionImage!,
+                                          contentType: 'test',
+                                          contentId: _selectedTestId,
+                                        );
+                                      }());
+                                    }
+                                    if (_testExplanationImage != null) {
+                                      uploads.add(() async {
+                                        if (!await _validateImageFile(
+                                            context,
+                                            _testExplanationImage!)) {
+                                          throw Exception(
+                                              'Explanation image too large');
+                                        }
+                                        expLink = await widget.api
+                                            .uploadQuestionImage(
+                                          batchId: _batchId!,
+                                          classLabel: _classLabel.text.trim(),
+                                          subject: _subject.text.trim(),
+                                          topic: _topic.text.trim().isEmpty
+                                              ? 'Test Questions'
+                                              : _topic.text.trim(),
+                                          file: _testExplanationImage!,
+                                          contentType: 'test_explanation',
+                                          contentId: _selectedTestId,
+                                        );
+                                      }());
+                                    }
+                                    if (uploads.isNotEmpty) {
+                                      await Future.wait(uploads);
+                                    }
+                                  }
                                   await widget.api.updateTestQuestion(
                                     id: _editingQuestionId!,
                                     question: _testQuestion.text.trim(),
@@ -3729,7 +3822,8 @@ class _TestsPageState extends State<TestsPage> {
                                     explanationImageLink: expLink,
                                   );
                                 }
-                                if (savedQuestionId != null) {
+                                if (savedQuestionId != null &&
+                                    _pendingExtraExplanationImages.isNotEmpty) {
                                   await _uploadPendingTestExplanationImages(
                                       savedQuestionId);
                                 }
@@ -5697,6 +5791,95 @@ class AdminApi {
         body['error']?.toString() ?? 'Server returned an unexpected response');
   }
 
+  Future<Map<String, dynamic>> _postQuestionWithMedia({
+    required String path,
+    required Map<String, String> fields,
+    File? questionImage,
+    File? explanationImage,
+  }) async {
+    if (token == null) throw Exception('Login first');
+    try {
+      final req = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
+      req.headers['Authorization'] = 'Bearer $token';
+      req.fields.addAll(fields);
+      if (questionImage != null) {
+        final bytes = await questionImage.readAsBytes();
+        final name = questionImage.path.split(Platform.pathSeparator).last;
+        req.files.add(
+          http.MultipartFile.fromBytes('questionImage', bytes, filename: name),
+        );
+      }
+      if (explanationImage != null) {
+        final bytes = await explanationImage.readAsBytes();
+        final name = explanationImage.path.split(Platform.pathSeparator).last;
+        req.files.add(
+          http.MultipartFile.fromBytes('explanationImage', bytes, filename: name),
+        );
+      }
+      final streamed = await req.send();
+      final bodyText = await streamed.stream.bytesToString();
+      final json = _decodeApiJson(
+        bodyText,
+        statusCode: streamed.statusCode,
+        method: 'POST',
+        path: path,
+      );
+      if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+        throw Exception(json['error'] ?? 'Request failed');
+      }
+      return json;
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log('POST $path', e, stackTrace: st);
+      rethrow;
+    }
+  }
+
+  int? _parseEntityId(dynamic id) {
+    if (id is int) return id;
+    if (id is num) return id.toInt();
+    if (id is String) return int.tryParse(id);
+    return null;
+  }
+
+  Future<int> addTestQuestionWithMedia({
+    required int testId,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    required String subject,
+    File? questionImage,
+    File? explanationImage,
+    String questionImageLink = '',
+    String explanationImageLink = '',
+  }) async {
+    final body = await _postQuestionWithMedia(
+      path: '/admin/tests/$testId/questions/with-media',
+      fields: {
+        'question': question,
+        'optionA': optionA,
+        'optionB': optionB,
+        'optionC': optionC,
+        'optionD': optionD,
+        'correctOption': correctOption,
+        'explanation': explanation,
+        'subject': subject,
+        'questionImageLink': questionImageLink,
+        'explanationImageLink': explanationImageLink,
+      },
+      questionImage: questionImage,
+      explanationImage: explanationImage,
+    );
+    final parsed = _parseEntityId((body['question'] as Map?)?['id']);
+    if (parsed != null) return parsed;
+    throw Exception(
+      body['error']?.toString() ?? 'Server returned an unexpected response',
+    );
+  }
+
   Future<List<dynamic>> testQuestions(int testId) async =>
       (await _get('/admin/tests/$testId/questions'))['questions']
           as List<dynamic>;
@@ -5760,6 +5943,38 @@ class AdminApi {
     });
   }
 
+  Future<void> addPracticeQuestionWithMedia({
+    required int setId,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    File? questionImage,
+    File? explanationImage,
+    String questionImageLink = '',
+    String explanationImageLink = '',
+  }) async {
+    await _postQuestionWithMedia(
+      path: '/admin/practice-sets/$setId/questions/with-media',
+      fields: {
+        'question': question,
+        'optionA': optionA,
+        'optionB': optionB,
+        'optionC': optionC,
+        'optionD': optionD,
+        'correctOption': correctOption,
+        'explanation': explanation,
+        'questionImageLink': questionImageLink,
+        'explanationImageLink': explanationImageLink,
+      },
+      questionImage: questionImage,
+      explanationImage: explanationImage,
+    );
+  }
+
   Future<void> updatePracticeQuestion({
     required int id,
     required String question,
@@ -5812,6 +6027,39 @@ class AdminApi {
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
     });
+  }
+
+  Future<void> addPyqWithMedia({
+    required int chapterId,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    required String explanation,
+    File? questionImage,
+    File? explanationImage,
+    String questionImageLink = '',
+    String explanationImageLink = '',
+  }) async {
+    await _postQuestionWithMedia(
+      path: '/admin/chapters/$chapterId/pyqs/with-media',
+      fields: {
+        'question': question,
+        'optionA': optionA,
+        'optionB': optionB,
+        'optionC': optionC,
+        'optionD': optionD,
+        'correctOption': correctOption,
+        'explanation': explanation,
+        'yearLabel': 'NEET',
+        'questionImageLink': questionImageLink,
+        'explanationImageLink': explanationImageLink,
+      },
+      questionImage: questionImage,
+      explanationImage: explanationImage,
+    );
   }
 
   Future<List<dynamic>> pyqs(int chapterId) async =>

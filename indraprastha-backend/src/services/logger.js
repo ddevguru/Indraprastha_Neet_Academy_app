@@ -126,7 +126,9 @@ class ErrorLogger {
     this._logToFile(logEntry);
 
     if (cloudLogging) {
-      this._logToGCP(logEntry);
+      this._logToGCP(logEntry).catch((err) => {
+        console.error('[LOGGER] Failed to write success to GCP:', err.message);
+      });
     }
   }
 

@@ -29,9 +29,17 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 },
 });
+const questionMediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+}).fields([
+  { name: 'questionImage', maxCount: 1 },
+  { name: 'explanationImage', maxCount: 1 },
+]);
 
 const UPLOAD_ROOT = path.join(os.tmpdir(), 'indra_uploads');
 const batchNameCache = new Map();
+const batchFolderCache = new Map();
 
 async function getBatchName(batchId) {
   if (batchNameCache.has(batchId)) return batchNameCache.get(batchId);
@@ -39,6 +47,76 @@ async function getBatchName(batchId) {
   const name = batchRes.rows[0]?.name || `Batch-${batchId}`;
   batchNameCache.set(batchId, name);
   return name;
+}
+
+async function getQuestionImagesFolderId(batchId) {
+  const key = String(batchId);
+  if (batchFolderCache.has(key)) return batchFolderCache.get(key);
+  const batchName = await getBatchName(batchId);
+  const folderId = await ensureDriveFolderPath({
+    rootFolderId: process.env.GDRIVE_FOLDER_ID,
+    segments: [batchName, 'QuestionImages'],
+  });
+  if (folderId) batchFolderCache.set(key, folderId);
+  return folderId;
+}
+
+async function uploadQuestionImageFast({ file, batchId }) {
+  const folderId = await getQuestionImagesFolderId(batchId);
+  const uploaded = await uploadBufferToDrive({
+    fileBuffer: file.buffer,
+    fileName: file.originalname,
+    mimeType: file.mimetype,
+    folderId,
+  });
+  return {
+    driveLink: uploaded.imageLink || normalizeDriveLink(uploaded.webViewLink, 'image') || '',
+    driveFileId: uploaded.fileId || '',
+    driveFolderId: folderId || '',
+  };
+}
+
+async function uploadQuestionMediaPair(batchId, questionFile, explanationFile) {
+  const uploads = [];
+  const result = { question: null, explanation: null };
+  if (questionFile) {
+    uploads.push(
+      uploadQuestionImageFast({ file: questionFile, batchId }).then((row) => {
+        result.question = row;
+      })
+    );
+  }
+  if (explanationFile) {
+    uploads.push(
+      uploadQuestionImageFast({ file: explanationFile, batchId }).then((row) => {
+        result.explanation = row;
+      })
+    );
+  }
+  if (uploads.length) await Promise.all(uploads);
+  return result;
+}
+
+async function getTestBatchId(testId) {
+  const row = await pool.query('SELECT batch_id FROM tests WHERE id = $1 LIMIT 1', [testId]);
+  return row.rows[0]?.batch_id ?? null;
+}
+
+async function getChapterBatchId(chapterId) {
+  const row = await pool.query(
+    `SELECT b.batch_id
+     FROM book_chapters ch
+     JOIN books b ON b.id = ch.book_id
+     WHERE ch.id = $1
+     LIMIT 1`,
+    [chapterId]
+  );
+  return row.rows[0]?.batch_id ?? null;
+}
+
+async function getPracticeSetBatchId(setId) {
+  const row = await pool.query('SELECT batch_id FROM practice_sets WHERE id = $1 LIMIT 1', [setId]);
+  return row.rows[0]?.batch_id ?? null;
 }
 
 function ensureUploadRoot() {
@@ -176,36 +254,13 @@ function mapQuestionImageLink(question) {
 async function uploadQuestionImageByHierarchy({
   file,
   batchId,
-  classLabel,
-  subject,
-  topic,
-  contentType,
-  contentId,
 }) {
-  const batchName = await getBatchName(batchId);
-  const idSegment =
-    contentType && contentId ? `${String(contentType).toUpperCase()}-${contentId}` : '';
-  const resolvedFolderId = await ensureDriveFolderPath({
-    rootFolderId: process.env.GDRIVE_FOLDER_ID,
-    segments: [
-      batchName,
-      classLabel || 'General',
-      subject || 'General',
-      topic || 'Questions',
-      idSegment || 'General',
-    ],
-  });
-  const uploaded = await uploadBufferToDrive({
-    fileBuffer: file.buffer,
-    fileName: file.originalname,
-    mimeType: file.mimetype,
-    folderId: resolvedFolderId,
-  });
+  const uploaded = await uploadQuestionImageFast({ file, batchId });
   return {
-    driveLink: uploaded.imageLink || normalizeDriveLink(uploaded.webViewLink, 'image') || '',
-    driveFileId: uploaded.fileId || '',
+    driveLink: uploaded.driveLink,
+    driveFileId: uploaded.driveFileId,
     drive: uploaded,
-    driveFolderId: resolvedFolderId,
+    driveFolderId: uploaded.driveFolderId,
   };
 }
 
@@ -882,6 +937,81 @@ router.post(
   }
 );
 
+router.post('/chapters/:chapterId/pyqs/with-media', adminAuth, questionMediaUpload, async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const {
+      question,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
+      correctOption,
+      explanation,
+      yearLabel,
+      questionImageLink = '',
+      explanationImageLink = '',
+    } = req.body;
+
+    const chapterCheck = await pool.query(
+      `SELECT id FROM book_chapters WHERE id = $1 LIMIT 1`,
+      [chapterId]
+    );
+    if (chapterCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Selected chapter does not exist.' });
+    }
+
+    const batchId = await getChapterBatchId(chapterId);
+    const files = req.files || {};
+    const questionFile = files.questionImage?.[0] || null;
+    const explanationFile = files.explanationImage?.[0] || null;
+
+    let qLink = questionImageLink;
+    let qFileId = extractDriveFileId(questionImageLink || '');
+    let eLink = explanationImageLink;
+    let eFileId = extractDriveFileId(explanationImageLink || '');
+
+    if (batchId && (questionFile || explanationFile)) {
+      const media = await uploadQuestionMediaPair(batchId, questionFile, explanationFile);
+      if (media.question) {
+        qLink = media.question.driveLink;
+        qFileId = media.question.driveFileId;
+      }
+      if (media.explanation) {
+        eLink = media.explanation.driveLink;
+        eFileId = media.explanation.driveFileId;
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO pyqs (
+        chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [
+        chapterId,
+        question,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        explanation || '',
+        yearLabel || 'NEET',
+        normalizeDriveLink(qLink || '', 'image'),
+        qFileId,
+        '',
+        normalizeDriveLink(eLink || '', 'image'),
+        eFileId,
+        '',
+      ]
+    );
+    return res.json({ success: true, pyq: mapQuestionImageLink(result.rows[0]) });
+  } catch (e) {
+    logAdminRouteError('/chapters/:chapterId/pyqs/with-media POST', e);
+    return res.status(500).json({ error: e.message || 'Failed to add PYQ' });
+  }
+});
+
 router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
   const { chapterId } = req.params;
   const {
@@ -1102,7 +1232,7 @@ router.post('/practice-sets/:setId/questions/batch', adminAuth, async (req, res)
       allParams
     );
 
-    await logger.logSuccess({
+    void logger.logSuccess({
       operationType: 'BATCH_ADD_QUESTIONS_SUCCESS',
       message: `Added ${questions.length} questions successfully`,
       operation: 'BATCH_ADD_QUESTIONS',
@@ -1129,6 +1259,68 @@ router.post('/practice-sets/:setId/questions/batch', adminAuth, async (req, res)
       details: { practiceSetId: req.params.setId }
     });
     return res.status(500).json({ error: 'Failed to add questions in batch' });
+  }
+});
+
+router.post('/practice-sets/:setId/questions/with-media', adminAuth, questionMediaUpload, async (req, res) => {
+  try {
+    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink = '', explanationImageLink = '' } =
+      req.body;
+
+    if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
+      return res.status(400).json({
+        error: 'question, optionA, optionB, optionC, optionD, correctOption are required',
+      });
+    }
+
+    const batchId = await getPracticeSetBatchId(req.params.setId);
+    const files = req.files || {};
+    const questionFile = files.questionImage?.[0] || null;
+    const explanationFile = files.explanationImage?.[0] || null;
+
+    let qLink = questionImageLink;
+    let qFileId = extractDriveFileId(questionImageLink || '');
+    let eLink = explanationImageLink;
+    let eFileId = extractDriveFileId(explanationImageLink || '');
+
+    if (batchId && (questionFile || explanationFile)) {
+      const media = await uploadQuestionMediaPair(batchId, questionFile, explanationFile);
+      if (media.question) {
+        qLink = media.question.driveLink;
+        qFileId = media.question.driveFileId;
+      }
+      if (media.explanation) {
+        eLink = media.explanation.driveLink;
+        eFileId = media.explanation.driveFileId;
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO practice_questions (
+        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [
+        req.params.setId,
+        question,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        explanation || '',
+        normalizeDriveLink(qLink || '', 'image'),
+        qFileId,
+        '',
+        normalizeDriveLink(eLink || '', 'image'),
+        eFileId,
+        '',
+      ]
+    );
+
+    return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
+  } catch (error) {
+    logAdminRouteError('/practice-sets/:setId/questions/with-media POST', error);
+    return res.status(500).json({ error: error.message || 'Failed to add practice question' });
   }
 });
 
@@ -1175,7 +1367,7 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
       ]
     );
 
-    await logger.logSuccess({
+    void logger.logSuccess({
       operationType: 'ADD_PRACTICE_QUESTION_SUCCESS',
       message: 'Practice question added successfully',
       operation: 'ADD_PRACTICE_QUESTION',
@@ -1336,6 +1528,83 @@ router.get('/tests/:testId/questions', adminAuth, async (req, res) => {
     [req.params.testId]
   );
   res.json({ success: true, questions: result.rows.map(mapQuestionImageLink) });
+});
+
+router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUpload, async (req, res) => {
+  try {
+    const testId = req.params.testId;
+    const {
+      subject,
+      question,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
+      correctOption,
+      explanation,
+      questionImageLink = '',
+      explanationImageLink = '',
+    } = req.body;
+
+    if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
+      return res.status(400).json({
+        error: 'question, optionA, optionB, optionC, optionD, correctOption are required',
+      });
+    }
+
+    const batchId = await getTestBatchId(testId);
+    const files = req.files || {};
+    const questionFile = files.questionImage?.[0] || null;
+    const explanationFile = files.explanationImage?.[0] || null;
+
+    let qLink = questionImageLink;
+    let qFileId = extractDriveFileId(questionImageLink || '');
+    let qFolder = '';
+    let eLink = explanationImageLink;
+    let eFileId = extractDriveFileId(explanationImageLink || '');
+    let eFolder = '';
+
+    if (batchId && (questionFile || explanationFile)) {
+      const media = await uploadQuestionMediaPair(batchId, questionFile, explanationFile);
+      if (media.question) {
+        qLink = media.question.driveLink;
+        qFileId = media.question.driveFileId;
+        qFolder = media.question.driveFolderId;
+      }
+      if (media.explanation) {
+        eLink = media.explanation.driveLink;
+        eFileId = media.explanation.driveFileId;
+        eFolder = media.explanation.driveFolderId;
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO test_questions (
+        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [
+        testId,
+        subject || 'Biology',
+        question,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        explanation || '',
+        normalizeDriveLink(qLink || '', 'image'),
+        qFileId,
+        qFolder,
+        normalizeDriveLink(eLink || '', 'image'),
+        eFileId,
+        eFolder,
+      ]
+    );
+    return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
+  } catch (e) {
+    logAdminRouteError('/tests/:testId/questions/with-media POST', e);
+    return res.status(500).json({ error: e.message || 'Failed to add test question' });
+  }
 });
 
 router.post('/tests/:testId/questions', adminAuth, async (req, res) => {

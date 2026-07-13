@@ -5,6 +5,14 @@ const os = require('os');
 const path = require('path');
 
 const folderPathCache = new Map();
+let cachedDriveClient = null;
+
+function getDriveClient() {
+  if (!cachedDriveClient) {
+    cachedDriveClient = createDriveClient();
+  }
+  return cachedDriveClient;
+}
 
 function createServiceAccountDriveClient() {
   const clientEmail = process.env.GDRIVE_CLIENT_EMAIL;
@@ -94,7 +102,7 @@ async function uploadBufferToDrive({
   mimeType,
   folderId,
 }) {
-  const drive = createDriveClient();
+  const drive = getDriveClient();
   const normalizedBuffer = normalizeToBuffer(fileBuffer);
   let response;
   try {
@@ -167,7 +175,7 @@ async function uploadFilePathToDrive({
   mimeType,
   folderId,
 }) {
-  const drive = createDriveClient();
+  const drive = getDriveClient();
   const response = await drive.files.create({
     requestBody: {
       name: fileName,
@@ -206,7 +214,7 @@ function streamToString(stream) {
 }
 
 async function extractPdfTextWithDriveOcr({ fileBuffer, fileName }) {
-  const drive = createDriveClient();
+  const drive = getDriveClient();
   const normalizedBuffer = normalizeToBuffer(fileBuffer);
   let tempDocId = '';
   try {
@@ -255,7 +263,7 @@ async function extractPdfTextWithDriveOcr({ fileBuffer, fileName }) {
 
 async function downloadDriveFileBuffer(fileId) {
   if (!fileId) return Buffer.alloc(0);
-  const drive = createDriveClient();
+  const drive = getDriveClient();
   const response = await drive.files.get(
     {
       fileId,
@@ -271,7 +279,7 @@ async function downloadDriveFileBuffer(fileId) {
 
 async function findRecentPdfInFolder(folderId) {
   if (!folderId) return '';
-  const drive = createDriveClient();
+  const drive = getDriveClient();
   const query = [
     `'${folderId}' in parents`,
     "mimeType = 'application/pdf'",
@@ -345,7 +353,7 @@ async function ensureDriveFolderPath({
   if (cached) {
     return cached;
   }
-  const drive = createDriveClient();
+  const drive = getDriveClient();
   let current = rootFolderId || null;
   if (current) {
     try {
