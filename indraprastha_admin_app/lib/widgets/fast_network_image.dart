@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/drive_image_url.dart';
 
@@ -27,36 +26,16 @@ class FastNetworkImage extends StatefulWidget {
 }
 
 class _FastNetworkImageState extends State<FastNetworkImage> {
-  static const _tokenKey = 'admin_auth_token';
-  Map<String, String>? _headers;
-  bool _useFallback = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadHeaders();
-  }
-
-  Future<void> _loadHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_tokenKey);
-    if (!mounted) return;
-    setState(() {
-      _headers = token == null ? null : {'Authorization': 'Bearer $token'};
-    });
-  }
+  int _fallbackStep = 0;
 
   @override
   Widget build(BuildContext context) {
-    final resolved = _useFallback
-        ? _driveFallbackUrl(widget.url)
-        : resolveDriveImageUrl(widget.url, thumbWidth: widget.thumbWidth);
+    final resolved = _resolvedUrl();
     if (resolved.isEmpty) return const SizedBox.shrink();
 
     Widget image = CachedNetworkImage(
       imageUrl: resolved,
-      httpHeaders: isApiImageUrl(resolved) ? _headers : null,
-      cacheKey: driveImageCacheKey(widget.url),
+      cacheKey: '${driveImageCacheKey(widget.url)}:$_fallbackStep',
       height: widget.height,
       width: widget.width,
       fit: widget.fit,
@@ -64,7 +43,7 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
           widget.height != null ? (widget.height! * 1.5).round().clamp(160, 900) : 600,
       maxWidthDiskCache: 1200,
       maxHeightDiskCache: 1200,
-      fadeInDuration: const Duration(milliseconds: 120),
+      fadeInDuration: const Duration(milliseconds: 150),
       fadeOutDuration: Duration.zero,
       useOldImageOnUrlChange: true,
       placeholder: (_, __) => Container(
@@ -79,24 +58,21 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
         ),
       ),
       errorWidget: (_, __, ___) {
-        if (!_useFallback) {
-          final fallback = _driveFallbackUrl(widget.url);
-          if (fallback.isNotEmpty && fallback != resolved) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) setState(() => _useFallback = true);
-            });
-            return Container(
-              height: widget.height ?? 120,
-              width: widget.width,
-              color: const Color(0xFFF3F4F6),
-              alignment: Alignment.center,
-              child: const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            );
-          }
+        if (_fallbackStep < 2) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _fallbackStep += 1);
+          });
+          return Container(
+            height: widget.height ?? 120,
+            width: widget.width,
+            color: const Color(0xFFF3F4F6),
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
         }
         return Container(
           height: widget.height ?? 120,
@@ -114,10 +90,13 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
     return image;
   }
 
-  String _driveFallbackUrl(String raw) {
-    final id = extractDriveFileId(raw);
-    if (id == null || id.isEmpty) return '';
-    final w = widget.thumbWidth.clamp(200, 1600);
-    return 'https://drive.google.com/thumbnail?id=$id&sz=w$w';
+  String _resolvedUrl() {
+    final id = extractDriveFileId(widget.url);
+    if (id == null || id.isEmpty) return widget.url.trim();
+    return switch (_fallbackStep) {
+      0 => buildDriveThumbnailUrl(id, thumbWidth: widget.thumbWidth),
+      1 => buildDriveViewUrl(id),
+      _ => buildDriveThumbnailUrl(id, thumbWidth: (widget.thumbWidth * 0.7).round()),
+    };
   }
 }

@@ -36,7 +36,7 @@ class ContentRepository {
   }
 
   Future<List<Map<String, dynamic>>> fetchPyqs(int chapterId) async {
-    final data = await _get('/content/chapters/$chapterId/pyqs');
+    final data = await _get('/content/chapters/$chapterId/pyqs', bypassCache: true);
     return List<Map<String, dynamic>>.from(data['pyqs'] as List<dynamic>);
   }
 
@@ -56,7 +56,7 @@ class ContentRepository {
       _get('/content/chapters/$chapterId');
 
   Future<Map<String, dynamic>> fetchPracticeAttemptData(int setId) =>
-      _get('/content/practice-sets/$setId/questions');
+      _get('/content/practice-sets/$setId/questions', bypassCache: true);
 
   Future<List<Map<String, dynamic>>> fetchTests({
     String? subject,
@@ -80,7 +80,7 @@ class ContentRepository {
       _get('/content/filters');
 
   Future<Map<String, dynamic>> fetchTestQuestions(int testId) =>
-      _get('/content/tests/$testId/questions');
+      _get('/content/tests/$testId/questions', bypassCache: true);
 
   Future<Map<String, dynamic>> submitTestAttempt({
     required int testId,

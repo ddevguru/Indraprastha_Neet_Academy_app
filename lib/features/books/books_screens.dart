@@ -17,6 +17,7 @@ import '../../widgets/app_widgets.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/fast_network_image.dart';
+import '../../core/utils/drive_image_url.dart';
 
 Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
@@ -527,8 +528,8 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
     unawaited(
       warmImageCacheUrls(
         widget.pyqs
-            .map((q) => q['question_image_link']?.toString() ?? '')
-            .where((url) => url.trim().isNotEmpty),
+            .map((q) => questionImageRawUrl(q))
+            .where((url) => url.isNotEmpty),
         thumbWidth: 700,
         maxItems: 12,
       ),
@@ -699,9 +700,9 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                     'Q${_index + 1}. ${q['question'] ?? ''}',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  if ((q['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                  if (hasQuestionImage(q)) ...[
                     const SizedBox(height: AppSpacing.sm),
-                    _buildQuestionImage(q['question_image_link'].toString()),
+                    _buildQuestionImage(questionImageRawUrl(q)),
                   ],
                   const SizedBox(height: AppSpacing.md),
                   ...options.entries.map((e) {

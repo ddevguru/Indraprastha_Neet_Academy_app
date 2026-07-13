@@ -16,6 +16,7 @@ import '../../widgets/app_widgets.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/fast_network_image.dart';
+import '../../core/utils/drive_image_url.dart';
 
 Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
@@ -272,8 +273,8 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       unawaited(
         warmImageCacheUrls(
           _questions
-              .map((q) => q['question_image_link']?.toString() ?? '')
-              .where((url) => url.trim().isNotEmpty),
+              .map((q) => questionImageRawUrl(q))
+              .where((url) => url.isNotEmpty),
           thumbWidth: 700,
           maxItems: 12,
         ),
@@ -513,9 +514,9 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           question['question']?.toString() ?? '',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
-                        if ((question['question_image_link']?.toString() ?? '').isNotEmpty) ...[
+                        if (hasQuestionImage(question)) ...[
                           const SizedBox(height: AppSpacing.md),
-                          _buildQuestionImage(question['question_image_link'].toString()),
+                          _buildQuestionImage(questionImageRawUrl(question)),
                         ],
                         const SizedBox(height: AppSpacing.lg),
                         ...List.generate(options.length, (index) {

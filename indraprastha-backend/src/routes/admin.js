@@ -31,10 +31,11 @@ const upload = multer({
 });
 const questionMediaUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: 12 * 1024 * 1024, files: 25 },
 }).fields([
   { name: 'questionImage', maxCount: 1 },
   { name: 'explanationImage', maxCount: 1 },
+  { name: 'extraExplanationImages', maxCount: 20 },
 ]);
 
 const UPLOAD_ROOT = path.join(os.tmpdir(), 'indra_uploads');
@@ -95,6 +96,37 @@ async function uploadQuestionMediaPair(batchId, questionFile, explanationFile) {
   }
   if (uploads.length) await Promise.all(uploads);
   return result;
+}
+
+async function insertTestExplanationImages(testQuestionId, uploads) {
+  if (!uploads.length) return [];
+  const rows = [];
+  let order = 1;
+  const existing = await pool.query(
+    `SELECT COALESCE(MAX(order_index), 0)::int AS max_order
+     FROM explanation_images
+     WHERE test_question_id = $1`,
+    [testQuestionId]
+  );
+  order = (existing.rows[0]?.max_order || 0) + 1;
+  for (const uploaded of uploads) {
+    const inserted = await pool.query(
+      `INSERT INTO explanation_images (
+        test_question_id, image_url, image_drive_file_id, image_drive_link, caption, order_index
+      ) VALUES ($1, $2, $3, $4, '', $5)
+      RETURNING id, image_url, image_drive_file_id, image_drive_link, caption, order_index`,
+      [
+        testQuestionId,
+        uploaded.driveLink,
+        uploaded.driveFileId,
+        uploaded.driveLink,
+        order,
+      ]
+    );
+    rows.push(inserted.rows[0]);
+    order += 1;
+  }
+  return rows;
 }
 
 async function getTestBatchId(testId) {
@@ -1556,6 +1588,7 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
     const files = req.files || {};
     const questionFile = files.questionImage?.[0] || null;
     const explanationFile = files.explanationImage?.[0] || null;
+    const extraFiles = files.extraExplanationImages || [];
 
     let qLink = questionImageLink;
     let qFileId = extractDriveFileId(questionImageLink || '');
@@ -1564,8 +1597,11 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
     let eFileId = extractDriveFileId(explanationImageLink || '');
     let eFolder = '';
 
-    if (batchId && (questionFile || explanationFile)) {
-      const media = await uploadQuestionMediaPair(batchId, questionFile, explanationFile);
+    if (batchId && (questionFile || explanationFile || extraFiles.length)) {
+      const [media, ...extraUploads] = await Promise.all([
+        uploadQuestionMediaPair(batchId, questionFile, explanationFile),
+        ...extraFiles.map((file) => uploadQuestionImageFast({ file, batchId })),
+      ]);
       if (media.question) {
         qLink = media.question.driveLink;
         qFileId = media.question.driveFileId;
@@ -1576,6 +1612,38 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
         eFileId = media.explanation.driveFileId;
         eFolder = media.explanation.driveFolderId;
       }
+
+      const result = await pool.query(
+        `INSERT INTO test_questions (
+          test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        [
+          testId,
+          subject || 'Biology',
+          question,
+          optionA,
+          optionB,
+          optionC,
+          optionD,
+          correctOption,
+          explanation || '',
+          normalizeDriveLink(qLink || '', 'image'),
+          qFileId,
+          qFolder,
+          normalizeDriveLink(eLink || '', 'image'),
+          eFileId,
+          eFolder,
+        ]
+      );
+      const explanationImages = await insertTestExplanationImages(
+        result.rows[0].id,
+        extraUploads
+      );
+      return res.json({
+        success: true,
+        question: mapQuestionImageLink(result.rows[0]),
+        explanationImages,
+      });
     }
 
     const result = await pool.query(

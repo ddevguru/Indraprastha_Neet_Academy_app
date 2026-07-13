@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'screens/error_logs_page.dart';
 import 'services/admin_error_logger.dart';
+import 'utils/drive_image_url.dart';
 import 'widgets/fast_network_image.dart';
 
 const String baseUrl = 'https://api.indraprasthaneetacademy.com/api';
@@ -2037,18 +2038,13 @@ class _BooksPageState extends State<BooksPage> {
                                               const SizedBox(height: 4),
                                               Text(
                                                   'Correct: ${q['correct_option'] ?? '-'}'),
-                                              if ((q['question_image_link']
-                                                          ?.toString() ??
-                                                      '')
-                                                  .isNotEmpty) ...[
+                                              if (hasQuestionImage(q)) ...[
                                                 const SizedBox(height: 8),
                                                 ClipRRect(
                                                   borderRadius:
                                                       BorderRadius.circular(8),
                                                   child: FastNetworkImage(
-                                                    url:
-                                                        q['question_image_link']
-                                                            .toString(),
+                                                    url: questionImageRawUrl(q),
                                                     height: 120,
                                                     width: double.infinity,
                                                     fit: BoxFit.cover,
@@ -3202,14 +3198,12 @@ class _TestsPageState extends State<TestsPage> {
                           Text(question['question']?.toString() ?? ''),
                           const SizedBox(height: 4),
                           Text('Correct: ${question['correct_option'] ?? '-'}'),
-                          if ((question['question_image_link']?.toString() ??
-                                  '')
-                              .isNotEmpty) ...[
+                          if (hasQuestionImage(question)) ...[
                             const SizedBox(height: 8),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: FastNetworkImage(
-                                url: question['question_image_link'].toString(),
+                                url: questionImageRawUrl(question),
                                 height: 120,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
@@ -3710,20 +3704,28 @@ class _TestsPageState extends State<TestsPage> {
                                 var imageLink = _testQuestionImageLink;
                                 var expLink = _testExplanationImageLink;
                                 var savedQuestionId = _editingQuestionId;
+                                final wasEditing = _editingQuestionId != null;
+                                final hasMedia = _testQuestionImage != null ||
+                                    _testExplanationImage != null ||
+                                    _pendingExtraExplanationImages.isNotEmpty;
                                 if (_editingQuestionId == null) {
-                                  if (_testQuestionImage != null &&
-                                      !await _validateImageFile(
-                                          context, _testQuestionImage!)) {
-                                    throw Exception('Question image too large');
+                                  final filesToValidate = <File>[
+                                    if (_testQuestionImage != null)
+                                      _testQuestionImage!,
+                                    if (_testExplanationImage != null)
+                                      _testExplanationImage!,
+                                    ..._pendingExtraExplanationImages,
+                                  ];
+                                  for (final file in filesToValidate) {
+                                    if (!await _validateImageFile(
+                                        context, file)) {
+                                      throw Exception(
+                                          'Image too large (max 5 MB each)');
+                                    }
                                   }
-                                  if (_testExplanationImage != null &&
-                                      !await _validateImageFile(
-                                          context, _testExplanationImage!)) {
-                                    throw Exception(
-                                        'Explanation image too large');
-                                  }
-                                  if (_testQuestionImage != null ||
-                                      _testExplanationImage != null) {
+                                  if (hasMedia) {
+                                    setState(() => _status =
+                                        'Uploading ${filesToValidate.length} image(s)...');
                                     savedQuestionId =
                                         await widget.api.addTestQuestionWithMedia(
                                       testId: _selectedTestId!,
@@ -3738,9 +3740,13 @@ class _TestsPageState extends State<TestsPage> {
                                       subject: _subject.text.trim(),
                                       questionImage: _testQuestionImage,
                                       explanationImage: _testExplanationImage,
+                                      extraExplanationImages:
+                                          List<File>.from(
+                                              _pendingExtraExplanationImages),
                                       questionImageLink: imageLink,
                                       explanationImageLink: expLink,
                                     );
+                                    _pendingExtraExplanationImages.clear();
                                   } else {
                                     savedQuestionId =
                                         await widget.api.addTestQuestion(
@@ -3822,7 +3828,8 @@ class _TestsPageState extends State<TestsPage> {
                                     explanationImageLink: expLink,
                                   );
                                 }
-                                if (savedQuestionId != null &&
+                                if (wasEditing &&
+                                    savedQuestionId != null &&
                                     _pendingExtraExplanationImages.isNotEmpty) {
                                   await _uploadPendingTestExplanationImages(
                                       savedQuestionId);
@@ -4131,7 +4138,7 @@ class _McqsPageState extends State<McqsPage> {
       .toList();
 
   Widget _buildMcqCard(Map<String, dynamic> m, {required bool archived}) {
-    final hasImage = (m['question_image_link']?.toString() ?? '').isNotEmpty;
+    final hasImage = hasQuestionImage(m);
     final created = _mcqCreatedAt(m);
     final dateLabel = created != null
         ? '${created.day.toString().padLeft(2, '0')}/${created.month.toString().padLeft(2, '0')}/${created.year}'
@@ -4186,7 +4193,7 @@ class _McqsPageState extends State<McqsPage> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: FastNetworkImage(
-                  url: m['question_image_link'].toString(),
+                  url: questionImageRawUrl(m),
                   height: 100,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -5796,6 +5803,7 @@ class AdminApi {
     required Map<String, String> fields,
     File? questionImage,
     File? explanationImage,
+    List<File> extraExplanationImages = const [],
   }) async {
     if (token == null) throw Exception('Login first');
     try {
@@ -5816,7 +5824,20 @@ class AdminApi {
           http.MultipartFile.fromBytes('explanationImage', bytes, filename: name),
         );
       }
-      final streamed = await req.send();
+      for (final extra in extraExplanationImages) {
+        final bytes = await extra.readAsBytes();
+        final name = extra.path.split(Platform.pathSeparator).last;
+        req.files.add(
+          http.MultipartFile.fromBytes(
+            'extraExplanationImages',
+            bytes,
+            filename: name,
+          ),
+        );
+      }
+      final streamed = await req
+          .send()
+          .timeout(const Duration(minutes: 15));
       final bodyText = await streamed.stream.bytesToString();
       final json = _decodeApiJson(
         bodyText,
@@ -5853,6 +5874,7 @@ class AdminApi {
     required String subject,
     File? questionImage,
     File? explanationImage,
+    List<File> extraExplanationImages = const [],
     String questionImageLink = '',
     String explanationImageLink = '',
   }) async {
@@ -5872,6 +5894,7 @@ class AdminApi {
       },
       questionImage: questionImage,
       explanationImage: explanationImage,
+      extraExplanationImages: extraExplanationImages,
     );
     final parsed = _parseEntityId((body['question'] as Map?)?['id']);
     if (parsed != null) return parsed;

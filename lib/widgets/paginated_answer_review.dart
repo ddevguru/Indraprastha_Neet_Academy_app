@@ -111,12 +111,16 @@ class AnswerReviewEntry {
 
     return AnswerReviewEntry(
       questionText: question['question']?.toString() ?? '',
-      questionImageUrl: question['question_image_link']?.toString(),
+      questionImageUrl: questionImageRawUrl(question).isEmpty
+          ? null
+          : questionImageRawUrl(question),
       options: options,
       correctIndex: correctIndex,
       selectedIndex: selectedIndex == null && selectedOption == null ? null : selectedIndex,
       explanation: question['explanation']?.toString(),
-      explanationImageUrl: question['explanation_image_link']?.toString(),
+      explanationImageUrl: _explanationImageRawUrl(question).isEmpty
+          ? null
+          : _explanationImageRawUrl(question),
       explanationImagesList: question['explanation_images_list'] != null
           ? List<Map<String, dynamic>>.from(
               (question['explanation_images_list'] as List).map(
@@ -126,6 +130,15 @@ class AnswerReviewEntry {
           : null,
     );
   }
+}
+
+String _explanationImageRawUrl(Map<String, dynamic> question) {
+  final fileId =
+      question['explanation_image_drive_file_id']?.toString().trim() ?? '';
+  if (fileId.isNotEmpty) {
+    return 'https://drive.google.com/file/d/$fileId/view';
+  }
+  return question['explanation_image_link']?.toString().trim() ?? '';
 }
 
 /// Full-screen review: one question per page with progress dots and stats.

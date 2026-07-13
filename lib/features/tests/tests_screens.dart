@@ -13,6 +13,7 @@ import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/fast_network_image.dart';
+import '../../core/utils/drive_image_url.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 
@@ -450,8 +451,8 @@ class _TestResultScreenState extends State<TestResultScreen> {
       unawaited(
         warmImageCacheUrls(
           questions
-              .map((q) => q['question_image_link']?.toString() ?? '')
-              .where((url) => url.trim().isNotEmpty),
+              .map((q) => questionImageRawUrl(q))
+              .where((url) => url.isNotEmpty),
           thumbWidth: 700,
           maxItems: 12,
         ),
@@ -624,10 +625,9 @@ class _TestResultScreenState extends State<TestResultScreen> {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Text(q['question']?.toString() ?? ''),
-                    if ((q['question_image_link']?.toString() ?? '')
-                        .isNotEmpty) ...[
+                    if (hasQuestionImage(q)) ...[
                       const SizedBox(height: AppSpacing.md),
-                      _buildQuestionImage(q['question_image_link'].toString()),
+                      _buildQuestionImage(questionImageRawUrl(q)),
                     ],
                     const SizedBox(height: AppSpacing.lg),
                     ...options.entries.map(

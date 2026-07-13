@@ -1,5 +1,3 @@
-const String apiBaseUrl = 'https://api.indraprasthaneetacademy.com/api';
-
 String? extractDriveFileId(String raw) {
   final value = raw.trim();
   if (value.isEmpty) return null;
@@ -26,21 +24,22 @@ String? extractDriveFileId(String raw) {
   return id;
 }
 
-bool isApiImageUrl(String raw) => raw.trim().contains('/content/images/');
-
-String buildApiImageUrl(String fileId, {int thumbWidth = 900}) {
+String buildDriveThumbnailUrl(String fileId, {int thumbWidth = 900}) {
   final w = thumbWidth.clamp(200, 1600);
-  return '$apiBaseUrl/content/images/$fileId?w=$w';
+  return 'https://drive.google.com/thumbnail?id=$fileId&sz=w$w';
 }
+
+String buildDriveViewUrl(String fileId) =>
+    'https://drive.google.com/uc?export=view&id=$fileId';
 
 String resolveDriveImageUrl(String raw, {int thumbWidth = 900}) {
   final value = raw.trim();
   if (value.isEmpty) return value;
-  if (isApiImageUrl(value)) return value;
   final id = extractDriveFileId(value);
   if (id != null && id.isNotEmpty) {
-    return buildApiImageUrl(id, thumbWidth: thumbWidth);
+    return buildDriveThumbnailUrl(id, thumbWidth: thumbWidth);
   }
+  if (value.contains('drive.google.com')) return value;
   return value;
 }
 
@@ -48,4 +47,18 @@ String driveImageCacheKey(String raw) {
   final id = extractDriveFileId(raw);
   if (id != null && id.isNotEmpty) return 'drive:$id';
   return raw.trim();
+}
+
+String questionImageRawUrl(Map<String, dynamic> question) {
+  final fileId = question['question_image_drive_file_id']?.toString().trim() ?? '';
+  if (fileId.isNotEmpty) {
+    return 'https://drive.google.com/file/d/$fileId/view';
+  }
+  return question['question_image_link']?.toString().trim() ?? '';
+}
+
+bool hasQuestionImage(Map<String, dynamic> question) {
+  final fileId = question['question_image_drive_file_id']?.toString().trim() ?? '';
+  final link = question['question_image_link']?.toString().trim() ?? '';
+  return fileId.isNotEmpty || link.isNotEmpty;
 }

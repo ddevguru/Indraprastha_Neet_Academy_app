@@ -1,12 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/utils/drive_image_url.dart';
 import '../theme/app_tokens.dart';
 
-/// Cached image widget — uses API image proxy for Drive files (auth + server cache).
+/// Cached Drive-thumbnail image widget.
 class FastNetworkImage extends StatefulWidget {
   const FastNetworkImage({
     super.key,
@@ -30,29 +29,11 @@ class FastNetworkImage extends StatefulWidget {
 }
 
 class _FastNetworkImageState extends State<FastNetworkImage> {
-  static const _secureStorage = FlutterSecureStorage();
-  Map<String, String>? _headers;
-  bool _useFallback = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadHeaders();
-  }
-
-  Future<void> _loadHeaders() async {
-    final token = await _secureStorage.read(key: 'auth_token');
-    if (!mounted) return;
-    setState(() {
-      _headers = token == null ? null : {'Authorization': 'Bearer $token'};
-    });
-  }
+  int _fallbackStep = 0;
 
   @override
   Widget build(BuildContext context) {
-    final resolved = _useFallback
-        ? _driveFallbackUrl(widget.url)
-        : resolveDriveImageUrl(widget.url, thumbWidth: widget.thumbWidth);
+    final resolved = _resolvedUrl();
     if (resolved.isEmpty) return const SizedBox.shrink();
 
     final memHeight =
@@ -61,19 +42,17 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
         widget.width != null ? (widget.width! * 2).round().clamp(320, 1200) : 1200;
     final diskH =
         widget.height != null ? (widget.height! * 2).round().clamp(240, 1200) : 1200;
-    final needsAuth = isApiImageUrl(resolved);
 
     Widget image = CachedNetworkImage(
       imageUrl: resolved,
-      httpHeaders: needsAuth ? _headers : null,
-      cacheKey: driveImageCacheKey(widget.url),
+      cacheKey: '${driveImageCacheKey(widget.url)}:$_fallbackStep',
       height: widget.height,
       width: widget.width,
       fit: widget.fit,
       memCacheHeight: memHeight,
       maxWidthDiskCache: diskW,
       maxHeightDiskCache: diskH,
-      fadeInDuration: const Duration(milliseconds: 120),
+      fadeInDuration: const Duration(milliseconds: 150),
       fadeOutDuration: Duration.zero,
       useOldImageOnUrlChange: true,
       placeholder: (context, imageUrl) => Container(
@@ -88,24 +67,21 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
         ),
       ),
       errorWidget: (context, imageUrl, error) {
-        if (!_useFallback) {
-          final fallback = _driveFallbackUrl(widget.url);
-          if (fallback.isNotEmpty && fallback != resolved) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) setState(() => _useFallback = true);
-            });
-            return Container(
-              height: widget.height ?? 120,
-              width: widget.width,
-              alignment: Alignment.center,
-              color: AppColors.surfaceMuted,
-              child: const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            );
-          }
+        if (_fallbackStep < 2) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _fallbackStep += 1);
+          });
+          return Container(
+            height: widget.height ?? 120,
+            width: widget.width,
+            alignment: Alignment.center,
+            color: AppColors.surfaceMuted,
+            child: const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
         }
         return _errorBox(widget.height, widget.width);
       },
@@ -117,11 +93,16 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
     return image;
   }
 
-  String _driveFallbackUrl(String raw) {
-    final id = extractDriveFileId(raw);
-    if (id == null || id.isEmpty) return '';
-    final w = widget.thumbWidth.clamp(200, 1600);
-    return 'https://drive.google.com/thumbnail?id=$id&sz=w$w';
+  String _resolvedUrl() {
+    final id = extractDriveFileId(widget.url);
+    if (id == null || id.isEmpty) {
+      return widget.url.trim();
+    }
+    return switch (_fallbackStep) {
+      0 => buildDriveThumbnailUrl(id, thumbWidth: widget.thumbWidth),
+      1 => buildDriveViewUrl(id),
+      _ => buildDriveThumbnailUrl(id, thumbWidth: (widget.thumbWidth * 0.7).round()),
+    };
   }
 
   Widget _errorBox(double? height, double? width) {
@@ -150,8 +131,6 @@ Future<void> warmImageCacheUrls(
   int thumbWidth = 900,
   int maxItems = 8,
 }) async {
-  final token = await const FlutterSecureStorage().read(key: 'auth_token');
-  final headers = token == null ? null : {'Authorization': 'Bearer $token'};
   final seen = <String>{};
   final urls = <String>[];
   for (final raw in rawUrls) {
@@ -164,11 +143,7 @@ Future<void> warmImageCacheUrls(
   await Future.wait(
     urls.map((url) async {
       try {
-        if (isApiImageUrl(url) && headers != null) {
-          await DefaultCacheManager().getSingleFile(url, headers: headers);
-        } else {
-          await DefaultCacheManager().getSingleFile(url);
-        }
+        await DefaultCacheManager().getSingleFile(url);
       } catch (_) {}
     }),
   );

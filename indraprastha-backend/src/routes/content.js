@@ -131,9 +131,7 @@ function mapExplanationImageEntry(img) {
     img.image_drive_file_id || extractDriveFileId(img.image_drive_link || img.image_url);
   const links = buildDrivePublicLinks(fileId);
   const resolved =
-    buildContentImageUrl(fileId, 1000) ||
-    links.imageLink ||
-    normalizeDriveLink(img.image_url || img.image_drive_link, 'image');
+    links.imageLink || normalizeDriveLink(img.image_url || img.image_drive_link, 'image');
   return {
     ...img,
     image_drive_file_id: fileId || '',
@@ -151,18 +149,14 @@ function mapQuestionImageLink(question) {
     extractDriveFileId(question.explanation_image_link);
   const expLinks = buildDrivePublicLinks(expFileId);
   const explanationImagesList = question.explanation_images_list;
-  const proxyImage =
-    buildContentImageUrl(fileId, 1000) ||
-    normalizeDriveLink(question.question_image_link, 'image');
-  const proxyExplanation =
-    buildContentImageUrl(expFileId, 1000) ||
-    normalizeDriveLink(question.explanation_image_link, 'image');
   return {
     ...question,
     question_image_drive_file_id: fileId || '',
-    question_image_link: proxyImage || links.imageLink || '',
+    question_image_link:
+      links.imageLink || normalizeDriveLink(question.question_image_link, 'image'),
     explanation_image_drive_file_id: expFileId || '',
-    explanation_image_link: proxyExplanation || expLinks.imageLink || '',
+    explanation_image_link:
+      expLinks.imageLink || normalizeDriveLink(question.explanation_image_link, 'image'),
     explanation_images_list: Array.isArray(explanationImagesList)
       ? explanationImagesList.map(mapExplanationImageEntry)
       : explanationImagesList,
