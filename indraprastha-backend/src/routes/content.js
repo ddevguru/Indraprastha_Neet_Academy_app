@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const https = require('https');
 const pdfParse = require('pdf-parse');
 const { pool } = require('../db');
 const {
@@ -13,11 +14,73 @@ const {
 
 const router = express.Router();
 
+const imageByteCache = new Map();
+const IMAGE_CACHE_TTL_MS = 60 * 60 * 1000;
+const API_PUBLIC_BASE_URL =
+  process.env.API_PUBLIC_BASE_URL || 'https://api.indraprasthaneetacademy.com/api';
+
 router.use((_req, res, next) => {
   // Small private cache window improves app responsiveness on back-navigation.
   res.setHeader('Cache-Control', 'private, max-age=20, stale-while-revalidate=40');
   next();
 });
+
+function buildContentImageUrl(fileId, width = 1000) {
+  if (!fileId) return '';
+  const w = Math.min(Math.max(Number(width) || 1000, 200), 1600);
+  return `${API_PUBLIC_BASE_URL}/content/images/${fileId}?w=${w}`;
+}
+
+async function loadContentScope(req) {
+  if (req.contentScope) return req.contentScope;
+  const result = await pool.query(
+    `SELECT u.batch_id, b.class_label
+     FROM users u
+     LEFT JOIN batches b ON b.id = u.batch_id
+     WHERE u.id = $1`,
+    [req.user.id]
+  );
+  req.contentScope = {
+    batchId: result.rows[0]?.batch_id ?? null,
+    classLabel: (result.rows[0]?.class_label || '').toString().trim(),
+  };
+  return req.contentScope;
+}
+
+function fetchUrlBuffer(url, redirectCount = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirectCount > 5) {
+      reject(new Error('Too many redirects'));
+      return;
+    }
+    https
+      .get(url, { headers: { 'User-Agent': 'Indraprastha-ImageProxy/1.0' } }, (response) => {
+        if (
+          response.statusCode >= 300 &&
+          response.statusCode < 400 &&
+          response.headers.location
+        ) {
+          fetchUrlBuffer(response.headers.location, redirectCount + 1)
+            .then(resolve)
+            .catch(reject);
+          return;
+        }
+        if (response.statusCode !== 200) {
+          reject(new Error(`Image fetch failed (${response.statusCode})`));
+          return;
+        }
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => {
+          resolve({
+            buffer: Buffer.concat(chunks),
+            contentType: response.headers['content-type'] || 'image/jpeg',
+          });
+        });
+      })
+      .on('error', reject);
+  });
+}
 
 async function userAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
@@ -68,7 +131,9 @@ function mapExplanationImageEntry(img) {
     img.image_drive_file_id || extractDriveFileId(img.image_drive_link || img.image_url);
   const links = buildDrivePublicLinks(fileId);
   const resolved =
-    links.imageLink || normalizeDriveLink(img.image_url || img.image_drive_link, 'image');
+    buildContentImageUrl(fileId, 1000) ||
+    links.imageLink ||
+    normalizeDriveLink(img.image_url || img.image_drive_link, 'image');
   return {
     ...img,
     image_drive_file_id: fileId || '',
@@ -86,14 +151,18 @@ function mapQuestionImageLink(question) {
     extractDriveFileId(question.explanation_image_link);
   const expLinks = buildDrivePublicLinks(expFileId);
   const explanationImagesList = question.explanation_images_list;
+  const proxyImage =
+    buildContentImageUrl(fileId, 1000) ||
+    normalizeDriveLink(question.question_image_link, 'image');
+  const proxyExplanation =
+    buildContentImageUrl(expFileId, 1000) ||
+    normalizeDriveLink(question.explanation_image_link, 'image');
   return {
     ...question,
     question_image_drive_file_id: fileId || '',
-    question_image_link:
-      links.imageLink || normalizeDriveLink(question.question_image_link, 'image'),
+    question_image_link: proxyImage || links.imageLink || '',
     explanation_image_drive_file_id: expFileId || '',
-    explanation_image_link:
-      expLinks.imageLink || normalizeDriveLink(question.explanation_image_link, 'image'),
+    explanation_image_link: proxyExplanation || expLinks.imageLink || '',
     explanation_images_list: Array.isArray(explanationImagesList)
       ? explanationImagesList.map(mapExplanationImageEntry)
       : explanationImagesList,
@@ -158,6 +227,94 @@ async function ensureChapterExtracted(chapter) {
   }
 }
 
+router.get('/images/:fileId', userAuth, async (req, res) => {
+  try {
+    const fileId =
+      extractDriveFileId(req.params.fileId) || String(req.params.fileId || '').trim();
+    const width = Math.min(Math.max(parseInt(req.query.w, 10) || 900, 200), 1600);
+    if (!fileId) {
+      return res.status(400).json({ error: 'Invalid image id' });
+    }
+
+    const cacheKey = `${fileId}:${width}`;
+    const cached = imageByteCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < IMAGE_CACHE_TTL_MS) {
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('Cache-Control', 'private, max-age=86400, stale-while-revalidate=604800');
+      return res.send(cached.buffer);
+    }
+
+    const thumbUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`;
+    let payload = null;
+    try {
+      payload = await fetchUrlBuffer(thumbUrl);
+    } catch (_) {
+      const buffer = await downloadDriveFileBuffer(fileId);
+      if (!buffer.length) {
+        return res.status(404).json({ error: 'Image not found' });
+      }
+      payload = { buffer, contentType: 'image/jpeg' };
+    }
+
+    imageByteCache.set(cacheKey, {
+      buffer: payload.buffer,
+      contentType: payload.contentType,
+      at: Date.now(),
+    });
+    res.setHeader('Content-Type', payload.contentType);
+    res.setHeader('Cache-Control', 'private, max-age=86400, stale-while-revalidate=604800');
+    return res.send(payload.buffer);
+  } catch (e) {
+    return res.status(500).json({ error: e.message || 'Image proxy failed' });
+  }
+});
+
+router.get('/filters', userAuth, async (req, res) => {
+  const scope = await loadContentScope(req);
+  const batchId = scope.batchId;
+  const classLabel = scope.classLabel;
+  const params = [batchId, classLabel];
+  const batchClause = batchId == null ? 'TRUE' : 'batch_id = $1';
+  const classClause =
+    classLabel === ''
+      ? 'TRUE'
+      : `(class_label IS NULL OR class_label = '' OR LOWER(class_label) = LOWER($2))`;
+
+  const [subjects, topics, categories] = await Promise.all([
+    pool.query(
+      `SELECT DISTINCT subject FROM (
+         SELECT subject FROM books WHERE ${batchClause} AND ${classClause} AND subject <> ''
+         UNION SELECT subject FROM practice_sets WHERE ${batchClause} AND ${classClause} AND subject <> ''
+         UNION SELECT subject FROM tests WHERE ${batchClause} AND ${classClause} AND subject <> ''
+       ) s ORDER BY subject ASC`,
+      params
+    ),
+    pool.query(
+      `SELECT DISTINCT topic FROM (
+         SELECT topic FROM books WHERE ${batchClause} AND ${classClause} AND topic <> ''
+         UNION SELECT topic FROM practice_sets WHERE ${batchClause} AND ${classClause} AND topic <> ''
+         UNION SELECT topic FROM tests WHERE ${batchClause} AND ${classClause} AND topic <> ''
+       ) t ORDER BY topic ASC`,
+      params
+    ),
+    pool.query(
+      `SELECT DISTINCT category FROM tests
+       WHERE ${batchClause} AND ${classClause} AND category <> ''
+       ORDER BY category ASC`,
+      params
+    ),
+  ]);
+
+  return res.json({
+    success: true,
+    batchId,
+    classLabel,
+    subjects: subjects.rows.map((r) => r.subject).filter(Boolean),
+    topics: topics.rows.map((r) => r.topic).filter(Boolean),
+    testCategories: categories.rows.map((r) => r.category).filter(Boolean),
+  });
+});
+
 router.get('/course', userAuth, async (req, res) => {
   const result = await pool.query(
     `SELECT c.id, c.name, b.id AS batch_id, b.name AS batch_name, b.target_year, b.class_label
@@ -171,15 +328,18 @@ router.get('/course', userAuth, async (req, res) => {
 });
 
 router.get('/books', userAuth, async (req, res) => {
+  const scope = await loadContentScope(req);
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
   const books = await pool.query(
     `SELECT bk.id, bk.title, bk.subject, bk.topic, bk.level, bk.category, bk.class_label
      FROM books bk
-     WHERE ($1 = '' OR bk.subject = $1)
-       AND ($2 = '' OR bk.topic = $2)
+     WHERE ($1::int IS NULL OR bk.batch_id = $1)
+       AND ($2 = '' OR bk.class_label IS NULL OR bk.class_label = '' OR LOWER(bk.class_label) = LOWER($2))
+       AND ($3 = '' OR bk.subject = $3)
+       AND ($4 = '' OR bk.topic = $4)
      ORDER BY id DESC`,
-    [subject, topic]
+    [scope.batchId, scope.classLabel, subject, topic]
   );
   res.json({ success: true, books: books.rows });
 });
@@ -256,6 +416,7 @@ router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
 });
 
 router.get('/practice-sets', userAuth, async (req, res) => {
+  const scope = await loadContentScope(req);
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
   const result = await pool.query(
@@ -263,10 +424,12 @@ router.get('/practice-sets', userAuth, async (req, res) => {
         (SELECT COUNT(*)::int FROM practice_questions pq WHERE pq.practice_set_id = ps.id) AS question_count
      FROM practice_sets ps
      WHERE (ps.source_type IS NULL OR ps.source_type = 'topic_mcq')
-       AND ($1 = '' OR ps.subject = $1)
-       AND ($2 = '' OR ps.topic = $2)
+       AND ($1::int IS NULL OR ps.batch_id = $1)
+       AND ($2 = '' OR ps.class_label IS NULL OR ps.class_label = '' OR LOWER(ps.class_label) = LOWER($2))
+       AND ($3 = '' OR ps.subject = $3)
+       AND ($4 = '' OR ps.topic = $4)
      ORDER BY id DESC`,
-    [subject, topic]
+    [scope.batchId, scope.classLabel, subject, topic]
   );
   res.json({ success: true, practiceSets: result.rows });
 });
@@ -313,8 +476,10 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
 });
 
 router.get('/tests', userAuth, async (req, res) => {
+  const scope = await loadContentScope(req);
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
+  const category = req.query.category?.toString() || '';
   const result = await pool.query(
     `SELECT t.id, t.title, t.category, t.subject, t.topic, t.class_label, t.duration_minutes, t.marks, t.question_count, t.syllabus_coverage, t.schedule_label,
         (ta.id IS NOT NULL) AS is_completed,
@@ -323,14 +488,17 @@ router.get('/tests', userAuth, async (req, res) => {
      LEFT JOIN LATERAL (
        SELECT id, score
        FROM test_attempts
-       WHERE user_id = $3 AND test_id = t.id
+       WHERE user_id = $5 AND test_id = t.id
        ORDER BY attempted_at DESC
        LIMIT 1
      ) ta ON true
-     WHERE ($1 = '' OR t.subject = $1)
-       AND ($2 = '' OR t.topic = $2)
+     WHERE ($1::int IS NULL OR t.batch_id = $1)
+       AND ($2 = '' OR t.class_label IS NULL OR t.class_label = '' OR LOWER(t.class_label) = LOWER($2))
+       AND ($3 = '' OR t.subject = $3)
+       AND ($4 = '' OR t.topic = $4)
+       AND ($6 = '' OR LOWER(t.category) LIKE '%' || LOWER($6) || '%')
      ORDER BY id DESC`,
-    [subject, topic, req.user.id]
+    [scope.batchId, scope.classLabel, subject, topic, req.user.id, category]
   );
   res.json({ success: true, tests: result.rows });
 });
@@ -378,29 +546,37 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
 });
 
 router.get('/videos', userAuth, async (req, res) => {
+  const scope = await loadContentScope(req);
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
   const result = await pool.query(
     `SELECT v.id, v.title, v.subject, v.topic, v.class_label, v.chapter_hint, v.section_label, v.duration_label, v.drive_link
      FROM videos v
-     WHERE ($1 = '' OR v.subject = $1)
-       AND ($2 = '' OR v.topic = $2)
+     WHERE ($1::int IS NULL OR v.batch_id = $1)
+       AND ($2 = '' OR v.class_label IS NULL OR v.class_label = '' OR LOWER(v.class_label) = LOWER($2))
+       AND ($3 = '' OR v.subject = $3)
+       AND ($4 = '' OR v.topic = $4)
      ORDER BY id DESC`,
-    [subject, topic]
+    [scope.batchId, scope.classLabel, subject, topic]
   );
   res.json({ success: true, videos: result.rows });
 });
 
 router.get('/mcqs', userAuth, async (req, res) => {
   try {
+    const scope = await loadContentScope(req);
     const result = await pool.query(
       `SELECT id, subject, topic, question,
               option_a, option_b, option_c, option_d, correct_option,
               explanation, question_image_link, question_image_drive_file_id,
               created_at, is_active
        FROM daily_mcqs
+       WHERE is_active = TRUE
+         AND ($1::int IS NULL OR batch_id = $1)
+         AND ($2 = '' OR class_label IS NULL OR class_label = '' OR LOWER(class_label) = LOWER($2))
        ORDER BY created_at DESC
-       LIMIT 100`
+       LIMIT 100`,
+      [scope.batchId, scope.classLabel]
     );
     res.json({ success: true, mcqs: result.rows.map(mapQuestionImageLink) });
   } catch (e) {

@@ -31,6 +31,16 @@ const upload = multer({
 });
 
 const UPLOAD_ROOT = path.join(os.tmpdir(), 'indra_uploads');
+const batchNameCache = new Map();
+
+async function getBatchName(batchId) {
+  if (batchNameCache.has(batchId)) return batchNameCache.get(batchId);
+  const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [batchId]);
+  const name = batchRes.rows[0]?.name || `Batch-${batchId}`;
+  batchNameCache.set(batchId, name);
+  return name;
+}
+
 function ensureUploadRoot() {
   try {
     fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
@@ -172,8 +182,7 @@ async function uploadQuestionImageByHierarchy({
   contentType,
   contentId,
 }) {
-  const batchRes = await pool.query('SELECT name FROM batches WHERE id = $1', [batchId]);
-  const batchName = batchRes.rows[0]?.name || `Batch-${batchId}`;
+  const batchName = await getBatchName(batchId);
   const idSegment =
     contentType && contentId ? `${String(contentType).toUpperCase()}-${contentId}` : '';
   const resolvedFolderId = await ensureDriveFolderPath({

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/utils/package_utils.dart';
 import '../../core/utils/payment_utils.dart';
+import '../../core/providers/subscription_providers.dart';
 import '../../models/app_models.dart';
 import '../content/data/content_repository.dart';
 import '../../theme/app_tokens.dart';
@@ -20,20 +21,7 @@ class SubscriptionsScreen extends ConsumerStatefulWidget {
 }
 
 class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
-  late Future<List<Map<String, dynamic>>> _plansFuture;
   bool _checkoutInFlight = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _reloadPlans();
-  }
-
-  void _reloadPlans() {
-    setState(() {
-      _plansFuture = ContentRepository().fetchPackages();
-    });
-  }
 
   Future<void> _startCheckout(
     BuildContext context,
@@ -81,13 +69,18 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
         final planName = verifyResult['subscription'] is Map
             ? (verifyResult['subscription'] as Map)['plan_name']?.toString()
             : null;
-        await ref.read(authBlocProvider).refreshProfile();
+        final resolvedPlan = (planName?.isNotEmpty == true ? planName! : plan.name);
+        ref.read(appUiControllerProvider.notifier).activateSubscription(resolvedPlan);
+        for (var attempt = 0; attempt < 3; attempt++) {
+          await ref.read(authBlocProvider).refreshProfile();
+          if (ref.read(appUiControllerProvider).hasActiveSubscription) break;
+          await Future<void>.delayed(Duration(seconds: 1 + attempt));
+        }
+        ContentRepository.clearCache();
         if (!context.mounted) return;
         messenger.showSnackBar(
           SnackBar(
-            content: Text(
-              '${planName?.isNotEmpty == true ? planName : plan.name} activated successfully.',
-            ),
+            content: Text('$resolvedPlan activated successfully.'),
           ),
         );
         context.go('/dashboard/0');
@@ -112,15 +105,20 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ui = ref.watch(appUiControllerProvider);
-    final activePlan = ui.selectedPlan;
+    final hasActiveSubscription = ref.watch(
+      appUiControllerProvider.select((s) => s.hasActiveSubscription),
+    );
+    final activePlan = ref.watch(
+      appUiControllerProvider.select((s) => s.selectedPlan),
+    );
+    final packagesAsync = ref.watch(subscriptionPackagesProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Subscriptions')),
       body: RefreshIndicator(
         onRefresh: () async {
-          _reloadPlans();
-          await _plansFuture;
+          ref.invalidate(subscriptionPackagesProvider);
+          await ref.read(subscriptionPackagesProvider.future);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -136,37 +134,26 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                       'Secure payment via Razorpay. After payment, your subscription activates automatically.',
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                FutureBuilder<List<Map<String, dynamic>>>(
-                  future: _plansFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const SkeletonLoader(cardCount: 2);
-                    }
-                    if (snapshot.hasError) {
-                      return Column(
-                        children: [
-                          EmptyStateWidget(
-                            title: 'Plans load nahi ho paaye',
-                            subtitle: snapshot.error.toString(),
-                            icon: Icons.error_outline_rounded,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          PrimaryButton(
-                            label: 'Retry',
-                            expanded: true,
-                            icon: Icons.refresh_rounded,
-                            onPressed: _reloadPlans,
-                          ),
-                        ],
-                      );
-                    }
-
-                    final allRawPlans = snapshot.data ?? const [];
-                    final starterPlans =
-                        allRawPlans.where(isStarterPackage).toList();
-                    final entries =
-                        starterPlans.map(subscriptionPlanFromApi).toList();
-
+                packagesAsync.when(
+                  loading: () => const SkeletonLoader(cardCount: 2),
+                  error: (error, _) => Column(
+                    children: [
+                      EmptyStateWidget(
+                        title: 'Plans load nahi ho paaye',
+                        subtitle: error.toString(),
+                        icon: Icons.error_outline_rounded,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      PrimaryButton(
+                        label: 'Retry',
+                        expanded: true,
+                        icon: Icons.refresh_rounded,
+                        onPressed: () =>
+                            ref.invalidate(subscriptionPackagesProvider),
+                      ),
+                    ],
+                  ),
+                  data: (entries) {
                     if (entries.isEmpty) {
                       return Column(
                         children: [
@@ -181,7 +168,8 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                             label: 'Refresh',
                             expanded: true,
                             icon: Icons.refresh_rounded,
-                            onPressed: _reloadPlans,
+                            onPressed: () =>
+                                ref.invalidate(subscriptionPackagesProvider),
                           ),
                         ],
                       );
@@ -195,10 +183,13 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                                 const EdgeInsets.only(bottom: AppSpacing.md),
                             child: PlanCard(
                               plan: entry.plan,
-                              active: ui.hasActiveSubscription &&
+                              active: hasActiveSubscription &&
                                   activePlan == entry.plan.name,
                               onSelect: () => _startCheckout(
-                                  context, entry.raw, entry.plan),
+                                context,
+                                entry.raw,
+                                entry.plan,
+                              ),
                             ),
                           ),
                       ],

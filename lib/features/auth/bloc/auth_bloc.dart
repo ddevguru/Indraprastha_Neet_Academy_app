@@ -109,14 +109,17 @@ class AuthBloc extends Cubit<AuthState> {
   }
 
   /// Refresh profile/subscription from backend (e.g. after payment).
-  Future<void> refreshProfile() async {
+  Future<bool> refreshProfile() async {
     final token = state.token;
-    if (token == null) return;
+    if (token == null) return false;
     try {
       final latestUser = await _repository.fetchMe(token);
       await _repository.saveSession(token: token, user: latestUser);
       emit(state.copyWith(user: latestUser));
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> markOnboardingSeen() async {

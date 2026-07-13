@@ -35,6 +35,7 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
   bool _processing = false;
   bool _completed = false;
   bool _checkoutOpened = false;
+  bool _userCancelled = false;
   String? _error;
 
   @override
@@ -44,7 +45,9 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handleSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handleError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _openCheckout());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_userCancelled) _openCheckout();
+    });
   }
 
   @override
@@ -88,17 +91,28 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
     String? razorpayOrderId,
     String? razorpaySignature,
   }) async {
-    final result = await ContentRepository().verifyPayment(
-      orderId: widget.orderId,
-      razorpayPaymentId: razorpayPaymentId,
-      razorpayOrderId: razorpayOrderId,
-      razorpaySignature: razorpaySignature,
-    );
-    if (isPaymentVerified(result)) return result;
-    throw Exception(
-      result['error']?.toString() ??
-          'Payment verification failed. Please try confirm payment.',
-    );
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final result = await ContentRepository().verifyPayment(
+          orderId: widget.orderId,
+          razorpayPaymentId: razorpayPaymentId,
+          razorpayOrderId: razorpayOrderId,
+          razorpaySignature: razorpaySignature,
+        );
+        if (isPaymentVerified(result)) return result;
+        lastError = Exception(
+          result['error']?.toString() ??
+              'Payment verification failed. Please try confirm payment.',
+        );
+      } catch (e) {
+        lastError = e;
+      }
+      if (attempt < 2) {
+        await Future<void>.delayed(Duration(seconds: 1 + attempt));
+      }
+    }
+    throw lastError ?? Exception('Payment verification failed');
   }
 
   Future<void> _confirmPaidAndExit(Map<String, dynamic> result) async {
@@ -170,6 +184,7 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
     if (_processing) return;
     setState(() {
       _checkoutOpened = false;
+      _userCancelled = true;
       _error = response.message ?? 'Payment cancelled or failed.';
       _processing = false;
     });
@@ -207,7 +222,9 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
                     Text(
                       _processing
                           ? 'Verifying payment...'
-                          : 'Razorpay checkout should open automatically.',
+                          : _userCancelled
+                              ? 'Payment cancel ho gaya. Retry dabayein ya wapas jayein.'
+                              : 'Razorpay checkout open karne ke liye "Retry Razorpay" dabayein.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
@@ -238,7 +255,11 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
                 onPressed: _processing || _completed
                     ? null
                     : () {
-                        _checkoutOpened = false;
+                        setState(() {
+                          _checkoutOpened = false;
+                          _userCancelled = false;
+                          _error = null;
+                        });
                         _openCheckout();
                       },
               ),

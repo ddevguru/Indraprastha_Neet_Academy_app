@@ -15,13 +15,18 @@ class ContentRepository {
   static final Map<String, ({DateTime at, Map<String, dynamic> data})> _cache = {};
   static const Duration _cacheTtl = Duration(minutes: 5);
 
+  static void clearCache() => _cache.clear();
+
   Future<String?> get _token async => _secureStorage.read(key: 'auth_token');
 
   Future<Map<String, dynamic>> fetchCourse() =>
       _get('/content/course');
 
-  Future<List<Map<String, dynamic>>> fetchBooks() async {
-    final data = await _get('/content/books');
+  Future<List<Map<String, dynamic>>> fetchBooks({
+    String? subject,
+    String? topic,
+  }) async {
+    final data = await _get(_scopedPath('/content/books', subject: subject, topic: topic));
     return List<Map<String, dynamic>>.from(data['books'] as List<dynamic>);
   }
 
@@ -35,8 +40,13 @@ class ContentRepository {
     return List<Map<String, dynamic>>.from(data['pyqs'] as List<dynamic>);
   }
 
-  Future<List<Map<String, dynamic>>> fetchPracticeSets() async {
-    final data = await _get('/content/practice-sets');
+  Future<List<Map<String, dynamic>>> fetchPracticeSets({
+    String? subject,
+    String? topic,
+  }) async {
+    final data = await _get(
+      _scopedPath('/content/practice-sets', subject: subject, topic: topic),
+    );
     return List<Map<String, dynamic>>.from(
       data['practiceSets'] as List<dynamic>,
     );
@@ -48,10 +58,26 @@ class ContentRepository {
   Future<Map<String, dynamic>> fetchPracticeAttemptData(int setId) =>
       _get('/content/practice-sets/$setId/questions');
 
-  Future<List<Map<String, dynamic>>> fetchTests() async {
-    final data = await _get('/content/tests');
+  Future<List<Map<String, dynamic>>> fetchTests({
+    String? subject,
+    String? topic,
+    String? category,
+  }) async {
+    final data = await _get(
+      _scopedPath(
+        '/content/tests',
+        subject: subject,
+        topic: topic,
+        extra: category == null || category.isEmpty
+            ? null
+            : {'category': category},
+      ),
+    );
     return List<Map<String, dynamic>>.from(data['tests'] as List<dynamic>);
   }
+
+  Future<Map<String, dynamic>> fetchContentFilters() =>
+      _get('/content/filters');
 
   Future<Map<String, dynamic>> fetchTestQuestions(int testId) =>
       _get('/content/tests/$testId/questions');
@@ -196,6 +222,31 @@ class ContentRepository {
     } catch (_) {
       return 0;
     }
+  }
+
+  String _scopedPath(
+    String path, {
+    String? subject,
+    String? topic,
+    Map<String, String>? extra,
+  }) {
+    final params = <String, String>{};
+    if (subject != null && subject.trim().isNotEmpty) {
+      params['subject'] = subject.trim();
+    }
+    if (topic != null && topic.trim().isNotEmpty) {
+      params['topic'] = topic.trim();
+    }
+    if (extra != null) {
+      extra.forEach((key, value) {
+        if (value.trim().isNotEmpty) params[key] = value.trim();
+      });
+    }
+    if (params.isEmpty) return path;
+    final query = params.entries
+        .map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}')
+        .join('&');
+    return '$path?$query';
   }
 
   Future<Map<String, dynamic>> _get(

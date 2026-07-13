@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/providers/app_state.dart';
+import '../features/auth/bloc/auth_bloc.dart';
 import '../features/analytics/analytics_screen.dart';
 import '../features/auth/auth_screens.dart';
 import '../features/auth/apple_signup_complete_screen.dart';
@@ -62,7 +63,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
   final router = GoRouter(
     initialLocation: '/',
-    refreshListenable: GoRouterRefreshStream(authBloc.stream),
+    refreshListenable: GoRouterAuthRefreshStream(authBloc.stream),
     redirect: redirect,
     routes: [
       GoRoute(
@@ -177,9 +178,45 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 
-  ref.listen(appUiControllerProvider, (previous, next) => router.refresh());
+  ref.listen(appUiControllerProvider, (previous, next) {
+    if (previous?.hasActiveSubscription != next.hasActiveSubscription) {
+      router.refresh();
+    }
+  });
   return router;
 });
+
+/// Only refresh routing when login or subscription status actually changes.
+/// Avoids rebuilding /subscriptions on every auth loading tick.
+class GoRouterAuthRefreshStream extends ChangeNotifier {
+  GoRouterAuthRefreshStream(Stream<AuthState> stream) {
+    _subscription = stream.listen(_onAuthState);
+  }
+
+  late final StreamSubscription<AuthState> _subscription;
+  bool _loggedIn = false;
+  String _phone = '';
+  bool _subscribed = false;
+
+  void _onAuthState(AuthState state) {
+    final loggedIn = state.isLoggedIn;
+    final phone = state.user?.mobileNumber ?? '';
+    final subscribed = state.user?.hasActiveSubscription ?? false;
+    if (_loggedIn == loggedIn && _phone == phone && _subscribed == subscribed) {
+      return;
+    }
+    _loggedIn = loggedIn;
+    _phone = phone;
+    _subscribed = subscribed;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
 
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Stream<dynamic> stream) {

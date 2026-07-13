@@ -243,8 +243,10 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   }
 
   Future<void> _guardAccess() async {
+    final authUser = ref.read(authBlocProvider).state.user;
     final hasSubscription =
-        ref.read(appUiControllerProvider).hasActiveSubscription;
+        ref.read(appUiControllerProvider).hasActiveSubscription ||
+            (authUser?.hasActiveSubscription ?? false);
     if (hasSubscription || !mounted) return;
     final sets = await ContentRepository().fetchPracticeSets();
     if (!mounted) return;

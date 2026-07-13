@@ -30,29 +30,28 @@ String _formatTestScoreLabel(Map<String, dynamic> test) {
 }
 
 String _normalizedTestCategory(Map<String, dynamic> test) {
-  final category = (test['category']?.toString() ?? '').toLowerCase();
+  final category = (test['category']?.toString() ?? '').toLowerCase().trim();
   final title = (test['title']?.toString() ?? '').toLowerCase();
   final topic = (test['topic']?.toString() ?? '').toLowerCase();
-  final subject = (test['subject']?.toString() ?? '').toLowerCase();
-  final keywords = '$category $title';
+  final keywords = '$category $title $topic';
 
-  if (keywords.contains('student')) {
-    return 'subject';
-  }
-  if (keywords.contains('subject')) {
-    return 'subject';
+  if (keywords.contains('grand') || keywords.contains('full syllabus')) {
+    return 'grand';
   }
   if (keywords.contains('chapter') || keywords.contains('topic')) {
     return 'chapter';
   }
-  if (keywords.contains('grand') || keywords.contains('full syllabus')) {
+  if (keywords.contains('subject')) {
+    return 'subject';
+  }
+
+  // Respect explicit DB category values from admin panel.
+  if (category.isNotEmpty) {
+    if (category.contains('chapter')) return 'chapter';
+    if (category.contains('subject')) return 'subject';
     return 'grand';
   }
 
-  // Legacy admin entries sometimes missed the category field. Infer a best-effort
-  // type from the title/topic so filters still work for already-created tests.
-  if (subject.isNotEmpty) return 'subject';
-  if (topic.isNotEmpty) return 'chapter';
   return 'grand';
 }
 

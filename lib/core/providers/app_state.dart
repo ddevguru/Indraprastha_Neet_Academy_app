@@ -90,9 +90,13 @@ class AppUiController extends Notifier<AppUiState> {
 
   /// Sync from backend `/me` or login payload.
   void syncSubscriptionStatus(bool active, {String? planName}) {
+    final nextPlan = planName ?? state.selectedPlan;
+    if (state.hasActiveSubscription == active && state.selectedPlan == nextPlan) {
+      return;
+    }
     state = state.copyWith(
       hasActiveSubscription: active,
-      selectedPlan: planName ?? state.selectedPlan,
+      selectedPlan: nextPlan,
     );
   }
 
