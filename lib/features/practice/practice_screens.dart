@@ -17,13 +17,12 @@ import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../core/utils/drive_image_url.dart';
+import '../../core/utils/question_fields.dart';
 
-String _optionLabel(int index, String value) {
-  final key = String.fromCharCode(65 + index);
-  final text = value.trim();
-  if (text.isEmpty) return '$key) —';
-  return '$key) $text';
-}
+String _optionLabel(int index, String value) => formatOptionLabel(
+      String.fromCharCode(65 + index),
+      value,
+    );
 
 Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
@@ -297,7 +296,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
   void _checkAnswer(Map<String, dynamic> question) {
     if (_selectedOption == null) return;
-    final correctOption = (question['correct_option']?.toString() ?? 'A').toUpperCase();
+    final correctOption = readCorrectOption(question);
     final keys = ['A', 'B', 'C', 'D'];
     final selectedKey = keys[_selectedOption!.clamp(0, 3)];
     _answers[_currentIndex] = selectedKey;
@@ -452,12 +451,12 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
     final question = _questions[_currentIndex];
         final options = [
-          question['option_a']?.toString() ?? '',
-          question['option_b']?.toString() ?? '',
-          question['option_c']?.toString() ?? '',
-          question['option_d']?.toString() ?? '',
+          readQuestionOption(question, 'A'),
+          readQuestionOption(question, 'B'),
+          readQuestionOption(question, 'C'),
+          readQuestionOption(question, 'D'),
         ];
-        final correctOption = (question['correct_option']?.toString() ?? 'A').toUpperCase();
+        final correctOption = readCorrectOption(question);
         final correctIndex = ['A', 'B', 'C', 'D'].indexOf(correctOption).clamp(0, 3);
         final uiState = ref.watch(appUiControllerProvider);
         final qId = question['id'].toString();
@@ -517,13 +516,14 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          (question['question']?.toString().trim().isNotEmpty ?? false)
-                              ? question['question']!.toString()
-                              : (hasQuestionImage(question)
-                                  ? 'Question image ke neeche dekhein'
-                                  : ''),
-                          style: Theme.of(context).textTheme.titleLarge,
+                        buildQuestionTextBlock(
+                          context,
+                          question,
+                          style: questionContentTextStyle(
+                            context,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         if (hasQuestionImage(question)) ...[
                           const SizedBox(height: AppSpacing.md),
@@ -583,11 +583,12 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                 ),
                                 child: Text(
                                   _optionLabel(index, options[index]),
-                                  style: TextStyle(
-                                    color: textColor,
+                                  style: questionContentTextStyle(
+                                    context,
                                     fontWeight: selected || revealState
                                         ? FontWeight.w600
                                         : FontWeight.w400,
+                                    color: textColor,
                                   ),
                                 ),
                               ),

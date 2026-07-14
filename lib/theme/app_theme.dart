@@ -4,8 +4,37 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_tokens.dart';
 
 class AppTheme {
+  static const List<String> _fontFallbacks = [
+    'Noto Sans Devanagari',
+    'Noto Sans',
+    'Roboto',
+    'sans-serif',
+  ];
+
+  static TextTheme _withScriptFallbacks(TextTheme theme) {
+    TextStyle? s(TextStyle? style) =>
+        style?.copyWith(fontFamilyFallback: _fontFallbacks);
+    return theme.copyWith(
+      displayLarge: s(theme.displayLarge),
+      displayMedium: s(theme.displayMedium),
+      displaySmall: s(theme.displaySmall),
+      headlineLarge: s(theme.headlineLarge),
+      headlineMedium: s(theme.headlineMedium),
+      headlineSmall: s(theme.headlineSmall),
+      titleLarge: s(theme.titleLarge),
+      titleMedium: s(theme.titleMedium),
+      titleSmall: s(theme.titleSmall),
+      bodyLarge: s(theme.bodyLarge),
+      bodyMedium: s(theme.bodyMedium),
+      bodySmall: s(theme.bodySmall),
+      labelLarge: s(theme.labelLarge),
+      labelMedium: s(theme.labelMedium),
+      labelSmall: s(theme.labelSmall),
+    );
+  }
+
   static ThemeData light() {
-    final baseText = GoogleFonts.plusJakartaSansTextTheme();
+    final baseText = _withScriptFallbacks(GoogleFonts.plusJakartaSansTextTheme());
     final scheme = ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       brightness: Brightness.light,
@@ -126,8 +155,10 @@ class AppTheme {
   }
 
   static ThemeData dark() {
-    final baseText = GoogleFonts.plusJakartaSansTextTheme(
-      ThemeData(brightness: Brightness.dark).textTheme,
+    final baseText = _withScriptFallbacks(
+      GoogleFonts.plusJakartaSansTextTheme(
+        ThemeData(brightness: Brightness.dark).textTheme,
+      ),
     );
     final scheme = ColorScheme.fromSeed(
       seedColor: AppColors.primary,

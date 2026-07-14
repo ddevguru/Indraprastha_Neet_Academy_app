@@ -18,6 +18,7 @@ import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../core/utils/drive_image_url.dart';
+import '../../core/utils/question_fields.dart';
 
 Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
@@ -30,11 +31,7 @@ Widget _buildQuestionImage(String rawUrl) {
   );
 }
 
-String _optionLabel(String key, String value) {
-  final text = value.trim();
-  if (text.isEmpty) return '$key) —';
-  return '$key) $text';
-}
+String _optionLabel(String key, String value) => formatOptionLabel(key, value);
 
 class BooksScreen extends ConsumerStatefulWidget {
   const BooksScreen({super.key});
@@ -678,12 +675,7 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
 
     final q = widget.pyqs[_index.clamp(0, widget.pyqs.length - 1)];
     final selected = _answers[_index];
-    final options = <String, String>{
-      'A': q['option_a']?.toString() ?? '',
-      'B': q['option_b']?.toString() ?? '',
-      'C': q['option_c']?.toString() ?? '',
-      'D': q['option_d']?.toString() ?? '',
-    };
+    final options = readQuestionOptions(q);
 
     return SizedBox.expand(
       child: SingleChildScrollView(
@@ -702,13 +694,14 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    (q['question']?.toString().trim().isNotEmpty ?? false)
-                        ? 'Q${_index + 1}. ${q['question']}'
-                        : (hasQuestionImage(q)
-                            ? 'Q${_index + 1}. Question image dekhein'
-                            : 'Q${_index + 1}.'),
-                    style: Theme.of(context).textTheme.titleMedium,
+                  buildQuestionTextBlock(
+                    context,
+                    q,
+                    style: questionContentTextStyle(
+                      context,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   if (hasQuestionImage(q)) ...[
                     const SizedBox(height: AppSpacing.sm),
@@ -733,7 +726,10 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                               color: isSel ? AppColors.indigo : AppColors.border,
                             ),
                           ),
-                          child: Text(_optionLabel(e.key, e.value)),
+                          child: Text(
+                            _optionLabel(e.key, e.value),
+                            style: questionContentTextStyle(context),
+                          ),
                         ),
                       ),
                     );

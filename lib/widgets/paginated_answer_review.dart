@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/utils/drive_image_url.dart';
+import '../core/utils/question_fields.dart';
 import '../theme/app_tokens.dart';
 import 'app_widgets.dart';
 import 'fast_network_image.dart';
@@ -89,10 +90,10 @@ class AnswerReviewEntry {
     required int index,
     String? selectedOption,
   }) {
-    final correct = (question['correct_option']?.toString() ?? 'A').toUpperCase();
+    final correct = readCorrectOption(question);
     final keys = ['A', 'B', 'C', 'D'];
     final options = keys
-        .map((k) => question['option_${k.toLowerCase()}']?.toString() ?? '')
+        .map((k) => readQuestionOption(question, k))
         .toList();
     final correctIndex = keys.indexOf(correct).clamp(0, 3);
     final selectedIndex = selectedOption == null
@@ -100,7 +101,7 @@ class AnswerReviewEntry {
         : keys.indexOf(selectedOption.toUpperCase()).clamp(0, 3);
 
     return AnswerReviewEntry(
-      questionText: question['question']?.toString() ?? '',
+      questionText: readQuestionText(question),
       questionImageUrl: questionImageRawUrl(question).isEmpty
           ? null
           : questionImageRawUrl(question),

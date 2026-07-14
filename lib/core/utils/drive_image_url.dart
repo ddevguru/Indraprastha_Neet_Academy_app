@@ -89,6 +89,8 @@ String explanationImageRawUrl(Map<String, dynamic> data) {
 
 bool hasQuestionImage(Map<String, dynamic> question) {
   final fileId = question['question_image_drive_file_id']?.toString().trim() ?? '';
+  if (fileId.length >= 10) return true;
   final link = question['question_image_link']?.toString().trim() ?? '';
-  return fileId.isNotEmpty || link.isNotEmpty;
+  final id = extractDriveFileId(link);
+  return id != null && id.length >= 10;
 }

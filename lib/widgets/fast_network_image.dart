@@ -1,4 +1,5 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -7,7 +8,7 @@ import 'package:http/http.dart' as http;
 import '../core/utils/drive_image_url.dart';
 import '../theme/app_tokens.dart';
 
-/// Cached image widget — loads via authenticated API proxy first, then Drive fallbacks.
+/// Loads images via authenticated API proxy (preferred) with Drive fallbacks.
 class FastNetworkImage extends StatefulWidget {
   const FastNetworkImage({
     super.key,
@@ -32,75 +33,97 @@ class FastNetworkImage extends StatefulWidget {
 
 class _FastNetworkImageState extends State<FastNetworkImage> {
   static const _secureStorage = FlutterSecureStorage();
+  static final Map<String, Uint8List> _memoryCache = {};
+
   int _fallbackStep = 0;
-  Map<String, String>? _headers;
-  bool _headersLoaded = false;
+  Uint8List? _bytes;
+  bool _loading = true;
+  bool _failed = false;
 
   @override
   void initState() {
     super.initState();
-    _loadAuthHeaders();
+    _load();
   }
 
-  Future<void> _loadAuthHeaders() async {
-    final token = await _secureStorage.read(key: 'auth_token');
-    if (!mounted) return;
-    setState(() {
-      _headers = token != null && token.isNotEmpty
-          ? {'Authorization': 'Bearer $token'}
-          : {};
-      _headersLoaded = true;
-    });
+  @override
+  void didUpdateWidget(covariant FastNetworkImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url || oldWidget.thumbWidth != widget.thumbWidth) {
+      _fallbackStep = 0;
+      _bytes = null;
+      _loading = true;
+      _failed = false;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final resolved = _resolvedUrl();
+    if (resolved.isEmpty) {
+      if (mounted) setState(() { _loading = false; _failed = true; });
+      return;
+    }
+
+    final cached = _memoryCache[resolved];
+    if (cached != null) {
+      if (mounted) setState(() { _bytes = cached; _loading = false; _failed = false; });
+      return;
+    }
+
+    if (mounted) setState(() { _loading = true; _failed = false; });
+
+    try {
+      final token = await _secureStorage.read(key: 'auth_token');
+      final headers = <String, String>{};
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await http
+          .get(Uri.parse(resolved), headers: headers.isEmpty ? null : headers)
+          .timeout(const Duration(seconds: 45));
+
+      final contentType = response.headers['content-type'] ?? '';
+      if (response.statusCode == 200 &&
+          response.bodyBytes.isNotEmpty &&
+          (contentType.contains('image') || !contentType.contains('json'))) {
+        _memoryCache[resolved] = response.bodyBytes;
+        if (mounted) {
+          setState(() {
+            _bytes = response.bodyBytes;
+            _loading = false;
+            _failed = false;
+          });
+        }
+        return;
+      }
+    } catch (_) {}
+
+    if (_fallbackStep < 2 && mounted) {
+      setState(() {
+        _fallbackStep += 1;
+        _loading = true;
+      });
+      await _load();
+      return;
+    }
+
+    if (mounted) setState(() { _loading = false; _failed = true; });
   }
 
   @override
   Widget build(BuildContext context) {
-    final resolved = _resolvedUrl();
-    if (resolved.isEmpty) return const SizedBox.shrink();
+    if (_loading) return _loadingBox();
+    if (_failed || _bytes == null) return _errorBox();
 
-    final needsAuth = isApiImageUrl(resolved);
-    if (needsAuth && !_headersLoaded) {
-      return _loadingBox();
-    }
-    if (needsAuth && (_headers == null || _headers!['Authorization'] == null)) {
-      if (_fallbackStep < 2) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _fallbackStep += 1);
-        });
-        return _loadingBox();
-      }
-    }
-
-    final memHeight =
-        widget.height != null ? (widget.height! * 1.5).round().clamp(160, 900) : 600;
-    final diskW =
-        widget.width != null ? (widget.width! * 2).round().clamp(320, 1200) : 1200;
-    final diskH =
-        widget.height != null ? (widget.height! * 2).round().clamp(240, 1200) : 1200;
-
-    Widget image = CachedNetworkImage(
-      imageUrl: resolved,
-      cacheKey: '${driveImageCacheKey(widget.url)}:$_fallbackStep',
-      httpHeaders: needsAuth ? _headers : null,
+    Widget image = Image.memory(
+      _bytes!,
       height: widget.height,
       width: widget.width,
       fit: widget.fit,
-      memCacheHeight: memHeight,
-      maxWidthDiskCache: diskW,
-      maxHeightDiskCache: diskH,
-      fadeInDuration: const Duration(milliseconds: 150),
-      fadeOutDuration: Duration.zero,
-      useOldImageOnUrlChange: true,
-      placeholder: (context, imageUrl) => _loadingBox(),
-      errorWidget: (context, imageUrl, error) {
-        if (_fallbackStep < 2) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _fallbackStep += 1);
-          });
-          return _loadingBox();
-        }
-        return _errorBox(widget.height, widget.width);
-      },
+      gaplessPlayback: true,
+      errorBuilder: (_, __, ___) => _errorBox(),
     );
 
     if (widget.borderRadius != null) {
@@ -137,10 +160,10 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
     );
   }
 
-  Widget _errorBox(double? height, double? width) {
+  Widget _errorBox() {
     return Container(
-      height: height ?? 120,
-      width: width,
+      height: widget.height ?? 120,
+      width: widget.width,
       alignment: Alignment.center,
       color: AppColors.surfaceMuted,
       child: const Text('Image unavailable', style: TextStyle(fontSize: 12)),
@@ -169,23 +192,19 @@ Future<void> warmImageCacheUrls(
       : null;
 
   final seen = <String>{};
-  final urls = <String>[];
   for (final raw in rawUrls) {
     final resolved = resolveDriveImageUrl(raw, thumbWidth: thumbWidth);
     if (resolved.isEmpty || !seen.add(resolved)) continue;
-    urls.add(resolved);
-    if (urls.length >= maxItems) break;
-  }
-
-  await Future.wait(
-    urls.map((url) async {
-      try {
-        if (isApiImageUrl(url) && headers != null) {
-          await http.get(Uri.parse(url), headers: headers);
-        } else {
-          await DefaultCacheManager().getSingleFile(url);
+    try {
+      if (isApiImageUrl(resolved) && headers != null) {
+        final res = await http.get(Uri.parse(resolved), headers: headers);
+        if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+          _FastNetworkImageState._memoryCache[resolved] = res.bodyBytes;
         }
-      } catch (_) {}
-    }),
-  );
+      } else {
+        await DefaultCacheManager().getSingleFile(resolved);
+      }
+    } catch (_) {}
+    if (seen.length >= maxItems) break;
+  }
 }

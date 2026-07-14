@@ -14,6 +14,7 @@ import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../core/utils/drive_image_url.dart';
+import '../../core/utils/question_fields.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 
@@ -106,11 +107,7 @@ Widget _buildQuestionImage(String rawUrl) {
   );
 }
 
-String _optionLabel(String key, String value) {
-  final text = value.trim();
-  if (text.isEmpty) return '$key) —';
-  return '$key) $text';
-}
+String _optionLabel(String key, String value) => formatOptionLabel(key, value);
 
 class TestsScreen extends ConsumerStatefulWidget {
   const TestsScreen({super.key});
@@ -128,6 +125,8 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
     'Grand tests',
     'Subject tests',
     'Chapter tests',
+    'Upcoming',
+    'Completed',
   ];
 
   @override
@@ -146,13 +145,24 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
     if (_activeFilter == null) return tests;
     return tests.where((t) {
       final category = _normalizedTestCategory(t);
+      final isCompleted = _isTestCompleted(t);
       return switch (_activeFilter) {
         'Grand tests' => category == 'grand',
         'Subject tests' => category == 'subject',
         'Chapter tests' => category == 'chapter',
+        'Upcoming' => !isCompleted,
+        'Completed' => isCompleted,
         _ => true,
       };
     }).toList();
+  }
+
+  bool _isTestCompleted(Map<String, dynamic> test) {
+    final value = test['is_completed'];
+    if (value == true) return true;
+    if (value is num) return value != 0;
+    final text = value?.toString().toLowerCase().trim() ?? '';
+    return text == 'true' || text == 't' || text == '1';
   }
 
   String _sectionTitle() {
@@ -160,6 +170,8 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
       'Grand tests' => 'Grand tests',
       'Subject tests' => 'Subject tests',
       'Chapter tests' => 'Chapter tests',
+      'Upcoming' => 'Upcoming tests',
+      'Completed' => 'Completed tests',
       _ => 'All tests',
     };
   }
@@ -169,7 +181,9 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
       'Grand tests' => 'Full-syllabus grand mock tests.',
       'Subject tests' => 'Subject-wise mock tests.',
       'Chapter tests' => 'Chapter-wise tests for focused practice.',
-      _ => 'Grand tests, subject tests, and chapter tests.',
+      'Upcoming' => 'Tests you have not attempted yet.',
+      'Completed' => 'Review your submitted tests and scores.',
+      _ => 'Grand tests, subject tests, chapter tests, and more.',
     };
   }
 
@@ -186,7 +200,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
             const SectionHeader(
               title: 'Test series',
               subtitle:
-                  'Grand tests, subject tests, and chapter-wise mock tests.',
+                  'Grand tests, subject tests, chapter tests, upcoming, and completed.',
             ),
             if (!hasSubscription) ...[
               const SizedBox(height: AppSpacing.md),
@@ -482,6 +496,18 @@ class _TestResultScreenState extends State<TestResultScreen> {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
         }
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Test')),
+            body: Center(
+              child: EmptyStateWidget(
+                title: 'Questions load nahi hue',
+                subtitle: snapshot.error.toString(),
+                icon: Icons.wifi_off_rounded,
+              ),
+            ),
+          );
+        }
         final test = Map<String, dynamic>.from(
             snapshot.data?['test'] as Map? ?? const {});
         final questions = List<Map<String, dynamic>>.from(
@@ -515,12 +541,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
         }
         final q = questions[_index.clamp(0, questions.length - 1)];
         final selected = _answers[_index];
-        final options = <String, String>{
-          'A': q['option_a']?.toString() ?? '',
-          'B': q['option_b']?.toString() ?? '',
-          'C': q['option_c']?.toString() ?? '',
-          'D': q['option_d']?.toString() ?? '',
-        };
+        final options = readQuestionOptions(q);
         if (_submitted) {
           final response = _submitResponse ??
               _buildLocalSubmitResponse(
@@ -630,13 +651,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    Text(
-                      (q['question']?.toString().trim().isNotEmpty ?? false)
-                          ? q['question']!.toString()
-                          : (hasQuestionImage(q)
-                              ? 'Question image ke neeche dekhein'
-                              : ''),
-                    ),
+                    buildQuestionTextBlock(context, q),
                     if (hasQuestionImage(q)) ...[
                       const SizedBox(height: AppSpacing.md),
                       _buildQuestionImage(questionImageRawUrl(q)),
@@ -667,7 +682,8 @@ class _TestResultScreenState extends State<TestResultScreen> {
                             alignment: Alignment.centerLeft,
                             child: Text(
                               _optionLabel(e.key, e.value),
-                              style: TextStyle(
+                              style: questionContentTextStyle(
+                                context,
                                 fontWeight: selected == e.key
                                     ? FontWeight.w700
                                     : FontWeight.w500,
