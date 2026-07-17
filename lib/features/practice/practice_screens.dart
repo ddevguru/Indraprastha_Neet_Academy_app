@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/services/onboarding_checklist_service.dart';
+import '../../core/services/practice_saved_store.dart';
 import '../content/data/content_repository.dart';
 import '../onboarding/onboarding_checklist_widget.dart';
 import '../../models/app_models.dart';
@@ -63,25 +64,48 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
     List<Map<String, dynamic>> allSets,
     bool hasSubscription,
   ) {
-    if (label == 'Topic-wise MCQs') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => TopicWiseMcqsScreen(
-            allSets: allSets,
-            hasActiveSubscription: hasSubscription,
+    switch (label) {
+      case 'Topic-wise MCQs':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TopicWiseMcqsScreen(
+              allSets: allSets,
+              hasActiveSubscription: hasSubscription,
+            ),
           ),
-        ),
-      );
-      return;
+        );
+      case 'Custom practice':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CustomPracticeScreen(
+              allSets: allSets,
+              hasActiveSubscription: hasSubscription,
+            ),
+          ),
+        );
+      case 'Incorrect questions':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const IncorrectQuestionsScreen(),
+          ),
+        );
+      case 'Bookmarked questions':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const BookmarkedQuestionsScreen(),
+          ),
+        );
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$label — coming soon')),
+        );
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label — coming soon')),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
+    final savedPractice = ref.watch(practiceSavedControllerProvider);
     const categories = [
       ('Topic-wise MCQs', Icons.grid_view_rounded),
       ('PYQs', Icons.history_edu_rounded),
@@ -89,6 +113,21 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
       ('Incorrect questions', Icons.refresh_rounded),
       ('Bookmarked questions', Icons.bookmark_rounded),
     ];
+
+    int? countFor(String label) {
+      switch (label) {
+        case 'Incorrect questions':
+          return savedPractice.incorrect.isEmpty
+              ? null
+              : savedPractice.incorrect.length;
+        case 'Bookmarked questions':
+          return savedPractice.bookmarked.isEmpty
+              ? null
+              : savedPractice.bookmarked.length;
+        default:
+          return null;
+      }
+    }
 
     return SingleChildScrollView(
       padding: mobileScrollPadding(context),
@@ -141,8 +180,41 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                                         child: Icon(category.$2, color: AppColors.indigo),
                                       ),
                                       const SizedBox(width: AppSpacing.md),
-                                      Expanded(child: Text(category.$1)),
-                                      const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                                      Expanded(
+                                        child: Text(
+                                          category.$1,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      if (countFor(category.$1) != null)
+                                        Container(
+                                          margin: const EdgeInsets.only(
+                                            right: AppSpacing.sm,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.sm,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.indigoSoft,
+                                            borderRadius:
+                                                BorderRadius.circular(99),
+                                          ),
+                                          child: Text(
+                                            '${countFor(category.$1)}',
+                                            style: const TextStyle(
+                                              color: AppColors.indigo,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      const Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        size: 14,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -220,9 +292,13 @@ class PracticeAttemptScreen extends ConsumerStatefulWidget {
   const PracticeAttemptScreen({
     super.key,
     required this.setId,
+    this.customQuestions,
+    this.customTitle,
   });
 
   final int setId;
+  final List<Map<String, dynamic>>? customQuestions;
+  final String? customTitle;
 
   @override
   ConsumerState<PracticeAttemptScreen> createState() =>
@@ -250,6 +326,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   }
 
   Future<void> _guardAccess() async {
+    if (widget.customQuestions != null) return;
     final authUser = ref.read(authBlocProvider).state.user;
     final hasSubscription =
         ref.read(appUiControllerProvider).hasActiveSubscription ||
@@ -270,6 +347,21 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   }
 
   Future<void> _loadAttempt() async {
+    if (widget.customQuestions != null) {
+      _set = {'title': widget.customTitle ?? 'Practice'};
+      _questions = List<Map<String, dynamic>>.from(widget.customQuestions!);
+      unawaited(
+        warmImageCacheUrls(
+          _questions
+              .map((q) => questionImageRawUrl(q))
+              .where((url) => url.isNotEmpty),
+          thumbWidth: 700,
+          maxItems: 12,
+        ),
+      );
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     try {
       final data = await ContentRepository().fetchPracticeAttemptData(widget.setId);
       _set = Map<String, dynamic>.from(data['practiceSet'] as Map? ?? {});
@@ -294,6 +386,15 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     }
   }
 
+  SavedPracticeQuestion _savedEntryFor(Map<String, dynamic> question) {
+    return SavedPracticeQuestion(
+      id: question['id'].toString(),
+      setId: widget.setId,
+      setTitle: _set['title']?.toString() ?? 'Practice',
+      question: Map<String, dynamic>.from(question),
+    );
+  }
+
   void _checkAnswer(Map<String, dynamic> question) {
     if (_selectedOption == null) return;
     final correctOption = readCorrectOption(question);
@@ -304,6 +405,9 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       _correctCount++;
     } else {
       _wrongCount++;
+      ref
+          .read(practiceSavedControllerProvider.notifier)
+          .addIncorrect(_savedEntryFor(question));
     }
     setState(() => _submitted = true);
   }
@@ -458,9 +562,9 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
         ];
         final correctOption = readCorrectOption(question);
         final correctIndex = ['A', 'B', 'C', 'D'].indexOf(correctOption).clamp(0, 3);
-        final uiState = ref.watch(appUiControllerProvider);
+        final savedPractice = ref.watch(practiceSavedControllerProvider);
         final qId = question['id'].toString();
-        final isBookmarked = uiState.bookmarkedQuestionIds.contains(qId);
+        final isBookmarked = savedPractice.bookmarkedIds.contains(qId);
 
         return Scaffold(
           appBar: AppBar(
@@ -488,8 +592,8 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
               ),
               IconButton(
                 onPressed: () => ref
-                    .read(appUiControllerProvider.notifier)
-                    .toggleQuestionBookmark(qId),
+                    .read(practiceSavedControllerProvider.notifier)
+                    .toggleBookmark(_savedEntryFor(question)),
                 icon: Icon(
                   isBookmarked
                       ? Icons.bookmark_rounded
@@ -875,6 +979,440 @@ class _SubjectTopicsScreen extends StatelessWidget {
               estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
               accuracy: 0,
               tag: set['class_label']?.toString() ?? set['standard_label']?.toString() ?? 'Topic',
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Saved / custom practice flows ─────────────────────────────────────────────
+
+class BookmarkedQuestionsScreen extends ConsumerWidget {
+  const BookmarkedQuestionsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final saved = ref.watch(practiceSavedControllerProvider);
+    return _SavedQuestionsScreen(
+      title: 'Bookmarked questions',
+      emptyTitle: 'No bookmarked questions yet',
+      emptySubtitle:
+          'Practice karte waqt app bar par bookmark icon dabao — saved questions yahan dikhenge.',
+      emptyIcon: Icons.bookmark_border_rounded,
+      questions: saved.bookmarked,
+      onRemove: (id) => ref
+          .read(practiceSavedControllerProvider.notifier)
+          .removeBookmark(id),
+      practiceTitle: 'Bookmarked practice',
+    );
+  }
+}
+
+class IncorrectQuestionsScreen extends ConsumerWidget {
+  const IncorrectQuestionsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final saved = ref.watch(practiceSavedControllerProvider);
+    return _SavedQuestionsScreen(
+      title: 'Incorrect questions',
+      emptyTitle: 'No incorrect questions yet',
+      emptySubtitle:
+          'Galat answer dene par questions yahan save honge taaki aap unhe dobara practice kar saken.',
+      emptyIcon: Icons.refresh_rounded,
+      questions: saved.incorrect,
+      onRemove: (id) =>
+          ref.read(practiceSavedControllerProvider.notifier).removeIncorrect(id),
+      practiceTitle: 'Incorrect review',
+      showClearAll: saved.incorrect.isNotEmpty,
+      onClearAll: () =>
+          ref.read(practiceSavedControllerProvider.notifier).clearIncorrect(),
+    );
+  }
+}
+
+class _SavedQuestionsScreen extends StatelessWidget {
+  const _SavedQuestionsScreen({
+    required this.title,
+    required this.emptyTitle,
+    required this.emptySubtitle,
+    required this.emptyIcon,
+    required this.questions,
+    required this.onRemove,
+    required this.practiceTitle,
+    this.showClearAll = false,
+    this.onClearAll,
+  });
+
+  final String title;
+  final String emptyTitle;
+  final String emptySubtitle;
+  final IconData emptyIcon;
+  final List<SavedPracticeQuestion> questions;
+  final ValueChanged<String> onRemove;
+  final String practiceTitle;
+  final bool showClearAll;
+  final VoidCallback? onClearAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          if (showClearAll)
+            IconButton(
+              onPressed: onClearAll,
+              icon: const Icon(Icons.delete_sweep_outlined),
+              tooltip: 'Clear all',
+            ),
+        ],
+      ),
+      body: questions.isEmpty
+          ? Center(
+              child: EmptyStateWidget(
+                title: emptyTitle,
+                subtitle: emptySubtitle,
+                icon: emptyIcon,
+              ),
+            )
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    AppSpacing.sm,
+                  ),
+                  child: PrimaryButton(
+                    label: 'Practice all (${questions.length})',
+                    expanded: true,
+                    icon: Icons.play_arrow_rounded,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PracticeAttemptScreen(
+                            setId: 0,
+                            customTitle: practiceTitle,
+                            customQuestions: questions
+                                .map((item) => item.question)
+                                .toList(),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    itemCount: questions.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: AppSpacing.md),
+                    itemBuilder: (context, index) {
+                      final item = questions[index];
+                      final preview = readQuestionText(item.question);
+                      return InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PracticeAttemptScreen(
+                                setId: item.setId,
+                                customTitle: item.setTitle,
+                                customQuestions: [item.question],
+                              ),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(AppRadii.lg),
+                        child: SurfaceCard(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.setTitle,
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.xs),
+                                    Text(
+                                      preview.isEmpty
+                                          ? 'Question ${index + 1}'
+                                          : preview,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => onRemove(item.id),
+                                icon: const Icon(Icons.close_rounded, size: 18),
+                                tooltip: 'Remove',
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class CustomPracticeScreen extends StatefulWidget {
+  const CustomPracticeScreen({
+    super.key,
+    required this.allSets,
+    required this.hasActiveSubscription,
+  });
+
+  final List<Map<String, dynamic>> allSets;
+  final bool hasActiveSubscription;
+
+  @override
+  State<CustomPracticeScreen> createState() => _CustomPracticeScreenState();
+}
+
+class _CustomPracticeScreenState extends State<CustomPracticeScreen> {
+  late final Future<Map<String, dynamic>> _filtersFuture;
+  String? _selectedSubject;
+  String? _selectedTopic;
+  int _questionCount = 10;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtersFuture = ContentRepository().fetchContentFilters();
+  }
+
+  List<Map<String, dynamic>> get _filteredSets {
+    return widget.allSets.where((set) {
+      final subject = set['subject']?.toString() ?? '';
+      final topic = set['topic']?.toString() ?? '';
+      if (_selectedSubject != null &&
+          _selectedSubject!.isNotEmpty &&
+          subject != _selectedSubject) {
+        return false;
+      }
+      if (_selectedTopic != null &&
+          _selectedTopic!.isNotEmpty &&
+          topic != _selectedTopic) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  Future<void> _startPractice() async {
+    final sets = _filteredSets;
+    if (sets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Is filter ke liye koi practice set nahi mila.')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final repo = ContentRepository();
+      final allQuestions = <Map<String, dynamic>>[];
+      for (final set in sets) {
+        final setId = (set['id'] as num?)?.toInt();
+        if (setId == null) continue;
+        final data = await repo.fetchPracticeAttemptData(setId);
+        final questions = List<Map<String, dynamic>>.from(
+          data['questions'] as List<dynamic>? ?? const [],
+        );
+        for (final question in questions) {
+          allQuestions.add(Map<String, dynamic>.from(question));
+        }
+      }
+
+      if (!mounted) return;
+      if (allQuestions.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selected filters ke liye questions nahi mile.')),
+        );
+        return;
+      }
+
+      allQuestions.shuffle();
+      final picked = allQuestions.take(_questionCount).toList();
+      final titleParts = <String>[
+        if (_selectedSubject != null && _selectedSubject!.isNotEmpty)
+          _selectedSubject!,
+        if (_selectedTopic != null && _selectedTopic!.isNotEmpty) _selectedTopic!,
+      ];
+      final title = titleParts.isEmpty
+          ? 'Custom practice'
+          : 'Custom: ${titleParts.join(' · ')}';
+
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PracticeAttemptScreen(
+            setId: 0,
+            customTitle: title,
+            customQuestions: picked,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Practice load nahi ho payi: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Custom practice')),
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _filtersFuture,
+        builder: (context, snapshot) {
+          final subjects = List<String>.from(
+            (snapshot.data?['subjects'] as List<dynamic>? ?? const [])
+                .map((item) => item is String
+                    ? item
+                    : item['value']?.toString() ?? '')
+                .where((value) => value.isNotEmpty),
+          );
+          final topics = List<String>.from(
+            (snapshot.data?['topics'] as List<dynamic>? ?? const [])
+                .map((item) =>
+                    item is String ? item : item['value']?.toString() ?? '')
+                .where((value) => value.isNotEmpty),
+          );
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: CenteredContent(
+              maxWidth: 720,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SectionHeader(
+                    title: 'Build your drill',
+                    subtitle:
+                        'Subject aur topic choose karo, phir random questions se custom set banao.',
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  SurfaceCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Subject',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        DropdownButtonFormField<String?>(
+                          value: _selectedSubject,
+                          decoration: const InputDecoration(
+                            hintText: 'All subjects',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('All subjects'),
+                            ),
+                            ...subjects.map(
+                              (subject) => DropdownMenuItem<String?>(
+                                value: subject,
+                                child: Text(subject),
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) => setState(() {
+                            _selectedSubject = value;
+                            _selectedTopic = null;
+                          }),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'Topic',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        DropdownButtonFormField<String?>(
+                          value: _selectedTopic,
+                          decoration: const InputDecoration(
+                            hintText: 'All topics',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('All topics'),
+                            ),
+                            ...topics.map(
+                              (topic) => DropdownMenuItem<String?>(
+                                value: topic,
+                                child: Text(topic),
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _selectedTopic = value),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'Questions',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: AppSpacing.sm,
+                          children: [5, 10, 15, 20, 30].map((count) {
+                            final selected = _questionCount == count;
+                            return ChoiceChip(
+                              label: Text('$count'),
+                              selected: selected,
+                              onSelected: (_) =>
+                                  setState(() => _questionCount = count),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          '${_filteredSets.length} matching set${_filteredSets.length == 1 ? '' : 's'} available',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  PrimaryButton(
+                    label: _loading ? 'Loading questions...' : 'Start custom practice',
+                    expanded: true,
+                    icon: Icons.play_arrow_rounded,
+                    onPressed: _loading ? null : _startPractice,
+                  ),
+                ],
+              ),
             ),
           );
         },

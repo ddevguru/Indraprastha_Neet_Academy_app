@@ -32,10 +32,24 @@ app.use(
     contentSecurityPolicy: false,
   })
 );
+
+// Loader.io domain verification — set LOADER_IO_TOKEN=loaderio-xxxxxxxx
+// Registered before rate limit so verification always succeeds.
+const loaderIoToken = (process.env.LOADER_IO_TOKEN || '').trim();
+if (loaderIoToken) {
+  const sendLoaderToken = (_req, res) => {
+    res.type('text/plain').send(loaderIoToken);
+  };
+  app.get(`/${loaderIoToken}`, sendLoaderToken);
+  app.get(`/${loaderIoToken}.txt`, sendLoaderToken);
+}
+
+const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+const rateLimitMax = Number(process.env.RATE_LIMIT_MAX) || 300;
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 300,
+    windowMs: rateLimitWindowMs,
+    max: rateLimitMax,
     standardHeaders: true,
     legacyHeaders: false,
   })

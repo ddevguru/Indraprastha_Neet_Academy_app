@@ -34,7 +34,7 @@ class DashboardShellScreen extends StatelessWidget {
 
   static const _titles = [
     'Home',
-    'Books',
+    'Notes',
     'Practice',
     'Tests',
     'Videos',
@@ -329,15 +329,15 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
             SectionHeader(
               title: 'Continue studying',
               subtitle: 'Jump back into your active study materials.',
-              actionLabel: 'Open books',
+              actionLabel: 'Open Notes',
               onAction: () => context.go('/dashboard/1'),
             ),
             const SizedBox(height: AppSpacing.md),
             LayoutBuilder(
               builder: (context, constraints) {
                 return const EmptyStateWidget(
-                  title: 'Books list moved to Books tab',
-                  subtitle: 'Ab yahan dummy cards nahi dikhaye ja rahe. Real content Books tab se load hota hai.',
+                  title: 'Notes list moved to Notes tab',
+                  subtitle: 'Ab yahan dummy cards nahi dikhaye ja rahe. Real content Notes tab se load hota hai.',
                   icon: Icons.menu_book_rounded,
                 );
               },

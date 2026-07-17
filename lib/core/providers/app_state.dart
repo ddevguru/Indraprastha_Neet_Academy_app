@@ -28,7 +28,6 @@ class AppUiState {
     this.hasActiveSubscription = false,
     this.selectedPlan = 'Starter',
     this.bookmarkedBookIds = const {'book_notes_bio'},
-    this.bookmarkedQuestionIds = const {'pq2'},
     this.savedChapterIds = const {'plant_kingdom', 'chemical_bonding'},
     this.notificationsEnabled = true,
     this.downloadOnWifiOnly = true,
@@ -39,7 +38,6 @@ class AppUiState {
   final bool hasActiveSubscription;
   final String selectedPlan;
   final Set<String> bookmarkedBookIds;
-  final Set<String> bookmarkedQuestionIds;
   final Set<String> savedChapterIds;
   final bool notificationsEnabled;
   final bool downloadOnWifiOnly;
@@ -49,7 +47,6 @@ class AppUiState {
     bool? hasActiveSubscription,
     String? selectedPlan,
     Set<String>? bookmarkedBookIds,
-    Set<String>? bookmarkedQuestionIds,
     Set<String>? savedChapterIds,
     bool? notificationsEnabled,
     bool? downloadOnWifiOnly,
@@ -59,8 +56,6 @@ class AppUiState {
       hasActiveSubscription: hasActiveSubscription ?? this.hasActiveSubscription,
       selectedPlan: selectedPlan ?? this.selectedPlan,
       bookmarkedBookIds: bookmarkedBookIds ?? this.bookmarkedBookIds,
-      bookmarkedQuestionIds:
-          bookmarkedQuestionIds ?? this.bookmarkedQuestionIds,
       savedChapterIds: savedChapterIds ?? this.savedChapterIds,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       downloadOnWifiOnly: downloadOnWifiOnly ?? this.downloadOnWifiOnly,
@@ -112,12 +107,6 @@ class AppUiController extends Notifier<AppUiState> {
     final next = <String>{...state.bookmarkedBookIds};
     next.contains(bookId) ? next.remove(bookId) : next.add(bookId);
     state = state.copyWith(bookmarkedBookIds: next);
-  }
-
-  void toggleQuestionBookmark(String questionId) {
-    final next = <String>{...state.bookmarkedQuestionIds};
-    next.contains(questionId) ? next.remove(questionId) : next.add(questionId);
-    state = state.copyWith(bookmarkedQuestionIds: next);
   }
 
   void toggleSavedChapter(String chapterId) {

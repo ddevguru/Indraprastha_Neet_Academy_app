@@ -348,7 +348,7 @@ class NotificationsScreen extends StatelessWidget {
 
     return [
       ...books.map((b) => {
-            'title': 'New book added: ${b['title'] ?? 'Book'}',
+            'title': 'New Note added: ${b['title'] ?? 'Note'}',
             'message': b['subject']?.toString() ?? 'Study material available',
             'icon': Icons.menu_book_rounded,
             'unread': true,
@@ -391,13 +391,13 @@ class NotificationsScreen extends StatelessWidget {
                   children: [
                     const SectionHeader(
                       title: 'Notifications',
-                      subtitle: 'Books, tests, and videos added by your institute.',
+                      subtitle: 'Notes, tests, and videos added by your institute.',
                     ),
                     const SizedBox(height: AppSpacing.md),
                     if (notifications.isEmpty)
                       const EmptyStateWidget(
                         title: 'No notifications yet',
-                        subtitle: 'Books, tests ya videos add hone par yahan dikhenge.',
+                        subtitle: 'Notes, tests ya videos add hone par yahan dikhenge.',
                         icon: Icons.notifications_off_outlined,
                       )
                     else
