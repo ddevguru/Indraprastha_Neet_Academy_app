@@ -64,8 +64,22 @@ List<Map<String, dynamic>> _questionsForReview({
   final enriched =
       submitResponse?['questionsWithExplanations'] as List<dynamic>?;
   if (enriched != null && enriched.isNotEmpty) {
+    final byId = {for (final q in questions) q['id']: q};
     return List<Map<String, dynamic>>.from(
-      enriched.map((e) => Map<String, dynamic>.from(e as Map)),
+      enriched.map((e) {
+        final merged = Map<String, dynamic>.from(e as Map);
+        final original = byId[merged['id']];
+        if (original != null &&
+            !hasQuestionImage(merged) &&
+            hasQuestionImage(original)) {
+          merged['question_image_link'] = original['question_image_link'];
+          merged['question_image_drive_file_id'] =
+              original['question_image_drive_file_id'];
+          merged['question_image_drive_folder_id'] =
+              original['question_image_drive_folder_id'];
+        }
+        return merged;
+      }),
     );
   }
   return questions;
@@ -879,6 +893,14 @@ class _ScoreSummaryCard extends StatelessWidget {
         _asNum((response['aiAnalytics'] as Map?)?['score'])?.toInt() ??
         0;
     final accuracy = _asNum(analytics['overall_accuracy'])?.toDouble() ?? 0.0;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scorePanelColor = isDark
+        ? scheme.primaryContainer.withValues(alpha: 0.55)
+        : AppColors.indigoSoft;
+    final scoreLabelStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: isDark ? scheme.onPrimaryContainer : AppColors.textSecondary,
+        );
 
     return SurfaceCard(
       child: Column(
@@ -894,14 +916,16 @@ class _ScoreSummaryCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   decoration: BoxDecoration(
-                    color: AppColors.indigoSoft,
+                    color: scorePanelColor,
                     borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: isDark
+                        ? Border.all(color: scheme.outlineVariant)
+                        : null,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Score',
-                          style: Theme.of(context).textTheme.labelLarge),
+                      Text('Score', style: scoreLabelStyle),
                       const SizedBox(height: 6),
                       Text(
                         '$score / $marks',
@@ -910,11 +934,15 @@ class _ScoreSummaryCard extends StatelessWidget {
                             .headlineMedium
                             ?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: AppColors.indigo,
+                              color:
+                                  isDark ? scheme.primary : AppColors.indigo,
                             ),
                       ),
                       const SizedBox(height: 6),
-                      Text('Accuracy: ${accuracy.toStringAsFixed(1)}%'),
+                      Text(
+                        'Accuracy: ${accuracy.toStringAsFixed(1)}%',
+                        style: scoreLabelStyle,
+                      ),
                     ],
                   ),
                 ),

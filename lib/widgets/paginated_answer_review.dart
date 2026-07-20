@@ -199,6 +199,14 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
 
     final total = widget.items.length;
     final isLast = _index >= total - 1;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scorePanelColor = isDark
+        ? scheme.primaryContainer.withValues(alpha: 0.55)
+        : AppColors.indigoSoft;
+    final scoreLabelStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: isDark ? scheme.onPrimaryContainer : AppColors.textSecondary,
+        );
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
@@ -216,8 +224,11 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
                 width: double.infinity,
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: AppColors.indigoSoft,
+                  color: scorePanelColor,
                   borderRadius: BorderRadius.circular(AppRadii.md),
+                  border: isDark
+                      ? Border.all(color: scheme.outlineVariant)
+                      : null,
                 ),
                 child: Row(
                   children: [
@@ -225,16 +236,14 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Your score',
-                            style: Theme.of(context).textTheme.labelLarge,
-                          ),
+                          Text('Your score', style: scoreLabelStyle),
                           const SizedBox(height: 4),
                           Text(
                             '${widget.score} / ${widget.totalMarks}',
                             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.indigo,
+                                  color:
+                                      isDark ? scheme.primary : AppColors.indigo,
                                 ),
                           ),
                         ],
@@ -243,7 +252,7 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
                     if (widget.accuracy != null)
                       Text(
                         '${widget.accuracy!.toStringAsFixed(1)}% accuracy',
-                        style: Theme.of(context).textTheme.labelLarge,
+                        style: scoreLabelStyle,
                       ),
                   ],
                 ),
