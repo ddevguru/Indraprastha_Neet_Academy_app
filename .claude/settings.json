@@ -21,7 +21,8 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(Sort-Object)",
-      "WebFetch(domain:docs.google.com)"
+      "WebFetch(domain:docs.google.com)",
+      "Bash(flutter clean *)"
     ]
   }
 }

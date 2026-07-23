@@ -3,7 +3,7 @@
     "short_name": "Indraprastha",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#FFF8F2",
+    "background_color": "#ffffff",
     "theme_color": "#4F5DE4",
     "description": "Structured NEET preparation with chapter-wise books, PYQs, practice sets, test series, and performance analytics.",
     "orientation": "portrait-primary",
