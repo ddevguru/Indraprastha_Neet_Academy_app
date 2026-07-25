@@ -1,23 +1,27 @@
 import 'dart:convert';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../models/daily_mcq_item.dart';
 
 class ContentRepository {
-  ContentRepository({http.Client? client}) : _client = client ?? _sharedClient;
+  ContentRepository({
+    http.Client? client,
+    SharedPreferences? prefs,
+  })  : _client = client ?? _sharedClient,
+        _prefs = prefs;
 
   final http.Client _client;
+  final SharedPreferences? _prefs;
   static final http.Client _sharedClient = http.Client();
-  static const _secureStorage = FlutterSecureStorage();
   static final Map<String, ({DateTime at, Map<String, dynamic> data})> _cache = {};
   static const Duration _cacheTtl = Duration(minutes: 5);
 
   static void clearCache() => _cache.clear();
 
-  Future<String?> get _token async => _secureStorage.read(key: 'auth_token');
+  Future<String?> get _token async => _prefs?.getString('auth_token');
 
   Future<Map<String, dynamic>> fetchCourse() =>
       _get('/content/course');

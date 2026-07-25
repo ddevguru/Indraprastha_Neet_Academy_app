@@ -2,8 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/utils/drive_image_url.dart';
 import '../theme/app_tokens.dart';
@@ -32,9 +32,9 @@ class FastNetworkImage extends StatefulWidget {
 }
 
 class _FastNetworkImageState extends State<FastNetworkImage> {
-  static const _secureStorage = FlutterSecureStorage();
   static final Map<String, Uint8List> _memoryCache = {};
 
+  late SharedPreferences _prefs;
   int _fallbackStep = 0;
   Uint8List? _bytes;
   bool _loading = true;
@@ -43,6 +43,11 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
   @override
   void initState() {
     super.initState();
+    _initPrefs();
+  }
+
+  Future<void> _initPrefs() async {
+    _prefs = await SharedPreferences.getInstance();
     _load();
   }
 
@@ -74,7 +79,7 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
     if (mounted) setState(() { _loading = true; _failed = false; });
 
     try {
-      final token = await _secureStorage.read(key: 'auth_token');
+      final token = _prefs.getString('auth_token');
       final headers = <String, String>{};
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
@@ -186,18 +191,15 @@ Future<void> warmImageCacheUrls(
   int thumbWidth = 900,
   int maxItems = 8,
 }) async {
-  final token = await const FlutterSecureStorage().read(key: 'auth_token');
-  final headers = token != null && token.isNotEmpty
-      ? {'Authorization': 'Bearer $token'}
-      : null;
+  final headers = <String, String>{};
 
   final seen = <String>{};
   for (final raw in rawUrls) {
     final resolved = resolveDriveImageUrl(raw, thumbWidth: thumbWidth);
     if (resolved.isEmpty || !seen.add(resolved)) continue;
     try {
-      if (isApiImageUrl(resolved) && headers != null) {
-        final res = await http.get(Uri.parse(resolved), headers: headers);
+      if (isApiImageUrl(resolved)) {
+        final res = await http.get(Uri.parse(resolved), headers: headers.isEmpty ? null : headers);
         if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
           _FastNetworkImageState._memoryCache[resolved] = res.bodyBytes;
         }

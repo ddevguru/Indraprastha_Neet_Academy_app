@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,7 +16,6 @@ class AuthRepository {
   static const _tokenKey = 'auth_token';
   static const _userKey = 'auth_user';
   static const _onboardingSeenKey = 'onboarding_seen';
-  static const _secureStorage = FlutterSecureStorage();
 
   final SharedPreferences _prefs;
   final http.Client _client;
@@ -44,13 +42,13 @@ class AuthRepository {
     required String token,
     required AppUser user,
   }) async {
-    await _secureStorage.write(key: _tokenKey, value: token);
-    await _secureStorage.write(key: _userKey, value: jsonEncode(user.toJson()));
+    await _prefs.setString(_tokenKey, token);
+    await _prefs.setString(_userKey, jsonEncode(user.toJson()));
   }
 
   Future<void> clearSession() async {
-    await _secureStorage.delete(key: _tokenKey);
-    await _secureStorage.delete(key: _userKey);
+    await _prefs.remove(_tokenKey);
+    await _prefs.remove(_userKey);
   }
 
   /// Verifies Firebase ID token on backend — returns whether user is new.
@@ -148,10 +146,10 @@ class AuthRepository {
     await clearSession();
   }
 
-  Future<String?> readSecureToken() => _secureStorage.read(key: _tokenKey);
+  Future<String?> readSecureToken() async => _prefs.getString(_tokenKey);
 
   Future<AppUser?> readSecureUser() async {
-    final raw = await _secureStorage.read(key: _userKey);
+    final raw = _prefs.getString(_userKey);
     if (raw == null) return null;
     try {
       return AppUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);

@@ -22,7 +22,8 @@
       "Bash(git push *)",
       "Bash(Sort-Object)",
       "WebFetch(domain:docs.google.com)",
-      "Bash(flutter clean *)"
+      "Bash(flutter clean *)",
+      "Bash(rm -rf build/)"
     ]
   }
 }
