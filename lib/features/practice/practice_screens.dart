@@ -28,10 +28,47 @@ String _optionLabel(int index, String value) => formatOptionLabel(
 Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
   List<Map<String, dynamic>> questions,
 ) {
+  if (questions.isNotEmpty) {
+    print('DEBUG: Sample question keys: ${questions.first.keys.toList()}');
+    print('DEBUG: Sample question data: ${questions.first.toString().substring(0, 200)}');
+  }
+
   final grouped = <String, List<Map<String, dynamic>>>{};
+
   for (final q in questions) {
-    final topic = q['topic']?.toString() ?? q['chapter']?.toString() ?? 'General';
-    grouped.putIfAbsent(topic, () => []).add(q);
+    String key;
+
+    // Priority 1: Use chapter_id if available (unique identifier per chapter)
+    if (q['chapter_id'] != null) {
+      final chapterName = q['chapter_name']?.toString() ?? q['chapter']?.toString() ?? 'Chapter';
+      key = 'ch_${q['chapter_id']}_$chapterName';
+    }
+    // Priority 2: Combine class + subject + topic
+    else {
+      final standard = q['class_label']?.toString() ??
+                       q['standard_label']?.toString() ?? '';
+      final subject = q['subject']?.toString() ??
+                      q['subject_name']?.toString() ?? '';
+      final topic = q['topic']?.toString() ??
+                    q['chapter']?.toString() ??
+                    q['chapter_name']?.toString() ?? 'General';
+
+      if (standard.isNotEmpty && subject.isNotEmpty) {
+        key = '$standard $subject - $topic';
+      } else if (subject.isNotEmpty) {
+        key = '$subject - $topic';
+      } else {
+        key = topic;
+      }
+    }
+
+    grouped.putIfAbsent(key, () => []).add(q);
+  }
+
+  print('DEBUG: Questions grouped into chapters: ${grouped.keys.toList()}');
+  print('DEBUG: Total chapters: ${grouped.length}');
+  for (final entry in grouped.entries) {
+    print('DEBUG:   ${entry.key}: ${entry.value.length} questions');
   }
   return grouped;
 }
@@ -322,6 +359,11 @@ class ChapterListScreen extends ConsumerWidget {
     final hasSubscription = ref.read(appUiControllerProvider).hasActiveSubscription ||
         (ref.read(authBlocProvider).state.user?.hasActiveSubscription ?? false);
 
+    print('DEBUG ChapterListScreen:');
+    print('  Total chapters: ${chapters.length}');
+    print('  Has subscription: $hasSubscription');
+    print('  Chapters: ${chapters.keys.toList()}');
+
     return Scaffold(
       appBar: AppBar(title: Text(setTitle)),
       body: ListView.separated(
@@ -334,6 +376,8 @@ class ChapterListScreen extends ConsumerWidget {
 
           final isUnlockedForFree = _isChapterUnlockedByIndex(index);
           final locked = !hasSubscription && !isUnlockedForFree;
+
+          print('DEBUG Chapter $index ($chapterName): unlocked=$isUnlockedForFree, locked=$locked');
 
           return InkWell(
             onTap: locked
@@ -497,6 +541,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
       // Show chapter selection if multiple chapters exist
       if (mounted && _questions.isNotEmpty) {
+        print('DEBUG: Showing ChapterListScreen with ${_questions.length} questions');
         Navigator.of(context).pop();
         Navigator.push(
           context,
@@ -510,6 +555,8 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
         );
         return;
       }
+
+      print('DEBUG: ChapterListScreen NOT shown (questions empty or not mounted)');
 
       unawaited(
         warmImageCacheUrls(
