@@ -25,6 +25,24 @@ String _optionLabel(int index, String value) => formatOptionLabel(
       value,
     );
 
+Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
+  List<Map<String, dynamic>> questions,
+) {
+  final grouped = <String, List<Map<String, dynamic>>>{};
+  for (final q in questions) {
+    final topic = q['topic']?.toString() ?? q['chapter']?.toString() ?? 'General';
+    grouped.putIfAbsent(topic, () => []).add(q);
+  }
+  return grouped;
+}
+
+String? _getSubjectFromQuestion(Map<String, dynamic> question) {
+  return question['subject']?.toString() ??
+         question['subject_name']?.toString() ??
+         question['class_label']?.toString() ??
+         question['standard_label']?.toString();
+}
+
 Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
     url: rawUrl,
@@ -49,7 +67,8 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _practiceFuture = ContentRepository().fetchPracticeSets();
+    final prefs = ref.read(sharedPreferencesProvider);
+    _practiceFuture = ContentRepository(prefs: prefs).fetchPracticeSets();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(completeOnboardingStep(
         ref,
@@ -251,7 +270,7 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                 return Column(
                   children: sets.asMap().entries.map(
                         (entry) {
-                          final locked = !ContentAccess.isItemUnlocked(
+                          final unlocked = ContentAccess.isItemUnlocked(
                             index: entry.key,
                             hasActiveSubscription: hasSubscription,
                           );
@@ -272,7 +291,7 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                                 accuracy: 0,
                                 tag: 'Batch-wise',
                               ),
-                              locked: locked,
+                              locked: !unlocked,
                             ),
                           );
                         },
@@ -288,17 +307,145 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
   }
 }
 
+class ChapterListScreen extends ConsumerWidget {
+  const ChapterListScreen({
+    super.key,
+    required this.setId,
+    required this.questions,
+    required this.setTitle,
+  });
+
+  final int setId;
+  final List<Map<String, dynamic>> questions;
+  final String setTitle;
+
+  Set<String> _getUnlockedChaptersPerSubject(
+    Map<String, List<Map<String, dynamic>>> chapters,
+  ) {
+    final seenSubjects = <String>{};
+    final unlocked = <String>{};
+
+    for (final chapterName in chapters.keys) {
+      final chapterQuestions = chapters[chapterName]!;
+      if (chapterQuestions.isEmpty) continue;
+
+      final subject = _getSubjectFromQuestion(chapterQuestions.first) ?? 'General';
+
+      if (!seenSubjects.contains(subject)) {
+        seenSubjects.add(subject);
+        unlocked.add('$subject::$chapterName');
+      }
+    }
+    return unlocked;
+  }
+
+  bool _isChapterUnlocked(
+    String chapterName,
+    List<Map<String, dynamic>> chapterQuestions,
+    Set<String> unlockedPerSubject,
+  ) {
+    if (chapterQuestions.isEmpty) return false;
+    final subject = _getSubjectFromQuestion(chapterQuestions.first) ?? 'General';
+    return unlockedPerSubject.contains('$subject::$chapterName');
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chapters = _groupQuestionsByChapter(questions);
+    final hasSubscription = ref.read(appUiControllerProvider).hasActiveSubscription ||
+        (ref.read(authBlocProvider).state.user?.hasActiveSubscription ?? false);
+    final unlockedPerSubject = _getUnlockedChaptersPerSubject(chapters);
+
+    return Scaffold(
+      appBar: AppBar(title: Text(setTitle)),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        itemCount: chapters.length,
+        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+        itemBuilder: (context, index) {
+          final chapterName = chapters.keys.elementAt(index);
+          final chapterQuestions = chapters[chapterName]!;
+
+          final isUnlockedForFree = _isChapterUnlocked(
+            chapterName,
+            chapterQuestions,
+            unlockedPerSubject,
+          );
+          final locked = !hasSubscription && !isUnlockedForFree;
+
+          return InkWell(
+            onTap: locked
+                ? () => ContentAccess.openSubscriptions(context)
+                : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PracticeAttemptScreen(
+                          setId: setId,
+                          chapterName: chapterName,
+                          chapterQuestions: chapterQuestions,
+                        ),
+                      ),
+                    ),
+            borderRadius: BorderRadius.circular(AppRadii.lg),
+            child: SurfaceCard(
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: locked ? null : AppGradients.primary,
+                      color: locked ? AppColors.goldSoft : null,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Icon(
+                      locked ? Icons.lock_rounded : Icons.book_rounded,
+                      color: locked ? AppColors.gold : Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          chapterName,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text('${chapterQuestions.length} questions'),
+                      ],
+                    ),
+                  ),
+                  if (locked)
+                    const Icon(Icons.lock_rounded, size: 20)
+                  else
+                    const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class PracticeAttemptScreen extends ConsumerStatefulWidget {
   const PracticeAttemptScreen({
     super.key,
     required this.setId,
     this.customQuestions,
     this.customTitle,
+    this.chapterName,
+    this.chapterQuestions,
   });
 
   final int setId;
   final List<Map<String, dynamic>>? customQuestions;
   final String? customTitle;
+  final String? chapterName;
+  final List<Map<String, dynamic>>? chapterQuestions;
 
   @override
   ConsumerState<PracticeAttemptScreen> createState() =>
@@ -332,7 +479,8 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
         ref.read(appUiControllerProvider).hasActiveSubscription ||
             (authUser?.hasActiveSubscription ?? false);
     if (hasSubscription || !mounted) return;
-    final sets = await ContentRepository().fetchPracticeSets();
+    final prefs = ref.read(sharedPreferencesProvider);
+    final sets = await ContentRepository(prefs: prefs).fetchPracticeSets();
     if (!mounted) return;
     final ids = sets.map((s) => '${s['id']}').toList();
     final unlocked = ContentAccess.isIdUnlocked(
@@ -347,6 +495,21 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   }
 
   Future<void> _loadAttempt() async {
+    if (widget.chapterQuestions != null) {
+      _set = {'title': widget.chapterName ?? 'Practice'};
+      _questions = List<Map<String, dynamic>>.from(widget.chapterQuestions!);
+      unawaited(
+        warmImageCacheUrls(
+          _questions
+              .map((q) => questionImageRawUrl(q))
+              .where((url) => url.isNotEmpty),
+          thumbWidth: 700,
+          maxItems: 12,
+        ),
+      );
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     if (widget.customQuestions != null) {
       _set = {'title': widget.customTitle ?? 'Practice'};
       _questions = List<Map<String, dynamic>>.from(widget.customQuestions!);
@@ -363,11 +526,29 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       return;
     }
     try {
-      final data = await ContentRepository().fetchPracticeAttemptData(widget.setId);
+      final prefs = ref.read(sharedPreferencesProvider);
+      final data = await ContentRepository(prefs: prefs).fetchPracticeAttemptData(widget.setId);
       _set = Map<String, dynamic>.from(data['practiceSet'] as Map? ?? {});
       _questions = List<Map<String, dynamic>>.from(
         data['questions'] as List<dynamic>? ?? const [],
       );
+
+      // Show chapter selection if multiple chapters exist
+      if (mounted && _questions.isNotEmpty) {
+        Navigator.of(context).pop();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChapterListScreen(
+              setId: widget.setId,
+              questions: _questions,
+              setTitle: _set['title']?.toString() ?? 'Practice',
+            ),
+          ),
+        );
+        return;
+      }
+
       unawaited(
         warmImageCacheUrls(
           _questions
@@ -380,7 +561,6 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       _loadError = null;
     } catch (e) {
       _loadError = e.toString();
-      rethrow;
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -967,9 +1147,8 @@ class _SubjectTopicsScreen extends StatelessWidget {
         separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
         itemBuilder: (context, i) {
           final set = sets[i];
-          final locked = hasActiveSubscription ? false : i > 0;
           return _PracticeSetCard(
-            locked: locked,
+            locked: false,
             set: PracticeSet(
               id: '${set['id']}',
               title: set['title']?.toString() ?? 'Practice Set',
@@ -1176,7 +1355,7 @@ class _SavedQuestionsScreen extends StatelessWidget {
   }
 }
 
-class CustomPracticeScreen extends StatefulWidget {
+class CustomPracticeScreen extends ConsumerStatefulWidget {
   const CustomPracticeScreen({
     super.key,
     required this.allSets,
@@ -1187,10 +1366,10 @@ class CustomPracticeScreen extends StatefulWidget {
   final bool hasActiveSubscription;
 
   @override
-  State<CustomPracticeScreen> createState() => _CustomPracticeScreenState();
+  ConsumerState<CustomPracticeScreen> createState() => _CustomPracticeScreenState();
 }
 
-class _CustomPracticeScreenState extends State<CustomPracticeScreen> {
+class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
   late final Future<Map<String, dynamic>> _filtersFuture;
   String? _selectedSubject;
   String? _selectedTopic;
@@ -1200,7 +1379,8 @@ class _CustomPracticeScreenState extends State<CustomPracticeScreen> {
   @override
   void initState() {
     super.initState();
-    _filtersFuture = ContentRepository().fetchContentFilters();
+    final prefs = ref.read(sharedPreferencesProvider);
+    _filtersFuture = ContentRepository(prefs: prefs).fetchContentFilters();
   }
 
   List<Map<String, dynamic>> get _filteredSets {
@@ -1232,7 +1412,8 @@ class _CustomPracticeScreenState extends State<CustomPracticeScreen> {
 
     setState(() => _loading = true);
     try {
-      final repo = ContentRepository();
+      final prefs = ref.read(sharedPreferencesProvider);
+      final repo = ContentRepository(prefs: prefs);
       final allQuestions = <Map<String, dynamic>>[];
       for (final set in sets) {
         final setId = (set['id'] as num?)?.toInt();
