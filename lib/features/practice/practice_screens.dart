@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show min;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -71,18 +72,16 @@ Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
 
   // Strategy 3: If still only 1 group (all questions grouped together),
   // split into 6 groups assuming 1 per subject
-  if (grouped.length == 1 && questions.length > 6) {
-    print('DEBUG: All questions in 1 group, splitting by question count');
+  if (grouped.length <= 1 && questions.length >= 6) {
+    print('DEBUG: Grouped length = ${grouped.length}, splitting into 6 chapters');
     grouped.clear();
 
     final questionsPerChapter = (questions.length / 6).ceil();
     for (var i = 0; i < questions.length; i++) {
-      final chapterIndex = i ~/ questionsPerChapter;
+      final chapterIndex = min(i ~/ questionsPerChapter, 5);
       final subjectNames = ['12th Biology', '12th Chemistry', '12th Physics',
                             '11th Biology', '11th Chemistry', '11th Physics'];
-      final chapterKey = subjectNames.length > chapterIndex
-          ? subjectNames[chapterIndex]
-          : 'Chapter ${chapterIndex + 1}';
+      final chapterKey = subjectNames[chapterIndex];
 
       grouped.putIfAbsent(chapterKey, () => []).add(questions[i]);
     }
@@ -382,13 +381,30 @@ class ChapterListScreen extends ConsumerWidget {
     final hasSubscription = ref.read(appUiControllerProvider).hasActiveSubscription ||
         (ref.read(authBlocProvider).state.user?.hasActiveSubscription ?? false);
 
-    print('DEBUG ChapterListScreen:');
-    print('  Total chapters: ${chapters.length}');
-    print('  Has subscription: $hasSubscription');
-    print('  Chapters: ${chapters.keys.toList()}');
+    print('=== ChapterListScreen Debug ===');
+    print('Total questions: ${questions.length}');
+    print('Total chapters grouped: ${chapters.length}');
+    print('Chapter names: ${chapters.keys.toList()}');
+    print('Has subscription: $hasSubscription');
 
     return Scaffold(
-      appBar: AppBar(title: Text(setTitle)),
+      appBar: AppBar(
+        title: Text(setTitle),
+        // Show debug info if no subscription
+        actions: !hasSubscription
+            ? [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Center(
+                    child: Text(
+                      '${chapters.length} chapters',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                )
+              ]
+            : null,
+      ),
       body: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.lg),
         itemCount: chapters.length,
@@ -400,7 +416,7 @@ class ChapterListScreen extends ConsumerWidget {
           final isUnlockedForFree = _isChapterUnlockedByIndex(index);
           final locked = !hasSubscription && !isUnlockedForFree;
 
-          print('DEBUG Chapter $index ($chapterName): unlocked=$isUnlockedForFree, locked=$locked');
+          print('Chapter[$index] $chapterName: unlocked=$isUnlockedForFree, locked=$locked');
 
           return InkWell(
             onTap: locked
