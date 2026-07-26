@@ -36,13 +36,6 @@ Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
   return grouped;
 }
 
-String? _getSubjectFromQuestion(Map<String, dynamic> question) {
-  return question['subject']?.toString() ??
-         question['subject_name']?.toString() ??
-         question['class_label']?.toString() ??
-         question['standard_label']?.toString();
-}
-
 Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
     url: rawUrl,
@@ -319,34 +312,8 @@ class ChapterListScreen extends ConsumerWidget {
   final List<Map<String, dynamic>> questions;
   final String setTitle;
 
-  Set<String> _getUnlockedChaptersPerSubject(
-    Map<String, List<Map<String, dynamic>>> chapters,
-  ) {
-    final seenSubjects = <String>{};
-    final unlocked = <String>{};
-
-    for (final chapterName in chapters.keys) {
-      final chapterQuestions = chapters[chapterName]!;
-      if (chapterQuestions.isEmpty) continue;
-
-      final subject = _getSubjectFromQuestion(chapterQuestions.first) ?? 'General';
-
-      if (!seenSubjects.contains(subject)) {
-        seenSubjects.add(subject);
-        unlocked.add('$subject::$chapterName');
-      }
-    }
-    return unlocked;
-  }
-
-  bool _isChapterUnlocked(
-    String chapterName,
-    List<Map<String, dynamic>> chapterQuestions,
-    Set<String> unlockedPerSubject,
-  ) {
-    if (chapterQuestions.isEmpty) return false;
-    final subject = _getSubjectFromQuestion(chapterQuestions.first) ?? 'General';
-    return unlockedPerSubject.contains('$subject::$chapterName');
+  bool _isChapterUnlockedByIndex(int index) {
+    return index < 6;
   }
 
   @override
@@ -354,7 +321,6 @@ class ChapterListScreen extends ConsumerWidget {
     final chapters = _groupQuestionsByChapter(questions);
     final hasSubscription = ref.read(appUiControllerProvider).hasActiveSubscription ||
         (ref.read(authBlocProvider).state.user?.hasActiveSubscription ?? false);
-    final unlockedPerSubject = _getUnlockedChaptersPerSubject(chapters);
 
     return Scaffold(
       appBar: AppBar(title: Text(setTitle)),
@@ -366,11 +332,7 @@ class ChapterListScreen extends ConsumerWidget {
           final chapterName = chapters.keys.elementAt(index);
           final chapterQuestions = chapters[chapterName]!;
 
-          final isUnlockedForFree = _isChapterUnlocked(
-            chapterName,
-            chapterQuestions,
-            unlockedPerSubject,
-          );
+          final isUnlockedForFree = _isChapterUnlockedByIndex(index);
           final locked = !hasSubscription && !isUnlockedForFree;
 
           return InkWell(
