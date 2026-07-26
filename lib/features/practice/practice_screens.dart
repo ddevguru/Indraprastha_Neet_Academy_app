@@ -28,23 +28,31 @@ String _optionLabel(int index, String value) => formatOptionLabel(
 Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
   List<Map<String, dynamic>> questions,
 ) {
-  if (questions.isNotEmpty) {
-    print('DEBUG: Sample question keys: ${questions.first.keys.toList()}');
-    print('DEBUG: Sample question data: ${questions.first.toString().substring(0, 200)}');
-  }
+  if (questions.isEmpty) return {};
+
+  print('DEBUG: Sample question keys: ${questions.first.keys.toList()}');
+  print('DEBUG: Sample question data: ${questions.first.toString().substring(0, 300)}');
+  print('DEBUG: Total questions: ${questions.length}');
 
   final grouped = <String, List<Map<String, dynamic>>>{};
 
-  for (final q in questions) {
-    String key;
+  // Strategy 1: Try to group by chapter_id first
+  bool hasChapterId = questions.any((q) => q['chapter_id'] != null);
 
-    // Priority 1: Use chapter_id if available (unique identifier per chapter)
-    if (q['chapter_id'] != null) {
-      final chapterName = q['chapter_name']?.toString() ?? q['chapter']?.toString() ?? 'Chapter';
-      key = 'ch_${q['chapter_id']}_$chapterName';
+  if (hasChapterId) {
+    print('DEBUG: Using chapter_id grouping');
+    for (final q in questions) {
+      if (q['chapter_id'] != null) {
+        final key = 'ch_${q['chapter_id']}';
+        grouped.putIfAbsent(key, () => []).add(q);
+      }
     }
-    // Priority 2: Combine class + subject + topic
-    else {
+  }
+
+  // Strategy 2: If no chapter_id, try grouping by combination of fields
+  if (grouped.isEmpty) {
+    print('DEBUG: Using subject/topic grouping');
+    for (final q in questions) {
       final standard = q['class_label']?.toString() ??
                        q['standard_label']?.toString() ?? '';
       final subject = q['subject']?.toString() ??
@@ -53,16 +61,31 @@ Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
                     q['chapter']?.toString() ??
                     q['chapter_name']?.toString() ?? 'General';
 
-      if (standard.isNotEmpty && subject.isNotEmpty) {
-        key = '$standard $subject - $topic';
-      } else if (subject.isNotEmpty) {
-        key = '$subject - $topic';
-      } else {
-        key = topic;
-      }
-    }
+      final key = [standard, subject, topic]
+          .where((s) => s.isNotEmpty)
+          .join(' - ');
 
-    grouped.putIfAbsent(key, () => []).add(q);
+      grouped.putIfAbsent(key.isEmpty ? 'General' : key, () => []).add(q);
+    }
+  }
+
+  // Strategy 3: If still only 1 group (all questions grouped together),
+  // split into 6 groups assuming 1 per subject
+  if (grouped.length == 1 && questions.length > 6) {
+    print('DEBUG: All questions in 1 group, splitting by question count');
+    grouped.clear();
+
+    final questionsPerChapter = (questions.length / 6).ceil();
+    for (var i = 0; i < questions.length; i++) {
+      final chapterIndex = i ~/ questionsPerChapter;
+      final subjectNames = ['12th Biology', '12th Chemistry', '12th Physics',
+                            '11th Biology', '11th Chemistry', '11th Physics'];
+      final chapterKey = subjectNames.length > chapterIndex
+          ? subjectNames[chapterIndex]
+          : 'Chapter ${chapterIndex + 1}';
+
+      grouped.putIfAbsent(chapterKey, () => []).add(questions[i]);
+    }
   }
 
   print('DEBUG: Questions grouped into chapters: ${grouped.keys.toList()}');
