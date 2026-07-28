@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/services/onboarding_checklist_service.dart';
-import '../content/data/content_repository.dart';
 import '../onboarding/onboarding_checklist_widget.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
@@ -133,7 +132,6 @@ class TestsScreen extends ConsumerStatefulWidget {
 class _TestsScreenState extends ConsumerState<TestsScreen> {
   late final Future<List<Map<String, dynamic>>> _testsFuture;
   String? _activeFilter;
-  static const int _freeUnlockedTestCount = 3;
 
   static const _filters = [
     'Grand tests',
@@ -146,7 +144,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
   @override
   void initState() {
     super.initState();
-    _testsFuture = ContentRepository().fetchTests();
+    _testsFuture = ref.read(contentRepositoryProvider).fetchTests();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(completeOnboardingStep(
         ref,
@@ -204,7 +202,9 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
   @override
   Widget build(BuildContext context) {
     final hasSubscription =
-        ref.watch(appUiControllerProvider).hasActiveSubscription;
+        ref.watch(appUiControllerProvider).hasActiveSubscription ||
+            (ref.watch(authBlocProvider).state.user?.hasActiveSubscription ??
+                false);
     return SingleChildScrollView(
       padding: mobileScrollPadding(context),
       child: CenteredContent(
@@ -251,6 +251,13 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SkeletonLoader(cardCount: 4);
                 }
+                if (snapshot.hasError) {
+                  return EmptyStateWidget(
+                    title: 'Tests load nahi ho paye',
+                    subtitle: snapshot.error.toString(),
+                    icon: Icons.error_outline_rounded,
+                  );
+                }
                 final allTests = snapshot.data ?? const [];
                 final tests = _applyFilter(allTests);
                 if (allTests.isEmpty) {
@@ -277,9 +284,10 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                         (t) => '${t['id']}' == '${entry.value['id']}',
                       );
                       final testIndex = index < 0 ? entry.key : index;
-                      final locked = hasSubscription
-                          ? false
-                          : testIndex >= _freeUnlockedTestCount;
+                      final locked = !ContentAccess.isTestUnlocked(
+                        index: testIndex,
+                        hasActiveSubscription: hasSubscription,
+                      );
                       final t = entry.value;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -321,7 +329,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
   }
 }
 
-class TestDetailScreen extends ConsumerWidget {
+class TestDetailScreen extends ConsumerStatefulWidget {
   const TestDetailScreen({
     super.key,
     required this.testId,
@@ -330,18 +338,28 @@ class TestDetailScreen extends ConsumerWidget {
   final int testId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TestDetailScreen> createState() => _TestDetailScreenState();
+}
+
+class _TestDetailScreenState extends ConsumerState<TestDetailScreen> {
+  bool _paywallHandled = false;
+
+  @override
+  Widget build(BuildContext context) {
     final hasSubscription =
-        ref.watch(appUiControllerProvider).hasActiveSubscription;
-    final accessFuture = ContentRepository().fetchTests().then((tests) {
+        ref.watch(appUiControllerProvider).hasActiveSubscription ||
+            (ref.watch(authBlocProvider).state.user?.hasActiveSubscription ??
+                false);
+    final repo = ref.read(contentRepositoryProvider);
+    final accessFuture = repo.fetchTests().then((tests) {
       final ids = tests.map((t) => '${t['id']}').toList();
-      return ContentAccess.isIdUnlocked(
-        itemId: '$testId',
+      return ContentAccess.isTestIdUnlocked(
+        testId: '${widget.testId}',
         orderedIds: ids,
         hasActiveSubscription: hasSubscription,
       );
     });
-    final future = ContentRepository().fetchTestQuestions(testId);
+    final future = repo.fetchTestQuestions(widget.testId);
     return FutureBuilder<List<dynamic>>(
       future: Future.wait([future, accessFuture]),
       builder: (context, snapshot) {
@@ -351,9 +369,14 @@ class TestDetailScreen extends ConsumerWidget {
         }
         final unlocked = snapshot.data?[1] as bool? ?? hasSubscription;
         if (!unlocked) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) ContentAccess.openSubscriptions(context);
-          });
+          if (!_paywallHandled) {
+            _paywallHandled = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.mounted) return;
+              ContentAccess.openSubscriptions(context);
+              context.pop();
+            });
+          }
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -403,7 +426,8 @@ class TestDetailScreen extends ConsumerWidget {
                       label: 'Start test',
                       expanded: true,
                       icon: Icons.play_arrow_rounded,
-                      onPressed: () => context.push('/tests/result/$testId'),
+                      onPressed: () =>
+                          context.push('/tests/result/${widget.testId}'),
                     ),
                   ],
                 ),
@@ -416,7 +440,7 @@ class TestDetailScreen extends ConsumerWidget {
   }
 }
 
-class TestResultScreen extends StatefulWidget {
+class TestResultScreen extends ConsumerStatefulWidget {
   const TestResultScreen({
     super.key,
     required this.testId,
@@ -425,10 +449,10 @@ class TestResultScreen extends StatefulWidget {
   final int testId;
 
   @override
-  State<TestResultScreen> createState() => _TestResultScreenState();
+  ConsumerState<TestResultScreen> createState() => _TestResultScreenState();
 }
 
-class _TestResultScreenState extends State<TestResultScreen> {
+class _TestResultScreenState extends ConsumerState<TestResultScreen> {
   int _index = 0;
   int _timeLeft = 0;
   bool _submitted = false;
@@ -477,8 +501,9 @@ class _TestResultScreenState extends State<TestResultScreen> {
   @override
   void initState() {
     super.initState();
+    final repo = ref.read(contentRepositoryProvider);
     _attemptFuture =
-        ContentRepository().fetchTestQuestions(widget.testId).then((data) {
+        repo.fetchTestQuestions(widget.testId).then((data) {
       final questions = List<Map<String, dynamic>>.from(
         data['questions'] as List<dynamic>? ?? const [],
       );
@@ -760,7 +785,8 @@ class _TestResultScreenState extends State<TestResultScreen> {
                                     final messenger =
                                         ScaffoldMessenger.of(context);
                                     try {
-                                      final res = await ContentRepository()
+                                      final res = await ref
+                                          .read(contentRepositoryProvider)
                                           .submitTestAttempt(
                                         testId: widget.testId,
                                         score: score,

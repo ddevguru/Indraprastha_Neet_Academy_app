@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../content/data/content_repository.dart';
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
 import '../../theme/app_tokens.dart';
@@ -16,8 +15,11 @@ class VideosScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
-    final videosFuture = ContentRepository().fetchVideos();
+    final hasSubscription =
+        ref.watch(appUiControllerProvider).hasActiveSubscription ||
+            (ref.watch(authBlocProvider).state.user?.hasActiveSubscription ??
+                false);
+    final videosFuture = ref.read(contentRepositoryProvider).fetchVideos();
 
     return SingleChildScrollView(
       padding: mobileScrollPadding(context),
@@ -43,6 +45,13 @@ class VideosScreen extends ConsumerWidget {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const SkeletonLoader(cardCount: 4);
                   }
+                  if (snapshot.hasError) {
+                    return EmptyStateWidget(
+                      title: 'Videos load nahi ho paye',
+                      subtitle: snapshot.error.toString(),
+                      icon: Icons.error_outline_rounded,
+                    );
+                  }
                   final videos = snapshot.data ?? const [];
                   if (videos.isEmpty) {
                     return const EmptyStateWidget(
@@ -52,7 +61,8 @@ class VideosScreen extends ConsumerWidget {
                     );
                   }
                   return Column(
-                    children: videos.asMap().entries.map((entry) {
+                    children: [
+                      ...videos.asMap().entries.map((entry) {
                       final video = entry.value;
                       final locked = !ContentAccess.isItemUnlocked(
                         index: entry.key,
@@ -135,17 +145,11 @@ class VideosScreen extends ConsumerWidget {
                         ),
                       ),
                     );
-                    }).toList(),
+                    }),
+                    ],
                   );
                 },
               ),
-
-            const SizedBox(height: AppSpacing.xl),
-            const EmptyStateWidget(
-              title: 'More videos coming soon',
-              subtitle: 'Full syllabus coverage with detailed explanations',
-              icon: Icons.video_library_outlined,
-            ),
           ],
         ),
       ),

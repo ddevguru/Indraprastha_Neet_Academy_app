@@ -46,11 +46,10 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
   @override
   void initState() {
     super.initState();
-    _dataFuture = _loadData();
+    _dataFuture = _loadData(ref.read(contentRepositoryProvider));
   }
 
-  Future<Map<String, dynamic>> _loadData() async {
-    final repo = ContentRepository();
+  Future<Map<String, dynamic>> _loadData(ContentRepository repo) async {
     final results = await Future.wait([
       repo.fetchCourse(),
       repo.fetchBooks(),
@@ -63,7 +62,8 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
   Future<void> _openBookChapter(BuildContext context, Map<String, dynamic> book) async {
     final bookId = int.tryParse(book['id']?.toString() ?? '');
     if (bookId == null) return;
-    final chapters = await ContentRepository().fetchChapters(bookId);
+    final chapters =
+        await ref.read(contentRepositoryProvider).fetchChapters(bookId);
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     if (chapters.isEmpty) {
@@ -96,7 +96,10 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
   @override
   Widget build(BuildContext context) {
     final uiState = ref.watch(appUiControllerProvider);
-    final hasSubscription = uiState.hasActiveSubscription;
+    final hasSubscription =
+        uiState.hasActiveSubscription ||
+            (ref.watch(authBlocProvider).state.user?.hasActiveSubscription ??
+                false);
     return SingleChildScrollView(
       padding: mobileScrollPadding(context),
       child: CenteredContent(
@@ -120,6 +123,13 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SkeletonLoader(cardCount: 4);
+                }
+                if (snapshot.hasError) {
+                  return EmptyStateWidget(
+                    title: 'Notes load nahi ho paye',
+                    subtitle: snapshot.error.toString(),
+                    icon: Icons.error_outline_rounded,
+                  );
                 }
                 final course =
                     (snapshot.data?['course'] as Map<String, dynamic>?) ?? {};
@@ -377,8 +387,9 @@ class ChapterDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final chapterFuture = ContentRepository().fetchChapterDetail(chapterId);
-    final pyqFuture = ContentRepository().fetchPyqs(chapterId);
+    final repo = ref.read(contentRepositoryProvider);
+    final chapterFuture = repo.fetchChapterDetail(chapterId);
+    final pyqFuture = repo.fetchPyqs(chapterId);
     return FutureBuilder<Map<String, dynamic>>(
       future: Future.wait([chapterFuture, pyqFuture]).then((v) => {
         'chapter': (v[0] as Map<String, dynamic>)['chapter'],

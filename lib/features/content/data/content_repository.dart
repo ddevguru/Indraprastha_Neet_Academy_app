@@ -23,6 +23,17 @@ class ContentRepository {
 
   Future<String?> get _token async => _prefs?.getString('auth_token');
 
+  List<Map<String, dynamic>> _mapsFromListKey(
+    Map<String, dynamic> data,
+    String key,
+  ) {
+    final raw = data[key];
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
   Future<Map<String, dynamic>> fetchCourse() =>
       _get('/content/course');
 
@@ -31,17 +42,17 @@ class ContentRepository {
     String? topic,
   }) async {
     final data = await _get(_scopedPath('/content/books', subject: subject, topic: topic));
-    return List<Map<String, dynamic>>.from(data['books'] as List<dynamic>);
+    return _mapsFromListKey(data, 'books');
   }
 
   Future<List<Map<String, dynamic>>> fetchChapters(int bookId) async {
     final data = await _get('/content/books/$bookId/chapters');
-    return List<Map<String, dynamic>>.from(data['chapters'] as List<dynamic>);
+    return _mapsFromListKey(data, 'chapters');
   }
 
   Future<List<Map<String, dynamic>>> fetchPyqs(int chapterId) async {
     final data = await _get('/content/chapters/$chapterId/pyqs', bypassCache: true);
-    return List<Map<String, dynamic>>.from(data['pyqs'] as List<dynamic>);
+    return _mapsFromListKey(data, 'pyqs');
   }
 
   Future<List<Map<String, dynamic>>> fetchPracticeSets({
@@ -51,9 +62,7 @@ class ContentRepository {
     final data = await _get(
       _scopedPath('/content/practice-sets', subject: subject, topic: topic),
     );
-    return List<Map<String, dynamic>>.from(
-      data['practiceSets'] as List<dynamic>,
-    );
+    return _mapsFromListKey(data, 'practiceSets');
   }
 
   Future<Map<String, dynamic>> fetchChapterDetail(int chapterId) =>
@@ -77,7 +86,7 @@ class ContentRepository {
             : {'category': category},
       ),
     );
-    return List<Map<String, dynamic>>.from(data['tests'] as List<dynamic>);
+    return _mapsFromListKey(data, 'tests');
   }
 
   Future<Map<String, dynamic>> fetchContentFilters() =>
@@ -127,7 +136,7 @@ class ContentRepository {
 
   Future<List<Map<String, dynamic>>> fetchVideos() async {
     final data = await _get('/content/videos');
-    return List<Map<String, dynamic>>.from(data['videos'] as List<dynamic>);
+    return _mapsFromListKey(data, 'videos');
   }
 
   Future<List<Map<String, dynamic>>> fetchPackages() async {

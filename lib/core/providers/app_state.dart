@@ -4,10 +4,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/auth/bloc/auth_bloc.dart';
 import '../../features/auth/data/auth_repository.dart';
+import '../../features/content/data/content_repository.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>(
   (_) => throw UnimplementedError('sharedPreferencesProvider must be overridden'),
 );
+
+final contentRepositoryProvider = Provider<ContentRepository>((ref) {
+  return ContentRepository(prefs: ref.watch(sharedPreferencesProvider));
+});
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);

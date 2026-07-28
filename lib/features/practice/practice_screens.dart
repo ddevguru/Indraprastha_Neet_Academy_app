@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' show min;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,15 +51,16 @@ Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
 
   // Strategy 2: If no chapter_id, try grouping by combination of fields
   if (grouped.isEmpty) {
-    print('DEBUG: Using subject/topic grouping');
     for (final q in questions) {
       final standard = q['class_label']?.toString() ??
-                       q['standard_label']?.toString() ?? '';
-      final subject = q['subject']?.toString() ??
-                      q['subject_name']?.toString() ?? '';
+          q['standard_label']?.toString() ??
+          '';
+      final subject =
+          q['subject']?.toString() ?? q['subject_name']?.toString() ?? '';
       final topic = q['topic']?.toString() ??
-                    q['chapter']?.toString() ??
-                    q['chapter_name']?.toString() ?? 'General';
+          q['chapter']?.toString() ??
+          q['chapter_name']?.toString() ??
+          'General';
 
       final key = [standard, subject, topic]
           .where((s) => s.isNotEmpty)
@@ -70,28 +70,6 @@ Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
     }
   }
 
-  // Strategy 3: If still only 1 group (all questions grouped together),
-  // split into 6 groups assuming 1 per subject
-  if (grouped.length <= 1 && questions.length >= 6) {
-    print('DEBUG: Grouped length = ${grouped.length}, splitting into 6 chapters');
-    grouped.clear();
-
-    final questionsPerChapter = (questions.length / 6).ceil();
-    for (var i = 0; i < questions.length; i++) {
-      final chapterIndex = min(i ~/ questionsPerChapter, 5);
-      final subjectNames = ['12th Biology', '12th Chemistry', '12th Physics',
-                            '11th Biology', '11th Chemistry', '11th Physics'];
-      final chapterKey = subjectNames[chapterIndex];
-
-      grouped.putIfAbsent(chapterKey, () => []).add(questions[i]);
-    }
-  }
-
-  print('DEBUG: Questions grouped into chapters: ${grouped.keys.toList()}');
-  print('DEBUG: Total chapters: ${grouped.length}');
-  for (final entry in grouped.entries) {
-    print('DEBUG:   ${entry.key}: ${entry.value.length} questions');
-  }
   return grouped;
 }
 
@@ -371,10 +349,6 @@ class ChapterListScreen extends ConsumerWidget {
   final List<Map<String, dynamic>> questions;
   final String setTitle;
 
-  bool _isChapterUnlockedByIndex(int index) {
-    return index < 6;
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final chapters = _groupQuestionsByChapter(questions);
@@ -413,8 +387,11 @@ class ChapterListScreen extends ConsumerWidget {
           final chapterName = chapters.keys.elementAt(index);
           final chapterQuestions = chapters[chapterName]!;
 
-          final isUnlockedForFree = _isChapterUnlockedByIndex(index);
-          final locked = !hasSubscription && !isUnlockedForFree;
+          final isUnlockedForFree = ContentAccess.isChapterUnlocked(
+            index: index,
+            hasActiveSubscription: hasSubscription,
+          );
+          final locked = !isUnlockedForFree;
 
           print('Chapter[$index] $chapterName: unlocked=$isUnlockedForFree, locked=$locked');
 
@@ -518,7 +495,9 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   }
 
   Future<void> _guardAccess() async {
-    if (widget.customQuestions != null) return;
+    if (widget.customQuestions != null || widget.chapterQuestions != null) {
+      return;
+    }
     final authUser = ref.read(authBlocProvider).state.user;
     final hasSubscription =
         ref.read(appUiControllerProvider).hasActiveSubscription ||
@@ -527,10 +506,17 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     final prefs = ref.read(sharedPreferencesProvider);
     final sets = await ContentRepository(prefs: prefs).fetchPracticeSets();
     if (!mounted) return;
-    final ids = sets.map((s) => '${s['id']}').toList();
-    final unlocked = ContentAccess.isIdUnlocked(
-      itemId: '${widget.setId}',
-      orderedIds: ids,
+    Map<String, dynamic>? currentSet;
+    for (final set in sets) {
+      if ((set['id'] as num?)?.toInt() == widget.setId) {
+        currentSet = set;
+        break;
+      }
+    }
+    if (currentSet == null) return;
+    final unlocked = ContentAccess.isPracticeSetUnlocked(
+      set: currentSet,
+      allSets: sets,
       hasActiveSubscription: false,
     );
     if (!unlocked && mounted) {
@@ -578,12 +564,10 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
         data['questions'] as List<dynamic>? ?? const [],
       );
 
-      // Show chapter selection if multiple chapters exist
-      if (mounted && _questions.isNotEmpty) {
-        print('DEBUG: Showing ChapterListScreen with ${_questions.length} questions');
-        Navigator.of(context).pop();
-        Navigator.push(
-          context,
+      // Only show chapter picker when a set truly contains multiple chapters.
+      final chapters = _groupQuestionsByChapter(_questions);
+      if (mounted && chapters.length > 1) {
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => ChapterListScreen(
               setId: widget.setId,
@@ -594,8 +578,6 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
         );
         return;
       }
-
-      print('DEBUG: ChapterListScreen NOT shown (questions empty or not mounted)');
 
       unawaited(
         warmImageCacheUrls(
@@ -1187,16 +1169,23 @@ class _SubjectTopicsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sortedSets = List<Map<String, dynamic>>.from(sets)
+      ..sort(ContentAccess.comparePracticeSetOrder);
+
     return Scaffold(
       appBar: AppBar(title: Text(subject)),
       body: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        itemCount: sets.length,
+        itemCount: sortedSets.length,
         separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
         itemBuilder: (context, i) {
-          final set = sets[i];
+          final set = sortedSets[i];
+          final locked = !ContentAccess.isItemUnlocked(
+            index: i,
+            hasActiveSubscription: hasActiveSubscription,
+          );
           return _PracticeSetCard(
-            locked: false,
+            locked: locked,
             set: PracticeSet(
               id: '${set['id']}',
               title: set['title']?.toString() ?? 'Practice Set',

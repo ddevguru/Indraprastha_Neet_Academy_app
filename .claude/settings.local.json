@@ -12,7 +12,9 @@
       "Read(//c/c/indraprastha/indraprastha-backend/src/**)",
       "Bash(cd /c/indraprastha/indraprastha-backend && grep -n \"average_score\\\\|average_accuracy\\\\|daily_study_hours\\\\|current_study_streak\\\\|physics_accuracy\\\\|chemistry_accuracy\\\\|biology_accuracy\\\\|total_tests_taken\" migrations/*.sql)",
       "Read(//c/c/indraprastha/indraprastha-backend/**)",
-      "Bash(xargs grep -l \"PYQ\\\\|pyq\\\\|previous.*year\")"
+      "Bash(xargs grep -l \"PYQ\\\\|pyq\\\\|previous.*year\")",
+      "Bash(git add *)",
+      "Bash(xargs grep -l \"class.*Question\\\\|Map.*question\")"
     ]
   }
 }
