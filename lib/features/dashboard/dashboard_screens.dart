@@ -267,19 +267,23 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
                 final mcqCount = snapshot.data != null
                     ? (snapshot.data![2] as int? ?? 0)
                     : 0;
-                final donut = Map<String, dynamic>.from(
-                  analytics['donut'] as Map? ?? const {},
-                );
-                final attempted =
-                    (donut['correct'] ?? 0) + (donut['wrong'] ?? 0);
-                final total =
-                    attempted + (donut['unattempted'] ?? 0);
+
+                // Extract data exactly like analytics_screen.dart does
+                final donut = (analytics['donut'] as Map<String, dynamic>?) ?? const {};
+                final overallStats = (analytics['analytics'] as Map<String, dynamic>?) ?? const {};
+
+                // Calculate metrics
+                final correct = _extractInt(donut['correct']);
+                final wrong = _extractInt(donut['wrong']);
+                final unattempted = _extractInt(donut['unattempted']);
+                final attempted = correct + wrong;
+                final total = attempted + unattempted;
                 final coverage = total == 0 ? 0.0 : (attempted / total).clamp(0.0, 1.0);
                 final accuracy = attempted == 0
                     ? 0.0
-                    : ((donut['correct'] ?? 0) / attempted).clamp(0.0, 1.0);
-                final streak = (analytics['analytics']?['overall_accuracy'] ?? 0)
-                    .toString();
+                    : ((correct / attempted) * 100 / 100).clamp(0.0, 1.0);
+                final overallAccuracy = _extractInt(overallStats['overall_accuracy']);
+                final streak = overallAccuracy > 0 ? '$overallAccuracy%' : '--';
 
                 if (compact) {
                   return Column(
@@ -350,12 +354,83 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
               onAction: () => context.push('/analytics'),
             ),
             const SizedBox(height: AppSpacing.md),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return const EmptyStateWidget(
-                  title: 'Analytics-driven progress',
-                  subtitle: 'Progress section backend analytics se bind ho raha hai. Dummy snapshot hata diya gaya hai.',
-                  icon: Icons.insights_rounded,
+            FutureBuilder<Map<String, dynamic>>(
+              future: _analyticsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SurfaceCard(
+                    child: SizedBox(
+                      height: 180,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return SurfaceCard(
+                    child: EmptyStateWidget(
+                      title: 'Error loading analytics',
+                      subtitle: snapshot.error.toString(),
+                      icon: Icons.error_outline_rounded,
+                    ),
+                  );
+                }
+
+                final payload = snapshot.data ?? const {};
+                final overall = (payload['analytics'] as Map<String, dynamic>?) ?? const {};
+                final donut = (payload['donut'] as Map<String, dynamic>?) ?? const {};
+
+                // Extract available metrics using helper function
+                final overallAccuracy = _extractInt(overall['overall_accuracy']);
+                final bestScore = _extractInt(overall['best_score']);
+                final correct = _extractInt(donut['correct']);
+                final wrong = _extractInt(donut['wrong']);
+                final attempted = correct + wrong;
+
+                // Show empty state if no data
+                if (overallAccuracy == 0 && bestScore == 0 && attempted == 0) {
+                  return const EmptyStateWidget(
+                    title: 'No tests attempted yet',
+                    subtitle: 'Submit a test to see your performance analytics here.',
+                    icon: Icons.insights_rounded,
+                  );
+                }
+
+                return SurfaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Performance Overview',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      _AnalyticsMetric(
+                        label: 'Overall Accuracy',
+                        value: overallAccuracy > 0 ? '$overallAccuracy%' : '--',
+                        icon: Icons.track_changes_rounded,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      _AnalyticsMetric(
+                        label: 'Questions Attempted',
+                        value: attempted > 0 ? '$attempted' : '--',
+                        icon: Icons.quiz_rounded,
+                        color: const Color(0xFF1976D2),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      _AnalyticsMetric(
+                        label: 'Best Score',
+                        value: bestScore > 0 ? '$bestScore/720' : '--',
+                        icon: Icons.trending_up_rounded,
+                        color: const Color(0xFFC99A33),
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -545,10 +620,19 @@ class _RecentTestsPanel extends StatelessWidget {
           FutureBuilder<List<Map<String, dynamic>>>(
             future: testsFuture,
             builder: (context, snapshot) {
-              final tests = snapshot.data ?? const [];
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const SkeletonLoader(cardCount: 3);
               }
+
+              if (snapshot.hasError) {
+                return EmptyStateWidget(
+                  title: 'Error loading tests',
+                  subtitle: snapshot.error.toString(),
+                  icon: Icons.error_outline_rounded,
+                );
+              }
+
+              final tests = snapshot.data ?? const [];
               if (tests.isEmpty) {
                 return const EmptyStateWidget(
                   title: 'No tests yet',
@@ -593,12 +677,21 @@ class _WeakTopicsPanel extends StatelessWidget {
           FutureBuilder<Map<String, dynamic>>(
             future: analyticsFuture,
             builder: (context, snapshot) {
-              final insights = List<Map<String, dynamic>>.from(
-                snapshot.data?['insights'] as List<dynamic>? ?? const [],
-              );
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const SkeletonLoader(cardCount: 3);
               }
+
+              if (snapshot.hasError) {
+                return EmptyStateWidget(
+                  title: 'Error loading insights',
+                  subtitle: snapshot.error.toString(),
+                  icon: Icons.error_outline_rounded,
+                );
+              }
+
+              final insights = List<Map<String, dynamic>>.from(
+                snapshot.data?['insights'] as List<dynamic>? ?? const [],
+              );
               if (insights.isEmpty) {
                 return const EmptyStateWidget(
                   title: 'No insights yet',
@@ -691,6 +784,14 @@ class _QuickActionsPanel extends StatelessWidget {
   }
 }
 
+int _extractInt(dynamic value) {
+  if (value == null) return 0;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
 class _PlanMiniStat extends StatelessWidget {
   const _PlanMiniStat({
     required this.title,
@@ -722,3 +823,55 @@ class _PlanMiniStat extends StatelessWidget {
   }
 }
 
+class _AnalyticsMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _AnalyticsMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}

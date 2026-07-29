@@ -14,7 +14,9 @@
       "Read(//c/c/indraprastha/indraprastha-backend/**)",
       "Bash(xargs grep -l \"PYQ\\\\|pyq\\\\|previous.*year\")",
       "Bash(git add *)",
-      "Bash(xargs grep -l \"class.*Question\\\\|Map.*question\")"
+      "Bash(xargs grep -l \"class.*Question\\\\|Map.*question\")",
+      "PowerShell(flutter doctor -v)",
+      "PowerShell(Stop-Process -Force -ErrorAction SilentlyContinue)"
     ]
   }
 }
