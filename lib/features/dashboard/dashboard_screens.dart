@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/bloc/auth_bloc.dart';
-import '../content/data/content_repository.dart';
 import '../../core/providers/app_state.dart';
+import '../../core/services/attempt_draft_store.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/adaptive_scaffold.dart';
 import '../../widgets/app_widgets.dart';
@@ -69,14 +69,20 @@ class DashboardHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
-  late final Future<List<dynamic>> _statsFuture;
-  late final Future<List<Map<String, dynamic>>> _recentTestsFuture;
-  late final Future<Map<String, dynamic>> _analyticsFuture;
+  late Future<List<dynamic>> _statsFuture;
+  late Future<List<Map<String, dynamic>>> _recentTestsFuture;
+  late Future<Map<String, dynamic>> _analyticsFuture;
+  DateTime? _lastReloadTime;
 
   @override
   void initState() {
     super.initState();
-    final repo = ContentRepository();
+    _reloadStats();
+  }
+
+  void _reloadStats() {
+    _lastReloadTime = DateTime.now();
+    final repo = ref.read(contentRepositoryProvider);
     _recentTestsFuture = repo.fetchTests();
     _analyticsFuture = repo.fetchLatestAnalytics();
     _statsFuture = Future.wait([
@@ -86,8 +92,19 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
     ]);
   }
 
+  void _refreshIfNeeded() {
+    if (_lastReloadTime == null ||
+        DateTime.now().difference(_lastReloadTime!).inMinutes >= 5) {
+      setState(_reloadStats);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshIfNeeded();
+    });
+
     final user = context.watch<AuthBloc>().state.user;
     if (user == null) {
       return const Center(child: CircularProgressIndicator());
@@ -95,7 +112,13 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 720;
 
-    return SingleChildScrollView(
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(_reloadStats);
+        await _statsFuture;
+      },
+      child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: mobileScrollPadding(context),
       child: CenteredContent(
         child: Column(
@@ -283,6 +306,12 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
                     ? 0.0
                     : ((correct / attempted) * 100 / 100).clamp(0.0, 1.0);
                 final overallAccuracy = _extractInt(overallStats['overall_accuracy']);
+                final bestScore = _extractInt(overallStats['best_score']);
+                final testsCompleted = _extractInt(overallStats['tests_completed']);
+                final completedFromList = tests
+                    .where((t) => isTruthyCompletionFlag(t['is_completed']))
+                    .length;
+                final takenCount = testsCompleted > 0 ? testsCompleted : completedFromList;
                 final streak = overallAccuracy > 0 ? '$overallAccuracy%' : '--';
 
                 if (compact) {
@@ -291,15 +320,16 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
                       _CurrentPlanCard(
                         activePlan: user.preferredPlan,
                         syllabus: '${(coverage * 100).round()}%',
-                        streak: streak == '0' ? '--' : '$streak%',
-                        testsTaken: '${tests.length}',
+                        streak: streak == '0%' ? '--' : streak,
+                        testsTaken: '$takenCount',
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       _DailyTargetCard(
                         coverage: coverage,
                         accuracy: accuracy,
-                        testsTaken: tests.length,
+                        testsTaken: takenCount,
                         mcqCount: mcqCount,
+                        bestScore: bestScore,
                       ),
                     ],
                   );
@@ -312,8 +342,8 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
                       child: _CurrentPlanCard(
                         activePlan: user.preferredPlan,
                         syllabus: '${(coverage * 100).round()}%',
-                        streak: streak == '0' ? '--' : '$streak%',
-                        testsTaken: '${tests.length}',
+                        streak: streak == '0%' ? '--' : streak,
+                        testsTaken: '$takenCount',
                       ),
                     ),
                     const SizedBox(width: AppSpacing.lg),
@@ -321,8 +351,9 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
                       child: _DailyTargetCard(
                         coverage: coverage,
                         accuracy: accuracy,
-                        testsTaken: tests.length,
+                        testsTaken: takenCount,
                         mcqCount: mcqCount,
+                        bestScore: bestScore,
                       ),
                     ),
                   ],
@@ -472,6 +503,7 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -561,12 +593,14 @@ class _DailyTargetCard extends StatelessWidget {
     required this.accuracy,
     required this.testsTaken,
     required this.mcqCount,
+    this.bestScore = 0,
   });
 
   final double coverage;
   final double accuracy;
   final int testsTaken;
   final int mcqCount;
+  final int bestScore;
 
   @override
   Widget build(BuildContext context) {
@@ -593,6 +627,14 @@ class _DailyTargetCard extends StatelessWidget {
             value: testsTaken == 0 ? 0 : 1,
             trailing: '$testsTaken total',
           ),
+          if (bestScore > 0) ...[
+            const SizedBox(height: AppSpacing.md),
+            MetricBar(
+              label: 'Best score',
+              value: (bestScore / 720).clamp(0.0, 1.0),
+              trailing: '$bestScore/720',
+            ),
+          ],
         ],
       ),
     );

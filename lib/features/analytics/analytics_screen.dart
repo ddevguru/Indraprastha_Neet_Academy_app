@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/app_state.dart';
 import '../../core/services/onboarding_checklist_service.dart';
-import '../content/data/content_repository.dart';
 import '../onboarding/onboarding_checklist_widget.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
@@ -15,24 +15,21 @@ class AnalyticsScreen extends ConsumerStatefulWidget {
 }
 
 class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
-  late final Future<Map<String, dynamic>> _analyticsFuture;
+  late Future<Map<String, dynamic>> _analyticsFuture;
 
   @override
   void initState() {
     super.initState();
-    _analyticsFuture = _loadAnalytics();
+    _reloadAnalytics();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       completeOnboardingStep(ref, OnboardingChecklistStep.viewAnalytics);
     });
   }
 
-  Future<Map<String, dynamic>> _loadAnalytics() async {
-    final repo = ContentRepository();
-    try {
-      return await repo.fetchLatestAnalytics();
-    } catch (_) {
-      return const {};
-    }
+  void _reloadAnalytics() {
+    setState(() {
+      _analyticsFuture = ref.read(contentRepositoryProvider).fetchLatestAnalytics();
+    });
   }
 
   // Backend may return numbers as String, int, or double — handle all three
@@ -69,6 +66,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('Analytics'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: _reloadAnalytics,
+              ),
+            ],
             bottom: isLoading
                 ? const PreferredSize(
                     preferredSize: Size.fromHeight(3),

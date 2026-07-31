@@ -401,13 +401,22 @@ router.get('/practice-sets', userAuth, async (req, res) => {
   const topic = req.query.topic?.toString() || '';
   const result = await pool.query(
     `SELECT ps.id, ps.title, ps.topic, ps.subject, ps.class_label, ps.difficulty, ps.estimated_minutes,
-        (SELECT COUNT(*)::int FROM practice_questions pq WHERE pq.practice_set_id = ps.id) AS question_count
+        (SELECT COUNT(*)::int FROM practice_questions pq WHERE pq.practice_set_id = ps.id) AS question_count,
+        (pa.id IS NOT NULL) AS is_completed,
+        pa.accuracy AS last_accuracy
      FROM practice_sets ps
+     LEFT JOIN LATERAL (
+       SELECT id, accuracy
+       FROM practice_attempts
+       WHERE user_id = $3 AND practice_set_id = ps.id
+       ORDER BY attempted_at DESC
+       LIMIT 1
+     ) pa ON true
      WHERE (ps.source_type IS NULL OR ps.source_type = 'topic_mcq')
        AND ($1 = '' OR ps.subject = $1)
        AND ($2 = '' OR ps.topic = $2)
      ORDER BY id DESC`,
-    [subject, topic]
+    [subject, topic, req.user.id]
   );
   res.json({ success: true, practiceSets: result.rows });
 });
@@ -451,6 +460,45 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
     practiceSet: setMeta.rows[0],
     questions: questions.rows.map(mapQuestionImageLink),
   });
+});
+
+router.post('/practice-sets/:setId/submit', userAuth, async (req, res) => {
+  try {
+    const setId = Number(req.params.setId);
+    if (!Number.isFinite(setId) || setId <= 0) {
+      return res.status(400).json({ error: 'Invalid setId' });
+    }
+    const setExists = await pool.query(
+      `SELECT id, title, subject, topic FROM practice_sets WHERE id = $1 LIMIT 1`,
+      [setId]
+    );
+    if (setExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Practice set not found' });
+    }
+
+    const {
+      score = 0,
+      accuracy = 0,
+      correctCount = 0,
+      wrongCount = 0,
+    } = req.body || {};
+
+    const attempt = await pool.query(
+      `INSERT INTO practice_attempts (user_id, practice_set_id, score, accuracy, correct_count, wrong_count)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING *`,
+      [req.user.id, setId, score, accuracy, correctCount, wrongCount]
+    );
+
+    return res.json({ success: true, attempt: attempt.rows[0] });
+  } catch (e) {
+    console.error('[CONTENT_PRACTICE_SUBMIT_ERROR]', {
+      message: e?.message || 'Unknown error',
+      setId: req.params?.setId,
+      userId: req.user?.id,
+    });
+    return res.status(500).json({ error: e?.message || 'Submit failed' });
+  }
 });
 
 router.get('/tests', userAuth, async (req, res) => {
@@ -735,19 +783,47 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
 });
 
 router.get('/analytics/latest', userAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  const attemptStats = await pool.query(
+    `SELECT
+       COUNT(DISTINCT test_id)::int AS tests_completed,
+       COALESCE(MAX(score), 0)::int AS best_score,
+       COALESCE(ROUND(AVG(score)), 0)::int AS average_score
+     FROM test_attempts
+     WHERE user_id = $1`,
+    [userId]
+  );
+
+  const practiceStats = await pool.query(
+    `SELECT COUNT(DISTINCT practice_set_id)::int AS practice_completed
+     FROM practice_attempts
+     WHERE user_id = $1`,
+    [userId]
+  );
+
+  const stats = attemptStats.rows[0] || {};
+  const practiceCompleted = practiceStats.rows[0]?.practice_completed ?? 0;
+
   const analyticsResult = await pool.query(
     `SELECT *
      FROM exam_analytics
      WHERE user_id = $1
      ORDER BY created_at DESC
      LIMIT 1`,
-    [req.user.id]
+    [userId]
   );
 
   if (analyticsResult.rows.length === 0) {
     return res.json({
       success: true,
-      analytics: null,
+      analytics: {
+        overall_accuracy: 0,
+        best_score: stats.best_score ?? 0,
+        average_score: stats.average_score ?? 0,
+        tests_completed: stats.tests_completed ?? 0,
+        practice_completed: practiceCompleted,
+      },
       donut: { correct: 0, wrong: 0, unattempted: 0 },
       insights: [],
     });
@@ -764,7 +840,13 @@ router.get('/analytics/latest', userAuth, async (req, res) => {
 
   res.json({
     success: true,
-    analytics,
+    analytics: {
+      ...analytics,
+      best_score: stats.best_score ?? 0,
+      average_score: stats.average_score ?? 0,
+      tests_completed: stats.tests_completed ?? 0,
+      practice_completed: practiceCompleted,
+    },
     donut: {
       correct: analytics.correct_count,
       wrong: analytics.wrong_count,

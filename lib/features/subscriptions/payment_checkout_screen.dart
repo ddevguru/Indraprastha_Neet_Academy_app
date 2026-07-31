@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../core/utils/payment_utils.dart';
+import '../../core/providers/app_state.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
-import '../content/data/content_repository.dart';
 
-class PaymentCheckoutScreen extends StatefulWidget {
+class PaymentCheckoutScreen extends ConsumerStatefulWidget {
   const PaymentCheckoutScreen({
     super.key,
     required this.packageName,
@@ -27,10 +28,10 @@ class PaymentCheckoutScreen extends StatefulWidget {
   final String customerName;
 
   @override
-  State<PaymentCheckoutScreen> createState() => _PaymentCheckoutScreenState();
+  ConsumerState<PaymentCheckoutScreen> createState() => _PaymentCheckoutScreenState();
 }
 
-class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
+class _PaymentCheckoutScreenState extends ConsumerState<PaymentCheckoutScreen> {
   late final Razorpay _razorpay;
   bool _processing = false;
   bool _completed = false;
@@ -94,7 +95,7 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
     Object? lastError;
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        final result = await ContentRepository().verifyPayment(
+        final result = await ref.read(contentRepositoryProvider).verifyPayment(
           orderId: widget.orderId,
           razorpayPaymentId: razorpayPaymentId,
           razorpayOrderId: razorpayOrderId,

@@ -391,6 +391,19 @@ async function ensureDatabaseSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS practice_attempts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      practice_set_id INTEGER NOT NULL REFERENCES practice_sets(id) ON DELETE CASCADE,
+      score INTEGER NOT NULL DEFAULT 0,
+      accuracy NUMERIC(5,2) NOT NULL DEFAULT 0,
+      correct_count INTEGER NOT NULL DEFAULT 0,
+      wrong_count INTEGER NOT NULL DEFAULT 0,
+      attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS videos (
       id SERIAL PRIMARY KEY,
       batch_id INTEGER NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
@@ -561,6 +574,8 @@ async function ensureDatabaseSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_daily_mcqs_batch_active ON daily_mcqs(batch_id, is_active);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_videos_batch_class_subject_topic ON videos(batch_id, class_label, subject, topic);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_analytics_user_created ON exam_analytics(user_id, created_at DESC);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_test_attempts_user_test ON test_attempts(user_id, test_id, attempted_at DESC);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_practice_attempts_user_set ON practice_attempts(user_id, practice_set_id, attempted_at DESC);`);
 
   const collegeCount = await pool.query('SELECT COUNT(*)::int AS count FROM colleges');
   if (collegeCount.rows[0].count === 0) {

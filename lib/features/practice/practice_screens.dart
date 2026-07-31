@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
+import '../../core/services/attempt_draft_store.dart';
 import '../../core/services/onboarding_checklist_service.dart';
 import '../../core/services/practice_saved_store.dart';
 import '../content/data/content_repository.dart';
@@ -92,18 +93,23 @@ class PracticeHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
-  late final Future<List<Map<String, dynamic>>> _practiceFuture;
+  late Future<List<Map<String, dynamic>>> _practiceFuture;
 
   @override
   void initState() {
     super.initState();
-    final prefs = ref.read(sharedPreferencesProvider);
-    _practiceFuture = ContentRepository(prefs: prefs).fetchPracticeSets();
+    _reloadPractice();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(completeOnboardingStep(
         ref,
         OnboardingChecklistStep.attemptFirstPractice,
       ));
+    });
+  }
+
+  void _reloadPractice() {
+    setState(() {
+      _practiceFuture = ref.read(contentRepositoryProvider).fetchPracticeSets();
     });
   }
 
@@ -305,6 +311,10 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                             hasActiveSubscription: hasSubscription,
                           );
                           final set = entry.value;
+                          final completed =
+                              isTruthyCompletionFlag(set['is_completed']);
+                          final lastAccuracy =
+                              (set['last_accuracy'] as num?)?.toDouble() ?? 0;
                           return Padding(
                             padding: const EdgeInsets.only(bottom: AppSpacing.md),
                             child: _PracticeSetCard(
@@ -318,10 +328,12 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                                     set['difficulty']?.toString() ?? 'Moderate',
                                 estimatedMinutes:
                                     (set['estimated_minutes'] as num?)?.toInt() ?? 20,
-                                accuracy: 0,
+                                accuracy: completed ? lastAccuracy / 100 : 0,
                                 tag: 'Batch-wise',
                               ),
                               locked: !unlocked,
+                              completed: completed,
+                              onOpened: _reloadPractice,
                             ),
                           );
                         },
@@ -480,6 +492,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   bool _submitted = false;
   bool _finished = false;
   bool _loading = true;
+  bool _draftRestored = false;
   String? _loadError;
   int _correctCount = 0;
   int _wrongCount = 0;
@@ -487,11 +500,90 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   Map<String, dynamic> _set = {};
   List<Map<String, dynamic>> _questions = [];
 
+  int get _draftSetId => widget.setId;
+
+  AttemptDraftStore get _draftStore =>
+      AttemptDraftStore(ref.read(sharedPreferencesProvider));
+
+  void _restoreDraftIfNeeded() {
+    if (_draftRestored || widget.customQuestions != null) return;
+    final draft = _draftStore.loadPracticeDraft(_draftSetId);
+    if (draft == null) {
+      _draftRestored = true;
+      return;
+    }
+    _currentIndex = (draft['currentIndex'] as num?)?.toInt() ?? _currentIndex;
+    _correctCount = (draft['correctCount'] as num?)?.toInt() ?? _correctCount;
+    _wrongCount = (draft['wrongCount'] as num?)?.toInt() ?? _wrongCount;
+    _submitted = draft['submitted'] == true;
+    final savedOption = draft['selectedOption'];
+    _selectedOption =
+        savedOption == null ? null : (savedOption as num).toInt();
+    final savedAnswers = draft['answers'];
+    if (savedAnswers is Map) {
+      savedAnswers.forEach((key, value) {
+        final idx = int.tryParse(key.toString());
+        if (idx != null && value != null) {
+          _answers[idx] = value.toString();
+        }
+      });
+    }
+    _draftRestored = true;
+  }
+
+  Future<void> _persistDraft() async {
+    if (_finished || widget.customQuestions != null) return;
+    await _draftStore.savePracticeDraft(_draftSetId, {
+      'currentIndex': _currentIndex,
+      'correctCount': _correctCount,
+      'wrongCount': _wrongCount,
+      'selectedOption': _selectedOption,
+      'submitted': _submitted,
+      'answers': _answers.map((k, v) => MapEntry('$k', v)),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> _submitPracticeResult() async {
+    final total = _questions.length;
+    if (total == 0) return;
+    final accuracy = total > 0 ? (_correctCount / total) * 100 : 0.0;
+    try {
+      await ref.read(contentRepositoryProvider).submitPracticeAttempt(
+            setId: widget.setId,
+            score: _correctCount,
+            accuracy: accuracy,
+            correctCount: _correctCount,
+            wrongCount: _wrongCount,
+          );
+      await _draftStore.clearPracticeDraft(_draftSetId);
+    } catch (_) {
+      // Keep local completion even if server submit fails.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _loadAttempt();
     WidgetsBinding.instance.addPostFrameCallback((_) => _guardAccess());
+  }
+
+  @override
+  void dispose() {
+    if (!_finished && widget.customQuestions == null) {
+      unawaited(_persistDraft());
+    }
+    super.dispose();
+  }
+
+  Future<void> _handleBack() async {
+    if (_finished) {
+      if (context.mounted) context.pop(true);
+      return;
+    }
+    await _persistDraft();
+    if (context.mounted) context.pop(false);
   }
 
   Future<void> _guardAccess() async {
@@ -538,7 +630,10 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
           maxItems: 12,
         ),
       );
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        _restoreDraftIfNeeded();
+        setState(() => _loading = false);
+      }
       return;
     }
     if (widget.customQuestions != null) {
@@ -592,7 +687,10 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     } catch (e) {
       _loadError = e.toString();
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        _restoreDraftIfNeeded();
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -620,11 +718,13 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
           .addIncorrect(_savedEntryFor(question));
     }
     setState(() => _submitted = true);
+    unawaited(_persistDraft());
   }
 
   void _nextQuestion() {
     if (_currentIndex >= _questions.length - 1) {
       setState(() => _finished = true);
+      unawaited(_submitPracticeResult());
       return;
     }
     setState(() {
@@ -632,6 +732,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       _selectedOption = null;
       _submitted = false;
     });
+    unawaited(_persistDraft());
   }
 
   List<AnswerReviewEntry> _reviewEntries() {
@@ -647,6 +748,16 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_handleBack());
+      },
+      child: _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -886,7 +997,12 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: AppSpacing.md),
                             child: InkWell(
-                              onTap: _submitted ? null : () => setState(() => _selectedOption = index),
+                              onTap: _submitted
+                                  ? null
+                                  : () {
+                                      setState(() => _selectedOption = index);
+                                      unawaited(_persistDraft());
+                                    },
                               borderRadius: BorderRadius.circular(AppRadii.md),
                               child: Container(
                                 padding: const EdgeInsets.all(AppSpacing.md),
@@ -945,10 +1061,14 @@ class _PracticeSetCard extends StatelessWidget {
   const _PracticeSetCard({
     required this.set,
     this.locked = false,
+    this.completed = false,
+    this.onOpened,
   });
 
   final PracticeSet set;
   final bool locked;
+  final bool completed;
+  final VoidCallback? onOpened;
 
   @override
   Widget build(BuildContext context) {
@@ -956,7 +1076,10 @@ class _PracticeSetCard extends StatelessWidget {
       onTap: () => ContentAccess.handleTap(
         context: context,
         locked: locked,
-        onUnlocked: () => context.push('/practice/attempt/${set.id}'),
+        onUnlocked: () async {
+          await context.push('/practice/attempt/${set.id}');
+          onOpened?.call();
+        },
       ),
       borderRadius: BorderRadius.circular(AppRadii.lg),
       child: Opacity(
@@ -968,13 +1091,21 @@ class _PracticeSetCard extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  gradient: locked ? null : AppGradients.primary,
-                  color: locked ? AppColors.goldSoft : null,
+                  gradient: locked || completed ? null : AppGradients.primary,
+                  color: locked
+                      ? AppColors.goldSoft
+                      : (completed ? AppColors.success.withValues(alpha: 0.15) : null),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(
-                  locked ? Icons.lock_rounded : Icons.bolt_rounded,
-                  color: locked ? AppColors.gold : Colors.white,
+                  locked
+                      ? Icons.lock_rounded
+                      : (completed
+                          ? Icons.check_circle_rounded
+                          : Icons.bolt_rounded),
+                  color: locked
+                      ? AppColors.gold
+                      : (completed ? AppColors.success : Colors.white),
                 ),
               ),
             const SizedBox(width: AppSpacing.lg),
@@ -1154,7 +1285,7 @@ class _SubjectGroupCard extends StatelessWidget {
   }
 }
 
-class _SubjectTopicsScreen extends StatelessWidget {
+class _SubjectTopicsScreen extends StatefulWidget {
   const _SubjectTopicsScreen({
     required this.subject,
     required this.sets,
@@ -1168,12 +1299,31 @@ class _SubjectTopicsScreen extends StatelessWidget {
   final bool hasActiveSubscription;
 
   @override
+  State<_SubjectTopicsScreen> createState() => _SubjectTopicsScreenState();
+}
+
+class _SubjectTopicsScreenState extends State<_SubjectTopicsScreen> {
+  late List<Map<String, dynamic>> _sets;
+
+  @override
+  void initState() {
+    super.initState();
+    _sets = List<Map<String, dynamic>>.from(widget.sets);
+  }
+
+  void _refreshSets() {
+    setState(() {
+      _sets = List<Map<String, dynamic>>.from(widget.sets);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final sortedSets = List<Map<String, dynamic>>.from(sets)
+    final sortedSets = List<Map<String, dynamic>>.from(_sets)
       ..sort(ContentAccess.comparePracticeSetOrder);
 
     return Scaffold(
-      appBar: AppBar(title: Text(subject)),
+      appBar: AppBar(title: Text(widget.subject)),
       body: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.lg),
         itemCount: sortedSets.length,
@@ -1182,10 +1332,13 @@ class _SubjectTopicsScreen extends StatelessWidget {
           final set = sortedSets[i];
           final locked = !ContentAccess.isItemUnlocked(
             index: i,
-            hasActiveSubscription: hasActiveSubscription,
+            hasActiveSubscription: widget.hasActiveSubscription,
           );
+          final completed = isTruthyCompletionFlag(set['is_completed']);
+          final lastAccuracy = (set['last_accuracy'] as num?)?.toDouble() ?? 0;
           return _PracticeSetCard(
             locked: locked,
+            completed: completed,
             set: PracticeSet(
               id: '${set['id']}',
               title: set['title']?.toString() ?? 'Practice Set',
@@ -1193,9 +1346,10 @@ class _SubjectTopicsScreen extends StatelessWidget {
               questionCount: (set['question_count'] as num?)?.toInt() ?? 0,
               difficulty: set['difficulty']?.toString() ?? 'Moderate',
               estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
-              accuracy: 0,
+              accuracy: completed ? lastAccuracy / 100 : 0,
               tag: set['class_label']?.toString() ?? set['standard_label']?.toString() ?? 'Topic',
             ),
+            onOpened: _refreshSets,
           );
         },
       ),

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/services/onboarding_checklist_service.dart';
+import '../../core/services/attempt_draft_store.dart';
 import '../onboarding/onboarding_checklist_widget.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_tokens.dart';
@@ -169,12 +170,14 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
     }).toList();
   }
 
+  void _reloadTests() {
+    setState(() {
+      _testsFuture = ref.read(contentRepositoryProvider).fetchTests();
+    });
+  }
+
   bool _isTestCompleted(Map<String, dynamic> test) {
-    final value = test['is_completed'];
-    if (value == true) return true;
-    if (value is num) return value != 0;
-    final text = value?.toString().toLowerCase().trim() ?? '';
-    return text == 'true' || text == 't' || text == '1';
+    return isTruthyCompletionFlag(test['is_completed']);
   }
 
   String _sectionTitle() {
@@ -306,14 +309,16 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                                 t['syllabus_coverage']?.toString() ?? '',
                             scheduleLabel:
                                 t['schedule_label']?.toString() ?? '',
-                            completed: t['is_completed'] == true,
+                            completed: _isTestCompleted(t),
                             scoreLabel: _formatTestScoreLabel(t),
                           ),
                           onTap: () => ContentAccess.handleTap(
                             context: context,
                             locked: locked,
-                            onUnlocked: () =>
-                                context.push('/tests/detail/${t['id']}'),
+                            onUnlocked: () async {
+                              await context.push('/tests/detail/${t['id']}');
+                              _reloadTests();
+                            },
                           ),
                         ),
                       );
@@ -426,8 +431,13 @@ class _TestDetailScreenState extends ConsumerState<TestDetailScreen> {
                       label: 'Start test',
                       expanded: true,
                       icon: Icons.play_arrow_rounded,
-                      onPressed: () =>
-                          context.push('/tests/result/${widget.testId}'),
+                      onPressed: () async {
+                        final submitted = await context
+                            .push<bool>('/tests/result/${widget.testId}');
+                        if (submitted == true && context.mounted) {
+                          context.pop(true);
+                        }
+                      },
                     ),
                   ],
                 ),
@@ -457,10 +467,90 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
   int _timeLeft = 0;
   bool _submitted = false;
   bool _submitting = false;
+  bool _draftRestored = false;
   Map<String, dynamic>? _submitResponse;
   final Map<int, String> _answers = {};
   late final Future<Map<String, dynamic>> _attemptFuture;
   Timer? _timer;
+
+  AttemptDraftStore get _draftStore =>
+      AttemptDraftStore(ref.read(sharedPreferencesProvider));
+
+  void _restoreDraftIfNeeded() {
+    if (_draftRestored) return;
+    final draft = _draftStore.loadTestDraft(widget.testId);
+    if (draft == null) {
+      _draftRestored = true;
+      return;
+    }
+    final savedIndex = (draft['index'] as num?)?.toInt();
+    final savedTime = (draft['timeLeft'] as num?)?.toInt();
+    final savedAnswers = draft['answers'];
+    if (savedIndex != null) _index = savedIndex;
+    if (savedTime != null && savedTime > 0) _timeLeft = savedTime;
+    if (savedAnswers is Map) {
+      savedAnswers.forEach((key, value) {
+        final idx = int.tryParse(key.toString());
+        if (idx != null && value != null) {
+          _answers[idx] = value.toString();
+        }
+      });
+    }
+    _draftRestored = true;
+  }
+
+  Future<void> _persistDraft() async {
+    if (_submitted) return;
+    await _draftStore.saveTestDraft(widget.testId, {
+      'index': _index,
+      'timeLeft': _timeLeft,
+      'answers': _answers.map((k, v) => MapEntry('$k', v)),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> _autoSubmitTest({
+    required List<Map<String, dynamic>> questions,
+    required Map<String, dynamic> test,
+  }) async {
+    if (_submitted || _submitting) return;
+    setState(() => _submitting = true);
+    int correct = 0;
+    for (var i = 0; i < questions.length; i++) {
+      final marked = _answers[i];
+      final actual = questions[i]['correct_option']?.toString().toUpperCase() ?? '';
+      if (marked == actual) correct++;
+    }
+    final wrong = _answers.length - correct;
+    final unattempted = questions.length - _answers.length;
+    final marks = (test['marks'] as num?)?.toInt() ?? 720;
+    final score = questions.isEmpty ? 0 : ((correct / questions.length) * marks).round();
+    final accuracy = _answers.isEmpty ? 0.0 : (correct / _answers.length) * 100;
+    try {
+      final res = await ref.read(contentRepositoryProvider).submitTestAttempt(
+        testId: widget.testId,
+        score: score,
+        accuracy: accuracy,
+        correctCount: correct,
+        wrongCount: wrong,
+        unattemptedCount: unattempted,
+      );
+      if (!mounted) return;
+      await _draftStore.clearTestDraft(widget.testId);
+      setState(() {
+        _submitted = true;
+        _submitResponse = res;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitted = true;
+        _submitResponse = _buildLocalSubmitResponse(questions: questions, test: test);
+      });
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   Map<String, dynamic> _buildLocalSubmitResponse({
     required List<Map<String, dynamic>> questions,
@@ -523,12 +613,30 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    if (!_submitted) {
+      unawaited(_persistDraft());
+    }
     super.dispose();
+  }
+
+  Future<bool> _handleBack() async {
+    if (_submitted) {
+      if (context.mounted) context.pop(true);
+      return false;
+    }
+    await _persistDraft();
+    if (context.mounted) context.pop(false);
+    return false;
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_handleBack());
+      },
+      child: FutureBuilder<Map<String, dynamic>>(
       future: _attemptFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -552,16 +660,22 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
         final questions = List<Map<String, dynamic>>.from(
           snapshot.data?['questions'] as List<dynamic>? ?? const [],
         );
-        if (_timeLeft == 0 && !_submitted) {
-          _timeLeft = ((test['duration_minutes'] as num?)?.toInt() ?? 180) * 60;
-          _timer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!_draftRestored && questions.isNotEmpty) {
+          _restoreDraftIfNeeded();
+          if (_timeLeft == 0) {
+            _timeLeft =
+                ((test['duration_minutes'] as num?)?.toInt() ?? 180) * 60;
+          }
+        }
+        if (!_submitted && _timer == null) {
+          _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
             if (!mounted || _submitted) {
               timer.cancel();
               return;
             }
             if (_timeLeft <= 0) {
               timer.cancel();
-              setState(() => _submitted = true);
+              unawaited(_autoSubmitTest(questions: questions, test: test));
               return;
             }
             setState(() => _timeLeft--);
@@ -702,7 +816,10 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                         child: OutlinedButton(
                           onPressed: _submitted
                               ? null
-                              : () => setState(() => _answers[_index] = e.key),
+                              : () {
+                                  setState(() => _answers[_index] = e.key);
+                                  unawaited(_persistDraft());
+                                },
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size.fromHeight(52),
                             backgroundColor: selected == e.key
@@ -757,6 +874,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                 : () async {
                                     if (_index < questions.length - 1) {
                                       setState(() => _index++);
+                                      unawaited(_persistDraft());
                                       return;
                                     }
                                     setState(() => _submitting = true);
@@ -796,6 +914,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                         unattemptedCount: unattempted,
                                       );
                                       if (!mounted) return;
+                                      await _draftStore.clearTestDraft(widget.testId);
                                       setState(() {
                                         _submitted = true;
                                         _submitResponse = res;
@@ -834,6 +953,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
           ),
         );
       },
+    ),
     );
   }
 }

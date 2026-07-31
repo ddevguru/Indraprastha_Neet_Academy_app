@@ -1,6 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/content/data/content_repository.dart';
 
@@ -12,9 +13,14 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 }
 
 class NotificationService {
-  NotificationService._();
-  static final NotificationService instance = NotificationService._();
+  NotificationService._(this._prefs);
+  static late NotificationService instance;
 
+  static void initializeService(SharedPreferences prefs) {
+    instance = NotificationService._(prefs);
+  }
+
+  final SharedPreferences _prefs;
   final _messaging = FirebaseMessaging.instance;
   final _local = FlutterLocalNotificationsPlugin();
 
@@ -68,7 +74,8 @@ class NotificationService {
     try {
       final token = await _messaging.getToken();
       if (token != null && token.isNotEmpty) {
-        await ContentRepository().registerFcmToken(token);
+        final repo = ContentRepository(prefs: _prefs);
+        await repo.registerFcmToken(token);
       }
     } catch (e) {
       if (kDebugMode) debugPrint('[FCM] token upload error: $e');

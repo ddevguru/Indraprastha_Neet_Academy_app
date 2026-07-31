@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers/app_state.dart';
 import '../../widgets/website_links.dart';
 import '../auth/bloc/auth_bloc.dart';
-import '../content/data/content_repository.dart';
 import '../../core/services/onboarding_checklist_service.dart';
 import '../onboarding/onboarding_checklist_widget.dart';
 import '../../models/app_models.dart';
@@ -207,7 +206,7 @@ class _SavedRevisionScreenState extends ConsumerState<SavedRevisionScreen> {
   }
 
   Future<Map<String, dynamic>> _loadSaved() async {
-    final repo = ContentRepository();
+    final repo = ref.read(contentRepositoryProvider);
     final books = await repo.fetchBooks();
     final tests = await repo.fetchTests();
     final chapterFutures = books.map((book) async {
@@ -332,11 +331,11 @@ class _SavedRevisionScreenState extends ConsumerState<SavedRevisionScreen> {
   }
 }
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
-  Future<List<Map<String, dynamic>>> _fetchNotifications() async {
-    final repo = ContentRepository();
+  Future<List<Map<String, dynamic>>> _fetchNotifications(WidgetRef ref) async {
+    final repo = ref.read(contentRepositoryProvider);
     final results = await Future.wait([
       repo.fetchBooks(),
       repo.fetchTests(),
@@ -371,7 +370,7 @@ class NotificationsScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: const Text('Notifications')),
       body: SingleChildScrollView(
@@ -379,7 +378,7 @@ class NotificationsScreen extends StatelessWidget {
         child: CenteredContent(
           maxWidth: 900,
           child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: _fetchNotifications(),
+            future: _fetchNotifications(ref),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const SkeletonLoader(cardCount: 5);

@@ -131,6 +131,40 @@ class ContentRepository {
     throw Exception(body['error']?.toString() ?? 'Failed request');
   }
 
+  Future<Map<String, dynamic>> submitPracticeAttempt({
+    required int setId,
+    required int score,
+    required double accuracy,
+    required int correctCount,
+    required int wrongCount,
+  }) async {
+    final token = await _token;
+    if (token == null) {
+      throw Exception('Not logged in. Please login again.');
+    }
+    final response = await _client.post(
+      Uri.parse('$baseUrl/content/practice-sets/$setId/submit'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'score': score,
+        'accuracy': accuracy,
+        'correctCount': correctCount,
+        'wrongCount': wrongCount,
+      }),
+    );
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      _cache.clear();
+      return body;
+    }
+    throw Exception(body['error']?.toString() ?? 'Failed request');
+  }
+
   Future<Map<String, dynamic>> fetchLatestAnalytics() =>
       _get('/content/analytics/latest');
 

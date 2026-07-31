@@ -343,7 +343,7 @@ class _DrawerTile extends StatelessWidget {
                   ],
                 ),
               ),
-              ?trailing,
+              if (trailing != null) trailing!,
             ],
           ),
         ),

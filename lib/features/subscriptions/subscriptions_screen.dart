@@ -43,7 +43,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
       messenger.showSnackBar(
         const SnackBar(content: Text('Creating payment order...')),
       );
-      final order = await ContentRepository().createPaymentOrder(packageId);
+      final order = await ref.read(contentRepositoryProvider).createPaymentOrder(packageId);
       final orderId = order['orderId']?.toString() ?? '';
       final razorpayOrderId = order['razorpayOrderId']?.toString() ?? '';
       final keyId = order['keyId']?.toString() ?? '';
@@ -223,17 +223,27 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
 class _ComparePlansTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final textStyle = Theme.of(context).textTheme.bodyMedium;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headerColor = isDark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : AppColors.surfaceMuted;
+    final textStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface,
+        );
+    final headerStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w700,
+        );
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 320),
         child: DataTable(
           columnSpacing: 22,
-          headingRowColor: WidgetStatePropertyAll(AppColors.surfaceMuted),
-          columns: const [
-            DataColumn(label: Text('Feature')),
-            DataColumn(label: Text('Rs 999 Plan')),
+          headingRowColor: WidgetStatePropertyAll(headerColor),
+          columns: [
+            DataColumn(label: Text('Feature', style: headerStyle)),
+            DataColumn(label: Text('Rs 999 Plan', style: headerStyle)),
           ],
           rows: [
             _row('NCERT smart reading', 'Yes', textStyle),
