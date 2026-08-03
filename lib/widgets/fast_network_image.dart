@@ -39,6 +39,7 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
   Uint8List? _bytes;
   bool _loading = true;
   bool _failed = false;
+  DateTime? _loadStartTime;
 
   @override
   void initState() {
@@ -76,7 +77,13 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
       return;
     }
 
-    if (mounted) setState(() { _loading = true; _failed = false; });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _failed = false;
+        _loadStartTime = DateTime.now();
+      });
+    }
 
     try {
       final token = _prefs.getString('auth_token');
@@ -87,7 +94,7 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
 
       final response = await http
           .get(Uri.parse(resolved), headers: headers.isEmpty ? null : headers)
-          .timeout(const Duration(seconds: 45));
+          .timeout(const Duration(seconds: 15));
 
       final contentType = response.headers['content-type'] ?? '';
       if (response.statusCode == 200 &&
@@ -152,16 +159,37 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
   }
 
   Widget _loadingBox() {
+    final elapsed = _loadStartTime != null
+        ? DateTime.now().difference(_loadStartTime!).inSeconds
+        : 0;
+    final isStuck = elapsed > 5;
+
     return Container(
       height: widget.height ?? 120,
       width: widget.width,
       alignment: Alignment.center,
       color: AppColors.surfaceMuted,
-      child: const SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
+      child: isStuck
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Loading image... (${elapsed}s)',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            )
+          : const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
     );
   }
 
@@ -170,8 +198,21 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
       height: widget.height ?? 120,
       width: widget.width,
       alignment: Alignment.center,
-      color: AppColors.surfaceMuted,
-      child: const Text('Image unavailable', style: TextStyle(fontSize: 12)),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.image_not_supported_outlined, size: 28, color: Colors.grey),
+          SizedBox(height: 6),
+          Text('Image unavailable', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        ],
+      ),
     );
   }
 }
