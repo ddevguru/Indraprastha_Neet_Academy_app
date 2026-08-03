@@ -296,6 +296,30 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SkeletonLoader(cardCount: 3);
                 }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline, size: 40, color: Colors.grey),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Could not load practice sets',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton(
+                            onPressed: _reloadPractice,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
                 if (sets.isEmpty) {
                   return const EmptyStateWidget(
                     title: 'No practice sets yet',
