@@ -176,24 +176,42 @@ class ContentRepository {
     if (token == null) {
       throw Exception('Not logged in. Please login again.');
     }
-    final response = await _client.post(
-      Uri.parse('$baseUrl/support/complaints'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'title': title,
-        'description': description,
-      }),
-    );
-    final body = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body) as Map<String, dynamic>;
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return body;
+    try {
+      final response = await _client.post(
+        Uri.parse('$baseUrl/support/complaints'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'title': title,
+          'description': description,
+        }),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (response.body.isEmpty) return {};
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+
+      // Handle error responses
+      if (response.body.isEmpty) {
+        throw Exception('Server returned ${response.statusCode} with no response');
+      }
+
+      try {
+        final errorBody = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(errorBody['error']?.toString() ?? 'Server error (${response.statusCode})');
+      } catch (e) {
+        // Response isn't JSON
+        if (response.body.startsWith('<')) {
+          throw Exception('Server error (${response.statusCode}): Backend may be down');
+        }
+        throw Exception(response.body);
+      }
+    } catch (e) {
+      throw Exception(e.toString().replaceFirst('Exception: ', ''));
     }
-    throw Exception(body['error']?.toString() ?? 'Failed to submit complaint');
   }
 
   Future<List<Map<String, dynamic>>> fetchVideos() async {

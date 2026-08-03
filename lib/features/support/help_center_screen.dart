@@ -57,10 +57,14 @@ class _HelpCenterScreenState extends ConsumerState<HelpCenterScreen> {
       _descriptionController.clear();
     } catch (e) {
       if (!mounted) return;
+      final errorMsg = e.toString()
+          .replaceFirst('Exception: ', '')
+          .replaceFirst('FormatException: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
+          content: Text('Error: $errorMsg'),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
         ),
       );
     } finally {
