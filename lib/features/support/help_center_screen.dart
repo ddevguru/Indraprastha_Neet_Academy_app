@@ -188,11 +188,11 @@ class _HelpCenterScreenState extends ConsumerState<HelpCenterScreen> {
                     _HelpTile(
                       icon: Icons.mail_outline_rounded,
                       title: 'Email Us',
-                      subtitle: 'support@indraprastha.com',
+                      subtitle: 'contact@indraprasthaneetacademy.com',
                       onTap: () async {
                         final uri = Uri(
                           scheme: 'mailto',
-                          path: 'support@indraprastha.com',
+                          path: 'contact@indraprasthaneetacademy.com',
                           queryParameters: {
                             'subject': 'Help Request from Indraprastha App',
                           },

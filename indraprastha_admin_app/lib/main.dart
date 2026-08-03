@@ -383,6 +383,7 @@ class _AdminHomeState extends State<AdminHome> {
     'Videos',
     'Packages',
     'Users',
+    'Complaints',
   ];
   static const _navItems = [
     (Icons.dashboard_outlined, 'Dashboard'),
@@ -394,6 +395,7 @@ class _AdminHomeState extends State<AdminHome> {
     (Icons.smart_display_outlined, 'Videos'),
     (Icons.workspace_premium_outlined, 'Packages'),
     (Icons.people_outline_rounded, 'Users'),
+    (Icons.report_outlined, 'Complaints'),
   ];
 
   @override
@@ -457,6 +459,7 @@ class _AdminHomeState extends State<AdminHome> {
       VideosPage(api: _api),
       PackagesPage(api: _api),
       UsersPage(api: _api),
+      ComplaintsPage(api: _api),
     ];
     final isLoggedIn = _api.token != null;
     if (isLoggedIn && !_checkedDriveAfterLogin) {
@@ -5467,6 +5470,376 @@ class _UsersPageState extends State<UsersPage> {
   }
 }
 
+class ComplaintsPage extends StatefulWidget {
+  const ComplaintsPage({super.key, required this.api});
+  final AdminApi api;
+  @override
+  State<ComplaintsPage> createState() => _ComplaintsPageState();
+}
+
+class _ComplaintsPageState extends State<ComplaintsPage> {
+  List<dynamic> _complaints = const [];
+  bool _loading = true;
+  String? _error;
+  final _search = TextEditingController();
+  String _query = '';
+  String _filterStatus = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await widget.api.complaints();
+      setState(() {
+        _complaints = (data['complaints'] as List<dynamic>? ?? []);
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  List<dynamic> get _filtered {
+    var filtered = _complaints;
+    if (_filterStatus != 'all') {
+      filtered = filtered.where((c) {
+        final m = c as Map<String, dynamic>;
+        return (m['status']?.toString() ?? '').toLowerCase() == _filterStatus;
+      }).toList();
+    }
+    if (_query.isEmpty) return filtered;
+    final q = _query.toLowerCase();
+    return filtered.where((c) {
+      final m = c as Map<String, dynamic>;
+      return (m['full_name']?.toString().toLowerCase().contains(q) ?? false) ||
+          (m['email']?.toString().toLowerCase().contains(q) ?? false) ||
+          (m['title']?.toString().toLowerCase().contains(q) ?? false);
+    }).toList();
+  }
+
+  Color _statusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'open':
+        return const Color(0xFFE85A1C);
+      case 'in-progress':
+        return const Color(0xFF2196F3);
+      case 'resolved':
+        return const Color(0xFF4CAF50);
+      case 'closed':
+        return const Color(0xFF9E9E9E);
+      default:
+        return const Color(0xFF757575);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Error: $_error', textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    final filtered = _filtered;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _search,
+                  decoration: InputDecoration(
+                    hintText: 'Search by name, email or issue…',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _query.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _search.clear();
+                              setState(() => _query = '');
+                            },
+                          )
+                        : null,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                  ),
+                  onChanged: (v) => setState(() => _query = v),
+                ),
+              ),
+              const SizedBox(width: 10),
+              DropdownButton<String>(
+                value: _filterStatus,
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('All')),
+                  DropdownMenuItem(value: 'open', child: Text('Open')),
+                  DropdownMenuItem(value: 'in-progress', child: Text('In Progress')),
+                  DropdownMenuItem(value: 'resolved', child: Text('Resolved')),
+                  DropdownMenuItem(value: 'closed', child: Text('Closed')),
+                ],
+                onChanged: (v) => setState(() => _filterStatus = v ?? 'all'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? Center(
+                  child: Text(
+                    _query.isEmpty && _filterStatus == 'all'
+                        ? 'No complaints yet'
+                        : 'No results found',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) {
+                    final complaint = filtered[i] as Map<String, dynamic>;
+                    final status = complaint['status']?.toString() ?? 'open';
+                    final createdAt = complaint['created_at']?.toString() ?? '';
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(12),
+                        leading: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: _statusColor(status).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            status == 'open'
+                                ? Icons.mail_outline
+                                : status == 'in-progress'
+                                    ? Icons.hourglass_bottom
+                                    : status == 'resolved'
+                                        ? Icons.check_circle_outline
+                                        : Icons.done_all,
+                            color: _statusColor(status),
+                            size: 24,
+                          ),
+                        ),
+                        title: Text(
+                          complaint['title']?.toString() ?? 'N/A',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                              complaint['full_name']?.toString() ?? 'N/A',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            Text(
+                              complaint['email']?.toString() ?? 'N/A',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              complaint['description']?.toString() ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _statusColor(status).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                status,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _statusColor(status),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              createdAt.split('T').first,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) => _ComplaintDetailsDialog(
+                              complaint: complaint,
+                              api: widget.api,
+                              onStatusChanged: _load,
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+}
+
+class _ComplaintDetailsDialog extends StatefulWidget {
+  final Map<String, dynamic> complaint;
+  final AdminApi api;
+  final VoidCallback onStatusChanged;
+
+  const _ComplaintDetailsDialog({
+    required this.complaint,
+    required this.api,
+    required this.onStatusChanged,
+  });
+
+  @override
+  State<_ComplaintDetailsDialog> createState() =>
+      _ComplaintDetailsDialogState();
+}
+
+class _ComplaintDetailsDialogState extends State<_ComplaintDetailsDialog> {
+  late String _status;
+  bool _updating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = widget.complaint['status']?.toString() ?? 'open';
+  }
+
+  Future<void> _updateStatus(String newStatus) async {
+    setState(() => _updating = true);
+    try {
+      await widget.api.updateComplaintStatus(
+        complaintId: widget.complaint['id'],
+        status: newStatus,
+      );
+      setState(() => _status = newStatus);
+      widget.onStatusChanged();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Status updated successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _updating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Complaint Details'),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Issue: ${widget.complaint['title'] ?? 'N/A'}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Text('Name: ${widget.complaint['full_name'] ?? 'N/A'}'),
+            Text('Email: ${widget.complaint['email'] ?? 'N/A'}'),
+            const SizedBox(height: 12),
+            const Text(
+              'Description:',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(widget.complaint['description']?.toString() ?? 'N/A'),
+            const SizedBox(height: 16),
+            const Text(
+              'Update Status:',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: ['open', 'in-progress', 'resolved', 'closed']
+                  .map((s) => ChoiceChip(
+                        label: Text(s),
+                        selected: _status == s,
+                        onSelected: _updating
+                            ? null
+                            : (selected) {
+                                if (selected) _updateStatus(s);
+                              },
+                      ))
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
 class AdminApi {
   static const _tokenKey = 'admin_auth_token';
   String? token;
@@ -5517,6 +5890,7 @@ class AdminApi {
   Future<Map<String, dynamic>> tests() => _get('/admin/tests');
   Future<Map<String, dynamic>> videos() => _get('/admin/videos');
   Future<Map<String, dynamic>> packages() => _get('/admin/packages');
+  Future<Map<String, dynamic>> complaints() => _get('/support/complaints');
   Future<Map<String, dynamic>> driveOAuthStart() =>
       _get('/admin/drive/oauth/start');
   Future<Map<String, dynamic>> driveOAuthStatus() =>
@@ -6427,6 +6801,15 @@ class AdminApi {
 
   Future<void> deletePackage(int id) => _delete('/admin/packages/$id');
 
+  Future<void> updateComplaintStatus({
+    required int complaintId,
+    required String status,
+  }) async {
+    await _patch('/support/complaints/$complaintId/status', {
+      'status': status,
+    });
+  }
+
   Future<Map<String, dynamic>> _get(String path) async {
     if (token == null) throw Exception('Login first');
     try {
@@ -6513,6 +6896,37 @@ class AdminApi {
     } catch (e, st) {
       await AdminErrorLogger.instance.log(
         'PUT $path',
+        e,
+        stackTrace: st,
+        details: payload,
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> _patch(String path, Map<String, dynamic> payload) async {
+    if (token == null) throw Exception('Login first');
+    try {
+      final response = await _client.patch(
+        Uri.parse('$baseUrl$path'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+      final body = _decodeApiJson(
+        response.body,
+        statusCode: response.statusCode,
+        method: 'PATCH',
+        path: path,
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(body['error'] ?? body['details'] ?? response.body);
+      }
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log(
+        'PATCH $path',
         e,
         stackTrace: st,
         details: payload,
