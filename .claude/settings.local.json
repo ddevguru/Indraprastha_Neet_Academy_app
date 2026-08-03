@@ -16,7 +16,8 @@
       "Bash(git add *)",
       "Bash(xargs grep -l \"class.*Question\\\\|Map.*question\")",
       "PowerShell(flutter doctor -v)",
-      "PowerShell(Stop-Process -Force -ErrorAction SilentlyContinue)"
+      "PowerShell(Stop-Process -Force -ErrorAction SilentlyContinue)",
+      "Bash(npm start *)"
     ]
   }
 }

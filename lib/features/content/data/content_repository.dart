@@ -168,6 +168,34 @@ class ContentRepository {
   Future<Map<String, dynamic>> fetchLatestAnalytics() =>
       _get('/content/analytics/latest');
 
+  Future<Map<String, dynamic>> submitComplaint({
+    required String title,
+    required String description,
+  }) async {
+    final token = await _token;
+    if (token == null) {
+      throw Exception('Not logged in. Please login again.');
+    }
+    final response = await _client.post(
+      Uri.parse('$baseUrl/support/complaints'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'title': title,
+        'description': description,
+      }),
+    );
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return body;
+    }
+    throw Exception(body['error']?.toString() ?? 'Failed to submit complaint');
+  }
+
   Future<List<Map<String, dynamic>>> fetchVideos() async {
     final data = await _get('/content/videos');
     return _mapsFromListKey(data, 'videos');

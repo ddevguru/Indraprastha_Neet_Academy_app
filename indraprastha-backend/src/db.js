@@ -642,6 +642,35 @@ async function ensureDatabaseSchema() {
      ON CONFLICT (class_id, name) DO NOTHING`
   );
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS complaints (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      full_name VARCHAR(100),
+      email VARCHAR(100),
+      title VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      status VARCHAR(50) DEFAULT 'open',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    ALTER TABLE complaints
+    ADD COLUMN IF NOT EXISTS full_name VARCHAR(100);
+  `);
+
+  await pool.query(`
+    ALTER TABLE complaints
+    ADD COLUMN IF NOT EXISTS email VARCHAR(100);
+  `);
+
+  await pool.query(`
+    ALTER TABLE complaints
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+  `);
+
   const adminUser = process.env.ADMIN_USERNAME || 'admin';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin@123';
   const adminPasswordHash = await bcrypt.hash(adminPassword, 10);

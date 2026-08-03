@@ -203,6 +203,24 @@ class AppDrawer extends ConsumerWidget {
                     ),
                     const Divider(color: Color(0x33FFFFFF)),
                     _DrawerTile(
+                      title: 'Help Center',
+                      leading: const Icon(Icons.help_rounded, color: AppColors.onDrawer),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/help-center');
+                      },
+                    ),
+                    _DrawerTile(
+                      title: 'Join Our Mentorship',
+                      leading: const Icon(Icons.groups_rounded, color: AppColors.onDrawer),
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        final uri = Uri.parse('https://t.me/+yiL4ctVZQVMwNDY1');
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      },
+                    ),
+                    const Divider(color: Color(0x33FFFFFF)),
+                    _DrawerTile(
                       title: 'Profile',
                       leading: const Icon(Icons.person_rounded, color: AppColors.onDrawer),
                       onTap: () {

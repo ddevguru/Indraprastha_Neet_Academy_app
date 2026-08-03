@@ -1115,7 +1115,13 @@ class _PracticeSetCard extends StatelessWidget {
                 children: [
                   Text(set.title, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: AppSpacing.xs),
-                  Text('${set.topic} . ${set.tag}'),
+                  Text(
+                    '${set.topic} . ${set.tag}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.sm),
                   Wrap(
                     spacing: AppSpacing.sm,
@@ -1157,7 +1163,14 @@ class _MetaPill extends StatelessWidget {
             : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(99),
       ),
-      child: Text(label),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+        ),
+      ),
     );
   }
 }

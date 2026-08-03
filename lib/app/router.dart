@@ -19,6 +19,7 @@ import '../features/profile/profile_screens.dart';
 import '../features/subscriptions/paywall_screen.dart';
 import '../features/subscriptions/subscriptions_screen.dart';
 import '../features/tests/tests_screens.dart';
+import '../features/support/help_center_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final authBloc = ref.read(authBlocProvider);
@@ -174,6 +175,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileShellScreen(),
+      ),
+      GoRoute(
+        path: '/help-center',
+        builder: (context, state) => const HelpCenterScreen(),
       ),
     ],
   );

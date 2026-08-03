@@ -81,6 +81,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/support', require('./routes/support'));
 
 app.use((err, req, res, _next) => {
   const elapsed = req.reqStart ? `${Date.now() - req.reqStart}ms` : 'n/a';
