@@ -290,13 +290,19 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             FutureBuilder<List<Map<String, dynamic>>>(
-              future: _practiceFuture,
+              future: Future.any([
+                _practiceFuture,
+                Future.delayed(const Duration(seconds: 10)).then((_) {
+                  throw Exception('Load timeout after 10s - check internet connection');
+                }),
+              ]),
               builder: (context, snapshot) {
                 final sets = snapshot.data ?? const [];
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SkeletonLoader(cardCount: 3);
                 }
                 if (snapshot.hasError) {
+                  final errorMsg = snapshot.error?.toString() ?? 'Unknown error';
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -311,6 +317,12 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 8),
+                          Text(
+                            errorMsg.replaceFirst('Exception: ', ''),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 12),
                           ElevatedButton(
                             onPressed: _reloadPractice,
                             child: const Text('Retry'),
