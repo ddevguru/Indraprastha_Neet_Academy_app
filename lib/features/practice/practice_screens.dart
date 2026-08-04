@@ -85,6 +85,33 @@ Widget _buildQuestionImage(String rawUrl) {
   );
 }
 
+double _parseDouble(dynamic value, {double defaultValue = 0}) {
+  if (value == null) return defaultValue;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    try {
+      return double.parse(value);
+    } catch (_) {
+      return defaultValue;
+    }
+  }
+  return defaultValue;
+}
+
+int _parseInt(dynamic value, {int defaultValue = 0}) {
+  if (value == null) return defaultValue;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    try {
+      return int.parse(value);
+    } catch (_) {
+      return defaultValue;
+    }
+  }
+  return defaultValue;
+}
+
 class PracticeHomeScreen extends ConsumerStatefulWidget {
   const PracticeHomeScreen({super.key});
 
@@ -382,8 +409,7 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                           final set = entry.value;
                           final completed =
                               isTruthyCompletionFlag(set['is_completed']);
-                          final lastAccuracy =
-                              (set['last_accuracy'] as num?)?.toDouble() ?? 0;
+                          final lastAccuracy = _parseDouble(set['last_accuracy']);
                           return Padding(
                             padding: const EdgeInsets.only(bottom: AppSpacing.md),
                             child: _PracticeSetCard(
@@ -391,12 +417,10 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                                 id: '${set['id']}',
                                 title: set['title']?.toString() ?? 'Practice Set',
                                 topic: set['topic']?.toString() ?? '',
-                                questionCount:
-                                    (set['question_count'] as num?)?.toInt() ?? 0,
+                                questionCount: _parseInt(set['question_count']),
                                 difficulty:
                                     set['difficulty']?.toString() ?? 'Moderate',
-                                estimatedMinutes:
-                                    (set['estimated_minutes'] as num?)?.toInt() ?? 20,
+                                estimatedMinutes: _parseInt(set['estimated_minutes'], defaultValue: 20),
                                 accuracy: completed ? lastAccuracy / 100 : 0,
                                 tag: 'Batch-wise',
                               ),
@@ -581,13 +605,12 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       _draftRestored = true;
       return;
     }
-    _currentIndex = (draft['currentIndex'] as num?)?.toInt() ?? _currentIndex;
-    _correctCount = (draft['correctCount'] as num?)?.toInt() ?? _correctCount;
-    _wrongCount = (draft['wrongCount'] as num?)?.toInt() ?? _wrongCount;
+    _currentIndex = _parseInt(draft['currentIndex'], defaultValue: _currentIndex);
+    _correctCount = _parseInt(draft['correctCount'], defaultValue: _correctCount);
+    _wrongCount = _parseInt(draft['wrongCount'], defaultValue: _wrongCount);
     _submitted = draft['submitted'] == true;
     final savedOption = draft['selectedOption'];
-    _selectedOption =
-        savedOption == null ? null : (savedOption as num).toInt();
+    _selectedOption = savedOption == null ? null : _parseInt(savedOption);
     final savedAnswers = draft['answers'];
     if (savedAnswers is Map) {
       savedAnswers.forEach((key, value) {
@@ -666,7 +689,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     if (!mounted) return;
     Map<String, dynamic>? currentSet;
     for (final set in sets) {
-      if ((set['id'] as num?)?.toInt() == widget.setId) {
+      if (_parseInt(set['id']) == widget.setId) {
         currentSet = set;
         break;
       }
@@ -1451,7 +1474,7 @@ class _SubjectTopicsScreenState extends State<_SubjectTopicsScreen> {
                       hasActiveSubscription: widget.hasActiveSubscription,
                     );
                     final completed = isTruthyCompletionFlag(set['is_completed']);
-                    final lastAccuracy = (set['last_accuracy'] as num?)?.toDouble() ?? 0;
+                    final lastAccuracy = _parseDouble(set['last_accuracy']);
                     return _PracticeSetCard(
                       locked: locked,
                       completed: completed,
@@ -1459,9 +1482,9 @@ class _SubjectTopicsScreenState extends State<_SubjectTopicsScreen> {
                         id: '${set['id']}',
                         title: set['title']?.toString() ?? 'Practice Set',
                         topic: set['topic']?.toString() ?? '',
-                        questionCount: (set['question_count'] as num?)?.toInt() ?? 0,
+                        questionCount: _parseInt(set['question_count']),
                         difficulty: set['difficulty']?.toString() ?? 'Moderate',
-                        estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
+                        estimatedMinutes: _parseInt(set['estimated_minutes'], defaultValue: 20),
                         accuracy: completed ? lastAccuracy / 100 : 0,
                         tag: set['class_label']?.toString() ?? set['standard_label']?.toString() ?? 'Topic',
                       ),
@@ -1723,7 +1746,7 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
       final repo = ContentRepository(prefs: prefs);
       final allQuestions = <Map<String, dynamic>>[];
       for (final set in sets) {
-        final setId = (set['id'] as num?)?.toInt();
+        final setId = set['id'] != null ? _parseInt(set['id']) : null;
         if (setId == null) continue;
         final data = await repo.fetchPracticeAttemptData(setId);
         final questions = List<Map<String, dynamic>>.from(

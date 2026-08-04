@@ -17,7 +17,11 @@
       "Bash(xargs grep -l \"class.*Question\\\\|Map.*question\")",
       "PowerShell(flutter doctor -v)",
       "PowerShell(Stop-Process -Force -ErrorAction SilentlyContinue)",
-      "Bash(npm start *)"
+      "Bash(npm start *)",
+      "Bash(flutter clean *)",
+      "Bash(git restore *)",
+      "Bash(flutter run *)",
+      "Bash(pkill -f \"flutter run\")"
     ]
   }
 }
