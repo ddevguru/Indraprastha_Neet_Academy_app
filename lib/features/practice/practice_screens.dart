@@ -333,10 +333,43 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                   );
                 }
                 if (sets.isEmpty) {
-                  return const EmptyStateWidget(
-                    title: 'No practice sets yet',
-                    subtitle: 'Admin panel se practice sets add karne ke baad yahan dikhenge.',
-                    icon: Icons.bolt_rounded,
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            hasSubscription ? Icons.bolt_rounded : Icons.lock_rounded,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            hasSubscription
+                                ? 'No practice sets yet'
+                                : 'Upgrade to Premium',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            hasSubscription
+                                ? 'Admin panel se practice sets add karne ke baad yahan dikhenge.'
+                                : 'Unlock all practice sets with Premium subscription.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          if (!hasSubscription) ...[
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: () => ContentAccess.openSubscriptions(context),
+                              child: const Text('View Plans'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   );
                 }
                 return Column(
