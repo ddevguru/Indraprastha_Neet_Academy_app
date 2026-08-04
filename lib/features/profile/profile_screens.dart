@@ -135,6 +135,7 @@ class _ProfileIdentity extends StatelessWidget {
       children: [
         Stack(
           clipBehavior: Clip.none,
+          alignment: Alignment.topLeft,
           children: [
             const AppLogo(size: 72, showGlow: true, padding: 4),
             Positioned(

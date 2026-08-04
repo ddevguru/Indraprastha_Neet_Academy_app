@@ -873,6 +873,7 @@ class GradientOrbs extends StatelessWidget {
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: Stack(
+        alignment: Alignment.topLeft,
         children: [
           Positioned(
             top: -60,

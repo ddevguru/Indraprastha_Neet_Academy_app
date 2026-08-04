@@ -1401,51 +1401,43 @@ class _SubjectTopicsScreenState extends State<_SubjectTopicsScreen> {
     final sortedSets = List<Map<String, dynamic>>.from(_sets)
       ..sort(ContentAccess.comparePracticeSetOrder);
 
-    final isEmpty = sortedSets.isEmpty;
-    final showUpgradeMessage = isEmpty && !widget.hasActiveSubscription;
-
     return Scaffold(
       appBar: AppBar(title: Text(widget.subject)),
-      body: showUpgradeMessage
+      body: sortedSets.isEmpty && !widget.hasActiveSubscription
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.lock_rounded, size: 48, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Premium Content',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'All ${widget.subject} practice sets require Premium subscription.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: () => ContentAccess.openSubscriptions(context),
-                        child: const Text('Upgrade Now'),
-                      ),
-                    ],
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lock_rounded, size: 48, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Premium Content',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'All ${widget.subject} practice sets require Premium subscription.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => ContentAccess.openSubscriptions(context),
+                      child: const Text('Upgrade Now'),
+                    ),
+                  ],
                 ),
               ),
             )
-          : isEmpty
+          : sortedSets.isEmpty
               ? Center(
-                  child: SingleChildScrollView(
-                    child: EmptyStateWidget(
-                      title: 'No practice sets',
-                      subtitle: 'No practice sets available for ${widget.subject}.',
-                      icon: Icons.grid_view_rounded,
-                    ),
+                  child: EmptyStateWidget(
+                    title: 'No practice sets',
+                    subtitle: 'No practice sets available for ${widget.subject}.',
+                    icon: Icons.grid_view_rounded,
                   ),
                 )
               : ListView.separated(

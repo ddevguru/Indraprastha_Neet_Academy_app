@@ -16,6 +16,7 @@ class PaywallScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Subscription required')),
       body: Stack(
+        alignment: Alignment.center,
         children: [
           const GradientOrbs(),
           SafeArea(

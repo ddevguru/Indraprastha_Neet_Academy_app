@@ -56,6 +56,7 @@ class _CookieConsentBannerState extends ConsumerState<CookieConsentBanner> {
   @override
   Widget build(BuildContext context) {
     return Stack(
+      alignment: Alignment.bottomCenter,
       children: [
         widget.child,
         if (_visible)

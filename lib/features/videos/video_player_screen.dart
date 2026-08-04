@@ -155,6 +155,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         onTap: _toggleControls,
         child: Stack(
           fit: StackFit.expand,
+          alignment: Alignment.center,
           children: [
             // Video
             if (initialized)
