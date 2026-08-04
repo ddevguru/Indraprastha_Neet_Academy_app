@@ -359,9 +359,6 @@ class ContentRepository {
     final response = await _client.get(
       Uri.parse('$baseUrl$path'),
       headers: {'Authorization': 'Bearer $token'},
-    ).timeout(
-      const Duration(seconds: 15),
-      onTimeout: () => throw Exception('Request timeout - network slow'),
     );
     final body = response.body.isEmpty
         ? <String, dynamic>{}
