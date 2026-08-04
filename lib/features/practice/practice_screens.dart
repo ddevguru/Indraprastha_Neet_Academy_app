@@ -1406,35 +1406,72 @@ class _SubjectTopicsScreenState extends State<_SubjectTopicsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.subject)),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        itemCount: sortedSets.length,
-        separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
-        itemBuilder: (context, i) {
-          final set = sortedSets[i];
-          final locked = !ContentAccess.isItemUnlocked(
-            index: i,
-            hasActiveSubscription: widget.hasActiveSubscription,
-          );
-          final completed = isTruthyCompletionFlag(set['is_completed']);
-          final lastAccuracy = (set['last_accuracy'] as num?)?.toDouble() ?? 0;
-          return _PracticeSetCard(
-            locked: locked,
-            completed: completed,
-            set: PracticeSet(
-              id: '${set['id']}',
-              title: set['title']?.toString() ?? 'Practice Set',
-              topic: set['topic']?.toString() ?? '',
-              questionCount: (set['question_count'] as num?)?.toInt() ?? 0,
-              difficulty: set['difficulty']?.toString() ?? 'Moderate',
-              estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
-              accuracy: completed ? lastAccuracy / 100 : 0,
-              tag: set['class_label']?.toString() ?? set['standard_label']?.toString() ?? 'Topic',
-            ),
-            onOpened: _refreshSets,
-          );
-        },
-      ),
+      body: sortedSets.isEmpty && !widget.hasActiveSubscription
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lock_rounded, size: 48, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Premium Content',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'All ${widget.subject} practice sets require Premium subscription.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => ContentAccess.openSubscriptions(context),
+                      child: const Text('Upgrade Now'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : sortedSets.isEmpty
+              ? Center(
+                  child: EmptyStateWidget(
+                    title: 'No practice sets',
+                    subtitle: 'No practice sets available for ${widget.subject}.',
+                    icon: Icons.grid_view_rounded,
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  itemCount: sortedSets.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+                  itemBuilder: (context, i) {
+                    final set = sortedSets[i];
+                    final locked = !ContentAccess.isItemUnlocked(
+                      index: i,
+                      hasActiveSubscription: widget.hasActiveSubscription,
+                    );
+                    final completed = isTruthyCompletionFlag(set['is_completed']);
+                    final lastAccuracy = (set['last_accuracy'] as num?)?.toDouble() ?? 0;
+                    return _PracticeSetCard(
+                      locked: locked,
+                      completed: completed,
+                      set: PracticeSet(
+                        id: '${set['id']}',
+                        title: set['title']?.toString() ?? 'Practice Set',
+                        topic: set['topic']?.toString() ?? '',
+                        questionCount: (set['question_count'] as num?)?.toInt() ?? 0,
+                        difficulty: set['difficulty']?.toString() ?? 'Moderate',
+                        estimatedMinutes: (set['estimated_minutes'] as num?)?.toInt() ?? 20,
+                        accuracy: completed ? lastAccuracy / 100 : 0,
+                        tag: set['class_label']?.toString() ?? set['standard_label']?.toString() ?? 'Topic',
+                      ),
+                      onOpened: _refreshSets,
+                    );
+                  },
+                ),
     );
   }
 }
