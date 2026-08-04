@@ -640,9 +640,6 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
   @override
   void dispose() {
-    if (!_finished && widget.customQuestions == null) {
-      unawaited(_persistDraft());
-    }
     super.dispose();
   }
 
