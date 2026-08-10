@@ -2550,19 +2550,26 @@ class _PracticePageState extends State<PracticePage> {
                                   );
                                   if (moveToSetId != null) {
                                     try {
+                                      final qId = _asInt(question['id'],
+                                          label: 'questionId');
                                       await widget.api.movePracticeQuestion(
-                                        id: _asInt(question['id'],
-                                            label: 'questionId'),
+                                        id: qId,
                                         practiceSetId: moveToSetId,
                                       );
                                       if (sheetContext.mounted) {
                                         Navigator.of(sheetContext).pop();
-                                        _openQuestionsForSet(setId);
+                                        await Future.delayed(
+                                            const Duration(milliseconds: 500));
+                                        if (mounted) {
+                                          _openQuestionsForSet(setId);
+                                          _showActionSnackBar(context,
+                                              'Question moved successfully');
+                                        }
                                       }
                                     } catch (e) {
                                       if (sheetContext.mounted) {
                                         _showActionSnackBar(sheetContext,
-                                            'Move failed: $e',
+                                            'Move failed: ${e.toString()}',
                                             isError: true);
                                       }
                                     }

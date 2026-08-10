@@ -1430,46 +1430,86 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
 router.put('/practice-questions/:id', adminAuth, async (req, res) => {
   const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, practiceSetId } =
     req.body;
-  const result = await pool.query(
-    `UPDATE practice_questions
-     SET question = COALESCE($2, question),
-         option_a = COALESCE($3, option_a),
-         option_b = COALESCE($4, option_b),
-         option_c = COALESCE($5, option_c),
-         option_d = COALESCE($6, option_d),
-         correct_option = COALESCE($7, correct_option),
-         explanation = COALESCE($8, explanation),
-         question_image_link = COALESCE($9, question_image_link),
-         question_image_drive_file_id = COALESCE($10, question_image_drive_file_id),
-         question_image_drive_folder_id = COALESCE($11, question_image_drive_folder_id),
-         explanation_image_link = COALESCE($12, explanation_image_link),
-         explanation_image_drive_file_id = COALESCE($13, explanation_image_drive_file_id),
-         explanation_image_drive_folder_id = COALESCE($14, explanation_image_drive_folder_id),
-         practice_set_id = COALESCE($15, practice_set_id)
-     WHERE id = $1
-     RETURNING *`,
-    [
-      req.params.id,
-      question,
-      optionA,
-      optionB,
-      optionC,
-      optionD,
-      correctOption,
-      explanation,
-      questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
-      questionImageLink == null ? null : extractDriveFileId(questionImageLink),
-      null,
-      explanationImageLink == null ? null : normalizeDriveLink(explanationImageLink, 'image'),
-      explanationImageLink == null ? null : extractDriveFileId(explanationImageLink),
-      null,
-      practiceSetId,
-    ]
-  );
-  return res.json({
-    success: true,
-    question: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
-  });
+
+  const updateFields = [];
+  const params = [req.params.id];
+  let paramIndex = 2;
+
+  if (question !== undefined && question !== null) {
+    updateFields.push(`question = $${paramIndex}`);
+    params.push(question);
+    paramIndex++;
+  }
+  if (optionA !== undefined && optionA !== null) {
+    updateFields.push(`option_a = $${paramIndex}`);
+    params.push(optionA);
+    paramIndex++;
+  }
+  if (optionB !== undefined && optionB !== null) {
+    updateFields.push(`option_b = $${paramIndex}`);
+    params.push(optionB);
+    paramIndex++;
+  }
+  if (optionC !== undefined && optionC !== null) {
+    updateFields.push(`option_c = $${paramIndex}`);
+    params.push(optionC);
+    paramIndex++;
+  }
+  if (optionD !== undefined && optionD !== null) {
+    updateFields.push(`option_d = $${paramIndex}`);
+    params.push(optionD);
+    paramIndex++;
+  }
+  if (correctOption !== undefined && correctOption !== null) {
+    updateFields.push(`correct_option = $${paramIndex}`);
+    params.push(correctOption);
+    paramIndex++;
+  }
+  if (explanation !== undefined && explanation !== null) {
+    updateFields.push(`explanation = $${paramIndex}`);
+    params.push(explanation);
+    paramIndex++;
+  }
+  if (questionImageLink !== undefined && questionImageLink !== null) {
+    updateFields.push(`question_image_link = $${paramIndex}`);
+    updateFields.push(`question_image_drive_file_id = $${paramIndex + 1}`);
+    params.push(normalizeDriveLink(questionImageLink, 'image'));
+    params.push(extractDriveFileId(questionImageLink));
+    paramIndex += 2;
+  }
+  if (explanationImageLink !== undefined && explanationImageLink !== null) {
+    updateFields.push(`explanation_image_link = $${paramIndex}`);
+    updateFields.push(`explanation_image_drive_file_id = $${paramIndex + 1}`);
+    params.push(normalizeDriveLink(explanationImageLink, 'image'));
+    params.push(extractDriveFileId(explanationImageLink));
+    paramIndex += 2;
+  }
+  if (practiceSetId !== undefined && practiceSetId !== null) {
+    updateFields.push(`practice_set_id = $${paramIndex}`);
+    params.push(practiceSetId);
+    paramIndex++;
+  }
+
+  if (updateFields.length === 0) {
+    return res.status(400).json({ success: false, error: 'No fields to update' });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE practice_questions
+       SET ${updateFields.join(', ')}
+       WHERE id = $1
+       RETURNING *`,
+      params
+    );
+    return res.json({
+      success: true,
+      question: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
+    });
+  } catch (error) {
+    logger.error('Update practice question error:', error, { questionId: req.params.id });
+    return res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 router.delete('/practice-questions/:id', adminAuth, async (req, res) => {
