@@ -1428,7 +1428,7 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
 });
 
 router.put('/practice-questions/:id', adminAuth, async (req, res) => {
-  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink } =
+  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, practiceSetId } =
     req.body;
   const result = await pool.query(
     `UPDATE practice_questions
@@ -1444,7 +1444,8 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
          question_image_drive_folder_id = COALESCE($11, question_image_drive_folder_id),
          explanation_image_link = COALESCE($12, explanation_image_link),
          explanation_image_drive_file_id = COALESCE($13, explanation_image_drive_file_id),
-         explanation_image_drive_folder_id = COALESCE($14, explanation_image_drive_folder_id)
+         explanation_image_drive_folder_id = COALESCE($14, explanation_image_drive_folder_id),
+         practice_set_id = COALESCE($15, practice_set_id)
      WHERE id = $1
      RETURNING *`,
     [
@@ -1462,6 +1463,7 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
       explanationImageLink == null ? null : normalizeDriveLink(explanationImageLink, 'image'),
       explanationImageLink == null ? null : extractDriveFileId(explanationImageLink),
       null,
+      practiceSetId,
     ]
   );
   return res.json({

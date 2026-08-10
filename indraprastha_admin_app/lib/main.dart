@@ -2482,35 +2482,148 @@ class _PracticePageState extends State<PracticePage> {
                           const SizedBox(height: 4),
                           Text('Correct: ${question['correct_option'] ?? '-'}'),
                           const SizedBox(height: 8),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _editingPracticeQuestionId =
-                                    _asInt(question['id'], label: 'questionId');
-                                _pqQuestion.text =
-                                    question['question']?.toString() ?? '';
-                                _pqOptionA.text =
-                                    question['option_a']?.toString() ?? '';
-                                _pqOptionB.text =
-                                    question['option_b']?.toString() ?? '';
-                                _pqOptionC.text =
-                                    question['option_c']?.toString() ?? '';
-                                _pqOptionD.text =
-                                    question['option_d']?.toString() ?? '';
-                                _pqCorrect =
-                                    question['correct_option']?.toString() ??
-                                        'A';
-                                _pqExplanation.text =
-                                    question['explanation']?.toString() ?? '';
-                                _pqImageLink = question['question_image_link']
-                                        ?.toString() ??
-                                    '';
-                                _pqImage = null;
-                              });
-                              Navigator.of(sheetContext).pop();
-                            },
-                            icon: const Icon(Icons.edit_outlined),
-                            label: const Text('Edit'),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _editingPracticeQuestionId =
+                                        _asInt(question['id'], label: 'questionId');
+                                    _pqQuestion.text =
+                                        question['question']?.toString() ?? '';
+                                    _pqOptionA.text =
+                                        question['option_a']?.toString() ?? '';
+                                    _pqOptionB.text =
+                                        question['option_b']?.toString() ?? '';
+                                    _pqOptionC.text =
+                                        question['option_c']?.toString() ?? '';
+                                    _pqOptionD.text =
+                                        question['option_d']?.toString() ?? '';
+                                    _pqCorrect =
+                                        question['correct_option']?.toString() ??
+                                            'A';
+                                    _pqExplanation.text =
+                                        question['explanation']?.toString() ?? '';
+                                    _pqImageLink = question['question_image_link']
+                                            ?.toString() ??
+                                        '';
+                                    _pqImage = null;
+                                  });
+                                  Navigator.of(sheetContext).pop();
+                                },
+                                icon: const Icon(Icons.edit_outlined),
+                                label: const Text('Edit'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final moveToSetId = await showDialog<int?>(
+                                    context: sheetContext,
+                                    builder: (dialogContext) => AlertDialog(
+                                      title: const Text('Move to Practice Set'),
+                                      content: SingleChildScrollView(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: _items
+                                              .where((set) =>
+                                                  _asInt((set
+                                                          as Map<String, dynamic>)[
+                                                      'id']) !=
+                                                  setId)
+                                              .map((set) {
+                                            final setMap =
+                                                set as Map<String, dynamic>;
+                                            final sId = _asInt(setMap['id']);
+                                            return ListTile(
+                                              title: Text(
+                                                  setMap['title']?.toString() ??
+                                                      ''),
+                                              onTap: () {
+                                                Navigator.of(dialogContext)
+                                                    .pop(sId);
+                                              },
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                  if (moveToSetId != null) {
+                                    try {
+                                      await widget.api.movePracticeQuestion(
+                                        id: _asInt(question['id'],
+                                            label: 'questionId'),
+                                        practiceSetId: moveToSetId,
+                                      );
+                                      if (sheetContext.mounted) {
+                                        Navigator.of(sheetContext).pop();
+                                        _openQuestionsForSet(setId);
+                                      }
+                                    } catch (e) {
+                                      if (sheetContext.mounted) {
+                                        _showActionSnackBar(sheetContext,
+                                            'Move failed: $e',
+                                            isError: true);
+                                      }
+                                    }
+                                  }
+                                },
+                                icon: const Icon(Icons.drive_file_move_outlined),
+                                label: const Text('Move'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: sheetContext,
+                                    builder: (dialogContext) => AlertDialog(
+                                      title:
+                                          const Text('Delete Question?'),
+                                      content: const Text(
+                                        'Is question delete ho jayega. Ye action undo nahi ho sakta.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(dialogContext)
+                                                  .pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(dialogContext)
+                                                  .pop(true),
+                                          child: const Text('Delete',
+                                              style: TextStyle(
+                                                  color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    try {
+                                      await widget.api.deletePracticeQuestion(
+                                        _asInt(question['id'],
+                                            label: 'questionId'),
+                                      );
+                                      if (sheetContext.mounted) {
+                                        Navigator.of(sheetContext).pop();
+                                        _openQuestionsForSet(setId);
+                                      }
+                                    } catch (e) {
+                                      if (sheetContext.mounted) {
+                                        _showActionSnackBar(sheetContext,
+                                            'Delete failed: $e',
+                                            isError: true);
+                                      }
+                                    }
+                                  }
+                                },
+                                icon: const Icon(Icons.delete_outlined,
+                                    color: Colors.red),
+                                label: const Text('Delete',
+                                    style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -6396,6 +6509,9 @@ class AdminApi {
       'explanationImageLink': explanationImageLink,
     });
   }
+
+  Future<void> movePracticeQuestion({required int id, required int practiceSetId}) =>
+      _put('/admin/practice-questions/$id', {'practiceSetId': practiceSetId});
 
   Future<void> deletePracticeQuestion(int id) =>
       _delete('/admin/practice-questions/$id');
