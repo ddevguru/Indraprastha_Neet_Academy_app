@@ -1223,17 +1223,13 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           final isDark = Theme.of(context).brightness == Brightness.dark;
                           final isCorrectOption = index == correctIndex;
 
-                          // Get option statistics from API or use default
+                          // Get option statistics from API only (real data)
                           final optionLabel = ['A', 'B', 'C', 'D'][index];
                           double percentage = 0.0;
 
+                          // Only show real data from API - no mock data
                           if (_optionStats.isNotEmpty && _optionStats[_currentIndex] != null) {
-                            // Use real data from API
                             percentage = _optionStats[_currentIndex]![optionLabel] ?? 0.0;
-                          } else {
-                            // Fallback to default percentages if API data not loaded yet
-                            const defaultPercentages = [45.2, 22.3, 18.5, 14.0];
-                            percentage = defaultPercentages[index];
                           }
 
                           Color bg;
@@ -1319,10 +1315,10 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                         ),
                                       ],
                                     ),
-                                    // Show statistics bar only after selection or submission
-                                    if (selected || revealState) ...[
+                                    // Show statistics bar only after submission with real data
+                                    if (_submitted && percentage > 0) ...[
                                       const SizedBox(height: 8),
-                                      // Statistics Bar
+                                      // Statistics Bar - Real Data Only
                                       Row(
                                         children: [
                                           Expanded(
