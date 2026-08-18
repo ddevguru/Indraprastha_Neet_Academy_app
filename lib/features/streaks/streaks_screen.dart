@@ -348,7 +348,9 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
                         // Month Header
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.grey.shade800
+                                : Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: ListTile(
@@ -360,9 +362,12 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
                             },
                             title: Text(
                               month['month'] ?? '',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                             trailing: Icon(
@@ -542,8 +547,8 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
             ],
           ),
         ),
-      ),
-    );
+      );
+    
   }
 
   void _showActivityDetails(
