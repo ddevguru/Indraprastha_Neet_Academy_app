@@ -595,8 +595,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
   late Timer _questionTimer;
   int _remainingSeconds = 0;
-  final int _questionTimerSeconds = 120;
-  final Set<int> _skippedQuestions = {};
+  final int _questionTimerSeconds = 10;
 
   int get _draftSetId => widget.setId;
 
@@ -695,12 +694,6 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     }
   }
 
-  void _skipQuestion() {
-    _questionTimer.cancel();
-    _skippedQuestions.add(_currentIndex);
-    _nextQuestion();
-    _startQuestionTimer();
-  }
 
   Future<void> _handleBack() async {
     if (_finished) {
@@ -1072,53 +1065,98 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                   // Progress and Timer Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: StatCard(
-                          title: 'Set progress',
+                          title: 'Q ${_currentIndex + 1}/${_questions.length}',
                           value: '${_currentIndex + 1}/${_questions.length}',
-                          subtitle: '${_set['estimated_minutes'] ?? 20} min estimated',
-                          icon: Icons.timelapse_rounded,
+                          subtitle: 'Progress',
+                          icon: Icons.task_alt_rounded,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),
-                      // Timer Display
+                      // Timer Display - Enhanced
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: _remainingSeconds <= 10
-                              ? AppColors.danger.withValues(alpha: 0.1)
-                              : AppColors.primary.withValues(alpha: 0.1),
+                          gradient: _remainingSeconds <= 3
+                              ? LinearGradient(
+                                  colors: [
+                                    AppColors.danger.withValues(alpha: 0.15),
+                                    AppColors.danger.withValues(alpha: 0.05),
+                                  ],
+                                )
+                              : LinearGradient(
+                                  colors: [
+                                    AppColors.primary.withValues(alpha: 0.1),
+                                    AppColors.primary.withValues(alpha: 0.05),
+                                  ],
+                                ),
                           borderRadius: BorderRadius.circular(AppRadii.md),
                           border: Border.all(
-                            color: _remainingSeconds <= 10
+                            color: _remainingSeconds <= 3
                                 ? AppColors.danger
-                                : AppColors.primary,
+                                : (_remainingSeconds <= 5
+                                    ? AppColors.warning
+                                    : AppColors.primary),
                             width: 2,
                           ),
+                          boxShadow: _remainingSeconds <= 3
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.danger.withValues(alpha: 0.2),
+                                    blurRadius: 8,
+                                    spreadRadius: 0,
+                                  ),
+                                ]
+                              : null,
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.schedule_rounded,
-                              size: 20,
-                              color: _remainingSeconds <= 10
-                                  ? AppColors.danger
-                                  : AppColors.primary,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '$_remainingSeconds s',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: _remainingSeconds <= 10
+                        child: SizedBox(
+                          width: 80,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.schedule_rounded,
+                                size: 22,
+                                color: _remainingSeconds <= 3
                                     ? AppColors.danger
-                                    : AppColors.primary,
+                                    : (_remainingSeconds <= 5
+                                        ? AppColors.warning
+                                        : AppColors.primary),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 6),
+                              AnimatedScale(
+                                scale: _remainingSeconds <= 3 ? 1.1 : 1.0,
+                                duration: const Duration(milliseconds: 300),
+                                child: Text(
+                                  '$_remainingSeconds',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                    color: _remainingSeconds <= 3
+                                        ? AppColors.danger
+                                        : (_remainingSeconds <= 5
+                                            ? AppColors.warning
+                                            : AppColors.primary),
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'seconds',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.6),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -1212,60 +1250,56 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                             ),
                           );
                         }),
-                        const SizedBox(height: AppSpacing.sm),
-                        // Submit Button
-                        PrimaryButton(
-                          label: _submitted
-                              ? (_currentIndex >= _questions.length - 1
-                                  ? 'Finish & see results'
-                                  : 'Next question')
-                              : 'Submit answer',
-                          icon: _submitted
-                              ? Icons.arrow_forward_rounded
-                              : Icons.check_rounded,
-                          expanded: true,
-                          onPressed: (_submitted || _selectedOption != null)
-                              ? () {
-                                  if (!_submitted) {
-                                    _checkAnswer(question);
-                                    return;
-                                  }
-                                  _nextQuestion();
-                                }
-                              : null,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        // Skip Button
-                        if (!_submitted)
-                          SecondaryButton(
-                            label: 'Skip this question',
-                            icon: Icons.skip_next_rounded,
-                            expanded: true,
-                            onPressed: _skipQuestion,
-                          ),
-                        const SizedBox(height: AppSpacing.md),
-                        // Navigation Buttons
+                        const SizedBox(height: AppSpacing.lg),
+                        // Action Buttons Row
                         Row(
                           children: [
+                            // Previous Button
+                            if (_currentIndex > 0)
+                              Expanded(
+                                child: SecondaryButton(
+                                  label: 'Previous',
+                                  icon: Icons.arrow_back_rounded,
+                                  onPressed: _previousQuestion,
+                                ),
+                              ),
+                            if (_currentIndex > 0)
+                              const SizedBox(width: AppSpacing.md),
+                            // Submit/Next Button
                             Expanded(
-                              child: SecondaryButton(
-                                label: 'Previous',
-                                icon: Icons.arrow_back_rounded,
-                                onPressed: _currentIndex > 0
-                                    ? _previousQuestion
+                              flex: 2,
+                              child: PrimaryButton(
+                                label: _submitted
+                                    ? (_currentIndex >= _questions.length - 1
+                                        ? 'Finish & see results'
+                                        : 'Next')
+                                    : 'Submit',
+                                icon: _submitted
+                                    ? Icons.arrow_forward_rounded
+                                    : Icons.check_rounded,
+                                expanded: true,
+                                onPressed: (_submitted || _selectedOption != null)
+                                    ? () {
+                                        if (!_submitted) {
+                                          _checkAnswer(question);
+                                          return;
+                                        }
+                                        _nextQuestion();
+                                      }
                                     : null,
                               ),
                             ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: SecondaryButton(
-                                label: 'Next',
-                                icon: Icons.arrow_forward_rounded,
-                                onPressed: _currentIndex < _questions.length - 1
-                                    ? _nextQuestion
-                                    : null,
+                            // Next Button
+                            if (_currentIndex < _questions.length - 1)
+                              const SizedBox(width: AppSpacing.md),
+                            if (_currentIndex < _questions.length - 1)
+                              Expanded(
+                                child: SecondaryButton(
+                                  label: 'Next',
+                                  icon: Icons.arrow_forward_rounded,
+                                  onPressed: _submitted ? null : _nextQuestion,
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ],
