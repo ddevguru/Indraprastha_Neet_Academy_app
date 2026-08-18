@@ -28,10 +28,11 @@ router.get('/current', authenticateToken, async (req, res) => {
         SUM(duration_minutes) as total_time_minutes,
         MAX(activity_date) as last_active
       FROM user_streaks
-      WHERE user_id = ?
+      WHERE user_id = $1
     `;
 
-    const [streakData] = await db.query(streakQuery, [userId]);
+    const streakResult = await db.pool.query(streakQuery, [userId]);
+    const streakData = streakResult.rows;
 
     res.json({
       currentStreak: streakData[0]?.current_streak || 0,
@@ -58,18 +59,19 @@ router.get('/monthly/:month/:year', authenticateToken, async (req, res) => {
 
     const monthQuery = `
       SELECT
-        DAY(activity_date) as date,
+        EXTRACT(DAY FROM activity_date)::int as date,
         COALESCE(streak_count, 0) as streak_count,
         COALESCE(activity_count, 0) as total_activities,
         COALESCE(duration_minutes, 0) as duration_minutes
       FROM user_streaks
-      WHERE user_id = ?
-        AND MONTH(activity_date) = ?
-        AND YEAR(activity_date) = ?
+      WHERE user_id = $1
+        AND EXTRACT(MONTH FROM activity_date) = $2
+        AND EXTRACT(YEAR FROM activity_date) = $3
       ORDER BY activity_date ASC
     `;
 
-    const [monthData] = await db.query(monthQuery, [userId, month, year]);
+    const monthResult = await db.pool.query(monthQuery, [userId, month, year]);
+    const monthData = monthResult.rows;
 
     // Create a map with all possible dates (1-31) initialized to 0
     const streaksMap = {};
@@ -137,11 +139,12 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
         COALESCE(duration_minutes, 0) as total_time_minutes,
         last_active_time as last_active
       FROM user_streaks
-      WHERE user_id = ? AND activity_date = ?
+      WHERE user_id = $1 AND activity_date = ?
       LIMIT 1
     `;
 
-    const [dayData] = await db.query(dayQuery, [userId, date]);
+    const dayResult = await db.pool.query(dayQuery, [userId, date]);
+    const dayData = dayResult.rows;
 
     // Get activities breakdown
     const activitiesQuery = `
@@ -150,11 +153,12 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
         activity_count,
         duration_minutes
       FROM user_activities
-      WHERE user_id = ? AND activity_date = ?
+      WHERE user_id = $1 AND activity_date = ?
       ORDER BY created_at DESC
     `;
 
-    const [activities] = await db.query(activitiesQuery, [userId, date]);
+    const activitiesResult = await db.pool.query(activitiesQuery, [userId, date]);
+    const activities = activitiesResult.rows;
 
     // Get content viewed
     const contentQuery = `
@@ -162,12 +166,13 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
         content_name,
         content_type
       FROM user_content_views
-      WHERE user_id = ? AND DATE(viewed_at) = ?
+      WHERE user_id = $1 AND DATE(viewed_at) = ?
       ORDER BY viewed_at DESC
       LIMIT 20
     `;
 
-    const [content] = await db.query(contentQuery, [userId, date]);
+    const contentResult = await db.pool.query(contentQuery, [userId, date]);
+    const content = contentResult.rows;
 
     // Return response even if no data (just zeros)
     res.json({
@@ -202,11 +207,12 @@ router.post('/log-activity', authenticateToken, async (req, res) => {
     // Insert into user_activities
     const insertQuery = `
       INSERT INTO user_activities
-      (user_id, activity_date, activity_type, activity_count, duration_minutes, metadata, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, NOW())
+      (user_id, activity_date, activity_type, activity_count, duration_minutes, metadata)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT DO NOTHING
     `;
 
-    await db.query(insertQuery, [
+    await db.pool.query(insertQuery, [
       userId,
       today,
       activityType,
@@ -215,29 +221,38 @@ router.post('/log-activity', authenticateToken, async (req, res) => {
       JSON.stringify(metadata || {}),
     ]);
 
-    // Update streak
+    // Upsert streak (PostgreSQL style)
     const streakQuery = `
       INSERT INTO user_streaks
       (user_id, activity_date, streak_count, last_active_time, duration_minutes, activity_type, activity_count)
-      VALUES (?, ?,
-        (SELECT COALESCE(MAX(streak_count), 0) + 1 FROM user_streaks
-         WHERE user_id = ? AND activity_date = DATE_SUB(?, INTERVAL 1 DAY)),
-        NOW(), ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        activity_count = activity_count + ?,
-        duration_minutes = duration_minutes + ?,
+      VALUES (
+        $1,
+        $2,
+        COALESCE((SELECT MAX(streak_count) FROM user_streaks
+                  WHERE user_id = $1 AND activity_date = $2::date - INTERVAL '1 day'), 0) + 1,
+        NOW(),
+        $3,
+        $4,
+        $5
+      )
+      ON CONFLICT (user_id, activity_date) DO UPDATE SET
+        activity_count = user_streaks.activity_count + $5,
+        duration_minutes = user_streaks.duration_minutes + $3,
         last_active_time = NOW()
     `;
 
-    await db.query(streakQuery, [
-      userId, today, userId, today, durationMinutes, activityType, activityCount,
-      activityCount, durationMinutes
+    await db.pool.query(streakQuery, [
+      userId, today, durationMinutes, activityType, activityCount
     ]);
 
     res.json({ success: true, message: 'Activity logged' });
   } catch (error) {
-    console.error('Error logging activity:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error logging activity:', error.message, error.sql);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+      details: error.sql
+    });
   }
 });
 
