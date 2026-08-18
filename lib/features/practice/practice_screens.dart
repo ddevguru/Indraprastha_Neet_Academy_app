@@ -744,7 +744,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       final token = prefs.getString('auth_token') ?? '';
 
       final response = await http.get(
-        Uri.parse('http://localhost:3000/api/analytics/practice-set/${widget.setId}/options'),
+        Uri.parse('https://api.indraprasthaneetacademy.com/api/analytics/practice-set/${widget.setId}/options'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
 

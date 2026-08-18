@@ -139,12 +139,12 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   }
 
   String _getApiBaseUrl() {
-    return 'http://localhost:3000';
+    return 'https://api.indraprasthaneetacademy.com';
   }
 
   Future<String> _getAuthToken() async {
-    // Get token from your auth provider
-    return 'auth_token_here';
+    // Get token from SharedPreferences or auth provider
+    return 'your_auth_token';
   }
 
   Color _getStreakColor(int streak) {

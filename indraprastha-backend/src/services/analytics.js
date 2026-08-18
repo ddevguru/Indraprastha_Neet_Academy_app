@@ -225,7 +225,7 @@ class AnalyticsService {
       ? Math.round(testAttempt.time_taken_seconds / 180) // 180 questions in NEET
       : 0;
     if (avgTimePerQuestion > 3) {
-      suggestions.push('Improve speed - you're spending too long per question');
+      suggestions.push("Improve speed - you're spending too long per question");
     } else if (avgTimePerQuestion < 1) {
       suggestions.push('Careful with speed - ensure accuracy at expense of time');
     }

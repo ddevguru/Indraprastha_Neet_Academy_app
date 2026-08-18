@@ -23,7 +23,10 @@
       "Bash(Sort-Object)",
       "WebFetch(domain:docs.google.com)",
       "Bash(flutter clean *)",
-      "Bash(rm -rf build/)"
+      "Bash(rm -rf build/)",
+      "Bash(npm start *)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(pkill -f \"node src/index.js\")"
     ]
   }
 }
