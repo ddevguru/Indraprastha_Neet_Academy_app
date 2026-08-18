@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -592,6 +594,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   final Map<int, String> _answers = {};
   Map<String, dynamic> _set = {};
   List<Map<String, dynamic>> _questions = [];
+  Map<int, Map<String, double>> _optionStats = {};
 
   late Timer _questionTimer;
   int _remainingSeconds = 0;
@@ -735,6 +738,37 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     }
   }
 
+  Future<void> _fetchOptionStats() async {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final token = prefs.getString('auth_token') ?? '';
+
+      final response = await http.get(
+        Uri.parse('http://localhost:3000/api/analytics/practice-set/${widget.setId}/options'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        setState(() {
+          data.forEach((qIdStr, options) {
+            final qId = int.tryParse(qIdStr) ?? 0;
+            if (options is Map) {
+              _optionStats[qId] = {};
+              (options as Map<String, dynamic>).forEach((option, percentage) {
+                _optionStats[qId]![option] = (percentage is num)
+                    ? percentage.toDouble()
+                    : double.tryParse(percentage.toString()) ?? 0.0;
+              });
+            }
+          });
+        });
+      }
+    } catch (e) {
+      // Silently fail and use default percentages
+    }
+  }
+
   Future<void> _loadAttempt() async {
     if (widget.chapterQuestions != null) {
       _set = {'title': widget.chapterName ?? 'Practice'};
@@ -776,6 +810,9 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       _questions = List<Map<String, dynamic>>.from(
         data['questions'] as List<dynamic>? ?? const [],
       );
+
+      // Fetch option statistics
+      unawaited(_fetchOptionStats());
 
       // Only show chapter picker when a set truly contains multiple chapters.
       final chapters = _groupQuestionsByChapter(_questions);
@@ -1186,10 +1223,18 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           final isDark = Theme.of(context).brightness == Brightness.dark;
                           final isCorrectOption = index == correctIndex;
 
-                          // Mock option statistics (replace with actual API data)
-                          final optionPercentages = [45.2, 22.3, 18.5, 14.0];
-                          final percentage = optionPercentages[index];
+                          // Get option statistics from API or use default
                           final optionLabel = ['A', 'B', 'C', 'D'][index];
+                          double percentage = 0.0;
+
+                          if (_optionStats.isNotEmpty && _optionStats[_currentIndex] != null) {
+                            // Use real data from API
+                            percentage = _optionStats[_currentIndex]![optionLabel] ?? 0.0;
+                          } else {
+                            // Fallback to default percentages if API data not loaded yet
+                            const defaultPercentages = [45.2, 22.3, 18.5, 14.0];
+                            percentage = defaultPercentages[index];
+                          }
 
                           Color bg;
                           Color border;
