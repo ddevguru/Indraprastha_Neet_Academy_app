@@ -853,6 +853,106 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
+                    // Submit Test Button
+                    PrimaryButton(
+                      label: 'Submit Test',
+                      icon: Icons.check_rounded,
+                      expanded: true,
+                      onPressed: _submitting
+                          ? null
+                          : () async {
+                              // Show confirmation dialog before submitting
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Submit Test?'),
+                                  content: const Text(
+                                    'Are you sure you want to submit the Test Now',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      child: const Text('Submit'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirmed != true) return;
+
+                              // Submit test
+                              setState(() => _submitting = true);
+                              int correct = 0;
+                              for (var i = 0; i < questions.length; i++) {
+                                final marked = _answers[i];
+                                final actual = questions[i]
+                                            ['correct_option']
+                                        ?.toString()
+                                        .toUpperCase() ??
+                                    '';
+                                if (marked == actual) correct++;
+                              }
+                              final wrong = _answers.length - correct;
+                              final unattempted =
+                                  questions.length - _answers.length;
+                              final marks =
+                                  (test['marks'] as num?)?.toInt() ?? 720;
+                              final score = questions.isEmpty
+                                  ? 0
+                                  : ((correct / questions.length) * marks)
+                                      .round();
+                              final accuracy = _answers.isEmpty
+                                  ? 0.0
+                                  : (correct / _answers.length) * 100;
+                              final messenger =
+                                  ScaffoldMessenger.of(context);
+                              try {
+                                final res = await ref
+                                    .read(contentRepositoryProvider)
+                                    .submitTestAttempt(
+                                  testId: widget.testId,
+                                  score: score,
+                                  accuracy: accuracy,
+                                  correctCount: correct,
+                                  wrongCount: wrong,
+                                  unattemptedCount: unattempted,
+                                );
+                                if (!mounted) return;
+                                await _draftStore.clearTestDraft(widget.testId);
+                                setState(() {
+                                  _submitted = true;
+                                  _submitResponse = res;
+                                });
+                              } catch (e) {
+                                if (!mounted) return;
+                                setState(() {
+                                  _submitted = true;
+                                  _submitResponse =
+                                      _buildLocalSubmitResponse(
+                                        questions: questions,
+                                        test: test,
+                                      );
+                                });
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Server submit failed, local result shown. Error: $e',
+                                    ),
+                                  ),
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _submitting = false);
+                                }
+                              }
+                            },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    // Navigation Buttons
                     Row(
                       children: [
                         Expanded(
@@ -865,109 +965,11 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                         ),
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
-                          child: PrimaryButton(
-                            label: 'Submit Question No ${_index + 1}',
-                            onPressed: _submitting
+                          child: SecondaryButton(
+                            label: 'Next',
+                            onPressed: _index == questions.length - 1
                                 ? null
-                                : () async {
-                                    // If on last question, show confirmation dialog
-                                    if (_index == questions.length - 1) {
-                                      final confirmed = await showDialog<bool>(
-                                        context: context,
-                                        barrierDismissible: false,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text('Submit Test?'),
-                                          content: const Text(
-                                            'Are you sure you want to submit the Test Now',
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context, false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            FilledButton(
-                                              onPressed: () => Navigator.pop(context, true),
-                                              child: const Text('Submit'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      if (confirmed != true) return;
-                                    }
-
-                                    // If not on last question, just go to next
-                                    if (_index < questions.length - 1) {
-                                      setState(() => _index++);
-                                      unawaited(_persistDraft());
-                                      return;
-                                    }
-
-                                    // Submit test
-                                    setState(() => _submitting = true);
-                                    int correct = 0;
-                                    for (var i = 0; i < questions.length; i++) {
-                                      final marked = _answers[i];
-                                      final actual = questions[i]
-                                                  ['correct_option']
-                                              ?.toString()
-                                              .toUpperCase() ??
-                                          '';
-                                      if (marked == actual) correct++;
-                                    }
-                                    final wrong = _answers.length - correct;
-                                    final unattempted =
-                                        questions.length - _answers.length;
-                                    final marks =
-                                        (test['marks'] as num?)?.toInt() ?? 720;
-                                    final score = questions.isEmpty
-                                        ? 0
-                                        : ((correct / questions.length) * marks)
-                                            .round();
-                                    final accuracy = _answers.isEmpty
-                                        ? 0.0
-                                        : (correct / _answers.length) * 100;
-                                    final messenger =
-                                        ScaffoldMessenger.of(context);
-                                    try {
-                                      final res = await ref
-                                          .read(contentRepositoryProvider)
-                                          .submitTestAttempt(
-                                        testId: widget.testId,
-                                        score: score,
-                                        accuracy: accuracy,
-                                        correctCount: correct,
-                                        wrongCount: wrong,
-                                        unattemptedCount: unattempted,
-                                      );
-                                      if (!mounted) return;
-                                      await _draftStore.clearTestDraft(widget.testId);
-                                      setState(() {
-                                        _submitted = true;
-                                        _submitResponse = res;
-                                      });
-                                    } catch (e) {
-                                      if (!mounted) return;
-                                      setState(() {
-                                        _submitted = true;
-                                        _submitResponse =
-                                            _buildLocalSubmitResponse(
-                                          questions: questions,
-                                          test: test,
-                                        );
-                                      });
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Server submit failed, local result shown. Error: $e',
-                                          ),
-                                        ),
-                                      );
-                                    } finally {
-                                      if (mounted) {
-                                        setState(() => _submitting = false);
-                                      }
-                                    }
-                                  },
+                                : () => setState(() => _index++),
                           ),
                         ),
                       ],

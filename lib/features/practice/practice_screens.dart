@@ -1324,7 +1324,29 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           );
                         }),
                         const SizedBox(height: AppSpacing.lg),
-                        // Action Buttons Row
+                        // Submit Button
+                        PrimaryButton(
+                          label: _submitted
+                              ? (_currentIndex >= _questions.length - 1
+                                  ? 'Finish & see results'
+                                  : 'Next question')
+                              : 'Submit answer',
+                          icon: _submitted
+                              ? Icons.arrow_forward_rounded
+                              : Icons.check_rounded,
+                          expanded: true,
+                          onPressed: (_submitted || _selectedOption != null)
+                              ? () {
+                                  if (!_submitted) {
+                                    _checkAnswer(question);
+                                    return;
+                                  }
+                                  _nextQuestion();
+                                }
+                              : null,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        // Navigation Buttons (Previous/Next)
                         Row(
                           children: [
                             // Previous Button
@@ -1338,33 +1360,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                               ),
                             if (_currentIndex > 0)
                               const SizedBox(width: AppSpacing.md),
-                            // Submit/Next Button
-                            Expanded(
-                              flex: 2,
-                              child: PrimaryButton(
-                                label: _submitted
-                                    ? (_currentIndex >= _questions.length - 1
-                                        ? 'Finish & see results'
-                                        : 'Next')
-                                    : 'Submit',
-                                icon: _submitted
-                                    ? Icons.arrow_forward_rounded
-                                    : Icons.check_rounded,
-                                expanded: true,
-                                onPressed: (_submitted || _selectedOption != null)
-                                    ? () {
-                                        if (!_submitted) {
-                                          _checkAnswer(question);
-                                          return;
-                                        }
-                                        _nextQuestion();
-                                      }
-                                    : null,
-                              ),
-                            ),
                             // Next Button
-                            if (_currentIndex < _questions.length - 1)
-                              const SizedBox(width: AppSpacing.md),
                             if (_currentIndex < _questions.length - 1)
                               Expanded(
                                 child: SecondaryButton(
@@ -1373,6 +1369,11 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                   onPressed: _submitted ? null : _nextQuestion,
                                 ),
                               ),
+                            // Flexible spacing if only one button
+                            if (_currentIndex == 0 && _currentIndex < _questions.length - 1)
+                              const SizedBox(width: AppSpacing.md),
+                            if (_currentIndex == _questions.length - 1)
+                              Expanded(child: SizedBox()),
                           ],
                         ),
                       ],
