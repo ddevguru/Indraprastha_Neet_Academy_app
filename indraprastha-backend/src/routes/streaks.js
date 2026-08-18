@@ -45,7 +45,7 @@ router.get('/current', authenticateToken, async (req, res) => {
   }
 });
 
-// Get monthly streaks
+// Get monthly streaks - returns all dates in month with streak data
 router.get('/monthly/:month/:year', authenticateToken, async (req, res) => {
   try {
     const userId = req.user_id;
@@ -54,20 +54,25 @@ router.get('/monthly/:month/:year', authenticateToken, async (req, res) => {
     const monthQuery = `
       SELECT
         DAY(activity_date) as date,
-        COALESCE(MAX(streak_count), 0) as streak_count,
-        SUM(activity_count) as total_activities,
-        SUM(duration_minutes) as duration_minutes
+        COALESCE(streak_count, 0) as streak_count,
+        COALESCE(activity_count, 0) as total_activities,
+        COALESCE(duration_minutes, 0) as duration_minutes
       FROM user_streaks
       WHERE user_id = ?
         AND MONTH(activity_date) = ?
         AND YEAR(activity_date) = ?
-      GROUP BY DAY(activity_date)
       ORDER BY activity_date ASC
     `;
 
     const [monthData] = await db.query(monthQuery, [userId, month, year]);
 
+    // Create a map with all possible dates (1-31) initialized to 0
     const streaksMap = {};
+    for (let date = 1; date <= 31; date++) {
+      streaksMap[date] = { streak: 0, activities: 0, duration: 0 };
+    }
+
+    // Fill in actual data from database
     monthData.forEach(row => {
       streaksMap[row.date] = {
         streak: row.streak_count,
@@ -83,22 +88,25 @@ router.get('/monthly/:month/:year', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all months with streaks
+// Get all months of current year (2026)
 router.get('/months', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user_id;
+    const currentYear = new Date().getFullYear();
+    const months = [
+      { month: 'January 2026', month_num: '01', year: '2026' },
+      { month: 'February 2026', month_num: '02', year: '2026' },
+      { month: 'March 2026', month_num: '03', year: '2026' },
+      { month: 'April 2026', month_num: '04', year: '2026' },
+      { month: 'May 2026', month_num: '05', year: '2026' },
+      { month: 'June 2026', month_num: '06', year: '2026' },
+      { month: 'July 2026', month_num: '07', year: '2026' },
+      { month: 'August 2026', month_num: '08', year: '2026' },
+      { month: 'September 2026', month_num: '09', year: '2026' },
+      { month: 'October 2026', month_num: '10', year: '2026' },
+      { month: 'November 2026', month_num: '11', year: '2026' },
+      { month: 'December 2026', month_num: '12', year: '2026' },
+    ];
 
-    const monthsQuery = `
-      SELECT DISTINCT
-        DATE_FORMAT(activity_date, '%B %Y') as month,
-        DATE_FORMAT(activity_date, '%m') as month_num,
-        DATE_FORMAT(activity_date, '%Y') as year
-      FROM user_streaks
-      WHERE user_id = ?
-      ORDER BY activity_date DESC
-    `;
-
-    const [months] = await db.query(monthsQuery, [userId]);
     res.json(months);
   } catch (error) {
     console.error('Error fetching months:', error);
@@ -116,27 +124,22 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
     const dayQuery = `
       SELECT
         activity_date,
-        COALESCE(MAX(streak_count), 0) as streak_count,
-        SUM(duration_minutes) as total_time_minutes,
-        MAX(last_active_time) as last_active
+        COALESCE(streak_count, 0) as streak_count,
+        COALESCE(duration_minutes, 0) as total_time_minutes,
+        last_active_time as last_active
       FROM user_streaks
       WHERE user_id = ? AND activity_date = ?
-      GROUP BY activity_date
+      LIMIT 1
     `;
 
     const [dayData] = await db.query(dayQuery, [userId, date]);
-
-    if (!dayData.length) {
-      return res.status(404).json({ error: 'No activity found for this date' });
-    }
 
     // Get activities breakdown
     const activitiesQuery = `
       SELECT
         activity_type,
         activity_count,
-        duration_minutes,
-        metadata
+        duration_minutes
       FROM user_activities
       WHERE user_id = ? AND activity_date = ?
       ORDER BY created_at DESC
@@ -152,20 +155,21 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
       FROM user_content_views
       WHERE user_id = ? AND DATE(viewed_at) = ?
       ORDER BY viewed_at DESC
+      LIMIT 20
     `;
 
     const [content] = await db.query(contentQuery, [userId, date]);
 
+    // Return response even if no data (just zeros)
     res.json({
-      date: dayData[0].activity_date,
-      streak: dayData[0].streak_count,
-      totalTime: dayData[0].total_time_minutes,
-      lastActive: dayData[0].last_active,
+      date: date,
+      streak: dayData[0]?.streak_count || 0,
+      totalTime: dayData[0]?.total_time_minutes || 0,
+      lastActive: dayData[0]?.last_active || null,
       activities: activities.map(act => ({
         type: act.activity_type,
         count: act.activity_count,
         duration: act.duration_minutes,
-        metadata: JSON.parse(act.metadata || '{}'),
       })),
       contentViewed: content.map(c => ({
         name: c.content_name,
