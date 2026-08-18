@@ -17,6 +17,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   int? expandedMonth;
   late Future<Map<String, dynamic>> _currentStreakFuture;
   late Future<List<Map<String, dynamic>>> _monthsFuture;
+  final Map<String, Future<Map<int, dynamic>>> _monthStreaksCache = {};
 
   @override
   void initState() {
@@ -92,19 +93,33 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
       final response = await http.get(
         Uri.parse('${_getApiBaseUrl()}/api/streaks/monthly/$month/$year'),
         headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final result = <int, dynamic>{};
+
+        // Parse response - handle both formats
         data.forEach((key, value) {
           final date = int.tryParse(key) ?? 0;
-          result[date] = value is Map ? value['streak'] ?? 0 : value;
+          if (date > 0 && date <= 31) {
+            if (value is Map) {
+              result[date] = value;
+            } else if (value is int) {
+              result[date] = {'streak': value};
+            } else {
+              result[date] = {'streak': 0};
+            }
+          }
         });
+
         return result;
+      } else {
+        print('API Error: ${response.statusCode}');
+        return {};
       }
-      return {};
     } catch (e) {
+      print('Error fetching monthly streaks: $e');
       return {};
     }
   }
@@ -338,30 +353,53 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
                             child: FutureBuilder<Map<int, dynamic>>(
-                              future: _fetchMonthlyStreaks(monthStr, yearStr),
+                              future: _monthStreaksCache.putIfAbsent(
+                                '$monthStr-$yearStr',
+                                () => _fetchMonthlyStreaks(monthStr, yearStr),
+                              ),
                               builder: (context, streaksSnapshot) {
                                 if (streaksSnapshot.connectionState ==
                                     ConnectionState.waiting) {
                                   return const Padding(
                                     padding: EdgeInsets.all(16),
                                     child: SizedBox(
-                                      height: 40,
-                                      child: CircularProgressIndicator(),
+                                      height: 50,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     ),
                                   );
                                 }
 
-                                final streaks = streaksSnapshot.data ?? {};
-
-                                if (streaks.isEmpty) {
+                                if (streaksSnapshot.hasError) {
                                   return Padding(
                                     padding: const EdgeInsets.all(16),
-                                    child: Text(
-                                      'Loading...',
-                                      style: TextStyle(
-                                          color: Colors.grey.shade600),
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.error_outline,
+                                            color: Colors.red.shade600),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Error: ${streaksSnapshot.error}',
+                                          style: TextStyle(
+                                            color: Colors.red.shade600,
+                                            fontSize: 12,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
                                     ),
                                   );
+                                }
+
+                                var streaks = streaksSnapshot.data ?? {};
+
+                                // Ensure all dates 1-31 exist in streaks map
+                                if (streaks.isEmpty) {
+                                  streaks = {};
+                                  for (int i = 1; i <= 31; i++) {
+                                    streaks[i] = {'streak': 0};
+                                  }
                                 }
 
                                 return GridView.builder(
