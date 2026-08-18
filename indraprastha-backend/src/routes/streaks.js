@@ -41,8 +41,12 @@ router.get('/current', authenticateToken, async (req, res) => {
       lastActive: streakData[0]?.last_active || null,
     });
   } catch (error) {
-    console.error('Error fetching current streak:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching current streak:', error.message, error.sql);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+      details: error.sql
+    });
   }
 });
 
@@ -84,8 +88,12 @@ router.get('/monthly/:month/:year', authenticateToken, async (req, res) => {
 
     res.json(streaksMap);
   } catch (error) {
-    console.error('Error fetching monthly streaks:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching monthly streaks:', error.message, error.sql);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+      details: error.sql
+    });
   }
 });
 
