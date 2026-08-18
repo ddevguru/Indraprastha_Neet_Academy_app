@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../theme/app_tokens.dart';
 import '../../core/providers/app_state.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class StreaksScreen extends ConsumerStatefulWidget {
   const StreaksScreen({super.key});
@@ -21,11 +21,29 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   final Map<String, Future<Map<int, dynamic>>> _monthStreaksCache = {};
   String _debugLog = 'Loading...';
   bool _showDebug = true;
+  String _authToken = '';
 
   @override
   void initState() {
     super.initState();
     currentDate = DateTime.now();
+    _initializeData();
+  }
+
+  void _initializeData() {
+    // Get token from auth repo
+    final authRepo = ref.read(authRepositoryProvider);
+    _authToken = authRepo.token ?? '';
+
+    if (_authToken.isEmpty) {
+      _addLog('❌ No auth token found - user not logged in');
+      setState(() {
+        _debugLog = 'Not logged in. Please login first.';
+      });
+      return;
+    }
+
+    _addLog('✅ Auth token found: ${_authToken.substring(0, min(20, _authToken.length))}...');
     _currentStreakFuture = _fetchCurrentStreak();
     _monthsFuture = _fetchMonths();
   }
@@ -33,7 +51,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   // Fetch current streak from API
   Future<Map<String, dynamic>> _fetchCurrentStreak() async {
     try {
-      final token = await _getAuthToken();
+      final token = _getAuthToken();
       final response = await http.get(
         Uri.parse('${_getApiBaseUrl()}/api/streaks/current'),
         headers: {'Authorization': 'Bearer $token'},
@@ -64,7 +82,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   // Fetch all months with streaks
   Future<List<Map<String, dynamic>>> _fetchMonths() async {
     try {
-      final token = await _getAuthToken();
+      final token = _getAuthToken();
       final url = '${_getApiBaseUrl()}/api/streaks/months';
       _addLog('📍 Fetching months from: $url');
 
@@ -111,7 +129,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   // Fetch monthly streaks
   Future<Map<int, dynamic>> _fetchMonthlyStreaks(String month, String year) async {
     try {
-      final token = await _getAuthToken();
+      final token = _getAuthToken();
       final url = '${_getApiBaseUrl()}/api/streaks/monthly/$month/$year';
       _addLog('📍 Fetching monthly streaks: $url');
 
@@ -156,7 +174,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   // Fetch activity details for a specific day
   Future<Map<String, dynamic>> _fetchActivityDetails(String date) async {
     try {
-      final token = await _getAuthToken();
+      final token = _getAuthToken();
       final response = await http.get(
         Uri.parse('${_getApiBaseUrl()}/api/streaks/day/$date'),
         headers: {'Authorization': 'Bearer $token'},
@@ -186,10 +204,8 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
     return 'https://api.indraprasthaneetacademy.com';
   }
 
-  Future<String> _getAuthToken() async {
-    // TODO: Get actual token from SharedPreferences or auth provider
-    // For now, return empty string and let API handle it
-    return '';
+  String _getAuthToken() {
+    return _authToken;
   }
 
   void _addLog(String message) {
