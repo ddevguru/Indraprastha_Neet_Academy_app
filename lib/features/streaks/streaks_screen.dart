@@ -19,6 +19,8 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   late Future<Map<String, dynamic>> _currentStreakFuture;
   late Future<List<Map<String, dynamic>>> _monthsFuture;
   final Map<String, Future<Map<int, dynamic>>> _monthStreaksCache = {};
+  String _debugLog = 'Loading...';
+  bool _showDebug = true;
 
   @override
   void initState() {
@@ -64,27 +66,27 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
     try {
       final token = await _getAuthToken();
       final url = '${_getApiBaseUrl()}/api/streaks/months';
-      print('📍 Fetching months from: $url');
+      _addLog('📍 Fetching months from: $url');
 
       final response = await http.get(
         Uri.parse(url),
         headers: token.isNotEmpty ? {'Authorization': 'Bearer $token'} : {},
       ).timeout(const Duration(seconds: 10));
 
-      print('✅ Months Response: ${response.statusCode}');
-      print('📋 Response body: ${response.body}');
+      _addLog('✅ Months Response: ${response.statusCode}');
+      _addLog('📋 Response: ${response.body.substring(0, min(200, response.body.length))}');
 
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List;
-        print('📊 Parsed ${list.length} months');
+        _addLog('📊 Parsed ${list.length} months');
         return list.cast<Map<String, dynamic>>();
       }
-      print('❌ Months API failed: ${response.statusCode}');
+      _addLog('❌ Months API failed: ${response.statusCode}');
 
       // Return all 12 months as fallback
       return _getAllMonths();
     } catch (e) {
-      print('🔥 Error fetching months: $e');
+      _addLog('🔥 Error fetching months: $e');
       return _getAllMonths();
     }
   }
@@ -111,15 +113,15 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
     try {
       final token = await _getAuthToken();
       final url = '${_getApiBaseUrl()}/api/streaks/monthly/$month/$year';
-      print('📍 Fetching monthly streaks: $url');
+      _addLog('📍 Fetching monthly streaks: $url');
 
       final response = await http.get(
         Uri.parse(url),
         headers: token.isNotEmpty ? {'Authorization': 'Bearer $token'} : {},
       ).timeout(const Duration(seconds: 8));
 
-      print('✅ Monthly streaks response: ${response.statusCode}');
-      print('📋 Response: ${response.body.substring(0, min(500, response.body.length))}');
+      _addLog('✅ Monthly streaks response: ${response.statusCode}');
+      _addLog('📋 Response: ${response.body.substring(0, min(200, response.body.length))}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -139,14 +141,14 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
           }
         });
 
-        print('📊 Parsed ${result.length} dates for $month/$year');
+        _addLog('📊 Parsed ${result.length} dates for $month/$year');
         return result;
       } else {
-        print('❌ Monthly API Error: ${response.statusCode} - ${response.body}');
+        _addLog('❌ Monthly API Error: ${response.statusCode} - ${response.body}');
         throw Exception('API Error: ${response.statusCode}');
       }
     } catch (e) {
-      print('🔥 Error fetching monthly streaks: $e');
+      _addLog('🔥 Error fetching monthly streaks: $e');
       rethrow;
     }
   }
@@ -190,6 +192,13 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
     return '';
   }
 
+  void _addLog(String message) {
+    print(message);
+    setState(() {
+      _debugLog += '\n$message';
+    });
+  }
+
   Color _getStreakColor(int streak) {
     if (streak == 0) return Colors.grey.shade300;
     if (streak <= 3) return AppColors.warning.withValues(alpha: 0.3);
@@ -204,12 +213,24 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
       appBar: AppBar(
         title: const Text('Your Streaks'),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(_showDebug ? Icons.bug_report : Icons.bug_report_outlined),
+            onPressed: () {
+              setState(() {
+                _showDebug = !_showDebug;
+              });
+            },
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // Current Streak Card
             FutureBuilder<Map<String, dynamic>>(
               future: _currentStreakFuture,
@@ -542,8 +563,32 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
                 );
               },
             ),
-          ],
-        ),
+            ],
+            ),
+          ),
+          // Debug Panel
+          if (_showDebug)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                color: Colors.black87,
+                padding: const EdgeInsets.all(12),
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: SingleChildScrollView(
+                  child: Text(
+                    _debugLog,
+                    style: const TextStyle(
+                      color: Colors.greenAccent,
+                      fontSize: 10,
+                      fontFamily: 'Courier',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
