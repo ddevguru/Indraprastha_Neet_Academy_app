@@ -335,126 +335,138 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
 
                         // Dates Grid (when expanded)
                         if (isExpanded)
-                          FutureBuilder<Map<int, dynamic>>(
-                            future: _fetchMonthlyStreaks(monthStr, yearStr),
-                            builder: (context, streaksSnapshot) {
-                              final streaks = streaksSnapshot.data ?? {};
-
-                              if (streaks.isEmpty) {
-                                return Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Text(
-                                    'No activity data',
-                                    style: TextStyle(
-                                        color: Colors.grey.shade600),
-                                  ),
-                                );
-                              }
-
-                              return Column(
-                                children: [
-                                  const SizedBox(height: 12),
-                                  GridView.builder(
-                                    shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
-                                    gridDelegate:
-                                        const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 7,
-                                      childAspectRatio: 1.2,
-                                      mainAxisSpacing: 8,
-                                      crossAxisSpacing: 8,
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: FutureBuilder<Map<int, dynamic>>(
+                              future: _fetchMonthlyStreaks(monthStr, yearStr),
+                              builder: (context, streaksSnapshot) {
+                                if (streaksSnapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: SizedBox(
+                                      height: 40,
+                                      child: CircularProgressIndicator(),
                                     ),
-                                    itemCount: 31,
-                                    itemBuilder: (context, index) {
-                                      final date = index + 1;
-                                      final streak =
-                                          (streaks[date] as int?) ?? 0;
+                                  );
+                                }
 
-                                      return GestureDetector(
-                                        onTap: streak > 0
-                                            ? () {
-                                                final dateStr =
-                                                    '$yearStr-${monthStr.padLeft(2, '0')}-${date.toString().padLeft(2, '0')}';
-                                                _showActivityDetails(
-                                                  context,
-                                                  month['month'] ?? '',
-                                                  date,
-                                                  streak,
-                                                  dateStr,
-                                                );
-                                              }
-                                            : null,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: _getStreakColor(streak),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                            border: Border.all(
-                                              color: streak > 0
-                                                  ? AppColors.primary
-                                                  : Colors.grey.shade300,
-                                              width: 0.5,
-                                            ),
-                                          ),
-                                          child: Stack(
-                                            children: [
-                                              Center(
-                                                child: Column(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .center,
-                                                  children: [
-                                                    Text(
-                                                      '$date',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        fontSize: 12,
-                                                        color: streak > 0
-                                                            ? Colors
-                                                                .black87
-                                                            : Colors
-                                                                .grey
-                                                                .shade600,
-                                                      ),
-                                                    ),
-                                                    if (streak > 0)
-                                                      Text(
-                                                        '$streak',
-                                                        style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          fontSize: 11,
-                                                          color: Colors
-                                                              .black54,
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                              ),
-                                              if (streak > 0)
-                                                Positioned(
-                                                  top: 2,
-                                                  right: 2,
-                                                  child: Icon(
-                                                    Icons
-                                                        .local_fire_department_rounded,
-                                                    size: 12,
-                                                    color: streak > 10
-                                                        ? Colors.deepOrange
-                                                        : AppColors.primary,
-                                                  ),
-                                                ),
-                                            ],
+                                final streaks = streaksSnapshot.data ?? {};
+
+                                if (streaks.isEmpty) {
+                                  return Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Text(
+                                      'Loading...',
+                                      style: TextStyle(
+                                          color: Colors.grey.shade600),
+                                    ),
+                                  );
+                                }
+
+                                return GridView.builder(
+                                  shrinkWrap: true,
+                                  physics:
+                                      const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 7,
+                                    childAspectRatio: 1.1,
+                                    mainAxisSpacing: 6,
+                                    crossAxisSpacing: 6,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 8),
+                                  itemCount: 31,
+                                  itemBuilder: (context, index) {
+                                    final date = index + 1;
+                                    final streakData =
+                                        streaks[date] as Map<String, dynamic>?;
+                                    final streak =
+                                        (streakData?['streak'] as int?) ?? 0;
+
+                                    return GestureDetector(
+                                      onTap: streak > 0
+                                          ? () {
+                                              final dateStr =
+                                                  '$yearStr-${monthStr.padLeft(2, '0')}-${date.toString().padLeft(2, '0')}';
+                                              _showActivityDetails(
+                                                context,
+                                                month['month'] ?? '',
+                                                date,
+                                                streak,
+                                                dateStr,
+                                              );
+                                            }
+                                          : null,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: _getStreakColor(streak),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: streak > 0
+                                                ? AppColors.primary
+                                                : Colors.grey.shade300,
+                                            width: streak > 0 ? 1.5 : 0.5,
                                           ),
                                         ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              );
-                            },
+                                        child: Stack(
+                                          children: [
+                                            Center(
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    '$date',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize: 11,
+                                                      color: streak > 0
+                                                          ? Colors.black87
+                                                          : Colors.grey
+                                                              .shade500,
+                                                    ),
+                                                  ),
+                                                  if (streak > 0) ...[
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      '$streak',
+                                                      style:
+                                                          const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        fontSize: 9,
+                                                        color: Colors.black54,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+                                            if (streak > 0)
+                                              Positioned(
+                                                top: 2,
+                                                right: 2,
+                                                child: Icon(
+                                                  Icons
+                                                      .local_fire_department_rounded,
+                                                  size: 10,
+                                                  color: streak > 10
+                                                      ? Colors.deepOrange
+                                                      : AppColors.primary,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
                           ),
 
                         const SizedBox(height: 16),
