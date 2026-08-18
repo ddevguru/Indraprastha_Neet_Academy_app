@@ -593,6 +593,11 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   Map<String, dynamic> _set = {};
   List<Map<String, dynamic>> _questions = [];
 
+  late Timer _questionTimer;
+  int _remainingSeconds = 0;
+  final int _questionTimerSeconds = 120;
+  final Set<int> _skippedQuestions = {};
+
   int get _draftSetId => widget.setId;
 
   AttemptDraftStore get _draftStore =>
@@ -659,11 +664,42 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     super.initState();
     _loadAttempt();
     WidgetsBinding.instance.addPostFrameCallback((_) => _guardAccess());
+    _startQuestionTimer();
   }
 
   @override
   void dispose() {
+    _questionTimer.cancel();
     super.dispose();
+  }
+
+  void _startQuestionTimer() {
+    _remainingSeconds = _questionTimerSeconds;
+    _questionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      setState(() {
+        _remainingSeconds--;
+      });
+      if (_remainingSeconds <= 0) {
+        timer.cancel();
+        _autoAdvanceToNextQuestion();
+      }
+    });
+  }
+
+  void _autoAdvanceToNextQuestion() {
+    if (!_submitted) {
+      setState(() => _submitted = true);
+    } else {
+      _nextQuestion();
+    }
+  }
+
+  void _skipQuestion() {
+    _questionTimer.cancel();
+    _skippedQuestions.add(_currentIndex);
+    _nextQuestion();
+    _startQuestionTimer();
   }
 
   Future<void> _handleBack() async {
@@ -811,6 +847,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   }
 
   void _nextQuestion() {
+    _questionTimer.cancel();
     if (_currentIndex >= _questions.length - 1) {
       setState(() => _finished = true);
       unawaited(_submitPracticeResult());
@@ -822,6 +859,19 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       _submitted = false;
     });
     unawaited(_persistDraft());
+    _startQuestionTimer();
+  }
+
+  void _previousQuestion() {
+    if (_currentIndex <= 0) return;
+    _questionTimer.cancel();
+    setState(() {
+      _currentIndex--;
+      _selectedOption = null;
+      _submitted = false;
+    });
+    unawaited(_persistDraft());
+    _startQuestionTimer();
   }
 
   List<AnswerReviewEntry> _reviewEntries() {
@@ -1019,11 +1069,59 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  StatCard(
-                    title: 'Set progress',
-                    value: '${_currentIndex + 1}/${_questions.length}',
-                    subtitle: '${_set['estimated_minutes'] ?? 20} min estimated',
-                    icon: Icons.timelapse_rounded,
+                  // Progress and Timer Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: StatCard(
+                          title: 'Set progress',
+                          value: '${_currentIndex + 1}/${_questions.length}',
+                          subtitle: '${_set['estimated_minutes'] ?? 20} min estimated',
+                          icon: Icons.timelapse_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      // Timer Display
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _remainingSeconds <= 10
+                              ? AppColors.danger.withValues(alpha: 0.1)
+                              : AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                          border: Border.all(
+                            color: _remainingSeconds <= 10
+                                ? AppColors.danger
+                                : AppColors.primary,
+                            width: 2,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.schedule_rounded,
+                              size: 20,
+                              color: _remainingSeconds <= 10
+                                  ? AppColors.danger
+                                  : AppColors.primary,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$_remainingSeconds s',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: _remainingSeconds <= 10
+                                    ? AppColors.danger
+                                    : AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   SurfaceCard(
@@ -1115,6 +1213,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           );
                         }),
                         const SizedBox(height: AppSpacing.sm),
+                        // Submit Button
                         PrimaryButton(
                           label: _submitted
                               ? (_currentIndex >= _questions.length - 1
@@ -1134,6 +1233,40 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                   _nextQuestion();
                                 }
                               : null,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        // Skip Button
+                        if (!_submitted)
+                          SecondaryButton(
+                            label: 'Skip this question',
+                            icon: Icons.skip_next_rounded,
+                            expanded: true,
+                            onPressed: _skipQuestion,
+                          ),
+                        const SizedBox(height: AppSpacing.md),
+                        // Navigation Buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SecondaryButton(
+                                label: 'Previous',
+                                icon: Icons.arrow_back_rounded,
+                                onPressed: _currentIndex > 0
+                                    ? _previousQuestion
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: SecondaryButton(
+                                label: 'Next',
+                                icon: Icons.arrow_forward_rounded,
+                                onPressed: _currentIndex < _questions.length - 1
+                                    ? _nextQuestion
+                                    : null,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
