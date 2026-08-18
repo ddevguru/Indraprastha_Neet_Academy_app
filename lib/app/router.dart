@@ -20,6 +20,7 @@ import '../features/subscriptions/paywall_screen.dart';
 import '../features/subscriptions/subscriptions_screen.dart';
 import '../features/tests/tests_screens.dart';
 import '../features/support/help_center_screen.dart';
+import '../features/streaks/streaks_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final authBloc = ref.read(authBlocProvider);
@@ -155,6 +156,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/analytics',
         builder: (context, state) => const AnalyticsScreen(),
+      ),
+      GoRoute(
+        path: '/streaks',
+        builder: (context, state) => const StreaksScreen(),
       ),
       GoRoute(
         path: '/subscriptions',

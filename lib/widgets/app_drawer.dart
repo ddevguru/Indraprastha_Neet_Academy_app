@@ -203,6 +203,14 @@ class AppDrawer extends ConsumerWidget {
                     ),
                     const Divider(color: Color(0x33FFFFFF)),
                     _DrawerTile(
+                      title: 'Streaks',
+                      leading: const Icon(Icons.local_fire_department_rounded, color: AppColors.onDrawer),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/streaks');
+                      },
+                    ),
+                    _DrawerTile(
                       title: 'Help Center',
                       leading: const Icon(Icons.help_rounded, color: AppColors.onDrawer),
                       onTap: () {
