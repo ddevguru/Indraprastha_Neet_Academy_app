@@ -1185,6 +1185,12 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           final revealState = _submitted && (selected || index == correctIndex);
                           final isDark = Theme.of(context).brightness == Brightness.dark;
                           final isCorrectOption = index == correctIndex;
+
+                          // Mock option statistics (replace with actual API data)
+                          final optionPercentages = [45.2, 22.3, 18.5, 14.0];
+                          final percentage = optionPercentages[index];
+                          final optionLabel = ['A', 'B', 'C', 'D'][index];
+
                           Color bg;
                           Color border;
                           Color textColor;
@@ -1236,15 +1242,82 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                   borderRadius: BorderRadius.circular(AppRadii.md),
                                   border: Border.all(color: border),
                                 ),
-                                child: Text(
-                                  _optionLabel(index, options[index]),
-                                  style: questionContentTextStyle(
-                                    context,
-                                    fontWeight: selected || revealState
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color: textColor,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Option Label and Text
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '$optionLabel)',
+                                          style: questionContentTextStyle(
+                                            context,
+                                            fontWeight: selected || revealState
+                                                ? FontWeight.w700
+                                                : FontWeight.w600,
+                                            color: textColor,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            options[index],
+                                            style: questionContentTextStyle(
+                                              context,
+                                              fontWeight: selected || revealState
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w400,
+                                              color: textColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    // Statistics Bar
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(4),
+                                            child: LinearProgressIndicator(
+                                              value: percentage / 100,
+                                              minHeight: 6,
+                                              backgroundColor: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.1),
+                                              valueColor: AlwaysStoppedAnimation(
+                                                revealState && isCorrectOption
+                                                    ? AppColors.success
+                                                    : (selected
+                                                        ? AppColors.primary
+                                                        : AppColors.primary
+                                                            .withValues(alpha: 0.6)),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        SizedBox(
+                                          width: 45,
+                                          child: Text(
+                                            '${percentage.toStringAsFixed(1)}%',
+                                            textAlign: TextAlign.right,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.7),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
