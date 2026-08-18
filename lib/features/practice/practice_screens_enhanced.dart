@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../theme/app_tokens.dart';
 import '../../widgets/fast_network_image.dart';
 
@@ -7,12 +8,14 @@ class EnhancedPracticeScreen extends StatefulWidget {
   final int practiceSetId;
   final String practiceTitle;
   final List<String> questions;
+  final int questionTimerSeconds;
 
   const EnhancedPracticeScreen({
     super.key,
     required this.practiceSetId,
     required this.practiceTitle,
     required this.questions,
+    this.questionTimerSeconds = 120,
   });
 
   @override
@@ -24,21 +27,53 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
   late List<PracticeQuestion> practiceQuestions;
   int currentQuestionIndex = 0;
   Set<int> answeredQuestions = {};
+  Set<int> skippedQuestions = {};
   Map<int, String> userAnswers = {};
   bool _showResults = false;
   late PageController _reviewController;
+
+  late Timer _questionTimer;
+  int _remainingSeconds = 0;
 
   @override
   void initState() {
     super.initState();
     _loadQuestions();
     _reviewController = PageController();
+    _startQuestionTimer();
   }
 
   @override
   void dispose() {
+    _questionTimer.cancel();
     _reviewController.dispose();
     super.dispose();
+  }
+
+  void _startQuestionTimer() {
+    _remainingSeconds = widget.questionTimerSeconds;
+    _questionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _remainingSeconds--;
+      });
+      if (_remainingSeconds <= 0) {
+        timer.cancel();
+        _autoAdvanceToNextQuestion();
+      }
+    });
+  }
+
+  void _autoAdvanceToNextQuestion() {
+    if (currentQuestionIndex < widget.questions.length - 1) {
+      _questionTimer.cancel();
+      setState(() {
+        currentQuestionIndex++;
+      });
+      _startQuestionTimer();
+    } else {
+      _questionTimer.cancel();
+      setState(() => _showResults = true);
+    }
   }
 
   void _loadQuestions() {
@@ -52,6 +87,12 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
         correctAnswer: 'A',
         topic: 'Topic ${index % 5 + 1}',
         explanation: 'This is the explanation for question ${index + 1}...',
+        optionStats: {
+          'A': 45.5,
+          'B': 20.3,
+          'C': 22.1,
+          'D': 12.1,
+        },
       ),
     );
   }
@@ -81,14 +122,25 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
 
   void _goToNextQuestion() {
     if (currentQuestionIndex < widget.questions.length - 1) {
+      _questionTimer.cancel();
       setState(() => currentQuestionIndex++);
+      _startQuestionTimer();
     }
   }
 
   void _goToPreviousQuestion() {
     if (currentQuestionIndex > 0) {
+      _questionTimer.cancel();
       setState(() => currentQuestionIndex--);
+      _startQuestionTimer();
     }
+  }
+
+  void _skipQuestion() {
+    setState(() {
+      skippedQuestions.add(currentQuestionIndex);
+    });
+    _goToNextQuestion();
   }
 
   @override
@@ -117,14 +169,56 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Question Number
-                  Text(
-                    'Question ${currentQuestionIndex + 1} of ${widget.questions.length}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  // Question Header with Timer
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Question ${currentQuestionIndex + 1} of ${widget.questions.length}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      // Timer Display
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _remainingSeconds <= 10
+                              ? Colors.red.withValues(alpha: 0.1)
+                              : AppColors.primarySoft,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _remainingSeconds <= 10
+                                ? Colors.red
+                                : AppColors.primary,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.timer,
+                              size: 14,
+                              color: _remainingSeconds <= 10
+                                  ? Colors.red
+                                  : AppColors.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '$_remainingSeconds s',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _remainingSeconds <= 10
+                                    ? Colors.red
+                                    : AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
 
@@ -161,6 +255,8 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                             final shouldShowCorrect = isAnswered &&
                                 isCorrectAnswer &&
                                 !isSelected;
+                            final optionPercentage =
+                                currentQuestion.optionStats[option] ?? 0.0;
 
                             return GestureDetector(
                               onTap: isAnswered
@@ -190,54 +286,85 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                                             : 1,
                                   ),
                                 ),
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: shouldShowCorrect
-                                              ? Colors.green
-                                              : isSelected
-                                                  ? AppColors
-                                                      .primary
-                                                  : AppColors
-                                                      .border,
-                                        ),
-                                        color: shouldShowCorrect
-                                            ? Colors.green
-                                            : isSelected
-                                                ? AppColors.primary
-                                                : Colors.transparent,
-                                      ),
-                                      child: isSelected ||
-                                              shouldShowCorrect
-                                          ? Icon(
-                                              Icons.check,
-                                              size: 14,
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
                                               color: shouldShowCorrect
-                                                  ? Colors.white
-                                                  : Colors.white,
-                                            )
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        '$option) ${currentQuestion.options[index]}',
-                                        style: const TextStyle(
-                                          fontSize: 14,
+                                                  ? Colors.green
+                                                  : isSelected
+                                                      ? AppColors.primary
+                                                      : AppColors.border,
+                                            ),
+                                            color: shouldShowCorrect
+                                                ? Colors.green
+                                                : isSelected
+                                                    ? AppColors.primary
+                                                    : Colors.transparent,
+                                          ),
+                                          child: isSelected ||
+                                                  shouldShowCorrect
+                                              ? const Icon(
+                                                  Icons.check,
+                                                  size: 14,
+                                                  color: Colors.white,
+                                                )
+                                              : null,
                                         ),
-                                      ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            '$option) ${currentQuestion.options[index]}',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                        if (shouldShowCorrect)
+                                          const Icon(
+                                            Icons.check_circle,
+                                            color: Colors.green,
+                                            size: 20,
+                                          ),
+                                      ],
                                     ),
-                                    if (shouldShowCorrect)
-                                      const Icon(
-                                        Icons.check_circle,
-                                        color: Colors.green,
-                                        size: 20,
+                                    if (currentQuestion.optionStats.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(4),
+                                              child: LinearProgressIndicator(
+                                                value: optionPercentage / 100,
+                                                minHeight: 4,
+                                                backgroundColor: Colors.grey.shade200,
+                                                valueColor: AlwaysStoppedAnimation(
+                                                  isSelected
+                                                      ? AppColors.primary
+                                                      : Colors.grey.shade400,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${optionPercentage.toStringAsFixed(1)}%',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
                                       ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -401,6 +528,8 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
 
   Widget _buildNavigationBar() {
     final isLastQuestion = currentQuestionIndex == widget.questions.length - 1;
+    final isFirstQuestion = currentQuestionIndex == 0;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -409,22 +538,49 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
           top: BorderSide(color: AppColors.border),
         ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: currentQuestionIndex > 0 ? _goToPreviousQuestion : null,
-              child: const Text('← Previous'),
-            ),
+          // Submit/Answer Section
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: isLastQuestion
+                      ? () => setState(() => _showResults = true)
+                      : null,
+                  child: Text(isLastQuestion ? 'Finish & View Score' : 'Submit All'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _skipQuestion,
+                icon: const Icon(Icons.skip_next, size: 18),
+                label: const Text('Skip'),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FilledButton(
-              onPressed: isLastQuestion
-                  ? () => setState(() => _showResults = true)
-                  : _goToNextQuestion,
-              child: Text(isLastQuestion ? 'Finish & View Score' : 'Next →'),
-            ),
+
+          const SizedBox(height: 12),
+
+          // Navigation Section
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: isFirstQuestion ? null : _goToPreviousQuestion,
+                  icon: const Icon(Icons.arrow_back, size: 16),
+                  label: const Text('Previous'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: isLastQuestion ? null : _goToNextQuestion,
+                  icon: const Icon(Icons.arrow_forward, size: 16),
+                  label: const Text('Next'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1058,6 +1214,7 @@ class PracticeQuestion {
   final String topic;
   final String? explanation;
   final List<ExplanationImage> explanationImages;
+  final Map<String, double> optionStats;
 
   PracticeQuestion({
     required this.id,
@@ -1067,6 +1224,7 @@ class PracticeQuestion {
     required this.topic,
     this.explanation,
     this.explanationImages = const [],
+    this.optionStats = const {},
   });
 }
 
