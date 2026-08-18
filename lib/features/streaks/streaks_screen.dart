@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../theme/app_tokens.dart';
 
 class StreaksScreen extends StatefulWidget {
@@ -11,132 +13,165 @@ class StreaksScreen extends StatefulWidget {
 class _StreaksScreenState extends State<StreaksScreen> {
   late DateTime currentDate;
   int? expandedMonth;
+  late Future<Map<String, dynamic>> _currentStreakFuture;
+  late Future<List<Map<String, dynamic>>> _monthsFuture;
 
   @override
   void initState() {
     super.initState();
     currentDate = DateTime.now();
+    _currentStreakFuture = _fetchCurrentStreak();
+    _monthsFuture = _fetchMonths();
   }
 
-  // Mock data for streaks - replace with API call
-  Map<String, dynamic> getStreaksData() {
+  // Fetch current streak from API
+  Future<Map<String, dynamic>> _fetchCurrentStreak() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${_getApiBaseUrl()}/api/streaks/current'),
+        headers: {'Authorization': 'Bearer ${await _getAuthToken()}'},
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return {};
+    } catch (e) {
+      print('Error fetching current streak: $e');
+      return {};
+    }
+  }
+
+  // Fetch all months with streaks
+  Future<List<Map<String, dynamic>>> _fetchMonths() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${_getApiBaseUrl()}/api/streaks/months'),
+        headers: {'Authorization': 'Bearer ${await _getAuthToken()}'},
+      );
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List;
+        return list.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching months: $e');
+      return [];
+    }
+  }
+
+  // Fetch monthly streaks
+  Future<Map<int, int>> _fetchMonthlyStreaks(String month, String year) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${_getApiBaseUrl()}/api/streaks/monthly/$month/$year'),
+        headers: {'Authorization': 'Bearer ${await _getAuthToken()}'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final result = <int, int>{};
+        data.forEach((key, value) {
+          final date = int.tryParse(key) ?? 0;
+          final streak = (value['streak'] as num?)?.toInt() ?? 0;
+          result[date] = streak;
+        });
+        return result;
+      }
+      return {};
+    } catch (e) {
+      print('Error fetching monthly streaks: $e');
+      return {};
+    }
+  }
+
+  // Fetch activity details for a specific day
+  Future<Map<String, dynamic>> _fetchActivityDetails(String date) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${_getApiBaseUrl()}/api/streaks/day/$date'),
+        headers: {'Authorization': 'Bearer ${await _getAuthToken()}'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return {
+          'date': data['date'] ?? date,
+          'totalTime': _formatMinutes(data['totalTime'] ?? 0),
+          'lastActive': data['lastActive'] ?? 'N/A',
+          'activities': _formatActivities(data['activities'] ?? []),
+          'contentViewed': _formatContent(data['contentViewed'] ?? []),
+        };
+      }
+      return _getEmptyActivityDetails(date);
+    } catch (e) {
+      print('Error fetching activity details: $e');
+      return _getEmptyActivityDetails(date);
+    }
+  }
+
+  String _formatMinutes(dynamic minutes) {
+    if (minutes == 0) return '0m';
+    final m = (minutes is int) ? minutes : (minutes as num).toInt();
+    final hours = m ~/ 60;
+    final mins = m % 60;
+    if (hours > 0) {
+      return '${hours}h ${mins}m';
+    }
+    return '${mins}m';
+  }
+
+  List<Map<String, dynamic>> _formatActivities(List activities) {
+    return activities.map((act) {
+      final typeMap = {
+        'practice': Icons.assignment_rounded,
+        'test': Icons.quiz_rounded,
+        'video': Icons.play_circle_rounded,
+        'book': Icons.book_rounded,
+      };
+      return {
+        'type': act['type'] ?? 'Activity',
+        'count': '${act['count'] ?? 0} ${_getActivityLabel(act['type'])}',
+        'time': _formatMinutes(act['duration'] ?? 0),
+        'icon': typeMap[act['type']] ?? Icons.assignment_rounded,
+      };
+    }).toList();
+  }
+
+  List<String> _formatContent(List content) {
+    return content.map((c) => c['name'] ?? '').where((s) => s.isNotEmpty).toList();
+  }
+
+  String _getActivityLabel(String? type) {
+    switch (type) {
+      case 'practice':
+        return 'questions';
+      case 'test':
+        return 'attempted';
+      case 'video':
+        return 'videos';
+      case 'book':
+        return 'pages';
+      default:
+        return 'items';
+    }
+  }
+
+  Map<String, dynamic> _getEmptyActivityDetails(String date) {
     return {
-      'January 2026': {
-        1: 5,
-        2: 5,
-        3: 0,
-        4: 8,
-        5: 8,
-        6: 8,
-        7: 0,
-        8: 10,
-        9: 10,
-        10: 10,
-        11: 10,
-        12: 0,
-        13: 12,
-        14: 12,
-        15: 12,
-        16: 0,
-        17: 0,
-        18: 3,
-        19: 3,
-        20: 3,
-        21: 3,
-        22: 3,
-        23: 3,
-        24: 3,
-        25: 3,
-        26: 3,
-        27: 0,
-        28: 0,
-        29: 2,
-        30: 2,
-        31: 2,
-      },
-      'February 2026': {
-        1: 2,
-        2: 2,
-        3: 2,
-        4: 2,
-        5: 2,
-        6: 0,
-        7: 5,
-        8: 5,
-        9: 5,
-        10: 5,
-        11: 5,
-        12: 5,
-        13: 5,
-        14: 0,
-        15: 7,
-        16: 7,
-        17: 7,
-        18: 0,
-        19: 0,
-        20: 4,
-        21: 4,
-        22: 4,
-        23: 0,
-        24: 6,
-        25: 6,
-        26: 6,
-        27: 0,
-        28: 3,
-      },
-      'March 2026': {
-        1: 0,
-        2: 8,
-        3: 8,
-        4: 8,
-        5: 8,
-        6: 8,
-        7: 0,
-        8: 0,
-        9: 10,
-        10: 10,
-      },
+      'date': date,
+      'totalTime': '0m',
+      'lastActive': 'N/A',
+      'activities': [],
+      'contentViewed': [],
     };
   }
 
-  // Mock activity details - replace with API call
-  Map<String, dynamic> getActivityDetails(String month, dynamic date) {
-    return {
-      'date': '$date $month',
-      'totalTime': '2h 45m',
-      'lastActive': '10:30 PM',
-      'activities': [
-        {
-          'type': 'Practice',
-          'count': '15 questions',
-          'time': '45m',
-          'icon': Icons.assignment_rounded,
-        },
-        {
-          'type': 'Videos',
-          'count': '3 videos watched',
-          'time': '1h 20m',
-          'icon': Icons.play_circle_rounded,
-        },
-        {
-          'type': 'Tests',
-          'count': '1 test attempted',
-          'time': '40m',
-          'icon': Icons.quiz_rounded,
-        },
-        {
-          'type': 'Books',
-          'count': '12 pages read',
-          'time': 'Chapter 5',
-          'icon': Icons.book_rounded,
-        },
-      ],
-      'contentViewed': [
-        'Biology - Cell Biology',
-        'Chemistry - Organic Reactions',
-        'Physics - Thermodynamics',
-      ],
-    };
+  String _getApiBaseUrl() {
+    // Replace with your backend URL
+    return 'http://localhost:3000';
+  }
+
+  Future<String> _getAuthToken() async {
+    // Get token from SharedPreferences or your auth provider
+    return 'your_auth_token';
   }
 
   Color _getStreakColor(int streak) {
