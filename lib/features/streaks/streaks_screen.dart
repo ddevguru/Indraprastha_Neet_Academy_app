@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../../theme/app_tokens.dart';
 import '../../core/providers/app_state.dart';
@@ -62,38 +63,63 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   Future<List<Map<String, dynamic>>> _fetchMonths() async {
     try {
       final token = await _getAuthToken();
+      final url = '${_getApiBaseUrl()}/api/streaks/months';
+      print('📍 Fetching months from: $url');
+
       final response = await http.get(
-        Uri.parse('${_getApiBaseUrl()}/api/streaks/months'),
-        headers: {'Authorization': 'Bearer $token'},
+        Uri.parse(url),
+        headers: token.isNotEmpty ? {'Authorization': 'Bearer $token'} : {},
       ).timeout(const Duration(seconds: 10));
+
+      print('✅ Months Response: ${response.statusCode}');
+      print('📋 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final list = jsonDecode(response.body) as List;
+        print('📊 Parsed ${list.length} months');
         return list.cast<Map<String, dynamic>>();
       }
-      // Return mock data as fallback
-      return [
-        {'month': 'January 2026', 'month_num': '01', 'year': '2026'},
-        {'month': 'February 2026', 'month_num': '02', 'year': '2026'},
-        {'month': 'March 2026', 'month_num': '03', 'year': '2026'},
-      ];
+      print('❌ Months API failed: ${response.statusCode}');
+
+      // Return all 12 months as fallback
+      return _getAllMonths();
     } catch (e) {
-      // Return mock data on error
-      return [
-        {'month': 'January 2026', 'month_num': '01', 'year': '2026'},
-        {'month': 'February 2026', 'month_num': '02', 'year': '2026'},
-      ];
+      print('🔥 Error fetching months: $e');
+      return _getAllMonths();
     }
+  }
+
+  List<Map<String, dynamic>> _getAllMonths() {
+    return [
+      {'month': 'January 2026', 'month_num': '01', 'year': '2026'},
+      {'month': 'February 2026', 'month_num': '02', 'year': '2026'},
+      {'month': 'March 2026', 'month_num': '03', 'year': '2026'},
+      {'month': 'April 2026', 'month_num': '04', 'year': '2026'},
+      {'month': 'May 2026', 'month_num': '05', 'year': '2026'},
+      {'month': 'June 2026', 'month_num': '06', 'year': '2026'},
+      {'month': 'July 2026', 'month_num': '07', 'year': '2026'},
+      {'month': 'August 2026', 'month_num': '08', 'year': '2026'},
+      {'month': 'September 2026', 'month_num': '09', 'year': '2026'},
+      {'month': 'October 2026', 'month_num': '10', 'year': '2026'},
+      {'month': 'November 2026', 'month_num': '11', 'year': '2026'},
+      {'month': 'December 2026', 'month_num': '12', 'year': '2026'},
+    ];
   }
 
   // Fetch monthly streaks
   Future<Map<int, dynamic>> _fetchMonthlyStreaks(String month, String year) async {
     try {
       final token = await _getAuthToken();
+      final url = '${_getApiBaseUrl()}/api/streaks/monthly/$month/$year';
+      print('📍 Fetching monthly streaks: $url');
+
       final response = await http.get(
-        Uri.parse('${_getApiBaseUrl()}/api/streaks/monthly/$month/$year'),
-        headers: {'Authorization': 'Bearer $token'},
+        Uri.parse(url),
+        headers: token.isNotEmpty ? {'Authorization': 'Bearer $token'} : {},
       ).timeout(const Duration(seconds: 8));
+
+      print('✅ Monthly streaks response: ${response.statusCode}');
+      print('📋 Response: ${response.body.substring(0, min(500, response.body.length))}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -113,14 +139,15 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
           }
         });
 
+        print('📊 Parsed ${result.length} dates for $month/$year');
         return result;
       } else {
-        print('API Error: ${response.statusCode}');
-        return {};
+        print('❌ Monthly API Error: ${response.statusCode} - ${response.body}');
+        throw Exception('API Error: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching monthly streaks: $e');
-      return {};
+      print('🔥 Error fetching monthly streaks: $e');
+      rethrow;
     }
   }
 
@@ -158,8 +185,9 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   }
 
   Future<String> _getAuthToken() async {
-    // Get token from SharedPreferences or auth provider
-    return 'your_auth_token';
+    // TODO: Get actual token from SharedPreferences or auth provider
+    // For now, return empty string and let API handle it
+    return '';
   }
 
   Color _getStreakColor(int streak) {
