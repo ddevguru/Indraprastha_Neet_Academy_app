@@ -680,6 +680,68 @@ async function ensureDatabaseSchema() {
      ON CONFLICT (username) DO NOTHING`,
     [adminUser, adminPasswordHash]
   );
+
+  // Create streaks tracking tables
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_streaks (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      activity_date DATE NOT NULL,
+      streak_count INTEGER DEFAULT 0,
+      last_active_time TIMESTAMP,
+      duration_minutes INTEGER DEFAULT 0,
+      activity_type VARCHAR(50),
+      activity_count INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (user_id, activity_date)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_streaks_user_date ON user_streaks(user_id, activity_date DESC);`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_activities (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      activity_date DATE NOT NULL,
+      activity_type VARCHAR(50) NOT NULL,
+      activity_count INTEGER DEFAULT 0,
+      duration_minutes INTEGER DEFAULT 0,
+      metadata JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_activities_user_date ON user_activities(user_id, activity_date DESC);`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_content_views (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      content_id INTEGER,
+      content_name VARCHAR(255) NOT NULL,
+      content_type VARCHAR(50),
+      viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_content_views_user_date ON user_content_views(user_id, viewed_at DESC);`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_answers (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      question_id INTEGER NOT NULL,
+      practice_set_id INTEGER,
+      test_id INTEGER,
+      option_key VARCHAR(5) NOT NULL,
+      is_correct BOOLEAN DEFAULT FALSE,
+      answered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_answers_stats ON user_answers(question_id, option_key);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_answers_practice_set ON user_answers(practice_set_id, question_id);`);
 }
 
 async function loadRuntimeConfigFromDb() {
