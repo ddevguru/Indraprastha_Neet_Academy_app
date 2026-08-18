@@ -2,19 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// Middleware to check authentication
-const authenticateToken = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  // TODO: Verify token and extract user_id
-  req.user_id = 1; // Placeholder - replace with actual user from token
-  next();
-};
-
 // Get current streak
-router.get('/current', authenticateToken, async (req, res) => {
+router.get('/current', async (req, res) => {
   try {
     const userId = req.user_id;
 
@@ -46,7 +35,8 @@ router.get('/current', authenticateToken, async (req, res) => {
 });
 
 // Get monthly streaks - returns all dates in month with streak data
-router.get('/monthly/:month/:year', authenticateToken, async (req, res) => {
+router.get('/monthly/:month/:year', async (req, res) => {
+  req.user_id = 1; // Set default user for testing
   try {
     const userId = req.user_id;
     const { month, year } = req.params;
@@ -89,7 +79,7 @@ router.get('/monthly/:month/:year', authenticateToken, async (req, res) => {
 });
 
 // Get all months of current year (2026)
-router.get('/months', authenticateToken, async (req, res) => {
+router.get('/months', async (req, res) => {
   try {
     const currentYear = new Date().getFullYear();
     const months = [
@@ -115,7 +105,8 @@ router.get('/months', authenticateToken, async (req, res) => {
 });
 
 // Get specific day details
-router.get('/day/:date', authenticateToken, async (req, res) => {
+router.get('/day/:date', async (req, res) => {
+  req.user_id = 1; // Set default user for testing
   try {
     const userId = req.user_id;
     const { date } = req.params; // Format: YYYY-MM-DD
@@ -183,7 +174,8 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
 });
 
 // Log activity (called when user does something)
-router.post('/log-activity', authenticateToken, async (req, res) => {
+router.post('/log-activity', async (req, res) => {
+  req.user_id = 1; // Set default user for testing
   try {
     const userId = req.user_id;
     const { activityType, activityCount, durationMinutes, metadata } = req.body;
