@@ -598,7 +598,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
   late Timer _questionTimer;
   int _remainingSeconds = 0;
-  final int _questionTimerSeconds = 10;
+  final int _questionTimerSeconds = 60;
 
   int get _draftSetId => widget.setId;
 
@@ -1319,49 +1319,52 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 8),
-                                    // Statistics Bar
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(4),
-                                            child: LinearProgressIndicator(
-                                              value: percentage / 100,
-                                              minHeight: 6,
-                                              backgroundColor: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withValues(alpha: 0.1),
-                                              valueColor: AlwaysStoppedAnimation(
-                                                revealState && isCorrectOption
-                                                    ? AppColors.success
-                                                    : (selected
-                                                        ? AppColors.primary
-                                                        : AppColors.primary
-                                                            .withValues(alpha: 0.6)),
+                                    // Show statistics bar only after selection or submission
+                                    if (selected || revealState) ...[
+                                      const SizedBox(height: 8),
+                                      // Statistics Bar
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(4),
+                                              child: LinearProgressIndicator(
+                                                value: percentage / 100,
+                                                minHeight: 6,
+                                                backgroundColor: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withValues(alpha: 0.1),
+                                                valueColor: AlwaysStoppedAnimation(
+                                                  revealState && isCorrectOption
+                                                      ? AppColors.success
+                                                      : (selected
+                                                          ? AppColors.primary
+                                                          : AppColors.primary
+                                                              .withValues(alpha: 0.6)),
+                                                ),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        SizedBox(
-                                          width: 45,
-                                          child: Text(
-                                            '${percentage.toStringAsFixed(1)}%',
-                                            textAlign: TextAlign.right,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withValues(alpha: 0.7),
+                                          const SizedBox(width: 10),
+                                          SizedBox(
+                                            width: 45,
+                                            child: Text(
+                                              '${percentage.toStringAsFixed(1)}%',
+                                              textAlign: TextAlign.right,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withValues(alpha: 0.7),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
+                                        ],
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
