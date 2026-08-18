@@ -866,17 +866,43 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: PrimaryButton(
-                            label: _index == questions.length - 1
-                                ? 'Submit test'
-                                : 'Next',
+                            label: 'Submit Question No ${_index + 1}',
                             onPressed: _submitting
                                 ? null
                                 : () async {
+                                    // If on last question, show confirmation dialog
+                                    if (_index == questions.length - 1) {
+                                      final confirmed = await showDialog<bool>(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('Submit Test?'),
+                                          content: const Text(
+                                            'Are you sure you want to submit the Test Now',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context, false),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            FilledButton(
+                                              onPressed: () => Navigator.pop(context, true),
+                                              child: const Text('Submit'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (confirmed != true) return;
+                                    }
+
+                                    // If not on last question, just go to next
                                     if (_index < questions.length - 1) {
                                       setState(() => _index++);
                                       unawaited(_persistDraft());
                                       return;
                                     }
+
+                                    // Submit test
                                     setState(() => _submitting = true);
                                     int correct = 0;
                                     for (var i = 0; i < questions.length; i++) {
