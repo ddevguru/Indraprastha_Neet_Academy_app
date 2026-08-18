@@ -86,6 +86,82 @@ router.get('/dashboard', requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /analytics/question/:questionId/options
+ * Get option statistics for a specific question
+ */
+router.get('/question/:questionId/options', async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const db = require('../db');
+
+    const statsQuery = `
+      SELECT
+        option_key as option,
+        COUNT(*) as selection_count,
+        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM user_answers WHERE question_id = ?), 1) as percentage
+      FROM user_answers
+      WHERE question_id = ?
+      GROUP BY option_key
+      ORDER BY selection_count DESC
+    `;
+
+    const [stats] = await db.query(statsQuery, [questionId, questionId]);
+
+    // Format as object with option keys
+    const result = {};
+    stats.forEach(row => {
+      result[row.option] = parseFloat(row.percentage);
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching option statistics:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /analytics/practice-set/:setId/options
+ * Get option statistics for all questions in a practice set
+ */
+router.get('/practice-set/:setId/options', async (req, res) => {
+  try {
+    const { setId } = req.params;
+    const db = require('../db');
+
+    const statsQuery = `
+      SELECT
+        question_id,
+        option_key as option,
+        COUNT(*) as selection_count,
+        ROUND(COUNT(*) * 100.0 / (
+          SELECT COUNT(*) FROM user_answers WHERE question_id = ua.question_id
+        ), 1) as percentage
+      FROM user_answers ua
+      WHERE practice_set_id = ?
+      GROUP BY question_id, option_key
+      ORDER BY question_id, selection_count DESC
+    `;
+
+    const [stats] = await db.query(statsQuery, [setId]);
+
+    // Group by question ID
+    const result = {};
+    stats.forEach(row => {
+      if (!result[row.question_id]) {
+        result[row.question_id] = {};
+      }
+      result[row.question_id][row.option] = parseFloat(row.percentage);
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching option statistics:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * POST /analytics/log-study-session
  * Log daily study hours and activity
  */

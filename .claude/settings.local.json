@@ -21,7 +21,10 @@
       "Bash(flutter clean *)",
       "Bash(git restore *)",
       "Bash(flutter run *)",
-      "Bash(pkill -f \"flutter run\")"
+      "Bash(pkill -f \"flutter run\")",
+      "Bash(dir -Force)",
+      "Bash(xargs grep -l \"practice.*question\\\\|question.*practice\")",
+      "Bash(git push *)"
     ]
   }
 }

@@ -80,6 +80,8 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/streaks', require('./routes/streaks'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/support', require('./routes/support'));
 
