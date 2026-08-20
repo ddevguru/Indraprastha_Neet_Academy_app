@@ -655,9 +655,46 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
             correctCount: _correctCount,
             wrongCount: _wrongCount,
           );
+
+      // Log activity to Streaks
+      _logPracticeActivity(total);
+
       await _draftStore.clearPracticeDraft(_draftSetId);
     } catch (_) {
       // Keep local completion even if server submit fails.
+    }
+  }
+
+  Future<void> _logPracticeActivity(int totalQuestions) async {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final token = prefs.getString('auth_token') ?? '';
+
+      final response = await http.post(
+        Uri.parse('https://api.indraprasthaneetacademy.com/api/streaks/log-activity'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'activityType': 'practice',
+          'activityCount': totalQuestions,
+          'durationMinutes': (_questionTimerSeconds - _remainingSeconds) ~/ 60,
+          'metadata': {
+            'setId': widget.setId,
+            'accuracy': (_correctCount / totalQuestions * 100).toStringAsFixed(1),
+          },
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        print('✅ Activity logged successfully');
+      } else {
+        print('❌ Failed to log activity: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('🔥 Error logging activity: $e');
+      // Silently fail - activity logging is non-critical
     }
   }
 
