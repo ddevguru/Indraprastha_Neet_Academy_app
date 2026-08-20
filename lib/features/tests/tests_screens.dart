@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
@@ -536,6 +538,10 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
         unattemptedCount: unattempted,
       );
       if (!mounted) return;
+
+      // Log activity to Streaks
+      await _logTestActivity(questions.length, score, accuracy);
+
       await _draftStore.clearTestDraft(widget.testId);
       setState(() {
         _submitted = true;
@@ -549,6 +555,33 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
       });
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _logTestActivity(int totalQuestions, int score, double accuracy) async {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final token = prefs.getString('auth_token') ?? '';
+
+      await http.post(
+        Uri.parse('https://api.indraprasthaneetacademy.com/api/streaks/log-activity'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'activityType': 'test',
+          'activityCount': totalQuestions,
+          'durationMinutes': 180, // Standard test duration
+          'metadata': {
+            'testId': widget.testId,
+            'score': score,
+            'accuracy': accuracy.toStringAsFixed(1),
+          },
+        }),
+      ).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      // Silently fail - activity logging is non-critical
     }
   }
 
