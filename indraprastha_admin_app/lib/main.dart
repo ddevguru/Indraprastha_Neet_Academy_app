@@ -3510,6 +3510,21 @@ class _TestsPageState extends State<TestsPage> {
                   decoration: const InputDecoration(labelText: 'Batch'),
                 ),
                 const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _testCategory,
+                  items: _testCategories
+                      .map(
+                        (category) => DropdownMenuItem<String>(
+                          value: category,
+                          child: Text(category),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setState(() => _testCategory = value ?? 'Grand test'),
+                  decoration: const InputDecoration(labelText: 'Test category'),
+                ),
+                const SizedBox(height: 8),
                 TextField(
                     controller: _title,
                     decoration: const InputDecoration(labelText: 'Test title')),
@@ -3525,21 +3540,6 @@ class _TestsPageState extends State<TestsPage> {
                 TextField(
                     controller: _topic,
                     decoration: const InputDecoration(labelText: 'Topic')),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: _testCategory,
-                  items: _testCategories
-                      .map(
-                        (category) => DropdownMenuItem<String>(
-                          value: category,
-                          child: Text(category),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) =>
-                      setState(() => _testCategory = value ?? 'Grand test'),
-                  decoration: const InputDecoration(labelText: 'Test category'),
-                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _duration,
