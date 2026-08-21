@@ -3255,6 +3255,22 @@ class _TestsPageState extends State<TestsPage> {
     unawaited(_loadTestExplanationImages(questionId));
   }
 
+  void _resetTestForm() {
+    _title.clear();
+    _classLabel.text = 'Class 11';
+    _subject.clear();
+    _topic.clear();
+    _duration.text = '180';
+    _marks.text = '720';
+    _questionCount.text = '180';
+    _schedule.text = 'Upcoming';
+    setState(() {
+      _testCategory = 'Grand test';
+      _editingId = null;
+      _status = null;
+    });
+  }
+
   void _resetTestQuestionForm() {
     _testQuestion.clear();
     _testOptionA.clear();
@@ -3566,6 +3582,7 @@ class _TestsPageState extends State<TestsPage> {
                                         180,
                                 scheduleLabel: _schedule.text.trim(),
                               );
+                              _resetTestForm();
                               setState(
                                   () => _status = 'Test added successfully');
                               if (context.mounted) {
