@@ -755,8 +755,11 @@ async function loadRuntimeConfigFromDb() {
   }
 }
 
+const query = (text, params) => pool.query(text, params);
+
 module.exports = {
   pool,
+  query,
   ensureDatabaseSchema,
   loadRuntimeConfigFromDb,
 };

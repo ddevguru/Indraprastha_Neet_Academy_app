@@ -35,10 +35,10 @@ router.get('/current', authenticateToken, async (req, res) => {
     const streakData = streakResult.rows;
 
     res.json({
-      currentStreak: streakData[0]?.current_streak || 0,
-      totalActiveDays: streakData[0]?.total_active_days || 0,
-      totalQuestions: streakData[0]?.total_questions || 0,
-      totalTimeMinutes: streakData[0]?.total_time_minutes || 0,
+      currentStreak: parseInt(streakData[0]?.current_streak) || 0,
+      totalActiveDays: parseInt(streakData[0]?.total_active_days) || 0,
+      totalQuestions: parseInt(streakData[0]?.total_questions) || 0,
+      totalTimeMinutes: parseInt(streakData[0]?.total_time_minutes) || 0,
       lastActive: streakData[0]?.last_active || null,
     });
   } catch (error) {
@@ -65,8 +65,8 @@ router.get('/monthly/:month/:year', authenticateToken, async (req, res) => {
         COALESCE(duration_minutes, 0) as duration_minutes
       FROM user_streaks
       WHERE user_id = $1
-        AND EXTRACT(MONTH FROM activity_date) = $2
-        AND EXTRACT(YEAR FROM activity_date) = $3
+        AND EXTRACT(MONTH FROM activity_date) = $2::int
+        AND EXTRACT(YEAR FROM activity_date) = $3::int
       ORDER BY activity_date ASC
     `;
 
@@ -139,7 +139,7 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
         COALESCE(duration_minutes, 0) as total_time_minutes,
         last_active_time as last_active
       FROM user_streaks
-      WHERE user_id = $1 AND activity_date = ?
+      WHERE user_id = $1 AND activity_date = $2::date
       LIMIT 1
     `;
 
@@ -153,7 +153,7 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
         activity_count,
         duration_minutes
       FROM user_activities
-      WHERE user_id = $1 AND activity_date = ?
+      WHERE user_id = $1 AND activity_date = $2::date
       ORDER BY created_at DESC
     `;
 
@@ -166,7 +166,7 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
         content_name,
         content_type
       FROM user_content_views
-      WHERE user_id = $1 AND DATE(viewed_at) = ?
+      WHERE user_id = $1 AND viewed_at::date = $2::date
       ORDER BY viewed_at DESC
       LIMIT 20
     `;

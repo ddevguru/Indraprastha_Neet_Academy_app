@@ -2057,6 +2057,8 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
   String? _selectedSubject;
   String? _selectedTopic;
   int _questionCount = 10;
+  bool _filterBookmarked = false;
+  bool _filterWrong = false;
   bool _loading = false;
 
   @override
@@ -2118,8 +2120,35 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
         return;
       }
 
-      allQuestions.shuffle();
-      final picked = allQuestions.take(_questionCount).toList();
+      var filteredQuestions = allQuestions;
+      if (_filterBookmarked) {
+        filteredQuestions = filteredQuestions
+            .where((q) => q['bookmarked'] == true)
+            .toList();
+      }
+      if (_filterWrong) {
+        filteredQuestions = filteredQuestions
+            .where((q) => q['is_correct'] == false || q['user_answer'] != null)
+            .toList();
+      }
+
+      if (filteredQuestions.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _filterBookmarked && _filterWrong
+                  ? 'Bookmarked aur wrong answer wale questions nahi mile.'
+                  : _filterBookmarked
+                      ? 'Bookmarked questions nahi mile.'
+                      : 'Wrong answer wale questions nahi mile.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      filteredQuestions.shuffle();
+      final picked = filteredQuestions.take(_questionCount).toList();
       final titleParts = <String>[
         if (_selectedSubject != null && _selectedSubject!.isNotEmpty)
           _selectedSubject!,
@@ -2241,6 +2270,43 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
                           ],
                           onChanged: (value) =>
                               setState(() => _selectedTopic = value),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'Filter Questions',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: AppSpacing.md,
+                          children: [
+                            FilterChip(
+                              label: const Text('Bookmarked'),
+                              avatar: const Icon(Icons.bookmark_rounded, size: 18),
+                              selected: _filterBookmarked,
+                              onSelected: (selected) {
+                                setState(() {
+                                  _filterBookmarked = selected;
+                                  if (_filterBookmarked && _filterWrong) {
+                                    _filterWrong = false;
+                                  }
+                                });
+                              },
+                            ),
+                            FilterChip(
+                              label: const Text('Wrong Answers'),
+                              avatar: const Icon(Icons.close_rounded, size: 18),
+                              selected: _filterWrong,
+                              onSelected: (selected) {
+                                setState(() {
+                                  _filterWrong = selected;
+                                  if (_filterWrong && _filterBookmarked) {
+                                    _filterBookmarked = false;
+                                  }
+                                });
+                              },
+                            ),
+                          ],
                         ),
                         const SizedBox(height: AppSpacing.lg),
                         Text(

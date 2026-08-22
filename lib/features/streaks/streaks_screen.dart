@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../theme/app_tokens.dart';
 import '../../core/providers/app_state.dart';
+import '../../core/constants/api_constants.dart';
 
 class StreaksScreen extends ConsumerStatefulWidget {
   const StreaksScreen({super.key});
@@ -15,8 +16,6 @@ class StreaksScreen extends ConsumerStatefulWidget {
 class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   late DateTime currentDate;
   int? expandedMonth;
-  late Future<Map<String, dynamic>> _currentStreakFuture;
-  late Future<List<Map<String, dynamic>>> _monthsFuture;
   final Map<String, Future<Map<int, dynamic>>> _monthStreaksCache = {};
   String _authToken = '';
 
@@ -31,37 +30,39 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
     // Get token from auth repo
     final authRepo = ref.read(authRepositoryProvider);
     _authToken = authRepo.token ?? '';
-
-    if (_authToken.isEmpty) {
-      return;
-    }
-
-    _currentStreakFuture = _fetchCurrentStreak();
-    _monthsFuture = _fetchMonths();
   }
 
   // Fetch current streak from API
   Future<Map<String, dynamic>> _fetchCurrentStreak() async {
     try {
       final token = _getAuthToken();
+      final url = '$baseUrl/streaks/current';
+      print('📊 STREAKS: Fetching from $url with token: ${token.isNotEmpty}');
+
       final response = await http.get(
-        Uri.parse('${_getApiBaseUrl()}/api/streaks/current'),
+        Uri.parse(url),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
 
+      print('📊 STREAKS: Response status: ${response.statusCode}');
+      print('📊 STREAKS: Response body: ${response.body}');
+
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        print('✅ STREAKS: Success - $data');
+        return data;
       }
-      // Return mock data as fallback
+
+      print('⚠️ STREAKS: API returned ${response.statusCode}, using fallback');
       return {
         'currentStreak': 3,
         'totalActiveDays': 27,
         'totalQuestions': 234,
         'totalTimeMinutes': 9360,
-        'lastActive': DateTime.now().toString(),
       };
-    } catch (e) {
-      // Return mock data on error
+    } catch (e, st) {
+      print('❌ STREAKS: Error - $e');
+      print('❌ STREAKS: Stack trace - $st');
       return {
         'currentStreak': 3,
         'totalActiveDays': 27,
@@ -75,7 +76,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   Future<List<Map<String, dynamic>>> _fetchMonths() async {
     try {
       final token = _getAuthToken();
-      final url = '${_getApiBaseUrl()}/api/streaks/months';
+      final url = '$baseUrl/streaks/months';
 
       final response = await http.get(
         Uri.parse(url),
@@ -116,7 +117,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   Future<Map<int, dynamic>> _fetchMonthlyStreaks(String month, String year) async {
     try {
       final token = _getAuthToken();
-      final url = '${_getApiBaseUrl()}/api/streaks/monthly/$month/$year';
+      final url = '$baseUrl/streaks/monthly/$month/$year';
 
       final response = await http.get(
         Uri.parse(url),
@@ -155,7 +156,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
     try {
       final token = _getAuthToken();
       final response = await http.get(
-        Uri.parse('${_getApiBaseUrl()}/api/streaks/day/$date'),
+        Uri.parse('$baseUrl/streaks/day/$date'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
 
@@ -169,8 +170,18 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   }
 
   String _formatMinutes(dynamic minutes) {
-    if (minutes == null || minutes == 0) return '0m';
-    final m = (minutes is int) ? minutes : (minutes as num).toInt();
+    if (minutes == null) return '0m';
+    int m = 0;
+    if (minutes is int) {
+      m = minutes;
+    } else if (minutes is double) {
+      m = minutes.toInt();
+    } else if (minutes is String) {
+      m = int.tryParse(minutes) ?? double.tryParse(minutes)?.toInt() ?? 0;
+    } else if (minutes is num) {
+      m = minutes.toInt();
+    }
+    if (m == 0) return '0m';
     final hours = m ~/ 60;
     final mins = m % 60;
     if (hours > 0) {
@@ -179,16 +190,16 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
     return '${mins}m';
   }
 
-  String _getApiBaseUrl() {
-    return 'https://api.indraprasthaneetacademy.com';
-  }
-
   String _getAuthToken() {
     return _authToken;
   }
 
-  Color _getStreakColor(int streak) {
-    if (streak == 0) return Colors.grey.shade300;
+  Color _getStreakColor(BuildContext context, int streak) {
+    if (streak == 0) {
+      return Theme.of(context).brightness == Brightness.dark
+          ? Colors.grey.shade800
+          : Colors.grey.shade300;
+    }
     if (streak <= 3) return AppColors.warning.withValues(alpha: 0.3);
     if (streak <= 7) return AppColors.primary.withValues(alpha: 0.5);
     if (streak <= 10) return AppColors.primary.withValues(alpha: 0.8);
@@ -198,6 +209,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Your Streaks'),
         elevation: 0,
@@ -209,111 +221,118 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
           children: [
             // Current Streak Card
             FutureBuilder<Map<String, dynamic>>(
-              future: _currentStreakFuture,
+              future: _fetchCurrentStreak(),
               builder: (context, snapshot) {
                 final data = snapshot.data ?? {};
                 return Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.primary,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Current Streak',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE85A1C),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.local_fire_department_rounded,
-                            color: Colors.orange,
-                            size: 32,
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Current Streak',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${data['currentStreak'] ?? 0} days',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.local_fire_department_rounded,
+                              color: Colors.orange,
+                              size: 32,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          Column(
-                            children: [
-                              Text(
-                                '${data['totalActiveDays'] ?? 0}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '${data['currentStreak'] ?? 0} days',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
                               ),
-                              const Text(
-                                'Total Days',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                Text(
+                                  '${data['totalActiveDays'] ?? 0}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              Text(
-                                _formatMinutes(data['totalTimeMinutes'] ?? 0),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
+                                const Text(
+                                  'Total Days',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                  ),
                                 ),
-                              ),
-                              const Text(
-                                'Total Time',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                Text(
+                                  _formatMinutes(data['totalTimeMinutes'] ?? 0),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              Text(
-                                '${data['totalQuestions'] ?? 0}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
+                                const Text(
+                                  'Total Time',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                  ),
                                 ),
-                              ),
-                              const Text(
-                                'Questions',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                Text(
+                                  '${data['totalQuestions'] ?? 0}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
+                                const Text(
+                                  'Questions',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
               },
             ),
 
@@ -327,7 +346,7 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
             const SizedBox(height: 16),
 
             FutureBuilder<List<Map<String, dynamic>>>(
-              future: _monthsFuture,
+              future: _fetchMonths(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -469,13 +488,15 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
                                           : null,
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          color: _getStreakColor(streak),
+                                          color: _getStreakColor(context, streak),
                                           borderRadius:
                                               BorderRadius.circular(6),
                                           border: Border.all(
                                             color: streak > 0
                                                 ? AppColors.primary
-                                                : Colors.grey.shade300,
+                                                : (Theme.of(context).brightness == Brightness.dark
+                                                    ? Colors.grey.shade700
+                                                    : Colors.grey.shade300),
                                             width: streak > 0 ? 1.5 : 0.5,
                                           ),
                                         ),
@@ -493,9 +514,12 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
                                                           FontWeight.w600,
                                                       fontSize: 11,
                                                       color: streak > 0
-                                                          ? Colors.black87
-                                                          : Colors.grey
-                                                              .shade500,
+                                                          ? (Theme.of(context).brightness == Brightness.dark
+                                                              ? Colors.white
+                                                              : Colors.black87)
+                                                          : (Theme.of(context).brightness == Brightness.dark
+                                                              ? Colors.white38
+                                                              : Colors.grey.shade500),
                                                     ),
                                                   ),
                                                   if (streak > 0) ...[
@@ -503,11 +527,13 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
                                                     Text(
                                                       '$streak',
                                                       style:
-                                                          const TextStyle(
+                                                          TextStyle(
                                                         fontWeight:
                                                             FontWeight.w700,
                                                         fontSize: 9,
-                                                        color: Colors.black54,
+                                                        color: Theme.of(context).brightness == Brightness.dark
+                                                            ? Colors.white70
+                                                            : Colors.black54,
                                                       ),
                                                     ),
                                                   ],

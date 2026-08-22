@@ -98,14 +98,15 @@ router.get('/question/:questionId/options', async (req, res) => {
       SELECT
         option_key as option,
         COUNT(*) as selection_count,
-        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM user_answers WHERE question_id = ?), 1) as percentage
+        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM user_answers WHERE question_id = $1), 1) as percentage
       FROM user_answers
-      WHERE question_id = ?
+      WHERE question_id = $2
       GROUP BY option_key
       ORDER BY selection_count DESC
     `;
 
-    const [stats] = await db.query(statsQuery, [questionId, questionId]);
+    const statsResult = await db.pool.query(statsQuery, [questionId, questionId]);
+    const stats = statsResult.rows;
 
     // Format as object with option keys
     const result = {};
@@ -133,11 +134,12 @@ router.get('/practice-set/:setId/options', async (req, res) => {
     const questionsQuery = `
       SELECT DISTINCT id as question_id
       FROM practice_set_questions
-      WHERE practice_set_id = ?
+      WHERE practice_set_id = $1
       ORDER BY id ASC
     `;
 
-    const [questions] = await db.query(questionsQuery, [setId]);
+    const questionsResult = await db.pool.query(questionsQuery, [setId]);
+    const questions = questionsResult.rows;
 
     if (questions.length === 0) {
       return res.json({});
@@ -153,12 +155,13 @@ router.get('/practice-set/:setId/options', async (req, res) => {
           SELECT COUNT(*) FROM user_answers WHERE question_id = ua.question_id
         ), 1) as percentage
       FROM user_answers ua
-      WHERE practice_set_id = ?
+      WHERE practice_set_id = $1
       GROUP BY question_id, option_key
       ORDER BY question_id, selection_count DESC
     `;
 
-    const [stats] = await db.query(statsQuery, [setId]);
+    const statsResult = await db.pool.query(statsQuery, [setId]);
+    const stats = statsResult.rows;
 
     // Create result with real data
     const result = {};
