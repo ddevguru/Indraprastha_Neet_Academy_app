@@ -255,8 +255,6 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                             final shouldShowCorrect = isAnswered &&
                                 isCorrectAnswer &&
                                 !isSelected;
-                            final optionPercentage =
-                                currentQuestion.optionStats[option] ?? 0.0;
 
                             return GestureDetector(
                               onTap: isAnswered
@@ -286,85 +284,50 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                                             : 1,
                                   ),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                child: Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 24,
-                                          height: 24,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: shouldShowCorrect
-                                                  ? Colors.green
-                                                  : isSelected
-                                                      ? AppColors.primary
-                                                      : AppColors.border,
-                                            ),
-                                            color: shouldShowCorrect
-                                                ? Colors.green
-                                                : isSelected
-                                                    ? AppColors.primary
-                                                    : Colors.transparent,
-                                          ),
-                                          child: isSelected ||
-                                                  shouldShowCorrect
-                                              ? const Icon(
-                                                  Icons.check,
-                                                  size: 14,
-                                                  color: Colors.white,
-                                                )
-                                              : null,
+                                    Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: shouldShowCorrect
+                                              ? Colors.green
+                                              : isSelected
+                                                  ? AppColors.primary
+                                                  : AppColors.border,
                                         ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            '$option) ${currentQuestion.options[index]}',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ),
-                                        if (shouldShowCorrect)
-                                          const Icon(
-                                            Icons.check_circle,
-                                            color: Colors.green,
-                                            size: 20,
-                                          ),
-                                      ],
-                                    ),
-                                    if (currentQuestion.optionStats.isNotEmpty) ...[
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(4),
-                                              child: LinearProgressIndicator(
-                                                value: optionPercentage / 100,
-                                                minHeight: 4,
-                                                backgroundColor: Colors.grey.shade200,
-                                                valueColor: AlwaysStoppedAnimation(
-                                                  isSelected
-                                                      ? AppColors.primary
-                                                      : Colors.grey.shade400,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${optionPercentage.toStringAsFixed(1)}%',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
+                                        color: shouldShowCorrect
+                                            ? Colors.green
+                                            : isSelected
+                                                ? AppColors.primary
+                                                : Colors.transparent,
                                       ),
-                                    ],
+                                      child: isSelected ||
+                                              shouldShowCorrect
+                                          ? const Icon(
+                                              Icons.check,
+                                              size: 14,
+                                              color: Colors.white,
+                                            )
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        '$option) ${currentQuestion.options[index]}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    if (shouldShowCorrect)
+                                      const Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green,
+                                        size: 20,
+                                      ),
                                   ],
                                 ),
                               ),
@@ -577,7 +540,7 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                 child: OutlinedButton.icon(
                   onPressed: isLastQuestion ? null : _goToNextQuestion,
                   icon: const Icon(Icons.arrow_forward, size: 16),
-                  label: const Text('Next'),
+                  label: const Text('Skip'),
                 ),
               ),
             ],

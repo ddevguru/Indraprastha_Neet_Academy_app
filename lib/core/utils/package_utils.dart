@@ -30,9 +30,9 @@ bool isStarterPackage(Map<String, dynamic> item) {
   final amount = amountRaw is num
       ? amountRaw.toDouble()
       : double.tryParse(amountRaw?.toString() ?? '');
-  if (amount != null && amount >= 99 && amount <= 1000) return true;
+  if (amount != null && amount >= 99 && amount <= 3500) return true;
   final price = item['price_label']?.toString().replaceAll(',', '') ?? '';
-  return price.contains('999') && !price.contains('4999');
+  return (price.contains('2999') || price.contains('999')) && !price.contains('4999');
 }
 
 SubscriptionPlanData subscriptionPlanFromApi(Map<String, dynamic> item) {

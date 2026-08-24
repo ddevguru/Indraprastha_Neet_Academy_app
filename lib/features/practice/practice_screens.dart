@@ -1287,18 +1287,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           final isDark = Theme.of(context).brightness == Brightness.dark;
                           final isCorrectOption = index == correctIndex;
 
-                          // Get option statistics from API (real or fallback data)
                           final optionLabel = ['A', 'B', 'C', 'D'][index];
-                          double percentage = 0.0;
-
-                          // Try to get real data from API first
-                          if (_optionStats.containsKey(_currentIndex)) {
-                            percentage = _optionStats[_currentIndex]![optionLabel] ?? 0.0;
-                          } else {
-                            // Fallback to defaults if no API data yet
-                            const defaultPercentages = [45.2, 22.3, 18.5, 14.0];
-                            percentage = defaultPercentages[index];
-                          }
 
                           Color bg;
                           Color border;
@@ -1381,54 +1370,8 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                             ),
                                           ),
                                         ),
-                                      ],
+                                                            ],
                                     ),
-                                    // Show statistics bar only after submission
-                                    if (_submitted) ...[
-                                      const SizedBox(height: 8),
-                                      // Statistics Bar - Real Data Only
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(4),
-                                              child: LinearProgressIndicator(
-                                                value: percentage / 100,
-                                                minHeight: 6,
-                                                backgroundColor: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.1),
-                                                valueColor: AlwaysStoppedAnimation(
-                                                  revealState && isCorrectOption
-                                                      ? AppColors.success
-                                                      : (selected
-                                                          ? AppColors.primary
-                                                          : AppColors.primary
-                                                              .withValues(alpha: 0.6)),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          SizedBox(
-                                            width: 45,
-                                            child: Text(
-                                              '${percentage.toStringAsFixed(1)}%',
-                                              textAlign: TextAlign.right,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.7),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ),
@@ -1458,7 +1401,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                               : null,
                         ),
                         const SizedBox(height: AppSpacing.md),
-                        // Navigation Buttons (Previous/Next)
+                        // Navigation Buttons (Previous/Skip)
                         Row(
                           children: [
                             // Previous Button
@@ -1472,11 +1415,11 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                               ),
                             if (_currentIndex > 0)
                               const SizedBox(width: AppSpacing.md),
-                            // Next Button
+                            // Skip Button
                             if (_currentIndex < _questions.length - 1)
                               Expanded(
                                 child: SecondaryButton(
-                                  label: 'Next',
+                                  label: 'Skip',
                                   icon: Icons.arrow_forward_rounded,
                                   onPressed: _submitted ? null : _nextQuestion,
                                 ),

@@ -146,6 +146,44 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
     const dayResult = await db.pool.query(dayQuery, [userId, date]);
     const dayData = dayResult.rows;
 
+    // Get test attempts on that date
+    const testsQuery = `
+      SELECT
+        ta.id,
+        t.title as test_title,
+        t.subject,
+        ta.score,
+        ta.accuracy,
+        COALESCE(ea.correct_count, 0) as correct_count,
+        COALESCE(ea.wrong_count, 0) as wrong_count,
+        COALESCE(ea.unattempted_count, 0) as unattempted_count,
+        ta.attempted_at
+      FROM test_attempts ta
+      JOIN tests t ON t.id = ta.test_id
+      LEFT JOIN exam_analytics ea ON ea.user_id = ta.user_id AND ea.test_id = ta.test_id
+      WHERE ta.user_id = $1 AND ta.attempted_at::date = $2::date
+      ORDER BY ta.attempted_at DESC
+    `;
+    const testsResult = await db.pool.query(testsQuery, [userId, date]).catch(() => ({ rows: [] }));
+
+    // Get practice attempts on that date
+    const practiceQuery = `
+      SELECT
+        pa.id,
+        ps.title as practice_title,
+        ps.topic,
+        pa.score,
+        pa.accuracy,
+        COALESCE(pa.correct_count, 0) as correct_count,
+        COALESCE(pa.wrong_count, 0) as wrong_count,
+        pa.attempted_at
+      FROM practice_attempts pa
+      JOIN practice_sets ps ON ps.id = pa.practice_set_id
+      WHERE pa.user_id = $1 AND pa.attempted_at::date = $2::date
+      ORDER BY pa.attempted_at DESC
+    `;
+    const practiceResult = await db.pool.query(practiceQuery, [userId, date]).catch(() => ({ rows: [] }));
+
     // Get activities breakdown
     const activitiesQuery = `
       SELECT
@@ -157,7 +195,7 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
       ORDER BY created_at DESC
     `;
 
-    const activitiesResult = await db.pool.query(activitiesQuery, [userId, date]);
+    const activitiesResult = await db.pool.query(activitiesQuery, [userId, date]).catch(() => ({ rows: [] }));
     const activities = activitiesResult.rows;
 
     // Get content viewed
@@ -171,15 +209,49 @@ router.get('/day/:date', authenticateToken, async (req, res) => {
       LIMIT 20
     `;
 
-    const contentResult = await db.pool.query(contentQuery, [userId, date]);
+    const contentResult = await db.pool.query(contentQuery, [userId, date]).catch(() => ({ rows: [] }));
     const content = contentResult.rows;
 
-    // Return response even if no data (just zeros)
+    // Compute total right and wrong
+    let totalRight = 0;
+    let totalWrong = 0;
+    testsResult.rows.forEach(t => {
+      totalRight += parseInt(t.correct_count) || 0;
+      totalWrong += parseInt(t.wrong_count) || 0;
+    });
+    practiceResult.rows.forEach(p => {
+      totalRight += parseInt(p.correct_count) || 0;
+      totalWrong += parseInt(p.wrong_count) || 0;
+    });
+
     res.json({
       date: date,
       streak: dayData[0]?.streak_count || 0,
       totalTime: dayData[0]?.total_time_minutes || 0,
       lastActive: dayData[0]?.last_active || null,
+      totalRight: totalRight,
+      totalWrong: totalWrong,
+      tests: testsResult.rows.map(t => ({
+        id: t.id,
+        title: t.test_title || 'Mock Test',
+        subject: t.subject || 'General',
+        score: t.score,
+        accuracy: t.accuracy,
+        correctCount: parseInt(t.correct_count) || 0,
+        wrongCount: parseInt(t.wrong_count) || 0,
+        unattemptedCount: parseInt(t.unattempted_count) || 0,
+        attemptedAt: t.attempted_at,
+      })),
+      practice: practiceResult.rows.map(p => ({
+        id: p.id,
+        title: p.practice_title || 'Practice Set',
+        topic: p.topic || 'General',
+        score: p.score,
+        accuracy: p.accuracy,
+        correctCount: parseInt(p.correct_count) || 0,
+        wrongCount: parseInt(p.wrong_count) || 0,
+        attemptedAt: p.attempted_at,
+      })),
       activities: activities.map(act => ({
         type: act.activity_type,
         count: act.activity_count,

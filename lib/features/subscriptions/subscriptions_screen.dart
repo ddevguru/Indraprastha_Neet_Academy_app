@@ -56,7 +56,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
         MaterialPageRoute(
           builder: (_) => PaymentCheckoutScreen(
             packageName: plan.name,
-            amountInr: (order['amountInr'] as num?)?.toDouble() ?? 999,
+            amountInr: (order['amountInr'] as num?)?.toDouble() ?? 2999,
             orderId: orderId,
             razorpayOrderId: razorpayOrderId,
             keyId: keyId,
@@ -243,7 +243,7 @@ class _ComparePlansTable extends StatelessWidget {
           headingRowColor: WidgetStatePropertyAll(headerColor),
           columns: [
             DataColumn(label: Text('Feature', style: headerStyle)),
-            DataColumn(label: Text('Rs 999 Plan', style: headerStyle)),
+            DataColumn(label: Text('Rs 2999 Plan', style: headerStyle)),
           ],
           rows: [
             _row('NCERT smart reading', 'Yes', textStyle),
