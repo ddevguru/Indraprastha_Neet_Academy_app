@@ -384,6 +384,7 @@ class _AdminHomeState extends State<AdminHome> {
     'Packages',
     'Users',
     'Complaints',
+    'Notifications',
   ];
   static const _navItems = [
     (Icons.dashboard_outlined, 'Dashboard'),
@@ -396,6 +397,7 @@ class _AdminHomeState extends State<AdminHome> {
     (Icons.workspace_premium_outlined, 'Packages'),
     (Icons.people_outline_rounded, 'Users'),
     (Icons.report_outlined, 'Complaints'),
+    (Icons.notifications_outlined, 'Notifications'),
   ];
 
   @override
@@ -460,6 +462,7 @@ class _AdminHomeState extends State<AdminHome> {
       PackagesPage(api: _api),
       UsersPage(api: _api),
       ComplaintsPage(api: _api),
+      NotificationsPage(api: _api),
     ];
     final isLoggedIn = _api.token != null;
     if (isLoggedIn && !_checkedDriveAfterLogin) {
@@ -5977,6 +5980,760 @@ class _ComplaintDetailsDialogState extends State<_ComplaintDetailsDialog> {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// NOTIFICATIONS PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class NotificationsPage extends StatefulWidget {
+  const NotificationsPage({super.key, required this.api});
+  final AdminApi api;
+  @override
+  State<NotificationsPage> createState() => _NotificationsPageState();
+}
+
+class _NotificationsPageState extends State<NotificationsPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabCtrl;
+
+  // Compose fields
+  final _titleCtrl = TextEditingController();
+  final _bodyCtrl = TextEditingController();
+  final _imageUrlCtrl = TextEditingController();
+  String _targetType = 'all'; // 'all' or 'specific'
+  bool _sending = false;
+
+  // User selection
+  List<dynamic> _allUsers = const [];
+  final Set<int> _selectedUserIds = {};
+  final _userSearchCtrl = TextEditingController();
+  String _userQuery = '';
+  bool _usersLoading = false;
+
+  // History
+  List<dynamic> _history = const [];
+  bool _historyLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+    _loadHistory();
+    _tabCtrl.addListener(() {
+      if (!_tabCtrl.indexIsChanging) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    _titleCtrl.dispose();
+    _bodyCtrl.dispose();
+    _imageUrlCtrl.dispose();
+    _userSearchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() => _historyLoading = true);
+    try {
+      final data = await widget.api.notificationHistory();
+      setState(() {
+        _history = (data['notifications'] as List<dynamic>? ?? []);
+        _historyLoading = false;
+      });
+    } catch (_) {
+      setState(() => _historyLoading = false);
+    }
+  }
+
+  Future<void> _loadUsers() async {
+    if (_allUsers.isNotEmpty) return;
+    setState(() => _usersLoading = true);
+    try {
+      final data = await widget.api.users();
+      setState(() {
+        _allUsers = (data['users'] as List<dynamic>? ?? []);
+        _usersLoading = false;
+      });
+    } catch (_) {
+      setState(() => _usersLoading = false);
+    }
+  }
+
+  List<dynamic> get _filteredUsers {
+    if (_userQuery.isEmpty) return _allUsers;
+    final q = _userQuery.toLowerCase();
+    return _allUsers.where((u) {
+      final m = u as Map<String, dynamic>;
+      return (m['full_name']?.toString().toLowerCase().contains(q) ?? false) ||
+          (m['phone']?.toString().toLowerCase().contains(q) ?? false);
+    }).toList();
+  }
+
+  Future<void> _send() async {
+    final title = _titleCtrl.text.trim();
+    final body = _bodyCtrl.text.trim();
+    if (title.isEmpty || body.isEmpty) {
+      _showSnack('Title aur Body required hain', isError: true);
+      return;
+    }
+    if (_targetType == 'specific' && _selectedUserIds.isEmpty) {
+      _showSnack('Kam se kam ek user select karo', isError: true);
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      final result = await widget.api.sendNotification(
+        title: title,
+        body: body,
+        imageUrl: _imageUrlCtrl.text.trim().isEmpty
+            ? null
+            : _imageUrlCtrl.text.trim(),
+        targetType: _targetType,
+        userIds: _targetType == 'specific' ? _selectedUserIds.toList() : [],
+      );
+      final sentCount = result['sentCount'] ?? 0;
+      if (!mounted) return;
+      _showSnack('✅ Notification bhej di! ($sentCount devices tak pahunchi)');
+      _titleCtrl.clear();
+      _bodyCtrl.clear();
+      _imageUrlCtrl.clear();
+      _selectedUserIds.clear();
+      setState(() => _targetType = 'all');
+      await _loadHistory();
+      _tabCtrl.animateTo(1);
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Error: ${e.toString().replaceFirst("Exception: ", "")}',
+          isError: true);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor:
+          isError ? Theme.of(context).colorScheme.error : const Color(0xFF2E7D32),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        // Tab bar
+        Container(
+          color: isDark ? const Color(0xFF1A1D26) : Colors.white,
+          child: TabBar(
+            controller: _tabCtrl,
+            tabs: const [
+              Tab(icon: Icon(Icons.edit_notifications_outlined), text: 'Compose'),
+              Tab(icon: Icon(Icons.history_rounded), text: 'History'),
+            ],
+            labelColor: scheme.primary,
+            unselectedLabelColor: scheme.onSurface.withValues(alpha: 0.6),
+            indicatorColor: scheme.primary,
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabCtrl,
+            children: [
+              _buildComposePage(scheme),
+              _buildHistoryPage(scheme),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildComposePage(ColorScheme scheme) {
+    final title = _titleCtrl.text.trim();
+    final body = _bodyCtrl.text.trim();
+    final hasPreview = title.isNotEmpty || body.isNotEmpty;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        // ── Section: Notification Content ───────────────────────────────────
+        _sectionHeader('🔔 Notification Content', scheme),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _titleCtrl,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            labelText: 'Title *',
+            hintText: 'e.g. 🏆 New Test Available!',
+            prefixIcon: Icon(Icons.title_rounded, size: 20),
+          ),
+          maxLength: 65,
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _bodyCtrl,
+          onChanged: (_) => setState(() {}),
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Message Body *',
+            hintText: 'e.g. Aaj ka Grand Test live ho gaya hai. Abhi attempt karo!',
+            prefixIcon: Padding(
+              padding: EdgeInsets.only(bottom: 40),
+              child: Icon(Icons.message_outlined, size: 20),
+            ),
+          ),
+          maxLength: 178,
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _imageUrlCtrl,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            labelText: 'Image URL (optional)',
+            hintText: 'https://...',
+            prefixIcon: Icon(Icons.image_outlined, size: 20),
+          ),
+        ),
+
+        // ── Live Preview ─────────────────────────────────────────────────────
+        if (hasPreview) ...[
+          const SizedBox(height: 20),
+          _sectionHeader('👁️ Preview (Android notification)', scheme),
+          const SizedBox(height: 10),
+          _buildNotificationPreview(title, body, scheme),
+        ],
+
+        // ── Section: Target ──────────────────────────────────────────────────
+        const SizedBox(height: 20),
+        _sectionHeader('🎯 Send To', scheme),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Column(
+            children: [
+              RadioListTile<String>(
+                value: 'all',
+                groupValue: _targetType,
+                onChanged: (v) => setState(() => _targetType = v!),
+                title: const Text('All Users',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Saare registered users ko bhejo'),
+                secondary: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1976D2).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text('Broadcast',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1976D2))),
+                ),
+                activeColor: scheme.primary,
+              ),
+              Divider(height: 1, color: scheme.outlineVariant),
+              RadioListTile<String>(
+                value: 'specific',
+                groupValue: _targetType,
+                onChanged: (v) {
+                  setState(() => _targetType = v!);
+                  _loadUsers();
+                },
+                title: const Text('Specific Users',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                  _selectedUserIds.isEmpty
+                      ? 'List se users select karo'
+                      : '${_selectedUserIds.length} user${_selectedUserIds.length == 1 ? '' : 's'} selected',
+                ),
+                secondary: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('Targeted',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.primary)),
+                ),
+                activeColor: scheme.primary,
+              ),
+            ],
+          ),
+        ),
+
+        // ── User list (when specific) ─────────────────────────────────────
+        if (_targetType == 'specific') ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _userSearchCtrl,
+            onChanged: (v) => setState(() => _userQuery = v),
+            decoration: InputDecoration(
+              hintText: 'Users search karo…',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _userQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _userSearchCtrl.clear();
+                        setState(() => _userQuery = '');
+                      },
+                    )
+                  : null,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_usersLoading)
+            const Center(
+                child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ))
+          else
+            _buildUserSelectionList(scheme),
+        ],
+
+        // ── Send Button ──────────────────────────────────────────────────────
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          onPressed: _sending ? null : _send,
+          icon: _sending
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.send_rounded),
+          label: Text(_sending ? 'Bhej rahe hain…' : 'Notification Bhejo'),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            backgroundColor: scheme.primary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotificationPreview(
+      String title, String body, ColorScheme scheme) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF252A35) : const Color(0xFFF0F4FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Android Phone',
+              style: TextStyle(
+                  fontSize: 11,
+                  color: scheme.onSurface.withValues(alpha: 0.5),
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          // Notification card
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1A1D26) : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // App icon
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFB8440E), Color(0xFFE85A1C)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.school_rounded,
+                      color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text('Indraprastha',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFE85A1C))),
+                          const SizedBox(width: 6),
+                          Text('now',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: scheme.onSurface
+                                      .withValues(alpha: 0.4))),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        title.isEmpty ? 'Notification Title' : title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: title.isEmpty
+                              ? scheme.onSurface.withValues(alpha: 0.3)
+                              : scheme.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        body.isEmpty ? 'Message body yahan dikhega…' : body,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: body.isEmpty
+                              ? scheme.onSurface.withValues(alpha: 0.3)
+                              : scheme.onSurface.withValues(alpha: 0.75),
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserSelectionList(ColorScheme scheme) {
+    final filtered = _filteredUsers;
+    if (filtered.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: const Center(child: Text('Koi user nahi mila')),
+      );
+    }
+
+    final colors = [
+      const Color(0xFF1976D2),
+      const Color(0xFF7B1FA2),
+      const Color(0xFFE85A1C),
+      const Color(0xFF2E7D32),
+      const Color(0xFFC99A33),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          // Select all / clear
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Text('${filtered.length} users',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface.withValues(alpha: 0.7),
+                        fontSize: 13)),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      for (final u in filtered) {
+                        final id = (u as Map<String, dynamic>)['id'];
+                        if (id is int) _selectedUserIds.add(id);
+                      }
+                    });
+                  },
+                  icon: const Icon(Icons.select_all, size: 16),
+                  label: const Text('Sab select karo',
+                      style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4)),
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(() => _selectedUserIds.clear()),
+                  icon: const Icon(Icons.deselect, size: 16),
+                  label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4)),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            separatorBuilder: (_, __) =>
+                Divider(height: 1, color: scheme.outlineVariant),
+            itemBuilder: (context, i) {
+              final u = filtered[i] as Map<String, dynamic>;
+              final id = u['id'];
+              final userId = id is int ? id : int.tryParse(id?.toString() ?? '');
+              if (userId == null) return const SizedBox.shrink();
+              final name = u['full_name']?.toString() ?? 'Unknown';
+              final phone = u['phone']?.toString() ?? '';
+              final isPremium = u['has_active_subscription'] == true;
+              final initials = name.trim().isNotEmpty
+                  ? name
+                      .trim()
+                      .split(' ')
+                      .map((w) => w.isNotEmpty ? w[0] : '')
+                      .take(2)
+                      .join()
+                      .toUpperCase()
+                  : '?';
+              final avatarColor = colors[i % colors.length];
+              final isSelected = _selectedUserIds.contains(userId);
+              return CheckboxListTile(
+                value: isSelected,
+                onChanged: (checked) {
+                  setState(() {
+                    if (checked == true) {
+                      _selectedUserIds.add(userId);
+                    } else {
+                      _selectedUserIds.remove(userId);
+                    }
+                  });
+                },
+                activeColor: scheme.primary,
+                secondary: CircleAvatar(
+                  radius: 20,
+                  backgroundColor: avatarColor.withValues(alpha: 0.15),
+                  child: Text(initials,
+                      style: TextStyle(
+                          color: avatarColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13)),
+                ),
+                title: Text(name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Row(
+                  children: [
+                    if (phone.isNotEmpty)
+                      Text(phone,
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: scheme.onSurface.withValues(alpha: 0.6))),
+                    if (phone.isNotEmpty) const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isPremium
+                            ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                            : scheme.outlineVariant.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        isPremium ? 'Premium' : 'Free',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: isPremium
+                                ? const Color(0xFF2E7D32)
+                                : scheme.onSurface.withValues(alpha: 0.5)),
+                      ),
+                    ),
+                  ],
+                ),
+                controlAffinity: ListTileControlAffinity.trailing,
+                dense: true,
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryPage(ColorScheme scheme) {
+    if (_historyLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_history.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.notifications_none_rounded,
+                size: 56, color: scheme.onSurface.withValues(alpha: 0.3)),
+            const SizedBox(height: 12),
+            Text('Abhi tak koi notification nahi bheji',
+                style: TextStyle(
+                    color: scheme.onSurface.withValues(alpha: 0.5))),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _loadHistory,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+            ),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _loadHistory,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        itemCount: _history.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (context, i) {
+          final n = _history[i] as Map<String, dynamic>;
+          final title = n['title']?.toString() ?? '';
+          final body = n['body']?.toString() ?? '';
+          final targetType = n['target_type']?.toString() ?? 'all';
+          final sentCount = n['sent_count'] ?? 0;
+          final createdAt = n['created_at']?.toString() ?? '';
+          final dateLabel = createdAt.length >= 10 ? createdAt.substring(0, 10) : createdAt;
+          final timeLabel = createdAt.length >= 16 ? createdAt.substring(11, 16) : '';
+
+          return Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardTheme.color,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFB8440E), Color(0xFFE85A1C)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.notifications_rounded,
+                      color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 15)),
+                      const SizedBox(height: 3),
+                      Text(body,
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: scheme.onSurface.withValues(alpha: 0.7)),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _historyChip(
+                            targetType == 'all'
+                                ? '📢 All Users'
+                                : '🎯 Specific',
+                            targetType == 'all'
+                                ? const Color(0xFF1976D2)
+                                : scheme.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          _historyChip(
+                            '📱 $sentCount devices',
+                            const Color(0xFF2E7D32),
+                          ),
+                          const Spacer(),
+                          Text('$dateLabel $timeLabel',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: scheme.onSurface
+                                      .withValues(alpha: 0.45))),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _historyChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
+
+  Widget _sectionHeader(String text, ColorScheme scheme) {
+    return Text(text,
+        style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+            color: scheme.onSurface));
+  }
+}
+
 class AdminApi {
   static const _tokenKey = 'admin_auth_token';
   String? token;
@@ -6021,6 +6778,8 @@ class AdminApi {
 
   Future<Map<String, dynamic>> dashboard() => _get('/admin/dashboard');
   Future<Map<String, dynamic>> users() => _get('/admin/users');
+  Future<Map<String, dynamic>> notificationHistory() =>
+      _get('/admin/notifications');
   Future<Map<String, dynamic>> batches() => _get('/admin/batches');
   Future<Map<String, dynamic>> books() => _get('/admin/books');
   Future<Map<String, dynamic>> practiceSets() => _get('/admin/practice-sets');
@@ -6947,6 +7706,22 @@ class AdminApi {
   }) async {
     await _patch('/support/complaints/$complaintId/status', {
       'status': status,
+    });
+  }
+
+  Future<Map<String, dynamic>> sendNotification({
+    required String title,
+    required String body,
+    String? imageUrl,
+    required String targetType, // 'all' or 'specific'
+    List<int> userIds = const [],
+  }) async {
+    return _postMap('/admin/notifications/send', {
+      'title': title,
+      'body': body,
+      if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+      'targetType': targetType,
+      'userIds': userIds,
     });
   }
 

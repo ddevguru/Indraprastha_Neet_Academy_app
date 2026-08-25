@@ -742,6 +742,20 @@ async function ensureDatabaseSchema() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_answers_stats ON user_answers(question_id, option_key);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_answers_practice_set ON user_answers(practice_set_id, question_id);`);
+
+  // Admin-sent push notification history
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_notifications (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      image_url TEXT,
+      target_type VARCHAR(20) DEFAULT 'all',
+      target_user_ids INTEGER[],
+      sent_count INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 }
 
 async function loadRuntimeConfigFromDb() {

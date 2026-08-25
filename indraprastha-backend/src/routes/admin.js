@@ -9,7 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const { pool } = require('../db');
-const { sendNotificationToAll } = require('../services/notifications');
+const { sendNotificationToAll, sendNotificationToUsers } = require('../services/notifications');
 const logger = require('../services/logger');
 const { logError: gcpLogError } = require('../services/gcp_log');
 const {
@@ -2505,6 +2505,81 @@ router.put('/explanation-images/:imageId', adminAuth, async (req, res) => {
   } catch (e) {
     logAdminRouteError('/explanation-images/:imageId PUT', e, { adminId: req.admin?.id });
     return res.status(500).json({ error: e.message || 'Failed to update explanation image' });
+  }
+});
+
+// ─── Admin Notifications ─────────────────────────────────────────────────────
+
+/**
+ * POST /admin/notifications/send
+ * Body: { title, body, imageUrl?, targetType: 'all'|'specific', userIds?: number[] }
+ * Send a push notification to all users or specific users.
+ */
+router.post('/notifications/send', adminAuth, async (req, res) => {
+  try {
+    const { title, body, imageUrl, targetType = 'all', userIds = [] } = req.body;
+    if (!title || !body) {
+      return res.status(400).json({ error: 'title aur body required hain' });
+    }
+
+    let sentCount = 0;
+
+    if (targetType === 'specific') {
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json({ error: 'Specific target ke liye userIds chahiye' });
+      }
+      const data = {};
+      if (imageUrl) data.imageUrl = imageUrl;
+      sentCount = await sendNotificationToUsers(pool, userIds, { title, body, data });
+    } else {
+      // send to all
+      const data = {};
+      if (imageUrl) data.imageUrl = imageUrl;
+      // Count tokens first for reporting
+      const countRes = await pool.query('SELECT COUNT(*) FROM fcm_tokens');
+      sentCount = parseInt(countRes.rows[0].count, 10) || 0;
+      await sendNotificationToAll(pool, { title, body, data });
+    }
+
+    // Save to history
+    await pool.query(
+      `INSERT INTO admin_notifications (title, body, image_url, target_type, target_user_ids, sent_count)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        title,
+        body,
+        imageUrl || null,
+        targetType,
+        targetType === 'specific' ? userIds : null,
+        sentCount,
+      ]
+    );
+
+    return res.json({ success: true, sentCount });
+  } catch (e) {
+    logAdminRouteError('/notifications/send POST', e, { adminId: req.admin?.id });
+    return res.status(500).json({ error: e.message || 'Notification send karne mein error' });
+  }
+});
+
+/**
+ * GET /admin/notifications
+ * Returns list of past sent notifications (latest first)
+ */
+router.get('/notifications', adminAuth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const result = await pool.query(
+      `SELECT id, title, body, image_url, target_type, target_user_ids, sent_count, created_at
+       FROM admin_notifications
+       ORDER BY created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    return res.json({ notifications: result.rows });
+  } catch (e) {
+    logAdminRouteError('/notifications GET', e, { adminId: req.admin?.id });
+    return res.status(500).json({ error: e.message || 'History fetch mein error' });
   }
 });
 

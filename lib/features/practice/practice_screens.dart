@@ -1996,7 +1996,6 @@ class CustomPracticeScreen extends ConsumerStatefulWidget {
 }
 
 class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
-  late final Future<Map<String, dynamic>> _filtersFuture;
   String? _selectedSubject;
   String? _selectedTopic;
   int _questionCount = 10;
@@ -2007,22 +2006,25 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
   @override
   void initState() {
     super.initState();
-    final prefs = ref.read(sharedPreferencesProvider);
-    _filtersFuture = ContentRepository(prefs: prefs).fetchContentFilters();
   }
 
   List<Map<String, dynamic>> get _filteredSets {
+    final allowedSubjects = ['Biology', 'Chemistry', 'Physics'];
     return widget.allSets.where((set) {
       final subject = set['subject']?.toString() ?? '';
       final topic = set['topic']?.toString() ?? '';
+
+      final isAllowed = allowedSubjects.any((allowed) => allowed.toLowerCase() == subject.toLowerCase());
+      if (!isAllowed) return false;
+
       if (_selectedSubject != null &&
           _selectedSubject!.isNotEmpty &&
-          subject != _selectedSubject) {
+          subject.toLowerCase() != _selectedSubject!.toLowerCase()) {
         return false;
       }
       if (_selectedTopic != null &&
           _selectedTopic!.isNotEmpty &&
-          topic != _selectedTopic) {
+          topic.toLowerCase() != _selectedTopic!.toLowerCase()) {
         return false;
       }
       return true;
@@ -2063,15 +2065,16 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
         return;
       }
 
+      final savedPractice = ref.read(practiceSavedControllerProvider);
       var filteredQuestions = allQuestions;
       if (_filterBookmarked) {
         filteredQuestions = filteredQuestions
-            .where((q) => q['bookmarked'] == true)
+            .where((q) => savedPractice.bookmarkedIds.contains(q['id']?.toString()))
             .toList();
       }
       if (_filterWrong) {
         filteredQuestions = filteredQuestions
-            .where((q) => q['is_correct'] == false || q['user_answer'] != null)
+            .where((q) => savedPractice.incorrectIds.contains(q['id']?.toString()))
             .toList();
       }
 
@@ -2123,172 +2126,192 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final allowedSubjects = ['Biology', 'Chemistry', 'Physics'];
+
+    // Extract unique subjects from widget.allSets matching allowedSubjects
+    final subjects = widget.allSets
+        .map((set) => set['subject']?.toString().trim() ?? '')
+        .where((subject) => subject.isNotEmpty)
+        .map((subject) {
+          final matched = allowedSubjects.firstWhere(
+            (allowed) => allowed.toLowerCase() == subject.toLowerCase(),
+            orElse: () => '',
+          );
+          return matched;
+        })
+        .where((subject) => subject.isNotEmpty)
+        .toSet()
+        .toList();
+
+    // Sort subjects so they match the allowedSubjects order
+    subjects.sort((a, b) {
+      final idxA = allowedSubjects.indexWhere((allowed) => allowed.toLowerCase() == a.toLowerCase());
+      final idxB = allowedSubjects.indexWhere((allowed) => allowed.toLowerCase() == b.toLowerCase());
+      return idxA.compareTo(idxB);
+    });
+
+    // Extract unique topics from widget.allSets subject-wise
+    final topics = widget.allSets
+        .where((set) {
+          final subject = set['subject']?.toString() ?? '';
+          if (_selectedSubject != null && _selectedSubject!.isNotEmpty) {
+            return subject.toLowerCase() == _selectedSubject!.toLowerCase();
+          }
+          return allowedSubjects.any((allowed) => allowed.toLowerCase() == subject.toLowerCase());
+        })
+        .map((set) => set['topic']?.toString().trim() ?? '')
+        .where((topic) => topic.isNotEmpty)
+        .toSet()
+        .toList();
+    topics.sort();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Custom practice')),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _filtersFuture,
-        builder: (context, snapshot) {
-          final subjects = List<String>.from(
-            (snapshot.data?['subjects'] as List<dynamic>? ?? const [])
-                .map((item) => item is String
-                    ? item
-                    : item['value']?.toString() ?? '')
-                .where((value) => value.isNotEmpty),
-          );
-          final topics = List<String>.from(
-            (snapshot.data?['topics'] as List<dynamic>? ?? const [])
-                .map((item) =>
-                    item is String ? item : item['value']?.toString() ?? '')
-                .where((value) => value.isNotEmpty),
-          );
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: CenteredContent(
-              maxWidth: 720,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SectionHeader(
-                    title: 'Build your drill',
-                    subtitle:
-                        'Subject aur topic choose karo, phir random questions se custom set banao.',
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  SurfaceCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: CenteredContent(
+          maxWidth: 720,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SectionHeader(
+                title: 'Build your drill',
+                subtitle:
+                    'Subject aur topic choose karo, phir random questions se custom set banao.',
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              SurfaceCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Subject',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    DropdownButtonFormField<String?>(
+                      value: _selectedSubject,
+                      decoration: const InputDecoration(
+                        hintText: 'All subjects',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All subjects'),
+                        ),
+                        ...subjects.map(
+                          (subject) => DropdownMenuItem<String?>(
+                            value: subject,
+                            child: Text(subject),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) => setState(() {
+                        _selectedSubject = value;
+                        _selectedTopic = null;
+                      }),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'Topic',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    DropdownButtonFormField<String?>(
+                      value: _selectedTopic,
+                      decoration: const InputDecoration(
+                        hintText: 'All topics',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All topics'),
+                        ),
+                        ...topics.map(
+                          (topic) => DropdownMenuItem<String?>(
+                            value: topic,
+                            child: Text(topic),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _selectedTopic = value),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'Filter Questions',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.md,
                       children: [
-                        Text(
-                          'Subject',
-                          style: Theme.of(context).textTheme.titleSmall,
+                        FilterChip(
+                          label: const Text('Bookmarked'),
+                          avatar: const Icon(Icons.bookmark_rounded, size: 18),
+                          selected: _filterBookmarked,
+                          onSelected: (selected) {
+                            setState(() {
+                              _filterBookmarked = selected;
+                              if (_filterBookmarked && _filterWrong) {
+                                _filterWrong = false;
+                              }
+                            });
+                          },
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        DropdownButtonFormField<String?>(
-                          value: _selectedSubject,
-                          decoration: const InputDecoration(
-                            hintText: 'All subjects',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: [
-                            const DropdownMenuItem<String?>(
-                              value: null,
-                              child: Text('All subjects'),
-                            ),
-                            ...subjects.map(
-                              (subject) => DropdownMenuItem<String?>(
-                                value: subject,
-                                child: Text(subject),
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) => setState(() {
-                            _selectedSubject = value;
-                            _selectedTopic = null;
-                          }),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        Text(
-                          'Topic',
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        DropdownButtonFormField<String?>(
-                          value: _selectedTopic,
-                          decoration: const InputDecoration(
-                            hintText: 'All topics',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: [
-                            const DropdownMenuItem<String?>(
-                              value: null,
-                              child: Text('All topics'),
-                            ),
-                            ...topics.map(
-                              (topic) => DropdownMenuItem<String?>(
-                                value: topic,
-                                child: Text(topic),
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) =>
-                              setState(() => _selectedTopic = value),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        Text(
-                          'Filter Questions',
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Wrap(
-                          spacing: AppSpacing.md,
-                          children: [
-                            FilterChip(
-                              label: const Text('Bookmarked'),
-                              avatar: const Icon(Icons.bookmark_rounded, size: 18),
-                              selected: _filterBookmarked,
-                              onSelected: (selected) {
-                                setState(() {
-                                  _filterBookmarked = selected;
-                                  if (_filterBookmarked && _filterWrong) {
-                                    _filterWrong = false;
-                                  }
-                                });
-                              },
-                            ),
-                            FilterChip(
-                              label: const Text('Wrong Answers'),
-                              avatar: const Icon(Icons.close_rounded, size: 18),
-                              selected: _filterWrong,
-                              onSelected: (selected) {
-                                setState(() {
-                                  _filterWrong = selected;
-                                  if (_filterWrong && _filterBookmarked) {
-                                    _filterBookmarked = false;
-                                  }
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        Text(
-                          'Questions',
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Wrap(
-                          spacing: AppSpacing.sm,
-                          children: [5, 10, 15, 20, 30].map((count) {
-                            final selected = _questionCount == count;
-                            return ChoiceChip(
-                              label: Text('$count'),
-                              selected: selected,
-                              onSelected: (_) =>
-                                  setState(() => _questionCount = count),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        Text(
-                          '${_filteredSets.length} matching set${_filteredSets.length == 1 ? '' : 's'} available',
-                          style: TextStyle(color: AppColors.textSecondary),
+                        FilterChip(
+                          label: const Text('Wrong Answers'),
+                          avatar: const Icon(Icons.close_rounded, size: 18),
+                          selected: _filterWrong,
+                          onSelected: (selected) {
+                            setState(() {
+                              _filterWrong = selected;
+                              if (_filterWrong && _filterBookmarked) {
+                                _filterBookmarked = false;
+                              }
+                            });
+                          },
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  PrimaryButton(
-                    label: _loading ? 'Loading questions...' : 'Start custom practice',
-                    expanded: true,
-                    icon: Icons.play_arrow_rounded,
-                    onPressed: _loading ? null : _startPractice,
-                  ),
-                ],
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'Questions',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      children: [5, 10, 15, 20, 30].map((count) {
+                        final selected = _questionCount == count;
+                        return ChoiceChip(
+                          label: Text('$count'),
+                          selected: selected,
+                          onSelected: (_) =>
+                              setState(() => _questionCount = count),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      '${_filteredSets.length} matching set${_filteredSets.length == 1 ? '' : 's'} available',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+              const SizedBox(height: AppSpacing.lg),
+              PrimaryButton(
+                label: _loading ? 'Loading questions...' : 'Start custom practice',
+                expanded: true,
+                icon: Icons.play_arrow_rounded,
+                onPressed: _loading ? null : _startPractice,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

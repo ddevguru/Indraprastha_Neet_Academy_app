@@ -76,4 +76,65 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
   }
 }
 
-module.exports = { sendNotificationToAll };
+/**
+ * Send a push notification to specific users by their user IDs.
+ * Silently no-ops if Firebase is not configured or tokens not found.
+ */
+async function sendNotificationToUsers(pool, userIds, { title, body, data = {} }) {
+  if (!userIds || userIds.length === 0) return 0;
+  const messaging = _getMessaging();
+  if (!messaging) return 0;
+
+  let sentCount = 0;
+  try {
+    const result = await pool.query(
+      'SELECT token FROM fcm_tokens WHERE user_id = ANY($1)',
+      [userIds]
+    );
+    const tokens = result.rows.map((r) => r.token).filter(Boolean);
+    if (tokens.length === 0) return 0;
+
+    const BATCH = 500;
+    for (let i = 0; i < tokens.length; i += BATCH) {
+      const batch = tokens.slice(i, i + BATCH);
+      const response = await messaging.sendEachForMulticast({
+        tokens: batch,
+        notification: { title, body },
+        data: Object.fromEntries(
+          Object.entries(data).map(([k, v]) => [k, String(v)])
+        ),
+        android: {
+          notification: {
+            channelId: 'indraprastha_updates',
+            priority: 'high',
+            sound: 'default',
+          },
+        },
+      });
+
+      const dead = [];
+      response.responses.forEach((resp, idx) => {
+        if (resp.success) {
+          sentCount++;
+        } else {
+          const code = resp.error?.code ?? '';
+          if (
+            code === 'messaging/invalid-registration-token' ||
+            code === 'messaging/registration-token-not-registered'
+          ) {
+            dead.push(batch[idx]);
+          }
+        }
+      });
+
+      if (dead.length > 0) {
+        await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1)', [dead]);
+      }
+    }
+  } catch (e) {
+    console.error('[FCM] sendNotificationToUsers error:', e.message);
+  }
+  return sentCount;
+}
+
+module.exports = { sendNotificationToAll, sendNotificationToUsers };
