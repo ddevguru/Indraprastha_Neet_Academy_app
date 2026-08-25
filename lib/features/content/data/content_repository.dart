@@ -37,6 +37,11 @@ class ContentRepository {
   Future<Map<String, dynamic>> fetchCourse() =>
       _get('/content/course');
 
+  Future<List<Map<String, dynamic>>> fetchAdminNotifications() async {
+    final data = await _get('/content/notifications', bypassCache: true);
+    return _mapsFromListKey(data, 'notifications');
+  }
+
   Future<List<Map<String, dynamic>>> fetchBooks({
     String? subject,
     String? topic,

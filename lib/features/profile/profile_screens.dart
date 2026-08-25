@@ -341,12 +341,21 @@ class NotificationsScreen extends ConsumerWidget {
       repo.fetchBooks(),
       repo.fetchTests(),
       repo.fetchVideos(),
+      repo.fetchAdminNotifications(),
     ]);
     final books = results[0];
     final tests = results[1];
     final videos = results[2];
+    final adminNotes = results[3];
 
-    return [
+    final list = <Map<String, dynamic>>[
+      ...adminNotes.map((n) => {
+            'title': n['title'] ?? 'Notification',
+            'message': n['body'] ?? '',
+            'icon': Icons.notifications_active_rounded,
+            'unread': true,
+            'date': n['created_at'],
+          }),
       ...books.map((b) => {
             'title': 'New Note added: ${b['title'] ?? 'Note'}',
             'message': b['subject']?.toString() ?? 'Study material available',
@@ -368,6 +377,17 @@ class NotificationsScreen extends ConsumerWidget {
             'unread': false,
           }),
     ];
+
+    list.sort((a, b) {
+      final dateA = a['date'] != null ? DateTime.tryParse(a['date'].toString()) : null;
+      final dateB = b['date'] != null ? DateTime.tryParse(b['date'].toString()) : null;
+      if (dateA != null && dateB != null) return dateB.compareTo(dateA);
+      if (dateA != null) return -1;
+      if (dateB != null) return 1;
+      return 0; // maintain original order for items without dates
+    });
+
+    return list;
   }
 
   @override

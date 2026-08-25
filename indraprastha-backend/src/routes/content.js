@@ -879,4 +879,24 @@ router.post('/fcm-token', userAuth, async (req, res) => {
   }
 });
 
+// ── Admin Notifications ───────────────────────────────────────────────────────
+
+router.get('/notifications', userAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, body, image_url, created_at 
+       FROM admin_notifications 
+       WHERE target_type = 'all' 
+          OR (target_type = 'specific_users' AND $1 = ANY(target_user_ids))
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [req.user.id]
+    );
+    return res.json({ notifications: result.rows });
+  } catch (e) {
+    console.error('[API] /content/notifications GET error:', e.message);
+    return res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
 module.exports = router;
