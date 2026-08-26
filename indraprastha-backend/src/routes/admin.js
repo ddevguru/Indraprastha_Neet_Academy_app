@@ -625,7 +625,7 @@ router.post('/books', adminAuth, async (req, res) => {
     title: '📚 New Book Added',
     body: `${title}${subject ? ` — ${subject}` : ''}`,
     data: { type: 'book', id: String(result.rows[0].id) },
-  });
+  }).catch((err) => logAdminRouteError('Async Background Book Notification', err));
   res.json({ success: true, book: result.rows[0] });
 });
 
@@ -1238,7 +1238,7 @@ router.post('/practice-sets', adminAuth, async (req, res) => {
     title: '⚡ New Practice Set',
     body: `${title}${topic ? ` — ${topic}` : ''}`,
     data: { type: 'practice', id: String(result.rows[0].id) },
-  });
+  }).catch((err) => logAdminRouteError('Async Background Practice Notification', err));
   res.json({ success: true, practiceSet: result.rows[0] });
 });
 
@@ -1608,7 +1608,7 @@ router.post('/tests', adminAuth, async (req, res) => {
     title: '📝 New Test Available',
     body: `${title}${category ? ` — ${category}` : ''}`,
     data: { type: 'test', id: String(result.rows[0].id) },
-  });
+  }).catch((err) => logAdminRouteError('Async Background Test Notification', err));
   res.json({ success: true, test: result.rows[0] });
 });
 
@@ -2152,7 +2152,7 @@ router.post('/videos', adminAuth, async (req, res) => {
       title: '🎥 New Video Lecture',
       body: `${title}${subject ? ` — ${subject}` : ''}`,
       data: { type: 'video', id: String(dbResult.rows[0].id) },
-    });
+    }).catch((err) => logAdminRouteError('Async Background Video Notification', err));
     return res.json({ success: true, video: dbResult.rows[0] });
   } catch (error) {
     logAdminRouteError('/videos', error);
@@ -2371,7 +2371,7 @@ router.post('/mcqs', adminAuth, async (req, res) => {
       title: '🧠 New MCQ of the Day',
       body: `${subject ? `${subject} — ` : ''}Solve today's MCQ now!`,
       data: { type: 'mcq', id: String(mcq.id) },
-    });
+    }).catch((err) => logAdminRouteError('Async Background MCQ Notification', err));
     return res.json({ success: true, mcq });
   } catch (e) {
     logAdminRouteError('/mcqs POST', e);
@@ -2635,6 +2635,45 @@ router.get('/notifications', adminAuth, async (req, res) => {
   } catch (e) {
     logAdminRouteError('/notifications GET', e, { adminId: req.admin?.id });
     return res.status(500).json({ error: e.message || 'History fetch mein error' });
+  }
+});
+
+/**
+ * GET /admin/logs/gcp-status
+ * Returns status of GCP Cloud Logging connection and registered FCM tokens metrics
+ */
+router.get('/logs/gcp-status', adminAuth, async (_req, res) => {
+  try {
+    const tokenResult = await pool.query('SELECT COUNT(*)::int AS token_count FROM fcm_tokens');
+    const userResult = await pool.query('SELECT COUNT(*)::int AS user_count FROM users');
+    const status = logger.getStatus();
+
+    return res.json({
+      success: true,
+      gcpStatus: status,
+      metrics: {
+        registeredFcmTokens: tokenResult.rows[0]?.token_count || 0,
+        totalUsers: userResult.rows[0]?.user_count || 0,
+      },
+    });
+  } catch (e) {
+    logAdminRouteError('/logs/gcp-status GET', e);
+    return res.status(500).json({ error: 'Failed to fetch GCP status' });
+  }
+});
+
+/**
+ * GET /admin/logs/recent
+ * Returns recent backend error logs stored locally
+ */
+router.get('/logs/recent', adminAuth, async (req, res) => {
+  try {
+    const days = Math.min(parseInt(req.query.days, 10) || 7, 30);
+    const logs = logger.getRecentLogs(days);
+    return res.json({ success: true, count: logs.length, logs });
+  } catch (e) {
+    logAdminRouteError('/logs/recent GET', e);
+    return res.status(500).json({ error: 'Failed to fetch recent logs' });
   }
 });
 

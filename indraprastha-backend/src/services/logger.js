@@ -7,20 +7,54 @@ const path = require('path');
 
 // Initialize GCP Cloud Logging if credentials available
 let cloudLogging = null;
-try {
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GCP_PROJECT_ID) {
-    const { Logging } = require('@google-cloud/logging');
-    const projectId = process.env.GCP_PROJECT_ID ||
-      (process.env.FIREBASE_SERVICE_ACCOUNT_JSON ?
-        JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON).project_id : null);
+let cloudLoggingError = null;
 
-    if (projectId) {
-      cloudLogging = new Logging({ projectId });
+function _initCloudLogging() {
+  if (cloudLogging) return cloudLogging;
+
+  try {
+    const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    let credentials = null;
+    let projectId = process.env.GCP_PROJECT_ID;
+
+    if (rawJson && rawJson.trim().length > 0) {
+      try {
+        let str = rawJson.trim();
+        if ((str.startsWith("'") && str.endsWith("'")) || (str.startsWith('"') && str.endsWith('"'))) {
+          str = str.slice(1, -1);
+        }
+        if (str.startsWith('{')) {
+          const parsed = JSON.parse(str);
+          projectId = projectId || parsed.project_id;
+          if (parsed.client_email && parsed.private_key) {
+            credentials = {
+              client_email: parsed.client_email,
+              private_key: parsed.private_key.replace(/\\n/g, '\n'),
+            };
+          }
+        }
+      } catch (pErr) {
+        console.warn('[LOGGER] Service account JSON parse warning:', pErr.message);
+      }
     }
+
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS || projectId || credentials) {
+      const { Logging } = require('@google-cloud/logging');
+      const loggingOptions = {};
+      if (projectId) loggingOptions.projectId = projectId;
+      if (credentials) loggingOptions.credentials = credentials;
+
+      cloudLogging = new Logging(loggingOptions);
+      console.log(`[LOGGER] GCP Cloud Logging initialized successfully (Project ID: ${projectId || 'default'})`);
+    }
+  } catch (err) {
+    cloudLoggingError = err.message;
+    console.warn('[LOGGER] GCP Cloud Logging initialization warning:', err.message);
   }
-} catch (err) {
-  console.warn('[LOGGER] GCP Cloud Logging not configured:', err.message);
+  return cloudLogging;
 }
+
+_initCloudLogging();
 
 // Local file logging directory
 const LOG_DIR = path.join(__dirname, '../../logs');
@@ -211,6 +245,18 @@ class ErrorLogger {
       console.error('[LOGGER] Failed to list log files:', err.message);
       return [];
     }
+  }
+
+  /**
+   * Get GCP Cloud Logging status
+   */
+  getStatus() {
+    return {
+      gcpCloudLoggingActive: !!cloudLogging,
+      gcpInitializationError: cloudLoggingError,
+      logDir: LOG_DIR,
+      nodeEnv: process.env.NODE_ENV,
+    };
   }
 }
 

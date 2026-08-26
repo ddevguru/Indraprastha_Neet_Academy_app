@@ -2,16 +2,17 @@
   "name": "indraprastha-backend",
   "version": "1.0.0",
   "main": "index.js",
- "scripts": {
-  "dev": "nodemon src/index.js",
-  "start": "node src/index.js",
-  "db:setup": "node scripts/setup-db.js"
-},
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "db:setup": "node scripts/setup-db.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google-cloud/logging": "^12.0.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

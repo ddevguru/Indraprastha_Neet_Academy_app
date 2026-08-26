@@ -85,6 +85,8 @@ app.use('/api/streaks', require('./routes/streaks'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/support', require('./routes/support'));
 
+const logger = require('./services/logger');
+
 app.use((err, req, res, _next) => {
   const elapsed = req.reqStart ? `${Date.now() - req.reqStart}ms` : 'n/a';
   gcpLogError('Unhandled API error', {
@@ -94,6 +96,17 @@ app.use((err, req, res, _next) => {
     message: err?.message || 'Unknown error',
     stack: err?.stack,
   });
+
+  logger.logError({
+    errorType: 'UNHANDLED_EXPRESS_ERROR',
+    message: err?.message || 'Unknown server error',
+    stack: err?.stack,
+    endpoint: req.originalUrl,
+    operation: `${req.method} ${req.originalUrl}`,
+    statusCode: 500,
+    userId: req.user?.id || null,
+  });
+
   if (res.headersSent) return;
   res.status(500).json({ error: 'Internal server error' });
 });

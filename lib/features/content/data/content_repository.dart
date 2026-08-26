@@ -293,13 +293,18 @@ class ContentRepository {
       if (authToken != null && authToken.isNotEmpty) {
         headers['Authorization'] = 'Bearer $authToken';
       }
-      await _client.post(
+      final res = await _client.post(
         Uri.parse('$baseUrl/content/fcm-token'),
         headers: headers,
         body: jsonEncode({'token': token.trim()}),
       );
-    } catch (_) {
-      // Non-critical — ignore network errors
+      if (kDebugMode) {
+        debugPrint('[FCM] Token register status: ${res.statusCode} -> ${res.body}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[FCM] Token upload error: $e');
+      }
     }
   }
 
