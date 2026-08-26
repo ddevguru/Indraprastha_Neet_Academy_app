@@ -2535,10 +2535,7 @@ router.post('/notifications/send', adminAuth, async (req, res) => {
       // send to all
       const data = {};
       if (imageUrl) data.imageUrl = imageUrl;
-      // Count tokens first for reporting
-      const countRes = await pool.query('SELECT COUNT(*) FROM fcm_tokens');
-      sentCount = parseInt(countRes.rows[0].count, 10) || 0;
-      await sendNotificationToAll(pool, { title, body, data });
+      sentCount = await sendNotificationToAll(pool, { title, body, data });
     }
 
     // Save to history

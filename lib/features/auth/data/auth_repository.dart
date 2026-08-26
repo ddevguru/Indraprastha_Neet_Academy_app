@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/api_constants.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../models/app_models.dart';
 
 class AuthRepository {
@@ -44,6 +45,11 @@ class AuthRepository {
   }) async {
     await _prefs.setString(_tokenKey, token);
     await _prefs.setString(_userKey, jsonEncode(user.toJson()));
+
+    // Upload FCM push token immediately after saving user session
+    try {
+      NotificationService.instance.uploadToken();
+    } catch (_) {}
   }
 
   Future<void> clearSession() async {

@@ -28,12 +28,17 @@ function _getMessaging() {
  */
 async function sendNotificationToAll(pool, { title, body, data = {} }) {
   const messaging = _getMessaging();
-  if (!messaging) return;
+  if (!messaging) {
+    throw new Error(
+      'Firebase Admin SDK is not initialized on server. Please verify FIREBASE_SERVICE_ACCOUNT_JSON environment variable is set.'
+    );
+  }
 
+  let sentCount = 0;
   try {
     const result = await pool.query('SELECT token FROM fcm_tokens');
     const tokens = result.rows.map((r) => r.token).filter(Boolean);
-    if (tokens.length === 0) return;
+    if (tokens.length === 0) return 0;
 
     const imageUrl = data.imageUrl || data.image_url;
     const payloadData = Object.fromEntries(
@@ -78,7 +83,13 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
       // Remove invalid/unregistered tokens to keep the table clean
       const dead = [];
       response.responses.forEach((resp, idx) => {
-        if (!resp.success) {
+        if (resp.success) {
+          sentCount++;
+        } else {
+          console.error(
+            `[FCM] Token delivery failed (${batch[idx].slice(0, 15)}...):`,
+            resp.error?.message || resp.error?.code
+          );
           const code = resp.error?.code ?? '';
           if (
             code === 'messaging/invalid-registration-token' ||
@@ -95,7 +106,9 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
     }
   } catch (e) {
     console.error('[FCM] sendNotificationToAll error:', e.message);
+    throw e;
   }
+  return sentCount;
 }
 
 /**
@@ -105,7 +118,11 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
 async function sendNotificationToUsers(pool, userIds, { title, body, data = {} }) {
   if (!userIds || userIds.length === 0) return 0;
   const messaging = _getMessaging();
-  if (!messaging) return 0;
+  if (!messaging) {
+    throw new Error(
+      'Firebase Admin SDK is not initialized on server. Please verify FIREBASE_SERVICE_ACCOUNT_JSON environment variable is set.'
+    );
+  }
 
   let sentCount = 0;
   try {
@@ -161,6 +178,10 @@ async function sendNotificationToUsers(pool, userIds, { title, body, data = {} }
         if (resp.success) {
           sentCount++;
         } else {
+          console.error(
+            `[FCM] User token delivery failed (${batch[idx].slice(0, 15)}...):`,
+            resp.error?.message || resp.error?.code
+          );
           const code = resp.error?.code ?? '';
           if (
             code === 'messaging/invalid-registration-token' ||
@@ -177,6 +198,7 @@ async function sendNotificationToUsers(pool, userIds, { title, body, data = {} }
     }
   } catch (e) {
     console.error('[FCM] sendNotificationToUsers error:', e.message);
+    throw e;
   }
   return sentCount;
 }

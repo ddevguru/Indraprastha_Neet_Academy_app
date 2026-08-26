@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../auth/bloc/auth_bloc.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/services/attempt_draft_store.dart';
+import '../../core/services/notification_service.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/adaptive_scaffold.dart';
 import '../../widgets/app_widgets.dart';
@@ -78,6 +79,9 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
   void initState() {
     super.initState();
     _reloadStats();
+    try {
+      NotificationService.instance.uploadToken();
+    } catch (_) {}
   }
 
   void _reloadStats() {
