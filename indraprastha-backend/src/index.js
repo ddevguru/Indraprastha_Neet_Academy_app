@@ -11,6 +11,7 @@ const adminRoutes = require('./routes/admin');
 const { logError: gcpLogError, logInfo: gcpLogInfo } = require('./services/gcp_log');
 
 const app = express();
+app.set('trust proxy', 1);
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map((o) => o.trim())
