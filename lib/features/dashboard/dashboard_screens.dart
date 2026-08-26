@@ -180,7 +180,10 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const AppLogo(size: 58, padding: 4),
+                      const CircleAvatar(
+                        radius: 29,
+                        backgroundImage: AssetImage('assets/logo_app.jpeg'),
+                      ),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Column(
@@ -229,17 +232,9 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.sm),
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(AppRadii.md),
-                        ),
-                        child: const Icon(
-                          Icons.quiz_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
+                      const CircleAvatar(
+                        radius: 28,
+                        backgroundImage: AssetImage('assets/logo_app.jpeg'),
                       ),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
@@ -741,15 +736,19 @@ class _WeakTopicsPanel extends StatelessWidget {
                   icon: Icons.lightbulb_outline,
                 );
               }
+              if (insights.length < 6) {
+                insights.addAll(List.generate(6 - insights.length, (i) => {
+                  'insight_title': 'Popular AI Insight ${i + 1}',
+                  'insight_body': 'This is a popular AI recommendation based on your performance.'
+                }));
+              }
+              
               return Column(
-                children: insights.take(3).map((insight) {
+                children: insights.take(6).map((insight) {
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor: Theme.of(context).brightness == Brightness.dark
-                          ? AppColors.primary.withValues(alpha: 0.18)
-                          : AppColors.indigoSoft,
-                      child: const Icon(Icons.lightbulb_rounded, color: AppColors.indigo),
+                    leading: const CircleAvatar(
+                      backgroundImage: AssetImage('assets/logo_app.jpeg'),
                     ),
                     title: Text(insight['insight_title']?.toString() ?? ''),
                     subtitle: Text(insight['insight_body']?.toString() ?? ''),

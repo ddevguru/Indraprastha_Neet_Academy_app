@@ -355,6 +355,13 @@ class SearchBarWidget extends StatelessWidget {
       padding: EdgeInsets.zero,
       borderRadius: AppRadii.xl,
       child: TextField(
+        onSubmitted: (value) {
+          if (value.trim().isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Searching for: $value')),
+            );
+          }
+        },
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: const Icon(Icons.search_rounded),

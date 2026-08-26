@@ -671,7 +671,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       final token = prefs.getString('auth_token') ?? '';
 
       final response = await http.post(
-        Uri.parse('https://api.indraprasthaneetacademy.com/api/streaks/log-activity'),
+        Uri.parse('$baseUrl/streaks/log-activity'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',

@@ -726,57 +726,56 @@ class _StreaksScreenState extends ConsumerState<StreaksScreen> {
                             size: 26,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            'Activity Detail: Day $date $month',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          Expanded(
+                            child: Text(
+                              'Activity Detail: Day $date $month',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 20),
 
                       // Metrics Grid (Attempted Qs, Right Qs, Wrong Qs, Time Spent)
-                      Row(
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 2.2,
                         children: [
-                          Expanded(
-                            child: _buildMetricCard(
-                              context,
-                              icon: Icons.quiz_outlined,
-                              iconColor: AppColors.primary,
-                              value: '$totalQuestions',
-                              label: 'Attempted Qs',
-                            ),
+                          _buildMetricCard(
+                            context,
+                            icon: Icons.quiz_outlined,
+                            iconColor: AppColors.primary,
+                            value: '$totalQuestions',
+                            label: 'Attempted Qs',
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              context,
-                              icon: Icons.check_circle_outline_rounded,
-                              iconColor: AppColors.success,
-                              value: '$totalRight',
-                              label: 'Right Qs ✅',
-                            ),
+                          _buildMetricCard(
+                            context,
+                            icon: Icons.check_circle_outline_rounded,
+                            iconColor: AppColors.success,
+                            value: '$totalRight',
+                            label: 'Right Qs ✅',
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              context,
-                              icon: Icons.cancel_outlined,
-                              iconColor: AppColors.danger,
-                              value: '$totalWrong',
-                              label: 'Wrong Qs ❌',
-                            ),
+                          _buildMetricCard(
+                            context,
+                            icon: Icons.cancel_outlined,
+                            iconColor: AppColors.danger,
+                            value: '$totalWrong',
+                            label: 'Wrong Qs ❌',
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              context,
-                              icon: Icons.timer_outlined,
-                              iconColor: Colors.deepPurple,
-                              value: _formatMinutes(activity['totalTime'] ?? 0),
-                              label: 'Time Spent',
-                            ),
+                          _buildMetricCard(
+                            context,
+                            icon: Icons.timer_outlined,
+                            iconColor: Colors.deepPurple,
+                            value: _formatMinutes(activity['totalTime'] ?? 0),
+                            label: 'Time Spent',
                           ),
                         ],
                       ),

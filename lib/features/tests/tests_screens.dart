@@ -564,7 +564,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
       final token = prefs.getString('auth_token') ?? '';
 
       await http.post(
-        Uri.parse('https://api.indraprasthaneetacademy.com/api/streaks/log-activity'),
+        Uri.parse('$baseUrl/streaks/log-activity'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
