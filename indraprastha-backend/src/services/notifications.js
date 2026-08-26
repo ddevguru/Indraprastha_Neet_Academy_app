@@ -180,7 +180,8 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
           });
           if (
             code === 'messaging/invalid-registration-token' ||
-            code === 'messaging/registration-token-not-registered'
+            code === 'messaging/registration-token-not-registered' ||
+            code === 'messaging/mismatched-credential'
           ) {
             dead.push(batch[idx]);
           }
@@ -303,7 +304,8 @@ async function sendNotificationToUsers(pool, userIds, { title, body, data = {} }
           });
           if (
             code === 'messaging/invalid-registration-token' ||
-            code === 'messaging/registration-token-not-registered'
+            code === 'messaging/registration-token-not-registered' ||
+            code === 'messaging/mismatched-credential'
           ) {
             dead.push(batch[idx]);
           }
