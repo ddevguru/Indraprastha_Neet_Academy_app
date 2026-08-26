@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const https = require('https');
 const pdfParse = require('pdf-parse');
 const { pool } = require('../db');
+const { recordUserStreakActivity } = require('./streaks');
 const {
   normalizeDriveLink,
   extractDriveFileId,
@@ -490,6 +491,13 @@ router.post('/practice-sets/:setId/submit', userAuth, async (req, res) => {
       [req.user.id, setId, score, accuracy, correctCount, wrongCount]
     );
 
+    recordUserStreakActivity(pool, req.user.id, {
+      activityType: 'practice',
+      activityCount: (Number(correctCount) || 0) + (Number(wrongCount) || 0) || 1,
+      durationMinutes: 15,
+      metadata: { practiceSetId: setId, correctCount, wrongCount, score }
+    }).catch(e => console.error('[STREAK_LOG_PRACTICE_ERROR]', e.message));
+
     return res.json({ success: true, attempt: attempt.rows[0] });
   } catch (e) {
     console.error('[CONTENT_PRACTICE_SUBMIT_ERROR]', {
@@ -648,6 +656,13 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
       [req.user.id, testId, accuracy, correctCount, wrongCount, unattemptedCount]
     );
     const analyticsId = analytics.rows[0].id;
+
+    recordUserStreakActivity(pool, req.user.id, {
+      activityType: 'test',
+      activityCount: (Number(correctCount) || 0) + (Number(wrongCount) || 0) || 1,
+      durationMinutes: 30,
+      metadata: { testId, correctCount, wrongCount, score }
+    }).catch(e => console.error('[STREAK_LOG_TEST_ERROR]', e.message));
     const testMeta = testExists.rows[0];
     const subject = (testMeta.subject || 'this subject').toString();
     const topic = (testMeta.topic || 'current topic').toString();
