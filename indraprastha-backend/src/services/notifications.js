@@ -12,15 +12,29 @@ function _getMessaging() {
   if (rawJson && rawJson.trim().length > 0) {
     try {
       let serviceAccount;
-      const str = rawJson.trim();
+      let str = rawJson.trim();
+      if ((str.startsWith("'") && str.endsWith("'")) || (str.startsWith('"') && str.endsWith('"'))) {
+        str = str.slice(1, -1);
+      }
       if (str.startsWith('{')) {
-        serviceAccount = JSON.parse(str);
+        try {
+          serviceAccount = JSON.parse(str);
+        } catch (parseError) {
+          console.error('[FCM] JSON parse error in FIREBASE_SERVICE_ACCOUNT_JSON:', parseError.message);
+        }
       } else if (fs.existsSync(str)) {
-        const fileContent = fs.readFileSync(str, 'utf8');
-        serviceAccount = JSON.parse(fileContent);
+        try {
+          const fileContent = fs.readFileSync(str, 'utf8');
+          serviceAccount = JSON.parse(fileContent);
+        } catch (parseError) {
+          console.error('[FCM] JSON parse error from file:', parseError.message);
+        }
       }
 
       if (serviceAccount) {
+        if (typeof serviceAccount.private_key === 'string') {
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
         admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
         _initialized = true;
         console.log('[FCM] Firebase Admin initialized via service account credentials');
