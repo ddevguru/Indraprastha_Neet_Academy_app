@@ -35,23 +35,31 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
     const tokens = result.rows.map((r) => r.token).filter(Boolean);
     if (tokens.length === 0) return;
 
+    const imageUrl = data.imageUrl || data.image_url;
+    const payloadData = Object.fromEntries(
+      Object.entries(data).map(([k, v]) => [k, String(v)])
+    );
+
     const BATCH = 500; // FCM multicast limit
     for (let i = 0; i < tokens.length; i += BATCH) {
       const batch = tokens.slice(i, i + BATCH);
       const response = await messaging.sendEachForMulticast({
         tokens: batch,
-        notification: { title, body },
-        data: Object.fromEntries(
-          Object.entries(data).map(([k, v]) => [k, String(v)])
-        ),
+        notification: {
+          title,
+          body,
+          ...(imageUrl ? { imageUrl } : {}),
+        },
+        data: payloadData,
         android: {
           priority: 'high',
           notification: {
             channelId: 'indraprastha_alerts',
             notificationPriority: 'PRIORITY_MAX',
-            sound: 'default',
             defaultSound: true,
             defaultVibrateTimings: true,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            ...(imageUrl ? { image: imageUrl } : {}),
           },
         },
         apns: {
@@ -63,6 +71,7 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
               'content-available': 1,
             },
           },
+          ...(imageUrl ? { fcmOptions: { image: imageUrl } } : {}),
         },
       });
 
@@ -107,23 +116,31 @@ async function sendNotificationToUsers(pool, userIds, { title, body, data = {} }
     const tokens = result.rows.map((r) => r.token).filter(Boolean);
     if (tokens.length === 0) return 0;
 
+    const imageUrl = data.imageUrl || data.image_url;
+    const payloadData = Object.fromEntries(
+      Object.entries(data).map(([k, v]) => [k, String(v)])
+    );
+
     const BATCH = 500;
     for (let i = 0; i < tokens.length; i += BATCH) {
       const batch = tokens.slice(i, i + BATCH);
       const response = await messaging.sendEachForMulticast({
         tokens: batch,
-        notification: { title, body },
-        data: Object.fromEntries(
-          Object.entries(data).map(([k, v]) => [k, String(v)])
-        ),
+        notification: {
+          title,
+          body,
+          ...(imageUrl ? { imageUrl } : {}),
+        },
+        data: payloadData,
         android: {
           priority: 'high',
           notification: {
             channelId: 'indraprastha_alerts',
             notificationPriority: 'PRIORITY_MAX',
-            sound: 'default',
             defaultSound: true,
             defaultVibrateTimings: true,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            ...(imageUrl ? { image: imageUrl } : {}),
           },
         },
         apns: {
@@ -135,6 +152,7 @@ async function sendNotificationToUsers(pool, userIds, { title, body, data = {} }
               'content-available': 1,
             },
           },
+          ...(imageUrl ? { fcmOptions: { image: imageUrl } } : {}),
         },
       });
 

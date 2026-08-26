@@ -7,9 +7,8 @@ import '../../features/content/data/content_repository.dart';
 
 // Must be a top-level function — called by FCM when app is terminated/background.
 @pragma('vm:entry-point')
-Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
-  // FCM displays the notification automatically for background/terminated state.
-  // No extra work needed here.
+Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
+  // FCM automatically handles background UI when notification payload is included.
 }
 
 class NotificationService {
@@ -28,53 +27,77 @@ class NotificationService {
   static const _channelName = 'Indraprastha Alerts';
 
   Future<void> initialize() async {
-    // iOS / Android 13+ permission request
-    await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    // 1. iOS / Android 13+ permission request
+    try {
+      await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      await _messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[FCM] permission error: $e');
+    }
 
-    await _messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    // 2. Configure local notifications
+    try {
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosInit = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+      await _local.initialize(
+        const InitializationSettings(android: androidInit, iOS: iosInit),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[FCM] local init error: $e');
+    }
 
-    // Configure local notifications (needed for foreground display)
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
-    await _local.initialize(
-      const InitializationSettings(android: androidInit, iOS: iosInit),
-    );
+    // 3. Create high-importance Android channel with sound and vibration
+    try {
+      await _local
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(
+            const AndroidNotificationChannel(
+              _channelId,
+              _channelName,
+              description: 'High Importance Notifications',
+              importance: Importance.max,
+              enableVibration: true,
+              playSound: true,
+            ),
+          );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[FCM] channel create error: $e');
+    }
 
-    // Create high-importance Android channel
-    await _local
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(
-          const AndroidNotificationChannel(
-            _channelId,
-            _channelName,
-            importance: Importance.max,
-            enableVibration: true,
-            playSound: true,
-          ),
-        );
+    // 4. Request exact notifications permission (Android 13+)
+    try {
+      await _local
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    } catch (_) {}
 
-    // Register background/terminated handler
-    FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+    // 5. Register handlers
+    try {
+      FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+      FirebaseMessaging.onMessage.listen(_showForegroundNotification);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[FCM] handler error: $e');
+    }
 
-    // Show notification banner when app is in foreground
-    FirebaseMessaging.onMessage.listen(_showForegroundNotification);
-
-    // Register token with backend and refresh on rotation
+    // 6. Register token with backend and refresh on rotation
     await uploadToken();
-    _messaging.onTokenRefresh.listen((_) => uploadToken());
+    try {
+      _messaging.onTokenRefresh.listen((_) => uploadToken());
+    } catch (_) {}
   }
 
   Future<void> uploadToken() async {

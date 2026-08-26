@@ -8,10 +8,14 @@ const authenticateToken = (req, res, next) => {
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized - No token provided' });
   }
-  // TODO: Verify token with JWT and extract user_id
-  // For now, just accept any token
-  req.user_id = 1; // TODO: Extract from verified token
-  next();
+  try {
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user_id = decoded.id;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
 };
 
 // Get current streak
