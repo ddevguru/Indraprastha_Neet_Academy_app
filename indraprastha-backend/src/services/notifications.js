@@ -47,8 +47,8 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
         android: {
           priority: 'high',
           notification: {
-            channelId: 'indraprastha_updates',
-            notificationPriority: 'PRIORITY_HIGH',
+            channelId: 'indraprastha_alerts',
+            notificationPriority: 'PRIORITY_MAX',
             sound: 'default',
             defaultSound: true,
             defaultVibrateTimings: true,
@@ -119,8 +119,8 @@ async function sendNotificationToUsers(pool, userIds, { title, body, data = {} }
         android: {
           priority: 'high',
           notification: {
-            channelId: 'indraprastha_updates',
-            notificationPriority: 'PRIORITY_HIGH',
+            channelId: 'indraprastha_alerts',
+            notificationPriority: 'PRIORITY_MAX',
             sound: 'default',
             defaultSound: true,
             defaultVibrateTimings: true,

@@ -24,8 +24,8 @@ class NotificationService {
   final _messaging = FirebaseMessaging.instance;
   final _local = FlutterLocalNotificationsPlugin();
 
-  static const _channelId = 'indraprastha_updates';
-  static const _channelName = 'Indraprastha Updates';
+  static const _channelId = 'indraprastha_alerts';
+  static const _channelName = 'Indraprastha Alerts';
 
   Future<void> initialize() async {
     // iOS / Android 13+ permission request
