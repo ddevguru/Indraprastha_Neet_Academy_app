@@ -35,7 +35,9 @@ function _getMessaging() {
         if (typeof serviceAccount.private_key === 'string') {
           serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
         }
-        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+        if (admin.apps.length === 0) {
+          admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+        }
         _initialized = true;
         console.log('[FCM] Firebase Admin initialized via service account credentials');
         return admin.messaging();

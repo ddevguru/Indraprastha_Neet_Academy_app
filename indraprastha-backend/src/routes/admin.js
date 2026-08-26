@@ -382,6 +382,64 @@ router.post('/drive/oauth/exchange', adminAuth, async (req, res) => {
   }
 });
 
+router.get('/firebase/status', adminAuth, async (_req, res) => {
+  try {
+    const dbConfig = await pool.query(
+      `SELECT value FROM app_config WHERE key = 'FIREBASE_SERVICE_ACCOUNT_JSON' LIMIT 1`
+    );
+    const hasDbConfig = dbConfig.rows.length > 0 && !!dbConfig.rows[0].value;
+    const hasEnvConfig = !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    return res.json({
+      success: true,
+      isConfigured: hasDbConfig || hasEnvConfig,
+      source: hasDbConfig ? 'db' : hasEnvConfig ? 'env' : 'none',
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/firebase/config', adminAuth, async (req, res) => {
+  try {
+    const { jsonString } = req.body;
+    if (!jsonString || typeof jsonString !== 'string') {
+      return res.status(400).json({ error: 'jsonString is required' });
+    }
+    let str = jsonString.trim();
+    if ((str.startsWith("'") && str.endsWith("'")) || (str.startsWith('"') && str.endsWith('"'))) {
+      str = str.slice(1, -1);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(str);
+    } catch (err) {
+      return res.status(400).json({ error: 'Invalid JSON format: ' + err.message });
+    }
+
+    if (!parsed.project_id || !parsed.private_key || !parsed.client_email) {
+      return res.status(400).json({ error: 'JSON is missing required Firebase service account fields (project_id, private_key, client_email)' });
+    }
+
+    const cleanJson = JSON.stringify(parsed);
+    await pool.query(
+      `INSERT INTO app_config (key, value, updated_at)
+       VALUES ('FIREBASE_SERVICE_ACCOUNT_JSON', $1, CURRENT_TIMESTAMP)
+       ON CONFLICT (key) DO UPDATE
+       SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+      [cleanJson]
+    );
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON = cleanJson;
+
+    return res.json({
+      success: true,
+      message: 'Firebase Service Account JSON saved to database and activated successfully.',
+    });
+  } catch (e) {
+    logAdminRouteError('/firebase/config', e);
+    return res.status(500).json({ error: e.message || 'Firebase config save failed' });
+  }
+});
+
 router.post('/question-images/upload', adminAuth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'image file is required' });
