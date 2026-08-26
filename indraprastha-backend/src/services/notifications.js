@@ -1,3 +1,4 @@
+const fs = require('fs');
 const admin = require('firebase-admin');
 
 let _initialized = false;
@@ -5,21 +6,42 @@ let _initialized = false;
 function _getMessaging() {
   if (_initialized) return admin.messaging();
 
-  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!json) {
-    return null; // Firebase not configured — skip silently
+  const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
+  // Option A: Service account JSON string or file path
+  if (rawJson && rawJson.trim().length > 0) {
+    try {
+      let serviceAccount;
+      const str = rawJson.trim();
+      if (str.startsWith('{')) {
+        serviceAccount = JSON.parse(str);
+      } else if (fs.existsSync(str)) {
+        const fileContent = fs.readFileSync(str, 'utf8');
+        serviceAccount = JSON.parse(fileContent);
+      }
+
+      if (serviceAccount) {
+        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+        _initialized = true;
+        console.log('[FCM] Firebase Admin initialized via service account credentials');
+        return admin.messaging();
+      }
+    } catch (e) {
+      console.error('[FCM] Failed to init via FIREBASE_SERVICE_ACCOUNT_JSON:', e.message);
+    }
   }
 
+  // Option B: Fallback to Google Cloud Application Default Credentials (ADC)
   try {
-    const serviceAccount = JSON.parse(json);
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    admin.initializeApp({ credential: admin.credential.applicationDefault() });
     _initialized = true;
-    console.log('[FCM] Firebase Admin initialized');
+    console.log('[FCM] Firebase Admin initialized via Google Application Default Credentials');
     return admin.messaging();
   } catch (e) {
-    console.error('[FCM] Failed to init Firebase Admin:', e.message);
-    return null;
+    console.error('[FCM] Application Default Credentials failed:', e.message);
   }
+
+  return null;
 }
 
 /**

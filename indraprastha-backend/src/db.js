@@ -762,7 +762,7 @@ async function loadRuntimeConfigFromDb() {
   const rows = await pool.query(
     `SELECT key, value
      FROM app_config
-     WHERE key IN ('GDRIVE_OAUTH_REFRESH_TOKEN')`
+     WHERE key IN ('GDRIVE_OAUTH_REFRESH_TOKEN', 'FIREBASE_SERVICE_ACCOUNT_JSON')`
   );
   for (const row of rows.rows) {
     process.env[row.key] = row.value;
