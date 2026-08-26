@@ -858,11 +858,24 @@ router.get('/analytics/latest', userAuth, async (req, res) => {
 
 // ── FCM token registration ────────────────────────────────────────────────────
 
-router.post('/fcm-token', userAuth, async (req, res) => {
+router.post('/fcm-token', async (req, res) => {
   const { token } = req.body;
   if (!token || typeof token !== 'string' || token.trim().length === 0) {
     return res.status(400).json({ error: 'token is required' });
   }
+
+  let userId = null;
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) {
+    try {
+      const authToken = authHeader.slice(7);
+      const payload = jwt.verify(authToken, process.env.JWT_SECRET);
+      if (payload?.id) {
+        userId = payload.id;
+      }
+    } catch (_) {}
+  }
+
   try {
     await pool.query(
       `INSERT INTO fcm_tokens (user_id, token, updated_at)
@@ -870,7 +883,7 @@ router.post('/fcm-token', userAuth, async (req, res) => {
        ON CONFLICT (token) DO UPDATE
          SET user_id = EXCLUDED.user_id,
              updated_at = CURRENT_TIMESTAMP`,
-      [req.user.id, token.trim()]
+      [userId, token.trim()]
     );
     return res.json({ success: true });
   } catch (e) {

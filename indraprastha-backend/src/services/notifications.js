@@ -76,6 +76,7 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
   try {
     const result = await pool.query('SELECT token FROM fcm_tokens');
     const tokens = result.rows.map((r) => r.token).filter(Boolean);
+    console.log(`[FCM] Found ${tokens.length} tokens in fcm_tokens table`);
     if (tokens.length === 0) return 0;
 
     const imageUrl = data.imageUrl || data.image_url;

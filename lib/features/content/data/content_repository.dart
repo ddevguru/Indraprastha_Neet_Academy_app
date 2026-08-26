@@ -284,16 +284,19 @@ class ContentRepository {
   }
 
   Future<void> registerFcmToken(String token) async {
-    final authToken = await _token;
-    if (authToken == null || token.isEmpty) return;
+    if (token.trim().isEmpty) return;
     try {
+      final authToken = await _token;
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (authToken != null && authToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $authToken';
+      }
       await _client.post(
         Uri.parse('$baseUrl/content/fcm-token'),
-        headers: {
-          'Authorization': 'Bearer $authToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'token': token}),
+        headers: headers,
+        body: jsonEncode({'token': token.trim()}),
       );
     } catch (_) {
       // Non-critical — ignore network errors
