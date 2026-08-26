@@ -45,10 +45,23 @@ async function sendNotificationToAll(pool, { title, body, data = {} }) {
           Object.entries(data).map(([k, v]) => [k, String(v)])
         ),
         android: {
+          priority: 'high',
           notification: {
             channelId: 'indraprastha_updates',
-            priority: 'high',
+            notificationPriority: 'PRIORITY_HIGH',
             sound: 'default',
+            defaultSound: true,
+            defaultVibrateTimings: true,
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              alert: { title, body },
+              sound: 'default',
+              badge: 1,
+              'content-available': 1,
+            },
           },
         },
       });
@@ -104,10 +117,23 @@ async function sendNotificationToUsers(pool, userIds, { title, body, data = {} }
           Object.entries(data).map(([k, v]) => [k, String(v)])
         ),
         android: {
+          priority: 'high',
           notification: {
             channelId: 'indraprastha_updates',
-            priority: 'high',
+            notificationPriority: 'PRIORITY_HIGH',
             sound: 'default',
+            defaultSound: true,
+            defaultVibrateTimings: true,
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              alert: { title, body },
+              sound: 'default',
+              badge: 1,
+              'content-available': 1,
+            },
           },
         },
       });

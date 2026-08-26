@@ -35,8 +35,14 @@ class NotificationService {
       sound: true,
     );
 
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     // Configure local notifications (needed for foreground display)
-    const androidInit = AndroidInitializationSettings('@drawable/splash_logo');
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -54,8 +60,9 @@ class NotificationService {
           const AndroidNotificationChannel(
             _channelId,
             _channelName,
-            importance: Importance.high,
+            importance: Importance.max,
             enableVibration: true,
+            playSound: true,
           ),
         );
 
@@ -66,11 +73,11 @@ class NotificationService {
     FirebaseMessaging.onMessage.listen(_showForegroundNotification);
 
     // Register token with backend and refresh on rotation
-    await _uploadToken();
-    _messaging.onTokenRefresh.listen((_) => _uploadToken());
+    await uploadToken();
+    _messaging.onTokenRefresh.listen((_) => uploadToken());
   }
 
-  Future<void> _uploadToken() async {
+  Future<void> uploadToken() async {
     try {
       final token = await _messaging.getToken();
       if (token != null && token.isNotEmpty) {
@@ -93,11 +100,11 @@ class NotificationService {
         android: AndroidNotificationDetails(
           _channelId,
           _channelName,
-          importance: Importance.high,
-          priority: Priority.high,
+          importance: Importance.max,
+          priority: Priority.max,
           enableVibration: true,
-          icon: '@drawable/splash_logo',
-          largeIcon: DrawableResourceAndroidBitmap('@drawable/splash_logo'),
+          playSound: true,
+          icon: '@mipmap/ic_launcher',
         ),
         iOS: DarwinNotificationDetails(
           presentAlert: true,

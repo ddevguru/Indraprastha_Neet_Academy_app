@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/services/analytics_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../models/app_models.dart';
 import '../apple_auth_helper.dart';
 import '../data/auth_repository.dart';
@@ -154,6 +155,7 @@ class AuthBloc extends Cubit<AuthState> {
       await _repository.setOnboardingSeen();
       AnalyticsService.instance.identify(enrichedUser.mobileNumber);
       AnalyticsService.instance.trackFunnelEvent('logged_in');
+      NotificationService.instance.uploadToken();
       emit(state.copyWith(
         loading: false,
         user: enrichedUser,
@@ -284,6 +286,7 @@ class AuthBloc extends Cubit<AuthState> {
       await _repository.setOnboardingSeen();
       AnalyticsService.instance.identify(enrichedUser.mobileNumber);
       AnalyticsService.instance.trackSignedUp(method: 'phone');
+      NotificationService.instance.uploadToken();
       emit(state.copyWith(
         loading: false,
         user: enrichedUser,
@@ -371,6 +374,7 @@ class AuthBloc extends Cubit<AuthState> {
             : enrichedUser.fullName,
       );
       AnalyticsService.instance.trackFunnelEvent('logged_in');
+      NotificationService.instance.uploadToken();
       emit(state.copyWith(
         loading: false,
         user: enrichedUser,

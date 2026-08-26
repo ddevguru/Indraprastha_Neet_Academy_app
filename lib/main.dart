@@ -26,6 +26,7 @@ Future<void> main() async {
   // Notification init runs after Firebase — errors are swallowed so the
   // app still launches even if google-services.json is missing in dev.
   try {
+    NotificationService.initializeService(prefs);
     await NotificationService.instance.initialize();
   } catch (_) {}
 
