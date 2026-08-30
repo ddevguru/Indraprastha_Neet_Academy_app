@@ -2254,6 +2254,68 @@ router.get('/users', adminAuth, async (req, res) => {
   }
 });
 
+router.post('/users/grant-subscription', adminAuth, async (req, res) => {
+  try {
+    const { phone, phones, planName = 'Rank Pro', durationDays = 365 } = req.body;
+    const phoneList = Array.isArray(phones)
+      ? phones
+      : phone
+      ? [phone]
+      : [];
+
+    if (phoneList.length === 0) {
+      return res.status(400).json({ error: 'At least one phone number is required' });
+    }
+
+    const normalizedPhones = phoneList.map((p) => String(p).replace(/\D/g, '').slice(-10));
+
+    for (const p of normalizedPhones) {
+      await pool.query(
+        `INSERT INTO users (phone, preferred_plan, full_name, is_profile_complete)
+         VALUES ($1, $2, $3, false)
+         ON CONFLICT (phone) DO UPDATE SET preferred_plan = EXCLUDED.preferred_plan`,
+        [p, planName, `User ${p}`]
+      );
+    }
+
+    const updateSubRes = await pool.query(
+      `INSERT INTO user_subscriptions (
+         user_id, plan_name, starts_at, expires_at, status, updated_at
+       )
+       SELECT id, $1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + ($2 || ' days')::interval, 'active', CURRENT_TIMESTAMP
+       FROM users
+       WHERE phone = ANY($3::text[])
+          OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = ANY($3::text[])
+       ON CONFLICT (user_id)
+       DO UPDATE SET
+         plan_name = EXCLUDED.plan_name,
+         starts_at = CURRENT_TIMESTAMP,
+         expires_at = CURRENT_TIMESTAMP + ($2 || ' days')::interval,
+         status = 'active',
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING user_id, plan_name, status, starts_at, expires_at`,
+      [planName, String(durationDays), normalizedPhones]
+    );
+
+    await pool.query(
+      `UPDATE users
+       SET preferred_plan = $1
+       WHERE phone = ANY($2::text[])
+          OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = ANY($2::text[])`,
+      [planName, normalizedPhones]
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully granted ${planName} subscription to ${updateSubRes.rows.length} user(s).`,
+      subscriptions: updateSubRes.rows,
+    });
+  } catch (e) {
+    logAdminRouteError('/users/grant-subscription POST', e);
+    return res.status(500).json({ error: e.message || 'Failed to grant subscription' });
+  }
+});
+
 router.get('/packages', adminAuth, async (_req, res) => {
   const result = await pool.query(
     `SELECT id, name, price_label, validity, highlight, features_json, is_active
