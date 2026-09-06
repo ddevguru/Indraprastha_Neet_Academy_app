@@ -68,7 +68,7 @@ class AnalyticsService {
         testTitle: testAttempt.title,
         score: testAttempt.score,
         totalQuestions: questions.length,
-        percentage: Math.round((testAttempt.score / questions.length) * 100),
+        percentage: Math.round((testAttempt.score / (questions.length * 4 || 1)) * 100),
         timeTaken: testAttempt.time_taken_seconds,
         accuracy: subjectAnalysis,
         weakTopics: weakTopics.slice(0, 5), // Top 5 weak topics

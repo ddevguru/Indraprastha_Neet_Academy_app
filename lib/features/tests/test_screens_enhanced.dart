@@ -853,11 +853,12 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
     // TODO: Calculate score and fetch comparison data from API
     await Future.delayed(const Duration(seconds: 1));
 
-    // Mock data
-    int score = (widget.answeredQuestions * 4).clamp(0, 360);
+    int wrong = widget.totalQuestions - widget.answeredQuestions;
+    int score = (widget.answeredQuestions * 4) - (wrong * 1);
+    int totalMarks = widget.totalQuestions * 4;
     return {
       'score': score,
-      'percentage': ((score / 360) * 100).toStringAsFixed(1),
+      'percentage': totalMarks > 0 ? ((score / totalMarks) * 100).toStringAsFixed(1) : '0.0',
       'totalQuestions': widget.totalQuestions,
       'correct': widget.answeredQuestions,
       'accuracy': ((widget.answeredQuestions / widget.totalQuestions) * 100)

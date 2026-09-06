@@ -526,8 +526,12 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
     }
     final wrong = _answers.length - correct;
     final unattempted = questions.length - _answers.length;
-    final marks = (test['marks'] as num?)?.toInt() ?? 720;
-    final score = questions.isEmpty ? 0 : ((correct / questions.length) * marks).round();
+    final marks = (test['marks'] as num?)?.toInt() ?? (questions.length * 4);
+    final double posPerQ = questions.isEmpty ? 4.0 : (marks / questions.length);
+    final double negPerQ = posPerQ / 4.0;
+    final score = questions.isEmpty
+        ? 0
+        : ((correct * posPerQ) - (wrong * negPerQ)).round();
     final accuracy = _answers.isEmpty ? 0.0 : (correct / _answers.length) * 100;
     try {
       final res = await ref.read(contentRepositoryProvider).submitTestAttempt(
@@ -599,9 +603,12 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
     }
     final wrong = _answers.length - correct;
     final unattempted = questions.length - _answers.length;
-    final marks = (test['marks'] as num?)?.toInt() ?? 720;
-    final score =
-        questions.isEmpty ? 0 : ((correct / questions.length) * marks).round();
+    final marks = (test['marks'] as num?)?.toInt() ?? (questions.length * 4);
+    final double posPerQ = questions.isEmpty ? 4.0 : (marks / questions.length);
+    final double negPerQ = posPerQ / 4.0;
+    final score = questions.isEmpty
+        ? 0
+        : ((correct * posPerQ) - (wrong * negPerQ)).round();
     final accuracy = _answers.isEmpty ? 0.0 : (correct / _answers.length) * 100;
     return {
       'attempt': {
@@ -655,11 +662,11 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
 
   Future<bool> _handleBack() async {
     if (_submitted) {
-      if (context.mounted) context.pop(true);
+      if (mounted) context.pop(true);
       return false;
     }
     await _persistDraft();
-    if (context.mounted) context.pop(false);
+    if (mounted) context.pop(false);
     return false;
   }
 
@@ -934,16 +941,16 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                               final unattempted =
                                   questions.length - _answers.length;
                               final marks =
-                                  (test['marks'] as num?)?.toInt() ?? 720;
+                                  (test['marks'] as num?)?.toInt() ?? (questions.length * 4);
+                              final double posPerQ = questions.isEmpty ? 4.0 : (marks / questions.length);
+                              final double negPerQ = posPerQ / 4.0;
                               final score = questions.isEmpty
                                   ? 0
-                                  : ((correct / questions.length) * marks)
+                                  : ((correct * posPerQ) - (wrong * negPerQ))
                                       .round();
                               final accuracy = _answers.isEmpty
                                   ? 0.0
                                   : (correct / _answers.length) * 100;
-                              final messenger =
-                                  ScaffoldMessenger.of(context);
                               try {
                                 final res = await ref
                                     .read(contentRepositoryProvider)
@@ -971,7 +978,8 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                         test: test,
                                       );
                                 });
-                                messenger.showSnackBar(
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       'Server submit failed, local result shown. Error: $e',
