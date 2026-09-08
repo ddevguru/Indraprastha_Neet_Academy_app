@@ -5948,7 +5948,7 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '${complaint['full_name'] ?? 'N/A'}  •  ${complaint['email'] ?? 'N/A'}',
+                                      '${complaint['full_name'] ?? 'N/A'}  •  ${complaint['phone'] ?? complaint['email'] ?? 'N/A'}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -6168,6 +6168,8 @@ class _ComplaintDetailsDialogState extends State<_ComplaintDetailsDialog> {
                 widget.complaint['full_name']?.toString() ?? 'N/A'),
             _infoRow(Icons.email_outlined, 'Email',
                 widget.complaint['email']?.toString() ?? 'N/A'),
+            _infoRow(Icons.phone_outlined, 'Phone',
+                widget.complaint['phone']?.toString() ?? 'N/A'),
             const Divider(height: 20),
             const Text(
               'Description:',

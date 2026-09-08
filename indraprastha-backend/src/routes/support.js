@@ -68,9 +68,9 @@ router.post('/complaints', authenticateToken, async (req, res) => {
     const validReportTypes = ['general', 'question_report'];
     const reportType = validReportTypes.includes(report_type) ? report_type : 'general';
 
-    // Get user email
+    // Get user email and phone
     const userResult = await pool.query(
-      'SELECT email, full_name FROM users WHERE id = $1',
+      'SELECT email, full_name, phone FROM users WHERE id = $1',
       [userId]
     );
     const user = userResult.rows[0];
@@ -81,10 +81,10 @@ router.post('/complaints', authenticateToken, async (req, res) => {
 
     // Insert complaint
     const result = await pool.query(
-      `INSERT INTO complaints (user_id, title, description, email, full_name, status, report_type, created_at)
-       VALUES ($1, $2, $3, $4, $5, 'open', $6, NOW())
+      `INSERT INTO complaints (user_id, title, description, email, full_name, phone, status, report_type, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'open', $7, NOW())
        RETURNING id, created_at`,
-      [userId, title.trim(), description.trim(), user.email, user.full_name, reportType]
+      [userId, title.trim(), description.trim(), user.email, user.full_name, user.phone, reportType]
     );
 
     const complaint = result.rows[0];
@@ -106,7 +106,7 @@ router.get('/complaints', adminAuth, async (req, res) => {
   try {
     const { type } = req.query; // Optional filter: 'question_report' or 'general'
 
-    let queryText = `SELECT id, user_id, full_name, email, title, description, status, report_type, created_at
+    let queryText = `SELECT id, user_id, full_name, email, phone, title, description, status, report_type, created_at
        FROM complaints`;
     const queryParams = [];
 
@@ -136,7 +136,7 @@ router.get('/complaints/:id', adminAuth, async (req, res) => {
     const { id } = req.params;
 
     const result = await pool.query(
-      'SELECT id, user_id, full_name, email, title, description, status, report_type, created_at FROM complaints WHERE id = $1',
+      'SELECT id, user_id, full_name, email, phone, title, description, status, report_type, created_at FROM complaints WHERE id = $1',
       [id]
     );
 

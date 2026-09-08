@@ -676,6 +676,11 @@ async function ensureDatabaseSchema() {
     ADD COLUMN IF NOT EXISTS report_type VARCHAR(50) DEFAULT 'general';
   `);
 
+  await pool.query(`
+    ALTER TABLE complaints
+    ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+  `);
+
   const adminUser = process.env.ADMIN_USERNAME || 'admin';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin@123';
   const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
