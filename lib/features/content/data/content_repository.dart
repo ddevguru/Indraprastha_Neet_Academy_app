@@ -177,6 +177,7 @@ class ContentRepository {
   Future<Map<String, dynamic>> submitComplaint({
     required String title,
     required String description,
+    String reportType = 'general',
   }) async {
     final token = await _token;
     if (token == null) {
@@ -192,6 +193,7 @@ class ContentRepository {
         body: jsonEncode({
           'title': title,
           'description': description,
+          'report_type': reportType,
         }),
       );
 

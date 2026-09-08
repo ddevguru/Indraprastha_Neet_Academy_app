@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
+// Student authentication (for submitting complaints)
 async function authenticateToken(req, res, next) {
   const header = req.headers.authorization || '';
   if (!header.startsWith('Bearer ')) {
@@ -30,10 +31,29 @@ async function authenticateToken(req, res, next) {
   }
 }
 
-// POST - Student submits a complaint
+// Admin authentication (for reading/managing complaints in admin panel)
+function adminAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Admin auth required' });
+  }
+  try {
+    const token = authHeader.slice(7);
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    if (payload.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin role required' });
+    }
+    req.admin = payload;
+    next();
+  } catch (_) {
+    return res.status(401).json({ error: 'Invalid admin token' });
+  }
+}
+
+// POST - Student submits a complaint or question report
 router.post('/complaints', authenticateToken, async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, description, report_type } = req.body;
     const userId = req.user.id;
 
     // Validate input
@@ -43,6 +63,10 @@ router.post('/complaints', authenticateToken, async (req, res) => {
     if (!description || !description.trim()) {
       return res.status(400).json({ error: 'Description is required' });
     }
+
+    // Validate report_type
+    const validReportTypes = ['general', 'question_report'];
+    const reportType = validReportTypes.includes(report_type) ? report_type : 'general';
 
     // Get user email
     const userResult = await pool.query(
@@ -57,10 +81,10 @@ router.post('/complaints', authenticateToken, async (req, res) => {
 
     // Insert complaint
     const result = await pool.query(
-      `INSERT INTO complaints (user_id, title, description, email, full_name, status, created_at)
-       VALUES ($1, $2, $3, $4, $5, 'open', NOW())
+      `INSERT INTO complaints (user_id, title, description, email, full_name, status, report_type, created_at)
+       VALUES ($1, $2, $3, $4, $5, 'open', $6, NOW())
        RETURNING id, created_at`,
-      [userId, title.trim(), description.trim(), user.email, user.full_name]
+      [userId, title.trim(), description.trim(), user.email, user.full_name, reportType]
     );
 
     const complaint = result.rows[0];
@@ -77,26 +101,23 @@ router.post('/complaints', authenticateToken, async (req, res) => {
   }
 });
 
-// GET - Admin endpoint to fetch all complaints
-router.get('/complaints', authenticateToken, async (req, res) => {
+// GET - Admin endpoint to fetch all complaints (uses admin JWT auth)
+router.get('/complaints', adminAuth, async (req, res) => {
   try {
-    // Check if user is admin
-    const userResult = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
-      [req.user.id]
-    );
-    const user = userResult.rows[0];
+    const { type } = req.query; // Optional filter: 'question_report' or 'general'
 
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ error: 'Unauthorized - Admin access required' });
+    let queryText = `SELECT id, user_id, full_name, email, title, description, status, report_type, created_at
+       FROM complaints`;
+    const queryParams = [];
+
+    if (type && ['question_report', 'general'].includes(type)) {
+      queryText += ` WHERE report_type = $1`;
+      queryParams.push(type);
     }
 
-    // Fetch all complaints
-    const result = await pool.query(
-      `SELECT id, user_id, full_name, email, title, description, status, created_at
-       FROM complaints
-       ORDER BY created_at DESC`
-    );
+    queryText += ` ORDER BY created_at DESC`;
+
+    const result = await pool.query(queryText, queryParams);
 
     res.json({
       success: true,
@@ -109,24 +130,13 @@ router.get('/complaints', authenticateToken, async (req, res) => {
   }
 });
 
-// GET - Admin endpoint to fetch complaint by ID
-router.get('/complaints/:id', authenticateToken, async (req, res) => {
+// GET - Admin endpoint to fetch complaint by ID (uses admin JWT auth)
+router.get('/complaints/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if user is admin
-    const userResult = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
-      [req.user.id]
-    );
-    const user = userResult.rows[0];
-
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
     const result = await pool.query(
-      'SELECT id, user_id, full_name, email, title, description, status, created_at FROM complaints WHERE id = $1',
+      'SELECT id, user_id, full_name, email, title, description, status, report_type, created_at FROM complaints WHERE id = $1',
       [id]
     );
 
@@ -144,22 +154,11 @@ router.get('/complaints/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// PATCH - Admin endpoint to update complaint status
-router.patch('/complaints/:id/status', authenticateToken, async (req, res) => {
+// PATCH - Admin endpoint to update complaint status (uses admin JWT auth)
+router.patch('/complaints/:id/status', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-
-    // Check if user is admin
-    const userResult = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
-      [req.user.id]
-    );
-    const user = userResult.rows[0];
-
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
 
     const validStatuses = ['open', 'in-progress', 'resolved', 'closed'];
     if (!validStatuses.includes(status)) {

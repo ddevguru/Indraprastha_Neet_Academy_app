@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/fast_network_image.dart';
+import '../../widgets/question_report_dialog.dart';
 /// Enhanced Test Taking Screen with Progress Dots
 class EnhancedTestScreen extends StatefulWidget {
   final int testId;
@@ -284,6 +285,12 @@ class _EnhancedTestScreenState extends State<EnhancedTestScreen> {
                         Text('View Explanation'),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  QuestionDisclaimerReportMark(
+                    questionId: '${currentQuestion.id}',
+                    questionText: currentQuestion.questionText,
+                    moduleTitle: widget.testTitle,
                   ),
                 ],
               ),

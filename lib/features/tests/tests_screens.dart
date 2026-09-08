@@ -20,6 +20,7 @@ import '../../core/utils/question_fields.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../core/constants/api_constants.dart';
+import '../../widgets/question_report_dialog.dart';
 
 num? _asNum(dynamic value) {
   if (value is num) return value;
@@ -475,6 +476,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
   final Map<int, String> _answers = {};
   late final Future<Map<String, dynamic>> _attemptFuture;
   Timer? _timer;
+  late final PageController _pageController;
 
   AttemptDraftStore get _draftStore =>
       AttemptDraftStore(ref.read(sharedPreferencesProvider));
@@ -632,6 +634,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _index);
     final repo = ref.read(contentRepositoryProvider);
     _attemptFuture =
         repo.fetchTestQuestions(widget.testId).then((data) {
@@ -653,11 +656,24 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
 
   @override
   void dispose() {
+    _pageController.dispose();
     _timer?.cancel();
     if (!_submitted) {
       unawaited(_persistDraft());
     }
     super.dispose();
+  }
+
+  void _goToPage(int page, int totalQuestions) {
+    if (page < 0 || page >= totalQuestions) return;
+    setState(() => _index = page);
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        page,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   Future<bool> _handleBack() async {
@@ -733,9 +749,6 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
             ),
           );
         }
-        final q = questions[_index.clamp(0, questions.length - 1)];
-        final selected = _answers[_index];
-        final options = readQuestionOptions(q);
         if (_submitted) {
           final response = _submitResponse ??
               _buildLocalSubmitResponse(
@@ -819,6 +832,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
           );
         }
 
+        // ── Active Test: swipeable PageView ──────────────────────────────
         return Scaffold(
           appBar: AppBar(
             title: Text(test['title']?.toString() ?? 'Test Attempt'),
@@ -832,194 +846,278 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
               ),
             ],
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: CenteredContent(
-              maxWidth: 980,
-              child: SurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          body: Column(
+            children: [
+              // ── Progress indicator ─────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                child: Row(
                   children: [
                     Text(
-                      'Q ${_index + 1}/${questions.length}',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      'Q ${_index + 1} / ${questions.length}',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    buildQuestionTextBlock(context, q),
-                    if (hasQuestionImage(q)) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      _buildQuestionImage(questionImageRawUrl(q)),
-                    ],
-                    const SizedBox(height: AppSpacing.lg),
-                    ...options.entries.map(
-                      (e) => Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: OutlinedButton(
-                          onPressed: _submitted
-                              ? null
-                              : () {
-                                  setState(() => _answers[_index] = e.key);
-                                  unawaited(_persistDraft());
-                                },
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(52),
-                            backgroundColor: selected == e.key
-                                ? AppColors.indigoSoft
-                                : Theme.of(context).cardColor,
-                            side: BorderSide(
-                              color: selected == e.key
-                                  ? AppColors.indigo
-                                  : AppColors.border,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                            ),
-                          ),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _optionLabel(e.key, e.value),
-                              style: questionContentTextStyle(
-                                context,
-                                fontWeight: selected == e.key
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: selected == e.key
-                                    ? AppColors.primaryDark
-                                    : Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: (_index + 1) / questions.length,
+                          minHeight: 5,
+                          backgroundColor: AppColors.border,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppColors.primary),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    // Submit Test Button
-                    PrimaryButton(
-                      label: 'Submit Test',
-                      icon: Icons.check_rounded,
-                      expanded: true,
-                      onPressed: _submitting
-                          ? null
-                          : () async {
-                              // Show confirmation dialog before submitting
-                              final confirmed = await showDialog<bool>(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Submit Test?'),
-                                  content: const Text(
-                                    'Are you sure you want to submit the Test Now',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    FilledButton(
-                                      onPressed: () => Navigator.pop(context, true),
-                                      child: const Text('Submit'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              if (confirmed != true) return;
-
-                              // Submit test
-                              setState(() => _submitting = true);
-                              int correct = 0;
-                              for (var i = 0; i < questions.length; i++) {
-                                final marked = _answers[i];
-                                final actual = questions[i]
-                                            ['correct_option']
-                                        ?.toString()
-                                        .toUpperCase() ??
-                                    '';
-                                if (marked == actual) correct++;
-                              }
-                              final wrong = _answers.length - correct;
-                              final unattempted =
-                                  questions.length - _answers.length;
-                              final marks =
-                                  (test['marks'] as num?)?.toInt() ?? (questions.length * 4);
-                              final double posPerQ = questions.isEmpty ? 4.0 : (marks / questions.length);
-                              final double negPerQ = posPerQ / 4.0;
-                              final score = questions.isEmpty
-                                  ? 0
-                                  : ((correct * posPerQ) - (wrong * negPerQ))
-                                      .round();
-                              final accuracy = _answers.isEmpty
-                                  ? 0.0
-                                  : (correct / _answers.length) * 100;
-                              try {
-                                final res = await ref
-                                    .read(contentRepositoryProvider)
-                                    .submitTestAttempt(
-                                  testId: widget.testId,
-                                  score: score,
-                                  accuracy: accuracy,
-                                  correctCount: correct,
-                                  wrongCount: wrong,
-                                  unattemptedCount: unattempted,
-                                );
-                                if (!mounted) return;
-                                await _draftStore.clearTestDraft(widget.testId);
-                                setState(() {
-                                  _submitted = true;
-                                  _submitResponse = res;
-                                });
-                              } catch (e) {
-                                if (!mounted) return;
-                                setState(() {
-                                  _submitted = true;
-                                  _submitResponse =
-                                      _buildLocalSubmitResponse(
-                                        questions: questions,
-                                        test: test,
-                                      );
-                                });
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Server submit failed, local result shown. Error: $e',
-                                    ),
-                                  ),
-                                );
-                              } finally {
-                                if (mounted) {
-                                  setState(() => _submitting = false);
-                                }
-                              }
-                            },
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    // Navigation Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SecondaryButton(
-                            label: 'Previous',
-                            onPressed: _index == 0
-                                ? null
-                                : () => setState(() => _index--),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: SecondaryButton(
-                            label: 'Next',
-                            onPressed: _index == questions.length - 1
-                                ? null
-                                : () => setState(() => _index++),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
               ),
-            ),
+
+              // ── Swipeable questions ────────────────────────────────────
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  onPageChanged: (page) {
+                    setState(() => _index = page);
+                    unawaited(_persistDraft());
+                  },
+                  itemCount: questions.length,
+                  itemBuilder: (context, idx) {
+                    final qItem = questions[idx];
+                    final selectedOpt = _answers[idx];
+                    final qOptions = readQuestionOptions(qItem);
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: CenteredContent(
+                        maxWidth: 980,
+                        child: SurfaceCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Q ${idx + 1}/${questions.length}',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              buildQuestionTextBlock(context, qItem),
+                              if (hasQuestionImage(qItem)) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                _buildQuestionImage(questionImageRawUrl(qItem)),
+                              ],
+                              const SizedBox(height: AppSpacing.lg),
+                              ...qOptions.entries.map(
+                                (e) => Padding(
+                                  padding: const EdgeInsets.only(
+                                      bottom: AppSpacing.sm),
+                                  child: OutlinedButton(
+                                    onPressed: _submitted
+                                        ? null
+                                        : () {
+                                            setState(
+                                                () => _answers[idx] = e.key);
+                                            unawaited(_persistDraft());
+                                          },
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize:
+                                          const Size.fromHeight(52),
+                                      backgroundColor: selectedOpt == e.key
+                                          ? AppColors.indigoSoft
+                                          : Theme.of(context).cardColor,
+                                      side: BorderSide(
+                                        color: selectedOpt == e.key
+                                            ? AppColors.indigo
+                                            : AppColors.border,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                            AppRadii.md),
+                                      ),
+                                    ),
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        _optionLabel(e.key, e.value),
+                                        style: questionContentTextStyle(
+                                          context,
+                                          fontWeight: selectedOpt == e.key
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: selectedOpt == e.key
+                                              ? AppColors.primaryDark
+                                              : Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              // Submit Test Button
+                              PrimaryButton(
+                                label: 'Submit Test',
+                                icon: Icons.check_rounded,
+                                expanded: true,
+                                onPressed: _submitting
+                                    ? null
+                                    : () async {
+                                        final confirmed =
+                                            await showDialog<bool>(
+                                          context: context,
+                                          barrierDismissible: false,
+                                          builder: (context) => AlertDialog(
+                                            title:
+                                                const Text('Submit Test?'),
+                                            content: const Text(
+                                              'Are you sure you want to submit the Test Now',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(
+                                                        context, false),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              FilledButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(
+                                                        context, true),
+                                                child: const Text('Submit'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirmed != true) return;
+
+                                        setState(() => _submitting = true);
+                                        int correct = 0;
+                                        for (var i = 0;
+                                            i < questions.length;
+                                            i++) {
+                                          final marked = _answers[i];
+                                          final actual = questions[i]
+                                                      ['correct_option']
+                                                  ?.toString()
+                                                  .toUpperCase() ??
+                                              '';
+                                          if (marked == actual) correct++;
+                                        }
+                                        final wrong =
+                                            _answers.length - correct;
+                                        final unattempted =
+                                            questions.length -
+                                                _answers.length;
+                                        final marks =
+                                            (test['marks'] as num?)
+                                                    ?.toInt() ??
+                                                (questions.length * 4);
+                                        final double posPerQ =
+                                            questions.isEmpty
+                                                ? 4.0
+                                                : (marks / questions.length);
+                                        final double negPerQ = posPerQ / 4.0;
+                                        final score = questions.isEmpty
+                                            ? 0
+                                            : ((correct * posPerQ) -
+                                                    (wrong * negPerQ))
+                                                .round();
+                                        final accuracy = _answers.isEmpty
+                                            ? 0.0
+                                            : (correct / _answers.length) *
+                                                100;
+                                        try {
+                                          final res = await ref
+                                              .read(
+                                                  contentRepositoryProvider)
+                                              .submitTestAttempt(
+                                            testId: widget.testId,
+                                            score: score,
+                                            accuracy: accuracy,
+                                            correctCount: correct,
+                                            wrongCount: wrong,
+                                            unattemptedCount: unattempted,
+                                          );
+                                          if (!mounted) return;
+                                          await _draftStore
+                                              .clearTestDraft(widget.testId);
+                                          setState(() {
+                                            _submitted = true;
+                                            _submitResponse = res;
+                                          });
+                                        } catch (e) {
+                                          if (!mounted) return;
+                                          setState(() {
+                                            _submitted = true;
+                                            _submitResponse =
+                                                _buildLocalSubmitResponse(
+                                              questions: questions,
+                                              test: test,
+                                            );
+                                          });
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Server submit failed, local result shown. Error: $e',
+                                              ),
+                                            ),
+                                          );
+                                        } finally {
+                                          if (mounted) {
+                                            setState(
+                                                () => _submitting = false);
+                                          }
+                                        }
+                                      },
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              // Navigation Buttons
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SecondaryButton(
+                                      label: '← Previous',
+                                      onPressed: _index == 0
+                                          ? null
+                                          : () => _goToPage(
+                                              _index - 1, questions.length),
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: SecondaryButton(
+                                      label: 'Next →',
+                                      onPressed: _index ==
+                                              questions.length - 1
+                                          ? null
+                                          : () => _goToPage(
+                                              _index + 1, questions.length),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              QuestionDisclaimerReportMark(
+                                questionId:
+                                    qItem['id']?.toString() ?? '$idx',
+                                questionText: qItem['question']?.toString(),
+                                moduleTitle: test['title']?.toString(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },

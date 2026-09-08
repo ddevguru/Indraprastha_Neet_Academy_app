@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../theme/app_tokens.dart';
 import '../../widgets/fast_network_image.dart';
+import '../../widgets/question_report_dialog.dart';
 
 /// Enhanced Practice/PYQ Screen with Explanation Page & Progress Dots
 class EnhancedPracticeScreen extends StatefulWidget {
@@ -369,6 +370,12 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                         ),
                       ),
                     ),
+                  const SizedBox(height: 8),
+                  QuestionDisclaimerReportMark(
+                    questionId: '${currentQuestion.id}',
+                    questionText: currentQuestion.questionText,
+                    moduleTitle: widget.practiceTitle,
+                  ),
                 ],
               ),
             ),

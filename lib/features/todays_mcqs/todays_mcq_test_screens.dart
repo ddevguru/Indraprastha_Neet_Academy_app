@@ -9,6 +9,7 @@ import '../../models/daily_mcq_item.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/paginated_answer_review.dart';
+import '../../widgets/question_report_dialog.dart';
 
 class TodaysMcqTestPreviewScreen extends ConsumerWidget {
   const TodaysMcqTestPreviewScreen({super.key});
@@ -322,169 +323,196 @@ class _TodaysMcqTestAttemptScreenState
 
     return Scaffold(
       appBar: AppBar(title: const Text("Today's MCQ test")),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: CenteredContent(
-          maxWidth: 720,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      title: 'Progress',
-                      value: '${_index + 1}/${active.length}',
-                      subtitle: 'Daily test',
-                      icon: Icons.timelapse_rounded,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: StatCard(
-                      title: 'Subject',
-                      value: item.subject.label,
-                      subtitle: item.standardLabel.isNotEmpty
-                          ? item.standardLabel
-                          : item.chapterTitle,
-                      icon: item.subject.icon,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              SurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity == null) return;
+          if (details.primaryVelocity! < -200) {
+            // Swiped left -> Next Question / Check answer
+            if (!_submitted) {
+              if (_selected != null) _checkAndContinue(active);
+            } else {
+              _next(active);
+            }
+          } else if (details.primaryVelocity! > 200 && _index > 0) {
+            // Swiped right -> Previous Question
+            setState(() {
+              _index--;
+              _selected = null;
+              _submitted = false;
+            });
+          }
+        },
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: CenteredContent(
+            maxWidth: 720,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    if (item.chapterTitle.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.sm,
-                          vertical: AppSpacing.xs,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.indigoSoft,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                        child: Text(
-                          '${item.subject.label}${item.chapterTitle.isNotEmpty ? ' · ${item.chapterTitle}' : ''}',
-                          style: const TextStyle(
-                            color: AppColors.indigo,
-                            fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: StatCard(
+                        title: 'Progress',
+                        value: '${_index + 1}/${active.length}',
+                        subtitle: 'Daily test',
+                        icon: Icons.timelapse_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: StatCard(
+                        title: 'Subject',
+                        value: item.subject.label,
+                        subtitle: item.standardLabel.isNotEmpty
+                            ? item.standardLabel
+                            : item.chapterTitle,
+                        icon: item.subject.icon,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SurfaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (item.chapterTitle.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.indigoSoft,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            '${item.subject.label}${item.chapterTitle.isNotEmpty ? ' · ${item.chapterTitle}' : ''}',
+                            style: const TextStyle(
+                              color: AppColors.indigo,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(
+                        item.preview,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      item.preview,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    ...List.generate(options.length, (i) {
-                      final sel = _selected == i;
-                      final isCorr = i == correct;
-                      final reveal = _submitted && (sel || isCorr);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                        child: InkWell(
-                          onTap: _submitted
-                              ? null
-                              : () => setState(() => _selected = i),
-                          borderRadius: BorderRadius.circular(AppRadii.md),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              color: reveal
-                                  ? (isCorr
-                                      ? Colors.green.withValues(alpha: 0.12)
-                                      : Colors.red.withValues(alpha: 0.08))
-                                  : (sel
-                                      ? AppColors.indigoSoft
-                                      : AppColors.surfaceMuted),
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                              border: Border.all(
-                                color: reveal && isCorr
-                                    ? Colors.green
-                                    : (reveal && sel && !isCorr
-                                        ? Colors.red
-                                        : AppColors.border),
+                      const SizedBox(height: AppSpacing.lg),
+                      ...List.generate(options.length, (i) {
+                        final sel = _selected == i;
+                        final isCorr = i == correct;
+                        final reveal = _submitted && (sel || isCorr);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: InkWell(
+                            onTap: _submitted
+                                ? null
+                                : () => setState(() => _selected = i),
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              decoration: BoxDecoration(
+                                color: reveal
+                                    ? (isCorr
+                                        ? Colors.green.withValues(alpha: 0.12)
+                                        : Colors.red.withValues(alpha: 0.08))
+                                    : (sel
+                                        ? AppColors.indigoSoft
+                                        : AppColors.surfaceMuted),
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                border: Border.all(
+                                  color: reveal && isCorr
+                                      ? Colors.green
+                                      : (reveal && sel && !isCorr
+                                          ? Colors.red
+                                          : AppColors.border),
+                                ),
                               ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: reveal && isCorr
-                                        ? Colors.green.withValues(alpha: 0.2)
-                                        : reveal && sel && !isCorr
-                                            ? Colors.red.withValues(alpha: 0.15)
-                                            : sel
-                                                ? AppColors.indigo
-                                                    .withValues(alpha: 0.15)
-                                                : AppColors.border
-                                                    .withValues(alpha: 0.5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      ['A', 'B', 'C', 'D'][i],
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 12,
-                                        color: reveal && isCorr
-                                            ? Colors.green
-                                            : reveal && sel && !isCorr
-                                                ? Colors.red
-                                                : AppColors.indigo,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: reveal && isCorr
+                                          ? Colors.green.withValues(alpha: 0.2)
+                                          : reveal && sel && !isCorr
+                                              ? Colors.red.withValues(alpha: 0.15)
+                                              : sel
+                                                  ? AppColors.indigo
+                                                      .withValues(alpha: 0.15)
+                                                  : AppColors.border
+                                                      .withValues(alpha: 0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        ['A', 'B', 'C', 'D'][i],
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12,
+                                          color: reveal && isCorr
+                                              ? Colors.green
+                                              : reveal && sel && !isCorr
+                                                  ? Colors.red
+                                                  : AppColors.indigo,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(child: Text(options[i])),
-                                if (reveal)
-                                  Icon(
-                                    isCorr
-                                        ? Icons.check_circle_rounded
-                                        : Icons.cancel_rounded,
-                                    color: isCorr ? Colors.green : Colors.red,
-                                    size: 20,
-                                  ),
-                              ],
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Expanded(child: Text(options[i])),
+                                  if (reveal)
+                                    Icon(
+                                      isCorr
+                                          ? Icons.check_circle_rounded
+                                          : Icons.cancel_rounded,
+                                      color: isCorr ? Colors.green : Colors.red,
+                                      size: 20,
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }),
-                  ],
+                        );
+                      }),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              if (!_submitted)
-                PrimaryButton(
-                  label: 'Check & continue',
-                  expanded: true,
-                  icon: Icons.check_rounded,
-                  onPressed: _selected == null
-                      ? null
-                      : () => _checkAndContinue(active),
-                )
-              else
-                PrimaryButton(
-                  label: _index >= active.length - 1
-                      ? 'Finish & see results'
-                      : 'Next question',
-                  expanded: true,
-                  icon: _index >= active.length - 1
-                      ? Icons.bar_chart_rounded
-                      : Icons.arrow_forward_rounded,
-                  onPressed: () => _next(active),
+                const SizedBox(height: AppSpacing.lg),
+                if (!_submitted)
+                  PrimaryButton(
+                    label: 'Check & continue',
+                    expanded: true,
+                    icon: Icons.check_rounded,
+                    onPressed: _selected == null
+                        ? null
+                        : () => _checkAndContinue(active),
+                  )
+                else
+                  PrimaryButton(
+                    label: _index >= active.length - 1
+                        ? 'Finish & see results'
+                        : 'Next question',
+                    expanded: true,
+                    icon: _index >= active.length - 1
+                        ? Icons.bar_chart_rounded
+                        : Icons.arrow_forward_rounded,
+                    onPressed: () => _next(active),
+                  ),
+                const SizedBox(height: AppSpacing.sm),
+                QuestionDisclaimerReportMark(
+                  questionId: '${item.id}',
+                  questionText: item.preview,
+                  moduleTitle: "Today's MCQ test",
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

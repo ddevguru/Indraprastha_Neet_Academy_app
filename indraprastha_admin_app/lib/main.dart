@@ -5624,6 +5624,7 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
   final _search = TextEditingController();
   String _query = '';
   String _filterStatus = 'all';
+  String _filterType = 'all'; // 'all', 'question_report', 'general'
 
   @override
   void initState() {
@@ -5652,6 +5653,15 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
 
   List<dynamic> get _filtered {
     var filtered = _complaints;
+    // Filter by report type
+    if (_filterType != 'all') {
+      filtered = filtered.where((c) {
+        final m = c as Map<String, dynamic>;
+        final rt = m['report_type']?.toString() ?? 'general';
+        return rt == _filterType;
+      }).toList();
+    }
+    // Filter by status
     if (_filterStatus != 'all') {
       filtered = filtered.where((c) {
         final m = c as Map<String, dynamic>;
@@ -5666,6 +5676,15 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
           (m['email']?.toString().toLowerCase().contains(q) ?? false) ||
           (m['title']?.toString().toLowerCase().contains(q) ?? false);
     }).toList();
+  }
+
+  int _countByType(String type) {
+    if (type == 'all') return _complaints.length;
+    return _complaints.where((c) {
+      final m = c as Map<String, dynamic>;
+      final rt = m['report_type']?.toString() ?? 'general';
+      return rt == type;
+    }).length;
   }
 
   Color _statusColor(String? status) {
@@ -5683,15 +5702,43 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
     }
   }
 
+  Color _reportTypeColor(String? reportType) {
+    switch (reportType) {
+      case 'question_report':
+        return const Color(0xFFFF6B35);
+      default:
+        return const Color(0xFF5C6BC0);
+    }
+  }
+
+  IconData _reportTypeIcon(String? reportType) {
+    switch (reportType) {
+      case 'question_report':
+        return Icons.quiz_outlined;
+      default:
+        return Icons.support_agent_outlined;
+    }
+  }
+
+  String _reportTypeLabel(String? reportType) {
+    switch (reportType) {
+      case 'question_report':
+        return 'Question Report';
+      default:
+        return 'General';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
             Text('Error: $_error', textAlign: TextAlign.center),
             const SizedBox(height: 12),
             FilledButton.icon(
@@ -5706,6 +5753,22 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
     final filtered = _filtered;
     return Column(
       children: [
+        // ── Type Filter Tabs ──────────────────────────────────────────────
+        Container(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              _buildTypeTab('all', 'All', Icons.list_alt_outlined),
+              const SizedBox(width: 8),
+              _buildTypeTab('question_report', 'Question Reports', Icons.quiz_outlined),
+              const SizedBox(width: 8),
+              _buildTypeTab('general', 'General', Icons.support_agent_outlined),
+            ],
+          ),
+        ),
+
+        // ── Search + Status Filter ────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Row(
@@ -5735,7 +5798,7 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
               DropdownButton<String>(
                 value: _filterStatus,
                 items: const [
-                  DropdownMenuItem(value: 'all', child: Text('All')),
+                  DropdownMenuItem(value: 'all', child: Text('All Status')),
                   DropdownMenuItem(value: 'open', child: Text('Open')),
                   DropdownMenuItem(value: 'in-progress', child: Text('In Progress')),
                   DropdownMenuItem(value: 'resolved', child: Text('Resolved')),
@@ -5746,109 +5809,49 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
             ],
           ),
         ),
+
+        // ── List ──────────────────────────────────────────────────────────
         Expanded(
           child: filtered.isEmpty
               ? Center(
-                  child: Text(
-                    _query.isEmpty && _filterStatus == 'all'
-                        ? 'No complaints yet'
-                        : 'No results found',
-                    style: const TextStyle(color: Colors.grey),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _filterType == 'question_report'
+                            ? Icons.quiz_outlined
+                            : Icons.inbox_outlined,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _query.isEmpty && _filterStatus == 'all' && _filterType == 'all'
+                            ? 'No reports yet'
+                            : 'No results found',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    ],
                   ),
                 )
               : ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 24),
                   itemCount: filtered.length,
                   itemBuilder: (_, i) {
                     final complaint = filtered[i] as Map<String, dynamic>;
                     final status = complaint['status']?.toString() ?? 'open';
                     final createdAt = complaint['created_at']?.toString() ?? '';
+                    final reportType = complaint['report_type']?.toString() ?? 'general';
+                    final typeColor = _reportTypeColor(reportType);
+                    final typeIcon = _reportTypeIcon(reportType);
+                    final typeLabel = _reportTypeLabel(reportType);
+
                     return Card(
                       margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(12),
-                        leading: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: _statusColor(status).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            status == 'open'
-                                ? Icons.mail_outline
-                                : status == 'in-progress'
-                                    ? Icons.hourglass_bottom
-                                    : status == 'resolved'
-                                        ? Icons.check_circle_outline
-                                        : Icons.done_all,
-                            color: _statusColor(status),
-                            size: 24,
-                          ),
-                        ),
-                        title: Text(
-                          complaint['title']?.toString() ?? 'N/A',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            Text(
-                              complaint['full_name']?.toString() ?? 'N/A',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            Text(
-                              complaint['email']?.toString() ?? 'N/A',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.grey),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              complaint['description']?.toString() ?? '',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _statusColor(status).withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                status,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: _statusColor(status),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              createdAt.split('T').first,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
+                          horizontal: 16, vertical: 6),
+                      elevation: 1,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
                         onTap: () {
                           showDialog(
                             context: context,
@@ -5859,12 +5862,184 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
                             ),
                           );
                         },
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Leading icon
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: typeColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  typeIcon,
+                                  color: typeColor,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Content
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        // Report type badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: typeColor.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(
+                                                color: typeColor.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Text(
+                                            typeLabel,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: typeColor,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        // Status badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: _statusColor(status)
+                                                .withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            status,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: _statusColor(status),
+                                            ),
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Text(
+                                          createdAt.split('T').first,
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      complaint['title']?.toString() ?? 'N/A',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${complaint['full_name'] ?? 'N/A'}  •  ${complaint['email'] ?? 'N/A'}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 11, color: Colors.grey),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      complaint['description']?.toString() ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   },
                 ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTypeTab(String type, String label, IconData icon) {
+    final isSelected = _filterType == type;
+    final count = _countByType(type);
+    final color = type == 'question_report'
+        ? const Color(0xFFFF6B35)
+        : type == 'general'
+            ? const Color(0xFF5C6BC0)
+            : Theme.of(context).colorScheme.primary;
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => setState(() => _filterType = type),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? color : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 18, color: isSelected ? color : Colors.grey.shade500),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? color : Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? color.withValues(alpha: 0.2)
+                      : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected ? color : Colors.grey.shade600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -5926,35 +6101,101 @@ class _ComplaintDetailsDialogState extends State<_ComplaintDetailsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final reportType = widget.complaint['report_type']?.toString() ?? 'general';
+    final isQuestionReport = reportType == 'question_report';
+    final typeColor = isQuestionReport
+        ? const Color(0xFFFF6B35)
+        : const Color(0xFF5C6BC0);
+    final typeLabel = isQuestionReport ? 'Question Report' : 'General Complaint';
+
     return AlertDialog(
-      title: const Text('Complaint Details'),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: typeColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              isQuestionReport ? Icons.quiz_outlined : Icons.support_agent_outlined,
+              color: typeColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Report Details',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700)),
+                Container(
+                  margin: const EdgeInsets.only(top: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: typeColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                        color: typeColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    typeLabel,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: typeColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
       content: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Issue: ${widget.complaint['title'] ?? 'N/A'}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            Text('Name: ${widget.complaint['full_name'] ?? 'N/A'}'),
-            Text('Email: ${widget.complaint['email'] ?? 'N/A'}'),
-            const SizedBox(height: 12),
+            _infoRow(Icons.title_outlined, 'Issue',
+                widget.complaint['title']?.toString() ?? 'N/A'),
+            const Divider(height: 20),
+            _infoRow(Icons.person_outline, 'Name',
+                widget.complaint['full_name']?.toString() ?? 'N/A'),
+            _infoRow(Icons.email_outlined, 'Email',
+                widget.complaint['email']?.toString() ?? 'N/A'),
+            const Divider(height: 20),
             const Text(
               'Description:',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             ),
             const SizedBox(height: 8),
-            Text(widget.complaint['description']?.toString() ?? 'N/A'),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Text(
+                widget.complaint['description']?.toString() ?? 'N/A',
+                style: const TextStyle(fontSize: 13, height: 1.5),
+              ),
+            ),
             const SizedBox(height: 16),
             const Text(
               'Update Status:',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: ['open', 'in-progress', 'resolved', 'closed']
                   .map((s) => ChoiceChip(
                         label: Text(s),
@@ -5976,6 +6217,33 @@ class _ComplaintDetailsDialogState extends State<_ComplaintDetailsDialog> {
           child: const Text('Close'),
         ),
       ],
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: Colors.grey.shade500),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500)),
+              const SizedBox(height: 1),
+              Text(value,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

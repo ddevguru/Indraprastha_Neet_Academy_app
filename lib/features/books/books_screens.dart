@@ -10,6 +10,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
+import '../practice/practice_screens.dart';
 import '../onboarding/onboarding_checklist_widget.dart';
 import '../../core/services/onboarding_checklist_service.dart';
 import '../../theme/app_tokens.dart';
@@ -409,7 +410,7 @@ class ChapterDetailScreen extends ConsumerWidget {
         final isSaved =
             ref.watch(appUiControllerProvider).savedChapterIds.contains(chapterIdString);
         return DefaultTabController(
-          length: 3,
+          length: 2,
           child: Scaffold(
             appBar: AppBar(
               title: Text(chapter['title']?.toString() ?? 'Chapter'),
@@ -427,8 +428,7 @@ class ChapterDetailScreen extends ConsumerWidget {
               ],
               bottom: const TabBar(
                 tabs: [
-                  Tab(text: 'Book'),
-                  Tab(text: 'PYQs'),
+                  Tab(text: 'Book & Notes'),
                   Tab(text: 'Highlights'),
                 ],
               ),
@@ -451,9 +451,49 @@ class ChapterDetailScreen extends ConsumerWidget {
                         Text(chapter['overview']?.toString() ?? ''),
                       ],
                       const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Linked PYQs: ${chapter['linked_pyq_count'] ?? pyqs.length}',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      Row(
+                        children: [
+                          Text(
+                            'Linked PYQs: ${chapter['linked_pyq_count'] ?? pyqs.length}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const Spacer(),
+                          if (pyqs.isNotEmpty)
+                            InkWell(
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => PracticeAttemptScreen(
+                                    setId: 0,
+                                    chapterName: chapter['title']?.toString() ?? 'Chapter PYQs',
+                                    chapterQuestions: pyqs,
+                                  ),
+                                ),
+                              ),
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  gradient: AppGradients.primary,
+                                  borderRadius: BorderRadius.circular(AppRadii.md),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Practice PYQs',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       if ((chapter['material_type']?.toString() ?? '') == 'pdf' &&
                           (chapter['material_drive_link']?.toString() ?? '').isNotEmpty) ...[
@@ -489,17 +529,10 @@ class ChapterDetailScreen extends ConsumerWidget {
                   ),
                 ),
                 const Divider(height: 1),
-                // ── TabBarView fills all remaining space ────────────────────
-                // Using Expanded here (not a fixed-height SizedBox) is what
-                // makes the 3 sections visible. A SizedBox inside a
-                // SingleChildScrollView collapses TabBarView because both
-                // scroll in the same axis and Flutter cannot resolve the
-                // unbounded-height constraint.
                 Expanded(
                   child: TabBarView(
                     children: [
                       _PdfOrNotesPanel(chapter: chapter),
-                      _PyqSolvePanel(pyqs: pyqs),
                       _DetailPanel(
                         title: 'Important lines',
                         content: chapter['highlight']?.toString() ?? '',

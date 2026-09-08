@@ -23,11 +23,9 @@ import '../../widgets/fast_network_image.dart';
 import '../../core/utils/drive_image_url.dart';
 import '../../core/utils/question_fields.dart';
 import '../../core/constants/api_constants.dart';
+import '../../widgets/question_report_dialog.dart';
 
-String _optionLabel(int index, String value) => formatOptionLabel(
-      String.fromCharCode(65 + index),
-      value,
-    );
+
 
 Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
   List<Map<String, dynamic>> questions,
@@ -156,6 +154,16 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
             builder: (_) => TopicWiseMcqsScreen(
               allSets: allSets,
               hasActiveSubscription: hasSubscription,
+            ),
+          ),
+        );
+      case 'PYQs':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TopicWiseMcqsScreen(
+              allSets: allSets,
+              hasActiveSubscription: hasSubscription,
+              isPyqCategory: true,
             ),
           ),
         );
@@ -699,9 +707,12 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     }
   }
 
+  late PageController _pageController;
+
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
     _loadAttempt();
     WidgetsBinding.instance.addPostFrameCallback((_) => _guardAccess());
     _startQuestionTimer();
@@ -710,6 +721,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   @override
   void dispose() {
     _questionTimer.cancel();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -948,11 +960,19 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       unawaited(_submitPracticeResult());
       return;
     }
+    final nextIdx = _currentIndex + 1;
     setState(() {
-      _currentIndex++;
+      _currentIndex = nextIdx;
       _selectedOption = null;
       _submitted = false;
     });
+    if (_pageController.hasClients && _pageController.page?.round() != nextIdx) {
+      _pageController.animateToPage(
+        nextIdx,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+      );
+    }
     unawaited(_persistDraft());
     _startQuestionTimer();
   }
@@ -960,11 +980,19 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   void _previousQuestion() {
     if (_currentIndex <= 0) return;
     _questionTimer.cancel();
+    final prevIdx = _currentIndex - 1;
     setState(() {
-      _currentIndex--;
+      _currentIndex = prevIdx;
       _selectedOption = null;
       _submitted = false;
     });
+    if (_pageController.hasClients && _pageController.page?.round() != prevIdx) {
+      _pageController.animateToPage(
+        prevIdx,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+      );
+    }
     unawaited(_persistDraft());
     _startQuestionTimer();
   }
@@ -1116,7 +1144,6 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
           readQuestionOption(question, 'D'),
         ];
         final correctOption = readCorrectOption(question);
-        final correctIndex = ['A', 'B', 'C', 'D'].indexOf(correctOption).clamp(0, 3);
         final savedPractice = ref.watch(practiceSavedControllerProvider);
         final qId = question['id'].toString();
         final isBookmarked = savedPractice.bookmarkedIds.contains(qId);
@@ -1157,287 +1184,315 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
               ),
             ],
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: CenteredContent(
-              maxWidth: 920,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Progress and Timer Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          body: PageView.builder(
+            controller: _pageController,
+            physics: const BouncingScrollPhysics(),
+            itemCount: _questions.length,
+            onPageChanged: (pageIndex) {
+              if (pageIndex == _currentIndex) return;
+              _questionTimer.cancel();
+              setState(() {
+                _currentIndex = pageIndex;
+                _selectedOption = null;
+                _submitted = false;
+              });
+              unawaited(_persistDraft());
+              _startQuestionTimer();
+            },
+            itemBuilder: (context, qIdx) {
+              final qItem = _questions[qIdx];
+              final qOptions = [
+                readQuestionOption(qItem, 'A'),
+                readQuestionOption(qItem, 'B'),
+                readQuestionOption(qItem, 'C'),
+                readQuestionOption(qItem, 'D'),
+              ];
+              final qCorrectOption = readCorrectOption(qItem);
+              final qCorrectIndex =
+                  ['A', 'B', 'C', 'D'].indexOf(qCorrectOption).clamp(0, 3);
+              final qIdStr = qItem['id'].toString();
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: CenteredContent(
+                  maxWidth: 920,
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: StatCard(
-                          title: 'Q ${_currentIndex + 1}/${_questions.length}',
-                          value: '${_currentIndex + 1}/${_questions.length}',
-                          subtitle: 'Progress',
-                          icon: Icons.task_alt_rounded,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      // Timer Display - Enhanced
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          gradient: _remainingSeconds <= 3
-                              ? LinearGradient(
-                                  colors: [
-                                    AppColors.danger.withValues(alpha: 0.15),
-                                    AppColors.danger.withValues(alpha: 0.05),
-                                  ],
-                                )
-                              : LinearGradient(
-                                  colors: [
-                                    AppColors.primary.withValues(alpha: 0.1),
-                                    AppColors.primary.withValues(alpha: 0.05),
-                                  ],
-                                ),
-                          borderRadius: BorderRadius.circular(AppRadii.md),
-                          border: Border.all(
-                            color: _remainingSeconds <= 3
-                                ? AppColors.danger
-                                : (_remainingSeconds <= 5
-                                    ? AppColors.warning
-                                    : AppColors.primary),
-                            width: 2,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: StatCard(
+                              title: 'Q ${qIdx + 1}/${_questions.length}',
+                              value: '${qIdx + 1}/${_questions.length}',
+                              subtitle: 'Progress',
+                              icon: Icons.task_alt_rounded,
+                            ),
                           ),
-                          boxShadow: _remainingSeconds <= 3
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.danger.withValues(alpha: 0.2),
-                                    blurRadius: 8,
-                                    spreadRadius: 0,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: SizedBox(
-                          width: 80,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.schedule_rounded,
-                                size: 22,
+                          const SizedBox(width: AppSpacing.md),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: _remainingSeconds <= 3
+                                  ? LinearGradient(
+                                      colors: [
+                                        AppColors.danger.withValues(alpha: 0.15),
+                                        AppColors.danger.withValues(alpha: 0.05),
+                                      ],
+                                    )
+                                  : LinearGradient(
+                                      colors: [
+                                        AppColors.primary.withValues(alpha: 0.1),
+                                        AppColors.primary.withValues(alpha: 0.05),
+                                      ],
+                                    ),
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                              border: Border.all(
                                 color: _remainingSeconds <= 3
                                     ? AppColors.danger
                                     : (_remainingSeconds <= 5
                                         ? AppColors.warning
                                         : AppColors.primary),
+                                width: 2,
                               ),
-                              const SizedBox(height: 6),
-                              AnimatedScale(
-                                scale: _remainingSeconds <= 3 ? 1.1 : 1.0,
-                                duration: const Duration(milliseconds: 300),
-                                child: Text(
-                                  '$_remainingSeconds',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w900,
+                              boxShadow: _remainingSeconds <= 3
+                                  ? [
+                                      BoxShadow(
+                                        color: AppColors.danger.withValues(alpha: 0.2),
+                                        blurRadius: 8,
+                                        spreadRadius: 0,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: SizedBox(
+                              width: 80,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.schedule_rounded,
+                                    size: 22,
                                     color: _remainingSeconds <= 3
                                         ? AppColors.danger
                                         : (_remainingSeconds <= 5
                                             ? AppColors.warning
                                             : AppColors.primary),
                                   ),
-                                ),
+                                  const SizedBox(height: 6),
+                                  AnimatedScale(
+                                    scale: _remainingSeconds <= 3 ? 1.1 : 1.0,
+                                    duration: const Duration(milliseconds: 300),
+                                    child: Text(
+                                      '$_remainingSeconds',
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w900,
+                                        color: _remainingSeconds <= 3
+                                            ? AppColors.danger
+                                            : (_remainingSeconds <= 5
+                                                ? AppColors.warning
+                                                : AppColors.primary),
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    'seconds',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.6),
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                'seconds',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface
-                                      .withValues(alpha: 0.6),
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      SurfaceCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            buildQuestionTextBlock(
+                              context,
+                              qItem,
+                              style: questionContentTextStyle(
+                                context,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (hasQuestionImage(qItem)) ...[
+                              const SizedBox(height: AppSpacing.md),
+                              _buildQuestionImage(questionImageRawUrl(qItem)),
+                            ],
+                            const SizedBox(height: AppSpacing.lg),
+                            ...List.generate(qOptions.length, (index) {
+                              final selected = _selectedOption == index;
+                              final revealState = _submitted && (selected || index == qCorrectIndex);
+                              final isDark = Theme.of(context).brightness == Brightness.dark;
+                              final isCorrectOption = index == qCorrectIndex;
+
+                              final optionLabel = ['A', 'B', 'C', 'D'][index];
+
+                              Color bg;
+                              Color border;
+                              Color textColor;
+                              if (revealState) {
+                                if (isCorrectOption) {
+                                  bg = isDark
+                                      ? AppColors.success.withValues(alpha: 0.18)
+                                      : const Color(0xFFE7F8EF);
+                                  border = AppColors.success;
+                                  textColor = isDark
+                                      ? const Color(0xFF6EE7A0)
+                                      : AppColors.success;
+                                } else {
+                                  bg = isDark
+                                      ? AppColors.danger.withValues(alpha: 0.18)
+                                      : const Color(0xFFFCEAEA);
+                                  border = AppColors.danger;
+                                  textColor = isDark
+                                      ? const Color(0xFFFF9B8F)
+                                      : AppColors.danger;
+                                }
+                              } else if (selected) {
+                                bg = isDark
+                                    ? AppColors.primary.withValues(alpha: 0.2)
+                                    : AppColors.indigoSoft;
+                                border = AppColors.indigo;
+                                textColor = AppColors.primary;
+                              } else {
+                                bg = Theme.of(context).cardColor;
+                                border = isDark
+                                    ? const Color(0xFF343B49)
+                                    : AppColors.border;
+                                textColor = Theme.of(context).colorScheme.onSurface;
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                                child: InkWell(
+                                  onTap: _submitted
+                                      ? null
+                                      : () {
+                                          setState(() => _selectedOption = index);
+                                          unawaited(_persistDraft());
+                                        },
+                                  borderRadius: BorderRadius.circular(AppRadii.md),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(AppSpacing.md),
+                                    decoration: BoxDecoration(
+                                      color: bg,
+                                      borderRadius: BorderRadius.circular(AppRadii.md),
+                                      border: Border.all(color: border),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              '$optionLabel)',
+                                              style: questionContentTextStyle(
+                                                context,
+                                                fontWeight: selected || revealState
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w600,
+                                                color: textColor,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                qOptions[index],
+                                                style: questionContentTextStyle(
+                                                  context,
+                                                  fontWeight: selected || revealState
+                                                      ? FontWeight.w600
+                                                      : FontWeight.w400,
+                                                  color: textColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                            const SizedBox(height: AppSpacing.lg),
+                            PrimaryButton(
+                              label: _submitted
+                                  ? (qIdx >= _questions.length - 1
+                                      ? 'Finish & see results'
+                                      : 'Next question')
+                                  : 'Submit answer',
+                              icon: _submitted
+                                  ? Icons.arrow_forward_rounded
+                                  : Icons.check_rounded,
+                              expanded: true,
+                              onPressed: (_submitted || _selectedOption != null)
+                                  ? () {
+                                      if (!_submitted) {
+                                        _checkAnswer(qItem);
+                                        return;
+                                      }
+                                      _nextQuestion();
+                                    }
+                                  : null,
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            Row(
+                              children: [
+                                if (qIdx > 0)
+                                  Expanded(
+                                    child: SecondaryButton(
+                                      label: 'Previous',
+                                      icon: Icons.arrow_back_rounded,
+                                      onPressed: _previousQuestion,
+                                    ),
+                                  ),
+                                if (qIdx > 0)
+                                  const SizedBox(width: AppSpacing.md),
+                                if (qIdx < _questions.length - 1)
+                                  Expanded(
+                                    child: SecondaryButton(
+                                      label: 'Skip',
+                                      icon: Icons.arrow_forward_rounded,
+                                      onPressed: _submitted ? null : _nextQuestion,
+                                    ),
+                                  ),
+                                if (qIdx == 0 && qIdx < _questions.length - 1)
+                                  const SizedBox(width: AppSpacing.md),
+                                if (qIdx == _questions.length - 1)
+                                  const Expanded(child: SizedBox()),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            QuestionDisclaimerReportMark(
+                              questionId: qIdStr,
+                              questionText: qItem['question']?.toString(),
+                              moduleTitle: _set['title']?.toString(),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.lg),
-                  SurfaceCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        buildQuestionTextBlock(
-                          context,
-                          question,
-                          style: questionContentTextStyle(
-                            context,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (hasQuestionImage(question)) ...[
-                          const SizedBox(height: AppSpacing.md),
-                          _buildQuestionImage(questionImageRawUrl(question)),
-                        ],
-                        const SizedBox(height: AppSpacing.lg),
-                        ...List.generate(options.length, (index) {
-                          final selected = _selectedOption == index;
-                          final revealState = _submitted && (selected || index == correctIndex);
-                          final isDark = Theme.of(context).brightness == Brightness.dark;
-                          final isCorrectOption = index == correctIndex;
-
-                          final optionLabel = ['A', 'B', 'C', 'D'][index];
-
-                          Color bg;
-                          Color border;
-                          Color textColor;
-                          if (revealState) {
-                            if (isCorrectOption) {
-                              bg = isDark
-                                  ? AppColors.success.withValues(alpha: 0.18)
-                                  : const Color(0xFFE7F8EF);
-                              border = AppColors.success;
-                              textColor = isDark
-                                  ? const Color(0xFF6EE7A0)
-                                  : AppColors.success;
-                            } else {
-                              bg = isDark
-                                  ? AppColors.danger.withValues(alpha: 0.18)
-                                  : const Color(0xFFFCEAEA);
-                              border = AppColors.danger;
-                              textColor = isDark
-                                  ? const Color(0xFFFF9B8F)
-                                  : AppColors.danger;
-                            }
-                          } else if (selected) {
-                            bg = isDark
-                                ? AppColors.primary.withValues(alpha: 0.2)
-                                : AppColors.indigoSoft;
-                            border = AppColors.indigo;
-                            textColor = AppColors.primary;
-                          } else {
-                            bg = Theme.of(context).cardColor;
-                            border = isDark
-                                ? const Color(0xFF343B49)
-                                : AppColors.border;
-                            textColor = Theme.of(context).colorScheme.onSurface;
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                            child: InkWell(
-                              onTap: _submitted
-                                  ? null
-                                  : () {
-                                      setState(() => _selectedOption = index);
-                                      unawaited(_persistDraft());
-                                    },
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                              child: Container(
-                                padding: const EdgeInsets.all(AppSpacing.md),
-                                decoration: BoxDecoration(
-                                  color: bg,
-                                  borderRadius: BorderRadius.circular(AppRadii.md),
-                                  border: Border.all(color: border),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Option Label and Text
-                                    Row(
-                                      children: [
-                                        Text(
-                                          '$optionLabel)',
-                                          style: questionContentTextStyle(
-                                            context,
-                                            fontWeight: selected || revealState
-                                                ? FontWeight.w700
-                                                : FontWeight.w600,
-                                            color: textColor,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            options[index],
-                                            style: questionContentTextStyle(
-                                              context,
-                                              fontWeight: selected || revealState
-                                                  ? FontWeight.w600
-                                                  : FontWeight.w400,
-                                              color: textColor,
-                                            ),
-                                          ),
-                                        ),
-                                                            ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                        const SizedBox(height: AppSpacing.lg),
-                        // Submit Button
-                        PrimaryButton(
-                          label: _submitted
-                              ? (_currentIndex >= _questions.length - 1
-                                  ? 'Finish & see results'
-                                  : 'Next question')
-                              : 'Submit answer',
-                          icon: _submitted
-                              ? Icons.arrow_forward_rounded
-                              : Icons.check_rounded,
-                          expanded: true,
-                          onPressed: (_submitted || _selectedOption != null)
-                              ? () {
-                                  if (!_submitted) {
-                                    _checkAnswer(question);
-                                    return;
-                                  }
-                                  _nextQuestion();
-                                }
-                              : null,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        // Navigation Buttons (Previous/Skip)
-                        Row(
-                          children: [
-                            // Previous Button
-                            if (_currentIndex > 0)
-                              Expanded(
-                                child: SecondaryButton(
-                                  label: 'Previous',
-                                  icon: Icons.arrow_back_rounded,
-                                  onPressed: _previousQuestion,
-                                ),
-                              ),
-                            if (_currentIndex > 0)
-                              const SizedBox(width: AppSpacing.md),
-                            // Skip Button
-                            if (_currentIndex < _questions.length - 1)
-                              Expanded(
-                                child: SecondaryButton(
-                                  label: 'Skip',
-                                  icon: Icons.arrow_forward_rounded,
-                                  onPressed: _submitted ? null : _nextQuestion,
-                                ),
-                              ),
-                            // Flexible spacing if only one button
-                            if (_currentIndex == 0 && _currentIndex < _questions.length - 1)
-                              const SizedBox(width: AppSpacing.md),
-                            if (_currentIndex == _questions.length - 1)
-                              Expanded(child: SizedBox()),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         );
   }
@@ -1449,12 +1504,14 @@ class _PracticeSetCard extends StatelessWidget {
     this.locked = false,
     this.completed = false,
     this.onOpened,
+    this.customTap,
   });
 
   final PracticeSet set;
   final bool locked;
   final bool completed;
   final VoidCallback? onOpened;
+  final VoidCallback? customTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1462,10 +1519,11 @@ class _PracticeSetCard extends StatelessWidget {
       onTap: () => ContentAccess.handleTap(
         context: context,
         locked: locked,
-        onUnlocked: () async {
-          await context.push('/practice/attempt/${set.id}');
-          onOpened?.call();
-        },
+        onUnlocked: customTap ??
+            () async {
+              await context.push('/practice/attempt/${set.id}');
+              onOpened?.call();
+            },
       ),
       borderRadius: BorderRadius.circular(AppRadii.lg),
       child: Opacity(
@@ -1563,19 +1621,66 @@ class _MetaPill extends StatelessWidget {
 
 // ── Topic-wise MCQs drill-down ────────────────────────────────────────────────
 
-class TopicWiseMcqsScreen extends StatelessWidget {
+class TopicWiseMcqsScreen extends ConsumerStatefulWidget {
   const TopicWiseMcqsScreen({
     super.key,
     required this.allSets,
     required this.hasActiveSubscription,
+    this.isPyqCategory = false,
   });
 
   final List<Map<String, dynamic>> allSets;
   final bool hasActiveSubscription;
+  final bool isPyqCategory;
 
-  Map<String, List<Map<String, dynamic>>> _groupBySubject() {
+  @override
+  ConsumerState<TopicWiseMcqsScreen> createState() => _TopicWiseMcqsScreenState();
+}
+
+class _TopicWiseMcqsScreenState extends ConsumerState<TopicWiseMcqsScreen> {
+  late Future<List<Map<String, dynamic>>> _combinedFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _combinedFuture = _loadCombinedSets();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadCombinedSets() async {
+    final repo = ref.read(contentRepositoryProvider);
+    if (widget.isPyqCategory) {
+      final pyqSets = <Map<String, dynamic>>[];
+      try {
+        final books = await repo.fetchBooks();
+        for (final book in books) {
+          final bookId = int.tryParse(book['id']?.toString() ?? '');
+          if (bookId == null) continue;
+          final chapters = await repo.fetchChapters(bookId);
+          for (final ch in chapters) {
+            pyqSets.add({
+              'id': 'ch_${ch['id']}',
+              'chapter_id': ch['id'],
+              'title': ch['title']?.toString() ?? 'Chapter',
+              'topic': book['topic']?.toString() ?? ch['title']?.toString() ?? '',
+              'subject': book['subject']?.toString() ?? '',
+              'class_label': book['class_label']?.toString() ?? '',
+              'question_count': _parseInt(ch['linked_pyq_count']),
+              'is_book_chapter': true,
+              'book_id': bookId,
+            });
+          }
+        }
+      } catch (_) {}
+      return pyqSets;
+    } else {
+      return widget.allSets;
+    }
+  }
+
+  Map<String, List<Map<String, dynamic>>> _groupByClassAndSubject(
+      List<Map<String, dynamic>> sets) {
     final map = <String, List<Map<String, dynamic>>>{};
-    for (final set in allSets) {
+    for (final set in sets) {
       final subject = set['subject']?.toString().trim() ?? '';
       final standard = set['class_label']?.toString().trim() ??
           set['standard_label']?.toString().trim() ??
@@ -1592,32 +1697,49 @@ class TopicWiseMcqsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final groups = _groupBySubject();
+    final screenTitle = widget.isPyqCategory
+        ? 'Class-wise & Chapter-wise PYQs'
+        : 'Topic-wise MCQs & PYQs';
     return Scaffold(
-      appBar: AppBar(title: const Text('Topic-wise MCQs')),
-      body: groups.isEmpty
-          ? const Center(
+      appBar: AppBar(title: Text(screenTitle)),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _combinedFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const SkeletonLoader(cardCount: 4);
+          }
+          final items = snapshot.data ?? widget.allSets;
+          final groups = _groupByClassAndSubject(items);
+
+          if (groups.isEmpty) {
+            return const Center(
               child: EmptyStateWidget(
                 title: 'No practice sets yet',
-                subtitle: 'Admin panel se practice sets add karne ke baad yahan dikhenge.',
+                subtitle:
+                    'Admin panel se practice sets add karne ke baad yahan dikhenge.',
                 icon: Icons.grid_view_rounded,
               ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              itemCount: groups.length,
-              separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
-              itemBuilder: (context, i) {
-                final subject = groups.keys.elementAt(i);
-                final sets = groups[subject]!;
-                return _SubjectGroupCard(
-                  subject: subject,
-                  sets: sets,
-                  allSets: allSets,
-                  hasActiveSubscription: hasActiveSubscription,
-                );
-              },
-            ),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            itemCount: groups.length,
+            separatorBuilder: (context, index) =>
+                const SizedBox(height: AppSpacing.md),
+            itemBuilder: (context, i) {
+              final subjectKey = groups.keys.elementAt(i);
+              final sets = groups[subjectKey]!;
+              return _SubjectGroupCard(
+                subject: subjectKey,
+                sets: sets,
+                allSets: items,
+                hasActiveSubscription: widget.hasActiveSubscription,
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -1672,7 +1794,9 @@ class _SubjectGroupCard extends StatelessWidget {
                 children: [
                   Text(subject,
                       style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text('${sets.length} practice set${sets.length == 1 ? '' : 's'}'),
+                  Text(
+                    '${sets.length} chapter set${sets.length == 1 ? '' : 's'}',
+                  ),
                 ],
               ),
             ),
@@ -1684,7 +1808,7 @@ class _SubjectGroupCard extends StatelessWidget {
   }
 }
 
-class _SubjectTopicsScreen extends StatefulWidget {
+class _SubjectTopicsScreen extends ConsumerStatefulWidget {
   const _SubjectTopicsScreen({
     required this.subject,
     required this.sets,
@@ -1698,10 +1822,10 @@ class _SubjectTopicsScreen extends StatefulWidget {
   final bool hasActiveSubscription;
 
   @override
-  State<_SubjectTopicsScreen> createState() => _SubjectTopicsScreenState();
+  ConsumerState<_SubjectTopicsScreen> createState() => _SubjectTopicsScreenState();
 }
 
-class _SubjectTopicsScreenState extends State<_SubjectTopicsScreen> {
+class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
   late List<Map<String, dynamic>> _sets;
 
   @override
@@ -1714,6 +1838,51 @@ class _SubjectTopicsScreenState extends State<_SubjectTopicsScreen> {
     setState(() {
       _sets = List<Map<String, dynamic>>.from(widget.sets);
     });
+  }
+
+  Future<void> _openBookChapterPyqs(Map<String, dynamic> set) async {
+    final chapterId = _parseInt(set['chapter_id']);
+    if (chapterId <= 0) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final repo = ref.read(contentRepositoryProvider);
+      final pyqs = await repo.fetchPyqs(chapterId);
+      if (mounted) Navigator.of(context).pop();
+
+      if (!mounted) return;
+      if (pyqs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Is chapter ke liye PYQs filhaal available nahi hain.'),
+          ),
+        );
+        return;
+      }
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PracticeAttemptScreen(
+            setId: 0,
+            chapterName: set['title']?.toString() ?? 'Chapter PYQs',
+            chapterQuestions: pyqs,
+          ),
+        ),
+      );
+      _refreshSets();
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PYQs load nahi ho paye: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -1756,14 +1925,16 @@ class _SubjectTopicsScreenState extends State<_SubjectTopicsScreen> {
               ? Center(
                   child: EmptyStateWidget(
                     title: 'No practice sets',
-                    subtitle: 'No practice sets available for ${widget.subject}.',
+                    subtitle:
+                        'No practice sets available for ${widget.subject}.',
                     icon: Icons.grid_view_rounded,
                   ),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   itemCount: sortedSets.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: AppSpacing.md),
                   itemBuilder: (context, i) {
                     final set = sortedSets[i];
                     final locked = !ContentAccess.isItemUnlocked(
@@ -1772,18 +1943,29 @@ class _SubjectTopicsScreenState extends State<_SubjectTopicsScreen> {
                     );
                     final completed = isTruthyCompletionFlag(set['is_completed']);
                     final lastAccuracy = _parseDouble(set['last_accuracy']);
+                    final isBookChapter = set['is_book_chapter'] == true;
+
                     return _PracticeSetCard(
                       locked: locked,
                       completed: completed,
+                      customTap: isBookChapter
+                          ? () => _openBookChapterPyqs(set)
+                          : null,
                       set: PracticeSet(
                         id: '${set['id']}',
                         title: set['title']?.toString() ?? 'Practice Set',
                         topic: set['topic']?.toString() ?? '',
                         questionCount: _parseInt(set['question_count']),
-                        difficulty: set['difficulty']?.toString() ?? 'Moderate',
-                        estimatedMinutes: _parseInt(set['estimated_minutes'], defaultValue: 20),
+                        difficulty:
+                            set['difficulty']?.toString() ?? 'Moderate',
+                        estimatedMinutes: _parseInt(set['estimated_minutes'],
+                            defaultValue: 20),
                         accuracy: completed ? lastAccuracy / 100 : 0,
-                        tag: set['class_label']?.toString() ?? set['standard_label']?.toString() ?? 'Topic',
+                        tag: isBookChapter
+                            ? 'Chapter PYQs'
+                            : (set['class_label']?.toString() ??
+                                set['standard_label']?.toString() ??
+                                'Topic'),
                       ),
                       onOpened: _refreshSets,
                     );
