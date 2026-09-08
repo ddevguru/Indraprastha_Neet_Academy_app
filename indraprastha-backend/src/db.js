@@ -62,6 +62,11 @@ async function ensureDatabaseSchema() {
   `);
 
   await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS courses (
       id SERIAL PRIMARY KEY,
       name VARCHAR(120) UNIQUE NOT NULL,

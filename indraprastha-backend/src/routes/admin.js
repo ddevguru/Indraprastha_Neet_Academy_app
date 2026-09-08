@@ -2208,7 +2208,7 @@ router.get('/users', adminAuth, async (req, res) => {
       const like = `%${search}%`;
       const result = await pool.query(
         `SELECT u.id, u.full_name, u.phone, u.preferred_plan, u.target_exam_year,
-                u.batch_id, u.created_at,
+                u.batch_id, u.created_at, u.is_blocked,
                 us.plan_name AS subscription_plan,
                 us.status AS subscription_status,
                 us.expires_at AS subscription_expires_at,
@@ -2230,7 +2230,7 @@ router.get('/users', adminAuth, async (req, res) => {
     } else {
       const result = await pool.query(
         `SELECT u.id, u.full_name, u.phone, u.preferred_plan, u.target_exam_year,
-                u.batch_id, u.created_at, b.name AS batch_name,
+                u.batch_id, u.created_at, u.is_blocked, b.name AS batch_name,
                 us.plan_name AS subscription_plan,
                 us.status AS subscription_status,
                 us.expires_at AS subscription_expires_at,
@@ -2251,6 +2251,41 @@ router.get('/users', adminAuth, async (req, res) => {
   } catch (e) {
     logAdminRouteError('/users GET', e);
     return res.status(500).json({ error: e.message || 'Failed to fetch users' });
+  }
+});
+
+router.patch('/users/:id/block', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isBlocked } = req.body;
+    if (typeof isBlocked !== 'boolean') {
+      return res.status(400).json({ error: 'isBlocked boolean is required' });
+    }
+    const result = await pool.query(
+      'UPDATE users SET is_blocked = $1 WHERE id = $2 RETURNING id, is_blocked',
+      [isBlocked, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ success: true, user: result.rows[0] });
+  } catch (err) {
+    logAdminRouteError('/users/:id/block', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.delete('/users/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ success: true, deletedId: id });
+  } catch (err) {
+    logAdminRouteError('/users/:id', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

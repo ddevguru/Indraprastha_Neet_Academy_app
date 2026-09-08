@@ -120,10 +120,13 @@ router.post('/complete-signup', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const existing = await pool.query('SELECT id FROM users WHERE phone = $1', [phone]);
+    const existing = await pool.query('SELECT id, is_blocked FROM users WHERE phone = $1', [phone]);
     let result;
 
     if (existing.rows.length > 0) {
+      if (existing.rows[0].is_blocked) {
+        return res.status(403).json({ error: 'Your account has been blocked by the admin.' });
+      }
       result = await pool.query(
         `UPDATE users
          SET full_name = $2,
@@ -176,6 +179,9 @@ router.post('/login', async (req, res) => {
     }
 
     const user = result.rows[0];
+    if (user.is_blocked) {
+      return res.status(403).json({ error: 'Your account has been blocked by the admin.' });
+    }
     if (!user.password_hash) {
       return res.status(401).json({ error: 'Account not set up with password. Please sign up again.' });
     }

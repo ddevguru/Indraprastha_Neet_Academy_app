@@ -79,6 +79,21 @@ router.post('/complaints', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Rate limit check for question_report: max 4 per month
+    if (reportType === 'question_report') {
+      const countResult = await pool.query(
+        `SELECT COUNT(*) as count 
+         FROM complaints 
+         WHERE user_id = $1 AND report_type = 'question_report' 
+         AND created_at >= NOW() - INTERVAL '1 month'`,
+        [userId]
+      );
+      const reportCount = parseInt(countResult.rows[0].count, 10);
+      if (reportCount >= 4) {
+        return res.status(400).json({ error: 'Monthly limit reached: You can only submit 4 question reports per month.' });
+      }
+    }
+
     // Insert complaint
     const result = await pool.query(
       `INSERT INTO complaints (user_id, title, description, email, full_name, phone, status, report_type, created_at)

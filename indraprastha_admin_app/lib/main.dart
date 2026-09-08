@@ -5439,6 +5439,7 @@ class _UsersPageState extends State<UsersPage> {
                     final plan = u['preferred_plan']?.toString() ?? '';
                     final year = u['target_exam_year']?.toString() ?? '';
                     final isPremium = u['has_active_subscription'] == true;
+                    final isBlocked = u['is_blocked'] == true;
                     final subscriptionPlan =
                         u['subscription_plan']?.toString() ?? '';
                     final expiresAt =
@@ -5488,10 +5489,26 @@ class _UsersPageState extends State<UsersPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(name,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 15)),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(name,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 15)),
+                                    ),
+                                    if (isBlocked)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
+                                        ),
+                                        child: const Text('BLOCKED', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.red)),
+                                      ),
+                                  ],
+                                ),
                                 const SizedBox(height: 4),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -7048,6 +7065,15 @@ class AdminApi {
 
   Future<Map<String, dynamic>> dashboard() => _get('/admin/dashboard');
   Future<Map<String, dynamic>> users() => _get('/admin/users');
+  
+  Future<void> toggleUserBlock(int userId, bool isBlocked) async {
+    await _patch('/admin/users/$userId/block', {'isBlocked': isBlocked});
+  }
+
+  Future<void> deleteUser(int userId) async {
+    await _delete('/admin/users/$userId');
+  }
+
   Future<Map<String, dynamic>> notificationHistory() =>
       _get('/admin/notifications');
   Future<Map<String, dynamic>> batches() => _get('/admin/batches');
