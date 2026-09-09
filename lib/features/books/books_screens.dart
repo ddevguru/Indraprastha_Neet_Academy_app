@@ -12,6 +12,9 @@ import '../../core/providers/app_state.dart';
 import '../content/data/content_repository.dart';
 import '../practice/practice_screens.dart';
 import '../onboarding/onboarding_checklist_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/services/completed_attempt_store.dart';
+import '../../core/services/incorrect_pdf_service.dart';
 import '../../core/services/onboarding_checklist_service.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
@@ -569,9 +572,13 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
   final Map<int, String> _answers = {};
   bool _submitted = false;
 
+  dynamic get _pyqKey =>
+      widget.pyqs.isNotEmpty ? (widget.pyqs.first['chapter_id'] ?? widget.pyqs.first['id'] ?? 'default_pyq') : 'default_pyq';
+
   @override
   void initState() {
     super.initState();
+    _restoreCompletedState();
     unawaited(
       warmImageCacheUrls(
         widget.pyqs
@@ -581,6 +588,35 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
         maxItems: 12,
       ),
     );
+  }
+
+  Future<void> _restoreCompletedState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completedStore = CompletedAttemptStore(prefs);
+    final completed = completedStore.loadCompletedPyq(_pyqKey);
+    if (completed != null && mounted) {
+      final savedAnswers = completed['answers'];
+      if (savedAnswers is Map) {
+        savedAnswers.forEach((key, value) {
+          final idx = int.tryParse(key.toString());
+          if (idx != null && value != null) {
+            _answers[idx] = value.toString();
+          }
+        });
+      }
+      setState(() {
+        _submitted = true;
+      });
+    }
+  }
+
+  Future<void> _saveCompletedState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completedStore = CompletedAttemptStore(prefs);
+    await completedStore.saveCompletedPyq(_pyqKey, {
+      'answers': _answers.map((k, v) => MapEntry('$k', v)),
+      'completedAt': DateTime.now().toIso8601String(),
+    });
   }
 
   void _openReview() {
@@ -703,6 +739,27 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
               ),
               const SizedBox(height: AppSpacing.sm),
               SecondaryButton(
+                label: 'Download Incorrect PDF',
+                expanded: true,
+                icon: Icons.picture_as_pdf_rounded,
+                onPressed: () {
+                  final items = List.generate(
+                    widget.pyqs.length,
+                    (i) => AnswerReviewEntry.fromAbcdMap(
+                      question: widget.pyqs[i],
+                      index: i,
+                      selectedOption: _answers[i],
+                    ),
+                  );
+                  IncorrectPdfService.downloadFromReviewEntries(
+                    context: context,
+                    title: 'PYQ Result',
+                    entries: items,
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SecondaryButton(
                 label: 'Solve again',
                 expanded: true,
                 onPressed: () => setState(() {
@@ -720,6 +777,7 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
     final q = widget.pyqs[_index.clamp(0, widget.pyqs.length - 1)];
     final selected = _answers[_index];
     final options = readQuestionOptions(q);
+    final correctOpt = readCorrectOption(q);
 
     return SizedBox.expand(
       child: SingleChildScrollView(
@@ -754,6 +812,44 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                   const SizedBox(height: AppSpacing.md),
                   ...options.entries.map((e) {
                     final isSel = selected == e.key;
+                    final isCorrect = e.key == correctOpt;
+                    final isAnswered = selected != null;
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+                    Color bg;
+                    Color border;
+                    Color textColor;
+
+                    if (isAnswered) {
+                      if (isCorrect) {
+                        bg = isDark
+                            ? AppColors.success.withValues(alpha: 0.18)
+                            : const Color(0xFFE7F8EF);
+                        border = AppColors.success;
+                        textColor = isDark ? const Color(0xFF6EE7A0) : AppColors.success;
+                      } else if (isSel) {
+                        bg = isDark
+                            ? AppColors.danger.withValues(alpha: 0.18)
+                            : const Color(0xFFFCEAEA);
+                        border = AppColors.danger;
+                        textColor = isDark ? const Color(0xFFFF9B8F) : AppColors.danger;
+                      } else {
+                        bg = Theme.of(context).cardColor;
+                        border = isDark ? const Color(0xFF343B49) : AppColors.border;
+                        textColor = Theme.of(context).colorScheme.onSurface;
+                      }
+                    } else if (isSel) {
+                      bg = isDark
+                          ? AppColors.primary.withValues(alpha: 0.2)
+                          : AppColors.indigoSoft;
+                      border = AppColors.indigo;
+                      textColor = AppColors.primary;
+                    } else {
+                      bg = Theme.of(context).cardColor;
+                      border = isDark ? const Color(0xFF343B49) : AppColors.border;
+                      textColor = Theme.of(context).colorScheme.onSurface;
+                    }
+
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: InkWell(
@@ -762,22 +858,107 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                         child: Container(
                           padding: const EdgeInsets.all(AppSpacing.md),
                           decoration: BoxDecoration(
-                            color: isSel
-                                ? AppColors.indigoSoft
-                                : Theme.of(context).cardColor,
+                            color: bg,
                             borderRadius: BorderRadius.circular(AppRadii.md),
-                            border: Border.all(
-                              color: isSel ? AppColors.indigo : AppColors.border,
-                            ),
+                            border: Border.all(color: border),
                           ),
                           child: Text(
                             _optionLabel(e.key, e.value),
-                            style: questionContentTextStyle(context),
+                            style: questionContentTextStyle(context, color: textColor),
                           ),
                         ),
                       ),
                     );
                   }),
+                  if (selected != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Builder(
+                      builder: (context) {
+                        final isDark = Theme.of(context).brightness == Brightness.dark;
+                        final expText = q['explanation']?.toString().trim() ?? '';
+                        final expImgUrl = explanationImageRawUrl(q);
+                        final expImagesList = q['explanation_images_list'] != null
+                            ? List<Map<String, dynamic>>.from(
+                                (q['explanation_images_list'] as List).map(
+                                  (e) => Map<String, dynamic>.from(e as Map),
+                                ),
+                              )
+                            : <Map<String, dynamic>>[];
+
+                        final hasExpText = expText.isNotEmpty;
+                        final hasExpImg = expImgUrl.isNotEmpty;
+                        final hasExpList = expImagesList.isNotEmpty;
+
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F7FF),
+                            borderRadius: BorderRadius.circular(AppRadii.lg),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF334155) : const Color(0xFFBAE6FD),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.lightbulb_rounded,
+                                    color: isDark ? const Color(0xFFF59E0B) : const Color(0xFF0284C7),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Explanation',
+                                    style: questionContentTextStyle(
+                                      context,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              if (hasExpText)
+                                Text(
+                                  expText,
+                                  style: questionContentTextStyle(
+                                    context,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              if (hasExpImg) ...[
+                                if (hasExpText) const SizedBox(height: AppSpacing.sm),
+                                _buildQuestionImage(expImgUrl),
+                              ],
+                              if (hasExpList) ...[
+                                for (final imgData in expImagesList) ...[
+                                  const SizedBox(height: AppSpacing.sm),
+                                  _buildQuestionImage(explanationImageRawUrl(imgData)),
+                                ],
+                              ],
+                              if (!hasExpText && !hasExpImg && !hasExpList)
+                                Text(
+                                  'Is question ka explanation available nahi hai.',
+                                  style: questionContentTextStyle(
+                                    context,
+                                    fontSize: 14,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -800,6 +981,7 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
                       if (_index < widget.pyqs.length - 1) {
                         setState(() => _index++);
                       } else {
+                        unawaited(_saveCompletedState());
                         setState(() => _submitted = true);
                       }
                     },

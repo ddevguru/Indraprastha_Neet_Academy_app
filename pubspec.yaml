@@ -58,6 +58,9 @@ dependencies:
   crypto: ^3.0.6
   cached_network_image: ^3.4.1
   flutter_cache_manager: ^3.4.1
+  pdf: ^3.11.1
+  printing: ^5.13.4
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

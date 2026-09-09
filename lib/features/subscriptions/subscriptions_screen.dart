@@ -131,7 +131,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                 const SectionHeader(
                   title: 'Choose your plan',
                   subtitle:
-                      'Secure payment via Razorpay. After payment, your subscription activates automatically.',
+                      'All subscriptions remain active for 1 full year (until NEET Exam). Secure payment via Razorpay.',
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 packagesAsync.when(

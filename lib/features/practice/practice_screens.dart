@@ -10,6 +10,8 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
 import '../../core/services/attempt_draft_store.dart';
+import '../../core/services/completed_attempt_store.dart';
+import '../../core/services/incorrect_pdf_service.dart';
 import '../../core/services/onboarding_checklist_service.dart';
 import '../../core/services/practice_saved_store.dart';
 import '../content/data/content_repository.dart';
@@ -614,8 +616,32 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   AttemptDraftStore get _draftStore =>
       AttemptDraftStore(ref.read(sharedPreferencesProvider));
 
+  CompletedAttemptStore get _completedStore =>
+      CompletedAttemptStore(ref.read(sharedPreferencesProvider));
+
   void _restoreDraftIfNeeded() {
     if (_draftRestored || widget.customQuestions != null) return;
+
+    // Check if practice set was ALREADY completed
+    final completed = _completedStore.loadCompletedPractice(_draftSetId);
+    if (completed != null) {
+      _finished = true;
+      _submitted = true;
+      _correctCount = _parseInt(completed['correctCount'], defaultValue: 0);
+      _wrongCount = _parseInt(completed['wrongCount'], defaultValue: 0);
+      final savedAnswers = completed['answers'];
+      if (savedAnswers is Map) {
+        savedAnswers.forEach((key, value) {
+          final idx = int.tryParse(key.toString());
+          if (idx != null && value != null) {
+            _answers[idx] = value.toString();
+          }
+        });
+      }
+      _draftRestored = true;
+      return;
+    }
+
     final draft = _draftStore.loadPracticeDraft(_draftSetId);
     if (draft == null) {
       _draftRestored = true;
@@ -667,10 +693,19 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
       // Log activity to Streaks
       _logPracticeActivity(total);
-
-      await _draftStore.clearPracticeDraft(_draftSetId);
     } catch (_) {
       // Keep local completion even if server submit fails.
+    } finally {
+      if (widget.customQuestions == null) {
+        await _completedStore.saveCompletedPractice(_draftSetId, {
+          'setId': widget.setId,
+          'correctCount': _correctCount,
+          'wrongCount': _wrongCount,
+          'answers': _answers.map((k, v) => MapEntry('$k', v)),
+          'completedAt': DateTime.now().toIso8601String(),
+        });
+        await _draftStore.clearPracticeDraft(_draftSetId);
+      }
     }
   }
 
@@ -1125,6 +1160,19 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 SecondaryButton(
+                  label: 'Download Incorrect PDF',
+                  expanded: true,
+                  icon: Icons.picture_as_pdf_rounded,
+                  onPressed: () {
+                    IncorrectPdfService.downloadFromReviewEntries(
+                      context: context,
+                      title: _set['title']?.toString() ?? 'Practice Result',
+                      entries: _reviewEntries(),
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                SecondaryButton(
                   label: 'Back to topics',
                   expanded: true,
                   onPressed: () => Navigator.of(context).pop(),
@@ -1143,7 +1191,6 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
           readQuestionOption(question, 'C'),
           readQuestionOption(question, 'D'),
         ];
-        final correctOption = readCorrectOption(question);
         final savedPractice = ref.watch(practiceSavedControllerProvider);
         final qId = question['id'].toString();
         final isBookmarked = savedPractice.bookmarkedIds.contains(qId);
@@ -1384,7 +1431,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                       ? null
                                       : () {
                                           setState(() => _selectedOption = index);
-                                          unawaited(_persistDraft());
+                                          _checkAnswer(qItem);
                                         },
                                   borderRadius: BorderRadius.circular(AppRadii.md),
                                   child: Container(
@@ -1431,6 +1478,99 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                 ),
                               );
                             }),
+                            if (_submitted) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              Builder(
+                                builder: (context) {
+                                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                                  final expText = qItem['explanation']?.toString().trim() ?? '';
+                                  final expImgUrl = explanationImageRawUrl(qItem);
+                                  final expImagesList = qItem['explanation_images_list'] != null
+                                      ? List<Map<String, dynamic>>.from(
+                                          (qItem['explanation_images_list'] as List).map(
+                                            (e) => Map<String, dynamic>.from(e as Map),
+                                          ),
+                                        )
+                                      : <Map<String, dynamic>>[];
+
+                                  final hasExpText = expText.isNotEmpty;
+                                  final hasExpImg = expImgUrl.isNotEmpty;
+                                  final hasExpList = expImagesList.isNotEmpty;
+
+                                  return Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(AppSpacing.md),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF1E293B)
+                                          : const Color(0xFFF0F7FF),
+                                      borderRadius: BorderRadius.circular(AppRadii.lg),
+                                      border: Border.all(
+                                        color: isDark
+                                            ? const Color(0xFF334155)
+                                            : const Color(0xFFBAE6FD),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.lightbulb_rounded,
+                                              color: isDark ? const Color(0xFFF59E0B) : const Color(0xFF0284C7),
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Explanation',
+                                              style: questionContentTextStyle(
+                                                context,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w700,
+                                                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: AppSpacing.sm),
+                                        if (hasExpText)
+                                          Text(
+                                            expText,
+                                            style: questionContentTextStyle(
+                                              context,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w400,
+                                            ),
+                                          ),
+                                        if (hasExpImg) ...[
+                                          if (hasExpText) const SizedBox(height: AppSpacing.sm),
+                                          _buildQuestionImage(expImgUrl),
+                                        ],
+                                        if (hasExpList) ...[
+                                          for (final imgData in expImagesList) ...[
+                                            const SizedBox(height: AppSpacing.sm),
+                                            _buildQuestionImage(explanationImageRawUrl(imgData)),
+                                          ],
+                                        ],
+                                        if (!hasExpText && !hasExpImg && !hasExpList)
+                                          Text(
+                                            'Is question ka explanation available nahi hai.',
+                                            style: questionContentTextStyle(
+                                              context,
+                                              fontSize: 14,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.6),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                             const SizedBox(height: AppSpacing.lg),
                             PrimaryButton(
                               label: _submitted
@@ -2050,6 +2190,23 @@ class _SavedQuestionsScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(title),
         actions: [
+          if (questions.isNotEmpty)
+            IconButton(
+              onPressed: () {
+                IncorrectPdfService.downloadIncorrectQuestionsPdf(
+                  context: context,
+                  title: title,
+                  questions: questions
+                      .map((item) => IncorrectPdfQuestion.fromMap(
+                            item.question,
+                            defaultChapter: item.setTitle,
+                          ))
+                      .toList(),
+                );
+              },
+              icon: const Icon(Icons.picture_as_pdf_rounded),
+              tooltip: 'Download Incorrect PDF',
+            ),
           if (showClearAll)
             IconButton(
               onPressed: onClearAll,

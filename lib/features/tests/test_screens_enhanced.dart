@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/incorrect_pdf_service.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../widgets/question_report_dialog.dart';
@@ -903,6 +904,26 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Text('${widget.testTitle} - Results'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.picture_as_pdf_rounded),
+                tooltip: 'Download Incorrect PDF',
+                onPressed: () {
+                  final rawQuestions = List<Map<String, dynamic>>.from(
+                    (results['questions'] as List<dynamic>?) ?? const [],
+                  );
+                  final userAnswers = Map<dynamic, String>.from(
+                    (results['userAnswers'] as Map?) ?? const {},
+                  );
+                  IncorrectPdfService.downloadFromRawQuestions(
+                    context: context,
+                    title: '${widget.testTitle} - Incorrect Questions',
+                    questions: rawQuestions,
+                    userAnswers: userAnswers,
+                  );
+                },
+              ),
+            ],
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -939,11 +960,23 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FilledButton(
+                      child: FilledButton.icon(
                         onPressed: () {
-                          // Navigate to full analysis
+                          final rawQuestions = List<Map<String, dynamic>>.from(
+                            (results['questions'] as List<dynamic>?) ?? const [],
+                          );
+                          final userAnswers = Map<dynamic, String>.from(
+                            (results['userAnswers'] as Map?) ?? const {},
+                          );
+                          IncorrectPdfService.downloadFromRawQuestions(
+                            context: context,
+                            title: '${widget.testTitle} - Incorrect Questions',
+                            questions: rawQuestions,
+                            userAnswers: userAnswers,
+                          );
                         },
-                        child: const Text('Full Analysis'),
+                        icon: const Icon(Icons.picture_as_pdf_rounded),
+                        label: const Text('Download Incorrect PDF'),
                       ),
                     ),
                   ],

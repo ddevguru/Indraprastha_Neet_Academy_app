@@ -1,13 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/providers/app_state.dart';
+import '../../core/services/completed_attempt_store.dart';
 import '../../core/providers/daily_mcqs_provider.dart';
 import '../../models/app_models.dart';
 import '../../models/daily_mcq_item.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
+import '../../core/services/incorrect_pdf_service.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/question_report_dialog.dart';
 
@@ -117,13 +121,24 @@ class TodaysMcqTestPreviewScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    PrimaryButton(
-                      label: 'Start test',
-                      expanded: true,
-                      icon: Icons.play_arrow_rounded,
-                      onPressed: active.isEmpty
-                          ? null
-                          : () => context.push('/todays-mcq-test/attempt'),
+                    Builder(
+                      builder: (context) {
+                        final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+                        final completedStore = CompletedAttemptStore(
+                          ref.read(sharedPreferencesProvider),
+                        );
+                        final isCompleted = completedStore.isMcqCompleted(todayKey);
+                        return PrimaryButton(
+                          label: isCompleted ? 'View Results & Review' : 'Start test',
+                          expanded: true,
+                          icon: isCompleted
+                              ? Icons.fact_check_rounded
+                              : Icons.play_arrow_rounded,
+                          onPressed: active.isEmpty
+                              ? null
+                              : () => context.push('/todays-mcq-test/attempt'),
+                        );
+                      },
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Center(
@@ -269,6 +284,13 @@ class _TodaysMcqTestAttemptScreenState
     _history.add((item: item, selected: _selected, correct: correct));
 
     if (_index >= active.length - 1) {
+      final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final completedStore = CompletedAttemptStore(ref.read(sharedPreferencesProvider));
+      unawaited(completedStore.saveCompletedMcq(todayKey, {
+        'correctCount': _correctCount,
+        'wrongCount': _wrongCount,
+        'completedAt': DateTime.now().toIso8601String(),
+      }));
       setState(() => _finished = true);
     } else {
       setState(() {
@@ -283,6 +305,23 @@ class _TodaysMcqTestAttemptScreenState
   Widget build(BuildContext context) {
     final items = ref.watch(dailyMcqsProvider).asData?.value ?? const [];
     final active = items.activeInTodaysFeed;
+    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final completedStore = CompletedAttemptStore(ref.read(sharedPreferencesProvider));
+    final isAlreadyCompleted = completedStore.isMcqCompleted(todayKey);
+
+    if (isAlreadyCompleted && !_finished) {
+      if (_history.isEmpty && active.isNotEmpty) {
+        for (final item in active) {
+          final correct = _correctFor(item);
+          _history.add((item: item, selected: null, correct: correct));
+        }
+      }
+      return _McqResultScreen(
+        history: _history,
+        correctCount: _correctCount,
+        wrongCount: _wrongCount,
+      );
+    }
 
     if (_finished) {
       return _McqResultScreen(
@@ -624,6 +663,19 @@ class _McqResultScreen extends StatelessWidget {
                         items: _mcqReviewEntries(history),
                       ),
                     ),
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SecondaryButton(
+                label: 'Download Incorrect PDF',
+                expanded: true,
+                icon: Icons.picture_as_pdf_rounded,
+                onPressed: () {
+                  IncorrectPdfService.downloadFromReviewEntries(
+                    context: context,
+                    title: 'Today\'s MCQs Result',
+                    entries: _mcqReviewEntries(history),
                   );
                 },
               ),

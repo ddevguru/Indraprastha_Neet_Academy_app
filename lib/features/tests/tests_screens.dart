@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
+import '../../core/services/completed_attempt_store.dart';
+import '../../core/services/incorrect_pdf_service.dart';
 import '../../core/services/onboarding_checklist_service.dart';
 import '../../core/services/attempt_draft_store.dart';
 import '../onboarding/onboarding_checklist_widget.dart';
@@ -431,16 +433,27 @@ class _TestDetailScreenState extends ConsumerState<TestDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.xl),
-                    PrimaryButton(
-                      label: 'Start test',
-                      expanded: true,
-                      icon: Icons.play_arrow_rounded,
-                      onPressed: () async {
-                        final submitted = await context
-                            .push<bool>('/tests/result/${widget.testId}');
-                        if (submitted == true && context.mounted) {
-                          context.pop(true);
-                        }
+                    Builder(
+                      builder: (context) {
+                        final completedStore = CompletedAttemptStore(
+                          ref.read(sharedPreferencesProvider),
+                        );
+                        final isCompleted = completedStore.isTestCompleted(widget.testId) ||
+                            isTruthyCompletionFlag(test['is_completed']);
+                        return PrimaryButton(
+                          label: isCompleted ? 'View Results & Review' : 'Start test',
+                          expanded: true,
+                          icon: isCompleted
+                              ? Icons.fact_check_rounded
+                              : Icons.play_arrow_rounded,
+                          onPressed: () async {
+                            final submitted = await context
+                                .push<bool>('/tests/result/${widget.testId}');
+                            if (submitted == true && context.mounted) {
+                              context.pop(true);
+                            }
+                          },
+                        );
                       },
                     ),
                   ],
@@ -481,8 +494,34 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
   AttemptDraftStore get _draftStore =>
       AttemptDraftStore(ref.read(sharedPreferencesProvider));
 
+  CompletedAttemptStore get _completedStore =>
+      CompletedAttemptStore(ref.read(sharedPreferencesProvider));
+
   void _restoreDraftIfNeeded() {
     if (_draftRestored) return;
+
+    // Check if test was ALREADY completed
+    final completed = _completedStore.loadCompletedTest(widget.testId);
+    if (completed != null) {
+      _submitted = true;
+      final savedAnswers = completed['answers'];
+      if (savedAnswers is Map) {
+        savedAnswers.forEach((key, value) {
+          final idx = int.tryParse(key.toString());
+          if (idx != null && value != null) {
+            _answers[idx] = value.toString();
+          }
+        });
+      }
+      if (completed['submitResponse'] is Map) {
+        _submitResponse = Map<String, dynamic>.from(
+          completed['submitResponse'] as Map,
+        );
+      }
+      _draftRestored = true;
+      return;
+    }
+
     final draft = _draftStore.loadTestDraft(widget.testId);
     if (draft == null) {
       _draftRestored = true;
@@ -549,6 +588,16 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
       // Log activity to Streaks
       await _logTestActivity(questions.length, score, accuracy);
 
+      await _completedStore.saveCompletedTest(widget.testId, {
+        'testId': widget.testId,
+        'answers': _answers.map((k, v) => MapEntry('$k', v)),
+        'score': score,
+        'accuracy': accuracy,
+        'correctCount': correct,
+        'wrongCount': wrong,
+        'unattemptedCount': unattempted,
+        'submitResponse': res,
+      });
       await _draftStore.clearTestDraft(widget.testId);
       setState(() {
         _submitted = true;
@@ -556,9 +605,20 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
       });
     } catch (e) {
       if (!mounted) return;
+      final fallbackRes = _buildLocalSubmitResponse(questions: questions, test: test);
+      await _completedStore.saveCompletedTest(widget.testId, {
+        'testId': widget.testId,
+        'answers': _answers.map((k, v) => MapEntry('$k', v)),
+        'score': score,
+        'accuracy': accuracy,
+        'correctCount': correct,
+        'wrongCount': wrong,
+        'unattemptedCount': unattempted,
+        'submitResponse': fallbackRes,
+      });
       setState(() {
         _submitted = true;
-        _submitResponse = _buildLocalSubmitResponse(questions: questions, test: test);
+        _submitResponse = fallbackRes;
       });
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -825,6 +885,36 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: AppSpacing.md),
+                    SecondaryButton(
+                      label: 'Download Incorrect PDF',
+                      expanded: true,
+                      icon: Icons.picture_as_pdf_rounded,
+                      onPressed: () {
+                        final response = _submitResponse ??
+                            _buildLocalSubmitResponse(
+                              questions: questions,
+                              test: test,
+                            );
+                        final reviewQuestions = _questionsForReview(
+                          questions: questions,
+                          submitResponse: response,
+                        );
+                        final items = List.generate(
+                          reviewQuestions.length,
+                          (i) => AnswerReviewEntry.fromAbcdMap(
+                            question: reviewQuestions[i],
+                            index: i,
+                            selectedOption: _answers[i],
+                          ),
+                        );
+                        IncorrectPdfService.downloadFromReviewEntries(
+                          context: context,
+                          title: test['title']?.toString() ?? 'Test Result',
+                          entries: items,
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -1043,6 +1133,16 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                             unattemptedCount: unattempted,
                                           );
                                           if (!mounted) return;
+                                          await _completedStore.saveCompletedTest(widget.testId, {
+                                            'testId': widget.testId,
+                                            'answers': _answers.map((k, v) => MapEntry('$k', v)),
+                                            'score': score,
+                                            'accuracy': accuracy,
+                                            'correctCount': correct,
+                                            'wrongCount': wrong,
+                                            'unattemptedCount': unattempted,
+                                            'submitResponse': res,
+                                          });
                                           await _draftStore
                                               .clearTestDraft(widget.testId);
                                           setState(() {
@@ -1051,13 +1151,24 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                           });
                                         } catch (e) {
                                           if (!mounted) return;
+                                          final fallbackRes =
+                                              _buildLocalSubmitResponse(
+                                            questions: questions,
+                                            test: test,
+                                          );
+                                          await _completedStore.saveCompletedTest(widget.testId, {
+                                            'testId': widget.testId,
+                                            'answers': _answers.map((k, v) => MapEntry('$k', v)),
+                                            'score': score,
+                                            'accuracy': accuracy,
+                                            'correctCount': correct,
+                                            'wrongCount': wrong,
+                                            'unattemptedCount': unattempted,
+                                            'submitResponse': fallbackRes,
+                                          });
                                           setState(() {
                                             _submitted = true;
-                                            _submitResponse =
-                                                _buildLocalSubmitResponse(
-                                              questions: questions,
-                                              test: test,
-                                            );
+                                            _submitResponse = fallbackRes;
                                           });
                                           if (!context.mounted) return;
                                           ScaffoldMessenger.of(context)

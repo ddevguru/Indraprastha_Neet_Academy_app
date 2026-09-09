@@ -628,15 +628,23 @@ async function ensureDatabaseSchema() {
   await pool.query(
     `INSERT INTO packages (name, price_label, validity, highlight, features_json, is_active, amount_inr)
      VALUES
-      ('Starter', 'Rs 2999', '1 month', 'Basic access for daily practice', '["Practice sets","Topic tests"]'::jsonb, TRUE, 2999),
-      ('Rank Pro', 'Rs 4999', '6 months', 'Advanced prep with tests and analytics', '["Full test series","Detailed analytics","Video lectures"]'::jsonb, TRUE, 4999)
+      ('Starter', 'Rs 2999', '1 year', 'Full 1 Year Access until NEET Exam', '["Practice sets","Topic tests","1 Year Access"]'::jsonb, TRUE, 2999),
+      ('Rank Pro', 'Rs 4999', '1 year', 'Advanced prep for 1 Year until NEET Exam', '["Full test series","Detailed analytics","Video lectures","1 Year Access"]'::jsonb, TRUE, 4999)
      ON CONFLICT (name) DO NOTHING`
   );
 
   await pool.query(`
     UPDATE packages
-    SET price_label = 'Rs 2999', amount_inr = 2999
+    SET validity = '1 year',
+        price_label = 'Rs 2999',
+        amount_inr = 2999
     WHERE LOWER(name) = 'starter'
+  `);
+
+  await pool.query(`
+    UPDATE packages
+    SET validity = '1 year'
+    WHERE validity IS NULL OR validity != '1 year'
   `);
 
   await pool.query(

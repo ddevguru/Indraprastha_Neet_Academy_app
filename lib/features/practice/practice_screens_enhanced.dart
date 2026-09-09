@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../../core/services/incorrect_pdf_service.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../widgets/question_report_dialog.dart';
@@ -341,11 +342,47 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
 
                   const SizedBox(height: 16),
 
-                  // View Explanation Button
-                  if (isAnswered)
+                  if (isAnswered) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F7FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFBAE6FD)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.lightbulb_rounded, color: Color(0xFF0284C7), size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Explanation',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            (currentQuestion.explanation?.isNotEmpty ?? false)
+                                ? currentQuestion.explanation!
+                                : 'Is question ka explanation available nahi hai.',
+                            style: const TextStyle(fontSize: 14, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
-                      child: FilledButton(
+                      child: OutlinedButton(
                         onPressed: () {
                           Navigator.push(
                             context,
@@ -363,13 +400,14 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                           mainAxisAlignment:
                               MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.lightbulb_outline, size: 18),
+                            Icon(Icons.open_in_new, size: 16),
                             SizedBox(width: 8),
-                            Text('View Full Explanation'),
+                            Text('View Full Explanation Page'),
                           ],
                         ),
                       ),
                     ),
+                  ],
                   const SizedBox(height: 8),
                   QuestionDisclaimerReportMark(
                     questionId: '${currentQuestion.id}',
@@ -572,6 +610,38 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
       appBar: AppBar(
         title: const Text('Practice Results'),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_rounded),
+            tooltip: 'Download Incorrect PDF',
+            onPressed: () {
+              final pdfQuestions = practiceQuestions.map((q) {
+                final idx = practiceQuestions.indexOf(q);
+                final userAns = userAnswers[idx];
+                final opts = q.options;
+                final keys = ['A', 'B', 'C', 'D'];
+                final correctIdx = keys.indexOf(q.correctAnswer).clamp(0, 3);
+                final selectedIdx =
+                    userAns == null ? null : keys.indexOf(userAns).clamp(0, 3);
+                return IncorrectPdfQuestion(
+                  questionText: q.questionText,
+                  options: opts,
+                  correctIndex: correctIdx,
+                  selectedIndex:
+                      selectedIdx == null && userAns == null ? null : selectedIdx,
+                  explanation: q.explanation,
+                  chapterOrSubject: q.topic,
+                );
+              }).toList();
+
+              IncorrectPdfService.downloadIncorrectQuestionsPdf(
+                context: context,
+                title: widget.practiceTitle,
+                questions: pdfQuestions,
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -727,9 +797,38 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: FilledButton(
-                    onPressed: () => setState(() => _showResults = false),
-                    child: const Text('Review Answers'),
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      final pdfQuestions = practiceQuestions.map((q) {
+                        final idx = practiceQuestions.indexOf(q);
+                        final userAns = userAnswers[idx];
+                        final opts = q.options;
+                        final keys = ['A', 'B', 'C', 'D'];
+                        final correctIdx =
+                            keys.indexOf(q.correctAnswer).clamp(0, 3);
+                        final selectedIdx = userAns == null
+                            ? null
+                            : keys.indexOf(userAns).clamp(0, 3);
+                        return IncorrectPdfQuestion(
+                          questionText: q.questionText,
+                          options: opts,
+                          correctIndex: correctIdx,
+                          selectedIndex: selectedIdx == null && userAns == null
+                              ? null
+                              : selectedIdx,
+                          explanation: q.explanation,
+                          chapterOrSubject: q.topic,
+                        );
+                      }).toList();
+
+                      IncorrectPdfService.downloadIncorrectQuestionsPdf(
+                        context: context,
+                        title: widget.practiceTitle,
+                        questions: pdfQuestions,
+                      );
+                    },
+                    icon: const Icon(Icons.picture_as_pdf_rounded),
+                    label: const Text('Download Incorrect PDF'),
                   ),
                 ),
               ],

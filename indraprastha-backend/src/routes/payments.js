@@ -24,11 +24,10 @@ function parseAmountInr(priceLabel, amountInrDb) {
 function validityToDays(validity) {
   const v = String(validity || '').toLowerCase();
   const monthMatch = v.match(/(\d+)\s*month/);
-  if (monthMatch) return Number(monthMatch[1]) * 30;
+  if (monthMatch) return Math.max(Number(monthMatch[1]) * 30, 365);
   const dayMatch = v.match(/(\d+)\s*day/);
-  if (dayMatch) return Number(dayMatch[1]);
-  if (v.includes('year') || v.includes('annual')) return 365;
-  return 30;
+  if (dayMatch) return Math.max(Number(dayMatch[1]), 365);
+  return 365; // Default 1 full year (365 days / until NEET exam)
 }
 
 async function activateSubscription(userId, orderRow, planName, validity) {

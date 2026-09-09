@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/services/incorrect_pdf_service.dart';
 import '../core/utils/drive_image_url.dart';
 import '../core/utils/question_fields.dart';
 import '../theme/app_tokens.dart';
@@ -209,7 +210,22 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
         );
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_rounded),
+            tooltip: 'Download Incorrect PDF',
+            onPressed: () {
+              IncorrectPdfService.downloadFromReviewEntries(
+                context: context,
+                title: widget.title,
+                entries: widget.items,
+              );
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           if (widget.score != null && widget.totalMarks != null)

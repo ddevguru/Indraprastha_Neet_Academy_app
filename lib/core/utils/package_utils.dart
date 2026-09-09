@@ -35,14 +35,22 @@ bool isStarterPackage(Map<String, dynamic> item) {
   return (price.contains('2999') || price.contains('999')) && !price.contains('4999');
 }
 
+String formatValidityLabel(String? rawValidity) {
+  final v = (rawValidity ?? '').trim();
+  if (v.isEmpty || v.toLowerCase().contains('year') || v.toLowerCase().contains('1') || v.toLowerCase().contains('month')) {
+    return '1 Year (Valid until NEET Exam)';
+  }
+  return '$v (Valid until NEET Exam)';
+}
+
 SubscriptionPlanData subscriptionPlanFromApi(Map<String, dynamic> item) {
   return SubscriptionPlanData(
     raw: item,
     plan: SubscriptionPlan(
       name: item['name']?.toString() ?? 'Plan',
       priceLabel: item['price_label']?.toString() ?? '',
-      validity: item['validity']?.toString() ?? '',
-      highlight: item['highlight']?.toString() ?? '',
+      validity: formatValidityLabel(item['validity']?.toString()),
+      highlight: item['highlight']?.toString() ?? 'Full 1 Year Access until NEET Exam',
       features: parsePackageFeatures(item['features_json']),
       isRecommended: item['name']?.toString().toLowerCase().contains('rank') ?? false,
     ),
