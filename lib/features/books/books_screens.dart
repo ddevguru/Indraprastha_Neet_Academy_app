@@ -558,16 +558,16 @@ class ChapterDetailScreen extends ConsumerWidget {
   }
 }
 
-class _PyqSolvePanel extends StatefulWidget {
+class _PyqSolvePanel extends ConsumerStatefulWidget {
   const _PyqSolvePanel({required this.pyqs});
 
   final List<Map<String, dynamic>> pyqs;
 
   @override
-  State<_PyqSolvePanel> createState() => _PyqSolvePanelState();
+  ConsumerState<_PyqSolvePanel> createState() => _PyqSolvePanelState();
 }
 
-class _PyqSolvePanelState extends State<_PyqSolvePanel> {
+class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
   int _index = 0;
   final Map<int, String> _answers = {};
   bool _submitted = false;
@@ -592,7 +592,8 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
 
   Future<void> _restoreCompletedState() async {
     final prefs = await SharedPreferences.getInstance();
-    final completedStore = CompletedAttemptStore(prefs);
+    final userId = ref.read(authBlocProvider).state.user?.mobileNumber;
+    final completedStore = CompletedAttemptStore(prefs, userId: userId);
     final completed = completedStore.loadCompletedPyq(_pyqKey);
     if (completed != null && mounted) {
       final savedAnswers = completed['answers'];
@@ -612,7 +613,8 @@ class _PyqSolvePanelState extends State<_PyqSolvePanel> {
 
   Future<void> _saveCompletedState() async {
     final prefs = await SharedPreferences.getInstance();
-    final completedStore = CompletedAttemptStore(prefs);
+    final userId = ref.read(authBlocProvider).state.user?.mobileNumber;
+    final completedStore = CompletedAttemptStore(prefs, userId: userId);
     await completedStore.saveCompletedPyq(_pyqKey, {
       'answers': _answers.map((k, v) => MapEntry('$k', v)),
       'completedAt': DateTime.now().toIso8601String(),

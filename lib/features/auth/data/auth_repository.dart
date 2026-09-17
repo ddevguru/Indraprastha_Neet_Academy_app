@@ -80,6 +80,22 @@ class AuthRepository {
     return _decodeResponse(response);
   }
 
+  /// Reset password after Firebase OTP verification.
+  Future<Map<String, dynamic>> resetPassword({
+    required String idToken,
+    required String newPassword,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/auth/reset-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idToken': idToken,
+        'newPassword': newPassword,
+      }),
+    );
+    return _decodeResponse(response);
+  }
+
   /// Complete signup — sends Firebase ID token + password + details.
   Future<Map<String, dynamic>> completeSignup({
     required String idToken,

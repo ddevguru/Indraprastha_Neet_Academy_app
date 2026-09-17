@@ -435,8 +435,10 @@ class _TestDetailScreenState extends ConsumerState<TestDetailScreen> {
                     const SizedBox(height: AppSpacing.xl),
                     Builder(
                       builder: (context) {
+                        final userId = ref.read(authBlocProvider).state.user?.mobileNumber;
                         final completedStore = CompletedAttemptStore(
                           ref.read(sharedPreferencesProvider),
+                          userId: userId,
                         );
                         final isCompleted = completedStore.isTestCompleted(widget.testId) ||
                             isTruthyCompletionFlag(test['is_completed']);
@@ -491,11 +493,13 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
   Timer? _timer;
   late final PageController _pageController;
 
+  String? get _userId => ref.read(authBlocProvider).state.user?.mobileNumber;
+
   AttemptDraftStore get _draftStore =>
-      AttemptDraftStore(ref.read(sharedPreferencesProvider));
+      AttemptDraftStore(ref.read(sharedPreferencesProvider), userId: _userId);
 
   CompletedAttemptStore get _completedStore =>
-      CompletedAttemptStore(ref.read(sharedPreferencesProvider));
+      CompletedAttemptStore(ref.read(sharedPreferencesProvider), userId: _userId);
 
   void _restoreDraftIfNeeded() {
     if (_draftRestored) return;

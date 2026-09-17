@@ -199,6 +199,47 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Reset password after Firebase OTP verification
+router.post('/reset-password', async (req, res) => {
+  const { idToken, newPassword } = req.body;
+
+  if (!idToken) {
+    return res.status(400).json({ error: 'Firebase ID token is required' });
+  }
+  if (!newPassword || String(newPassword).length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters' });
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const phone = normalizePhone(decoded.phone_number);
+    if (!phone || phone.length < 10) {
+      return res.status(400).json({ error: 'Invalid phone number in token' });
+    }
+
+    const userResult = await pool.query('SELECT id, is_blocked FROM users WHERE phone = $1', [phone]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No account found with this phone number.' });
+    }
+
+    const user = userResult.rows[0];
+    if (user.is_blocked) {
+      return res.status(403).json({ error: 'Your account has been blocked by the admin.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, user.id]);
+
+    return res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err) {
+    console.error('reset-password error:', err);
+    if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error') {
+      return res.status(401).json({ error: 'Firebase token expired. Please verify OTP again.' });
+    }
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const result = await pool.query(

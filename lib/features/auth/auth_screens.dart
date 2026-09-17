@@ -310,7 +310,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    context.read<AuthBloc>().resetOtpState();
+                    context.go('/forgot-password');
+                  },
+                  child: const Text('Forgot Password?'),
+                ),
+              ),
+              const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: state.loading
                     ? null
@@ -604,16 +614,221 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 }
 
-class ForgotPasswordScreen extends StatelessWidget {
+class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final _phone = TextEditingController();
+  final _otp = TextEditingController();
+  final _newPassword = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+
+  @override
+  void dispose() {
+    _phone.dispose();
+    _otp.dispose();
+    _newPassword.dispose();
+    _confirmPassword.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const _AuthBody(
-      title: 'Forgot Password',
-      child: Text(
-        'Please contact your academy to reset your password.',
-        textAlign: TextAlign.center,
-      ),
+    return BlocConsumer<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state.errorMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.errorMessage!)),
+          );
+        }
+      },
+      builder: (context, state) {
+        // step 0 = enter phone, step 1 = enter OTP, step 2 = enter new password
+        final int step = !state.otpSent ? 0 : (!state.isOtpVerified ? 1 : 2);
+
+        return _AuthBody(
+          title: 'Reset Password',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Step 0: Enter Mobile Number ────────────────────────────
+              if (step == 0) ...[
+                Text(
+                  'Enter your registered phone number to receive an OTP.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone number',
+                    prefixText: '+91 ',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: state.loading
+                      ? null
+                      : () => context
+                          .read<AuthBloc>()
+                          .sendOtp(_phone.text.trim()),
+                  child: state.loading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Send OTP'),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () {
+                    context.read<AuthBloc>().resetOtpState();
+                    context.go('/login');
+                  },
+                  child: const Text('Back to Login'),
+                ),
+              ],
+
+              // ── Step 1: Verify OTP ──────────────────────────────────────
+              if (step == 1) ...[
+                Text(
+                  'OTP sent to +91 ${state.phoneNumber}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _otp,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'Enter 6-digit OTP',
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: state.loading
+                      ? null
+                      : () => context
+                          .read<AuthBloc>()
+                          .verifyOtp(_otp.text.trim()),
+                  child: state.loading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Verify OTP'),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: state.loading
+                      ? null
+                      : () => context
+                          .read<AuthBloc>()
+                          .sendOtp(state.phoneNumber),
+                  child: const Text('Resend OTP'),
+                ),
+              ],
+
+              // ── Step 2: New Password ────────────────────────────────────
+              if (step == 2) ...[
+                Text(
+                  'Create a new password for your account.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _newPassword,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'New password (min 6 characters)',
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _confirmPassword,
+                  obscureText: _obscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm new password',
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureConfirm
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: state.loading
+                      ? null
+                      : () async {
+                          if (_newPassword.text.length < 6) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Password must be at least 6 characters'),
+                              ),
+                            );
+                            return;
+                          }
+                          if (_newPassword.text != _confirmPassword.text) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Passwords do not match'),
+                              ),
+                            );
+                            return;
+                          }
+                          final messenger = ScaffoldMessenger.of(context);
+                          final router = GoRouter.of(context);
+                          final success = await context
+                              .read<AuthBloc>()
+                              .resetPassword(_newPassword.text);
+                          if (success) {
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Password reset successfully! Please log in.'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            router.go('/login');
+                          }
+                        },
+                  child: state.loading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Reset Password'),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

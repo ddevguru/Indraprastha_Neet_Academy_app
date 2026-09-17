@@ -302,6 +302,50 @@ class AuthBloc extends Cubit<AuthState> {
     }
   }
 
+  void resetOtpState() {
+    emit(state.copyWith(
+      otpSent: false,
+      isOtpVerified: false,
+      phoneNumber: '',
+      verificationId: null,
+      firebaseIdToken: null,
+      clearError: true,
+    ));
+  }
+
+  // ─── Forgot Password: Reset password using verified Firebase ID token ──────
+
+  Future<bool> resetPassword(String newPassword) async {
+    final idToken = state.firebaseIdToken;
+    if (idToken == null) {
+      emit(state.copyWith(errorMessage: 'OTP verification required'));
+      return false;
+    }
+    if (newPassword.length < 6) {
+      emit(state.copyWith(errorMessage: 'Password must be at least 6 characters'));
+      return false;
+    }
+
+    emit(state.copyWith(loading: true, clearError: true));
+    try {
+      await _repository.resetPassword(
+        idToken: idToken,
+        newPassword: newPassword,
+      );
+      emit(state.copyWith(
+        loading: false,
+        otpSent: false,
+        isOtpVerified: false,
+        verificationId: null,
+        firebaseIdToken: null,
+      ));
+      return true;
+    } catch (e) {
+      emit(state.copyWith(loading: false, errorMessage: e.toString()));
+      return false;
+    }
+  }
+
   Future<void> loadBatches() async {
     try {
       final batches = await _repository.fetchBatches();

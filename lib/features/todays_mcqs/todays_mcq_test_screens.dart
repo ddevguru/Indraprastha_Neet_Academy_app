@@ -124,8 +124,10 @@ class TodaysMcqTestPreviewScreen extends ConsumerWidget {
                     Builder(
                       builder: (context) {
                         final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+                        final userId = ref.read(authBlocProvider).state.user?.mobileNumber;
                         final completedStore = CompletedAttemptStore(
                           ref.read(sharedPreferencesProvider),
+                          userId: userId,
                         );
                         final isCompleted = completedStore.isMcqCompleted(todayKey);
                         return PrimaryButton(
@@ -285,7 +287,8 @@ class _TodaysMcqTestAttemptScreenState
 
     if (_index >= active.length - 1) {
       final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final completedStore = CompletedAttemptStore(ref.read(sharedPreferencesProvider));
+      final userId = ref.read(authBlocProvider).state.user?.mobileNumber;
+      final completedStore = CompletedAttemptStore(ref.read(sharedPreferencesProvider), userId: userId);
       unawaited(completedStore.saveCompletedMcq(todayKey, {
         'correctCount': _correctCount,
         'wrongCount': _wrongCount,
@@ -306,7 +309,8 @@ class _TodaysMcqTestAttemptScreenState
     final items = ref.watch(dailyMcqsProvider).asData?.value ?? const [];
     final active = items.activeInTodaysFeed;
     final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final completedStore = CompletedAttemptStore(ref.read(sharedPreferencesProvider));
+    final userId = ref.read(authBlocProvider).state.user?.mobileNumber;
+    final completedStore = CompletedAttemptStore(ref.read(sharedPreferencesProvider), userId: userId);
     final isAlreadyCompleted = completedStore.isMcqCompleted(todayKey);
 
     if (isAlreadyCompleted && !_finished) {

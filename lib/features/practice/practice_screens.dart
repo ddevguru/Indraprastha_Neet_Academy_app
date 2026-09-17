@@ -599,6 +599,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   bool _finished = false;
   bool _loading = true;
   bool _draftRestored = false;
+  bool _navigatedAway = false;
   String? _loadError;
   int _correctCount = 0;
   int _wrongCount = 0;
@@ -613,14 +614,16 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
 
   int get _draftSetId => widget.setId;
 
+  String? get _userId => ref.read(authBlocProvider).state.user?.mobileNumber;
+
   AttemptDraftStore get _draftStore =>
-      AttemptDraftStore(ref.read(sharedPreferencesProvider));
+      AttemptDraftStore(ref.read(sharedPreferencesProvider), userId: _userId);
 
   CompletedAttemptStore get _completedStore =>
-      CompletedAttemptStore(ref.read(sharedPreferencesProvider));
+      CompletedAttemptStore(ref.read(sharedPreferencesProvider), userId: _userId);
 
   void _restoreDraftIfNeeded() {
-    if (_draftRestored || widget.customQuestions != null) return;
+    if (_draftRestored || widget.customQuestions != null || widget.chapterQuestions != null) return;
 
     // Check if practice set was ALREADY completed
     final completed = _completedStore.loadCompletedPractice(_draftSetId);
@@ -648,6 +651,9 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       return;
     }
     _currentIndex = _parseInt(draft['currentIndex'], defaultValue: _currentIndex);
+    if (_questions.isNotEmpty) {
+      _currentIndex = _currentIndex.clamp(0, _questions.length - 1);
+    }
     _correctCount = _parseInt(draft['correctCount'], defaultValue: _correctCount);
     _wrongCount = _parseInt(draft['wrongCount'], defaultValue: _wrongCount);
     _submitted = draft['submitted'] == true;
@@ -929,6 +935,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       // Only show chapter picker when a set truly contains multiple chapters.
       final chapters = _groupQuestionsByChapter(_questions);
       if (mounted && chapters.length > 1) {
+        _navigatedAway = true;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => ChapterListScreen(
@@ -954,7 +961,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     } catch (e) {
       _loadError = e.toString();
     } finally {
-      if (mounted) {
+      if (mounted && !_navigatedAway) {
         _restoreDraftIfNeeded();
         setState(() => _loading = false);
       }
@@ -1184,7 +1191,8 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
       );
     }
 
-    final question = _questions[_currentIndex];
+    final safeIndex = _currentIndex.clamp(0, _questions.isEmpty ? 0 : _questions.length - 1);
+    final question = _questions[safeIndex];
         final options = [
           readQuestionOption(question, 'A'),
           readQuestionOption(question, 'B'),
