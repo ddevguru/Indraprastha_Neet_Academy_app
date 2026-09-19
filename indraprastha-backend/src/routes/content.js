@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const https = require('https');
 const pdfParse = require('pdf-parse');
 const { pool } = require('../db');
+const { normalizeTestCategory, getCategoryType } = require('../utils/categoryHelper');
 const { recordUserStreakActivity } = require('./streaks');
 const {
   normalizeDriveLink,
@@ -512,7 +513,7 @@ router.post('/practice-sets/:setId/submit', userAuth, async (req, res) => {
 router.get('/tests', userAuth, async (req, res) => {
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';
-  const category = req.query.category?.toString() || '';
+  const categoryFilter = req.query.category?.toString() || '';
   const result = await pool.query(
     `SELECT t.id, t.title, t.category, t.subject, t.topic, t.class_label, t.duration_minutes, t.marks, t.question_count, t.syllabus_coverage, t.schedule_label,
         (ta.id IS NOT NULL) AS is_completed,
@@ -527,11 +528,30 @@ router.get('/tests', userAuth, async (req, res) => {
      ) ta ON true
      WHERE ($1 = '' OR t.subject = $1)
        AND ($2 = '' OR t.topic = $2)
-       AND ($4 = '' OR LOWER(t.category) LIKE '%' || LOWER($4) || '%')
-     ORDER BY id DESC`,
-    [subject, topic, req.user.id, category]
+     ORDER BY t.id DESC`,
+    [subject, topic, req.user.id]
   );
-  res.json({ success: true, tests: result.rows });
+
+  const tests = result.rows.map((row) => {
+    const normCategory = normalizeTestCategory(row);
+    return {
+      ...row,
+      category: normCategory,
+      category_type: getCategoryType(normCategory),
+    };
+  });
+
+  const filtered = categoryFilter
+    ? tests.filter((t) => {
+        const cf = categoryFilter.toLowerCase();
+        return (
+          t.category.toLowerCase().includes(cf) ||
+          t.category_type.toLowerCase() === cf
+        );
+      })
+    : tests;
+
+  res.json({ success: true, tests: filtered });
 });
 
 router.get('/tests/:testId/questions', userAuth, async (req, res) => {

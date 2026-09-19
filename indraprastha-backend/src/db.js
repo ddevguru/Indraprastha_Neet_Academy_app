@@ -1,6 +1,7 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
+const { normalizeTestCategory } = require('./utils/categoryHelper');
 
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
 
@@ -342,6 +343,18 @@ async function ensureDatabaseSchema() {
     ALTER TABLE tests
     ADD COLUMN IF NOT EXISTS topic VARCHAR(140) DEFAULT '';
   `);
+
+  try {
+    const existingTests = await pool.query('SELECT id, title, category, subject, topic FROM tests');
+    for (const t of existingTests.rows) {
+      const norm = normalizeTestCategory(t);
+      if (t.category !== norm) {
+        await pool.query('UPDATE tests SET category = $1 WHERE id = $2', [norm, t.id]);
+      }
+    }
+  } catch (err) {
+    console.error('Test category auto-normalization warning:', err?.message);
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS test_questions (

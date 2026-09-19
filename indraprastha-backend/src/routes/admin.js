@@ -9,6 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const { pool } = require('../db');
+const { normalizeTestCategory, getCategoryType } = require('../utils/categoryHelper');
 const { sendNotificationToAll, sendNotificationToUsers } = require('../services/notifications');
 const logger = require('../services/logger');
 const { logError: gcpLogError } = require('../services/gcp_log');
@@ -1586,6 +1587,13 @@ router.post('/tests', adminAuth, async (req, res) => {
     scheduleLabel,
   } = req.body;
   const { batchId, classLabel, subject, topic } = hierarchyFromBody(req.body);
+  const canonicalCategory = normalizeTestCategory({
+    title,
+    category,
+    subject,
+    topic,
+  });
+
   const result = await pool.query(
     `INSERT INTO tests (
       batch_id, class_label, subject, topic, title, category, duration_minutes, marks, question_count, syllabus_coverage, schedule_label
@@ -1596,7 +1604,7 @@ router.post('/tests', adminAuth, async (req, res) => {
       subject,
       topic,
       title,
-      category || 'Grand test',
+      canonicalCategory,
       durationMinutes || 180,
       marks || 720,
       questionCount || 180,
@@ -1606,7 +1614,7 @@ router.post('/tests', adminAuth, async (req, res) => {
   );
   sendNotificationToAll(pool, {
     title: '📝 New Test Available',
-    body: `${title}${category ? ` — ${category}` : ''}`,
+    body: `${title}${canonicalCategory ? ` — ${canonicalCategory}` : ''}`,
     data: { type: 'test', id: String(result.rows[0].id) },
   }).catch((err) => logAdminRouteError('Async Background Test Notification', err));
   res.json({ success: true, test: result.rows[0] });
@@ -1619,7 +1627,15 @@ router.get('/tests', adminAuth, async (_req, res) => {
      JOIN batches b ON b.id = t.batch_id
      ORDER BY t.id DESC`
   );
-  res.json({ success: true, tests: result.rows });
+  const tests = result.rows.map((row) => {
+    const normCategory = normalizeTestCategory(row);
+    return {
+      ...row,
+      category: normCategory,
+      category_type: getCategoryType(normCategory),
+    };
+  });
+  res.json({ success: true, tests });
 });
 
 router.put('/tests/:id', adminAuth, async (req, res) => {
@@ -1627,13 +1643,28 @@ router.put('/tests/:id', adminAuth, async (req, res) => {
   const { title, category, durationMinutes, marks, questionCount, syllabusCoverage, scheduleLabel } =
     req.body;
   const { classLabel, subject, topic } = hierarchyFromBody(req.body);
+
+  const existingRes = await pool.query('SELECT * FROM tests WHERE id = $1 LIMIT 1', [id]);
+  const existing = existingRes.rows[0] || {};
+  const mergedTitle = title !== undefined ? title : existing.title;
+  const mergedCategory = category !== undefined ? category : existing.category;
+  const mergedSubject = subject !== undefined ? subject : existing.subject;
+  const mergedTopic = topic !== undefined ? topic : existing.topic;
+
+  const canonicalCategory = normalizeTestCategory({
+    title: mergedTitle,
+    category: mergedCategory,
+    subject: mergedSubject,
+    topic: mergedTopic,
+  });
+
   const result = await pool.query(
     `UPDATE tests
      SET title = COALESCE($2, title),
          class_label = COALESCE($3, class_label),
          subject = COALESCE($4, subject),
          topic = COALESCE($5, topic),
-         category = COALESCE($6, category),
+         category = $6,
          duration_minutes = COALESCE($7, duration_minutes),
          marks = COALESCE($8, marks),
          question_count = COALESCE($9, question_count),
@@ -1641,7 +1672,7 @@ router.put('/tests/:id', adminAuth, async (req, res) => {
          schedule_label = COALESCE($11, schedule_label)
      WHERE id = $1
      RETURNING *`,
-    [id, title, classLabel, subject, topic, category, durationMinutes, marks, questionCount, syllabusCoverage, scheduleLabel]
+    [id, title, classLabel, subject, topic, canonicalCategory, durationMinutes, marks, questionCount, syllabusCoverage, scheduleLabel]
   );
   res.json({ success: true, test: result.rows[0] });
 });

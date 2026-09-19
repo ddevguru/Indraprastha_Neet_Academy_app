@@ -38,29 +38,87 @@ String _formatTestScoreLabel(Map<String, dynamic> test) {
 }
 
 String _normalizedTestCategory(Map<String, dynamic> test) {
-  final category = (test['category']?.toString() ?? '').toLowerCase().trim();
-  final title = (test['title']?.toString() ?? '').toLowerCase();
-  final topic = (test['topic']?.toString() ?? '').toLowerCase();
-  final keywords = '$category $title $topic';
+  final categoryType = (test['category_type']?.toString() ?? '').toLowerCase().trim();
+  if (categoryType == 'subject') return 'subject';
+  if (categoryType == 'chapter') return 'chapter';
+  if (categoryType == 'grand') return 'grand';
 
-  if (keywords.contains('grand') || keywords.contains('full syllabus')) {
-    return 'grand';
+  final category = (test['category']?.toString() ?? '').toLowerCase().trim();
+  final title = (test['title']?.toString() ?? '').toLowerCase().trim();
+  final topic = (test['topic']?.toString() ?? '').toLowerCase().trim();
+  final subject = (test['subject']?.toString() ?? '').toLowerCase().trim();
+
+  // 1. Title acronyms and keywords check (e.g. TST 01, ST-02, CT 01, GT 05)
+  final titleIsSubject = RegExp(
+    r'^(tst|st|sub|subject)[-_\s0-9:]|\b(tst|st|subject|sub-test|sub\s+test|subjectwise|subject-wise)\b',
+    caseSensitive: false,
+  ).hasMatch(title);
+
+  final titleIsChapter = RegExp(
+    r'^(ct|chapter)[-_\s0-9:]|\b(ct|chapter|chapterwise|chapter-wise)\b',
+    caseSensitive: false,
+  ).hasMatch(title);
+
+  final titleIsGrand = RegExp(
+    r'^(gt|flt|fmt|grand)[-_\s0-9:]|\b(gt|grand|full\s*syllabus|flt|fmt|full\s*mock)\b',
+    caseSensitive: false,
+  ).hasMatch(title);
+
+  if (titleIsSubject && !titleIsGrand) return 'subject';
+  if (titleIsChapter && !titleIsGrand) return 'chapter';
+  if (titleIsGrand && !titleIsSubject) return 'grand';
+
+  // 2. Explicit DB category check
+  if (category.isNotEmpty) {
+    if (category.contains('subject') ||
+        category.contains('tst') ||
+        RegExp(r'\b(st|tst)\b', caseSensitive: false).hasMatch(category)) {
+      return 'subject';
+    }
+    if (category.contains('chapter') ||
+        category.contains('ct') ||
+        RegExp(r'\bct\b', caseSensitive: false).hasMatch(category)) {
+      return 'chapter';
+    }
+    if (category.contains('grand') ||
+        category.contains('gt') ||
+        category.contains('full syllabus') ||
+        RegExp(r'\bgt\b', caseSensitive: false).hasMatch(category)) {
+      return 'grand';
+    }
   }
-  if (keywords.contains('chapter') || keywords.contains('topic')) {
-    return 'chapter';
-  }
-  if (keywords.contains('subject')) {
+
+  // 3. Search full text (category + title + topic + subject)
+  final fullText = '$category $title $topic $subject';
+  if (RegExp(r'\b(tst|st|subject|sub-test|sub\s+test|subjectwise)\b', caseSensitive: false)
+      .hasMatch(fullText)) {
     return 'subject';
   }
-
-  // Respect explicit DB category values from admin panel.
-  if (category.isNotEmpty) {
-    if (category.contains('chapter')) return 'chapter';
-    if (category.contains('subject')) return 'subject';
+  if (RegExp(r'\b(ct|chapter|chapterwise)\b', caseSensitive: false)
+      .hasMatch(fullText)) {
+    return 'chapter';
+  }
+  if (RegExp(r'\b(gt|grand|full\s*syllabus|flt|fmt)\b', caseSensitive: false)
+      .hasMatch(fullText)) {
     return 'grand';
   }
 
   return 'grand';
+}
+
+String _displayCategory(Map<String, dynamic> test) {
+  final cat = (test['category']?.toString() ?? '').trim();
+  final norm = _normalizedTestCategory(test);
+
+  if (cat.isNotEmpty && cat.toLowerCase() != 'grand test') {
+    return cat;
+  }
+
+  return switch (norm) {
+    'subject' => 'Subject test',
+    'chapter' => 'Chapter test',
+    _ => 'Grand test',
+  };
 }
 
 List<Map<String, dynamic>> _questionsForReview({
@@ -305,7 +363,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                           test: TestItem(
                             id: '${t['id']}',
                             title: t['title']?.toString() ?? 'Test',
-                            category: t['category']?.toString() ?? 'Grand test',
+                            category: _displayCategory(t),
                             durationMinutes:
                                 (t['duration_minutes'] as num?)?.toInt() ?? 180,
                             marks: (t['marks'] as num?)?.toInt() ?? 720,
