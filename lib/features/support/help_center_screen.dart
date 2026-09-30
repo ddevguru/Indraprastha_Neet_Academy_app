@@ -83,12 +83,12 @@ class _HelpCenterScreenState extends ConsumerState<HelpCenterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Report an Issue',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -96,7 +96,7 @@ class _HelpCenterScreenState extends ConsumerState<HelpCenterScreen> {
                 'Tell us about any issues you\'re facing in the app or with your tests. Include images if needed.',
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),

@@ -1911,6 +1911,71 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
     question: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
   });
 });
+router.post('/tests/:testId/move-to-practice', adminAuth, async (req, res) => {
+  try {
+    const { questionIds } = req.body;
+    if (!questionIds || !Array.isArray(questionIds) || questionIds.length === 0) {
+      return res.status(400).json({ error: 'questionIds array is required' });
+    }
+
+    const testRes = await pool.query('SELECT batch_id, class_label, subject, topic, title FROM tests WHERE id = $1', [req.params.testId]);
+    if (testRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Test not found' });
+    }
+    const test = testRes.rows[0];
+
+    let practiceSetId;
+    const psRes = await pool.query(
+      'SELECT id FROM practice_sets WHERE batch_id = $1 AND COALESCE(class_label, \'\') = COALESCE($2, \'\') AND COALESCE(subject, \'\') = COALESCE($3, \'\') AND COALESCE(topic, \'\') = COALESCE($4, \'\') LIMIT 1',
+      [test.batch_id, test.class_label, test.subject, test.topic]
+    );
+
+    if (psRes.rows.length > 0) {
+      practiceSetId = psRes.rows[0].id;
+    } else {
+      const newPsRes = await pool.query(
+        `INSERT INTO practice_sets (batch_id, class_label, subject, topic, title, difficulty, estimated_minutes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [
+          test.batch_id,
+          test.class_label || '',
+          test.subject || '',
+          test.topic || '',
+          `Practice: ${test.topic || test.title}`,
+          'Moderate',
+          30
+        ]
+      );
+      practiceSetId = newPsRes.rows[0].id;
+    }
+
+    for (const qId of questionIds) {
+      const qRes = await pool.query('SELECT * FROM test_questions WHERE id = $1 AND test_id = $2', [qId, req.params.testId]);
+      if (qRes.rows.length > 0) {
+        const q = qRes.rows[0];
+        await pool.query(
+          `INSERT INTO practice_questions (
+            practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation,
+            question_image_link, question_image_drive_file_id, question_image_drive_folder_id,
+            explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+          [
+            practiceSetId,
+            q.question, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation,
+            q.question_image_link, q.question_image_drive_file_id, q.question_image_drive_folder_id,
+            q.explanation_image_link, q.explanation_image_drive_file_id, q.explanation_image_drive_folder_id
+          ]
+        );
+        await pool.query('DELETE FROM test_questions WHERE id = $1', [qId]);
+      }
+    }
+
+    res.json({ success: true, practiceSetId });
+  } catch (err) {
+    console.error('Error moving questions to practice:', err);
+    res.status(500).json({ error: 'Failed to move questions to practice' });
+  }
+});
 
 router.delete('/test-questions/:id', adminAuth, async (req, res) => {
   await pool.query('DELETE FROM test_questions WHERE id = $1', [req.params.id]);

@@ -3313,127 +3313,213 @@ class _TestsPageState extends State<TestsPage> {
 
   Future<void> _showTestQuestionsSheet(List<dynamic> qs) async {
     if (!mounted) return;
+    final List<int> selectedQuestionIds = [];
+    bool isMoving = false;
+
     await showModalBottomSheet(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          shrinkWrap: true,
-          children: [
-            Text('Questions', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            if (qs.isEmpty)
-              const Text('No questions yet')
-            else
-              ...qs.map(
-                (q) {
-                  final question = q as Map<String, dynamic>;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(question['question']?.toString() ?? ''),
-                          const SizedBox(height: 4),
-                          Text('Correct: ${question['correct_option'] ?? '-'}'),
-                          if (hasQuestionImage(question)) ...[
-                            const SizedBox(height: 8),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: FastNetworkImage(
-                                url: questionImageRawUrl(question),
-                                height: 120,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                thumbWidth: 600,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  final questionId = _asInt(question['id'],
-                                      label: 'questionId');
-                                  setState(() {
-                                    _editingQuestionId = questionId;
-                                    _testQuestion.text =
-                                        question['question']?.toString() ?? '';
-                                    _testOptionA.text =
-                                        question['option_a']?.toString() ?? '';
-                                    _testOptionB.text =
-                                        question['option_b']?.toString() ?? '';
-                                    _testOptionC.text =
-                                        question['option_c']?.toString() ?? '';
-                                    _testOptionD.text =
-                                        question['option_d']?.toString() ?? '';
-                                    _testCorrect = question['correct_option']
-                                            ?.toString() ??
-                                        'A';
-                                    _testExplanation.text =
-                                        question['explanation']?.toString() ??
-                                            '';
-                                    _testQuestionImageLink =
-                                        question['question_image_link']
-                                                ?.toString() ??
-                                            '';
-                                    _testExplanationImageLink =
-                                        question['explanation_image_link']
-                                                ?.toString() ??
-                                            '';
-                                    _testQuestionImage = null;
-                                    _testExplanationImage = null;
-                                    _pendingExtraExplanationImages.clear();
-                                  });
-                                  await _loadTestExplanationImages(questionId);
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setStateSheet) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Questions (${qs.length})', style: Theme.of(context).textTheme.titleLarge),
+                    if (selectedQuestionIds.isNotEmpty)
+                      ElevatedButton.icon(
+                        onPressed: isMoving
+                            ? null
+                            : () async {
+                                setStateSheet(() => isMoving = true);
+                                try {
+                                  await widget.api.moveTestQuestionsToPractice(
+                                    _selectedTestId!,
+                                    selectedQuestionIds,
+                                  );
                                   if (sheetContext.mounted) {
                                     Navigator.of(sheetContext).pop();
                                   }
-                                },
-                                icon: const Icon(Icons.edit_outlined),
-                                label: const Text('Edit'),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  try {
-                                    await widget.api.deleteTestQuestion(
-                                      _asInt(question['id'],
-                                          label: 'questionId'),
+                                  await _openQuestionsForTest(_selectedTestId!);
+                                  if (mounted) {
+                                    _showActionSnackBar(
+                                      context,
+                                      '${selectedQuestionIds.length} questions moved to practice.',
                                     );
-                                    if (sheetContext.mounted) {
-                                      Navigator.of(sheetContext).pop();
-                                    }
-                                    await _openQuestionsForTest(
-                                        _selectedTestId!);
-                                  } catch (e, st) {
-                                    if (!mounted) return;
+                                  }
+                                } catch (e, st) {
+                                  if (mounted) {
                                     await _handleTaskError(
                                       context,
-                                      'Delete test question',
+                                      'Move test questions to practice',
                                       e,
                                       stackTrace: st,
                                     );
                                   }
-                                },
-                                icon: const Icon(Icons.delete_outline),
-                                label: const Text('Delete'),
-                              ),
-                            ],
-                          ),
-                        ],
+                                } finally {
+                                  if (sheetContext.mounted) {
+                                    setStateSheet(() => isMoving = false);
+                                  }
+                                }
+                              },
+                        icon: isMoving
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.move_up),
+                        label: Text('Move ${selectedQuestionIds.length} to Practice'),
                       ),
-                    ),
-                  );
-                },
+                  ],
+                ),
               ),
-          ],
+              Flexible(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shrinkWrap: true,
+                  children: [
+                    if (qs.isEmpty)
+                      const Text('No questions yet')
+                    else
+                      ...qs.map(
+                        (q) {
+                          final question = q as Map<String, dynamic>;
+                          final qId = _asInt(question['id'], label: 'questionId');
+                          final isSelected = selectedQuestionIds.contains(qId);
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            color: isSelected ? Colors.blue.withOpacity(0.1) : null,
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Checkbox(
+                                        value: isSelected,
+                                        onChanged: (val) {
+                                          setStateSheet(() {
+                                            if (val == true) {
+                                              selectedQuestionIds.add(qId);
+                                            } else {
+                                              selectedQuestionIds.remove(qId);
+                                            }
+                                          });
+                                        },
+                                      ),
+                                      Expanded(
+                                        child: Text(question['question']?.toString() ?? ''),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text('Correct: ${question['correct_option'] ?? '-'}'),
+                                  if (hasQuestionImage(question)) ...[
+                                    const SizedBox(height: 8),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: FastNetworkImage(
+                                        url: questionImageRawUrl(question),
+                                        height: 120,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        thumbWidth: 600,
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      OutlinedButton.icon(
+                                        onPressed: () async {
+                                          final questionId = _asInt(question['id'],
+                                              label: 'questionId');
+                                          setState(() {
+                                            _editingQuestionId = questionId;
+                                            _testQuestion.text =
+                                                question['question']?.toString() ?? '';
+                                            _testOptionA.text =
+                                                question['option_a']?.toString() ?? '';
+                                            _testOptionB.text =
+                                                question['option_b']?.toString() ?? '';
+                                            _testOptionC.text =
+                                                question['option_c']?.toString() ?? '';
+                                            _testOptionD.text =
+                                                question['option_d']?.toString() ?? '';
+                                            _testCorrect = question['correct_option']
+                                                    ?.toString() ??
+                                                'A';
+                                            _testExplanation.text =
+                                                question['explanation']?.toString() ??
+                                                    '';
+                                            _testQuestionImageLink =
+                                                question['question_image_link']
+                                                        ?.toString() ??
+                                                    '';
+                                            _testExplanationImageLink =
+                                                question['explanation_image_link']
+                                                        ?.toString() ??
+                                                    '';
+                                            _testQuestionImage = null;
+                                            _testExplanationImage = null;
+                                            _pendingExtraExplanationImages.clear();
+                                          });
+                                          await _loadTestExplanationImages(questionId);
+                                          if (sheetContext.mounted) {
+                                            Navigator.of(sheetContext).pop();
+                                          }
+                                        },
+                                        icon: const Icon(Icons.edit_outlined),
+                                        label: const Text('Edit'),
+                                      ),
+                                      OutlinedButton.icon(
+                                        onPressed: () async {
+                                          try {
+                                            await widget.api.deleteTestQuestion(
+                                              _asInt(question['id'],
+                                                  label: 'questionId'),
+                                            );
+                                            if (sheetContext.mounted) {
+                                              Navigator.of(sheetContext).pop();
+                                            }
+                                            await _openQuestionsForTest(
+                                                _selectedTestId!);
+                                          } catch (e, st) {
+                                            if (!mounted) return;
+                                            await _handleTaskError(
+                                              context,
+                                              'Delete test question',
+                                              e,
+                                              stackTrace: st,
+                                            );
+                                          }
+                                        },
+                                        icon: const Icon(Icons.delete_outline),
+                                        label: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -7502,6 +7588,12 @@ class AdminApi {
 
   Future<void> deleteTestQuestion(int id) =>
       _delete('/admin/test-questions/$id');
+
+  Future<void> moveTestQuestionsToPractice(int testId, List<int> questionIds) async {
+    await _postMap('/admin/tests/$testId/move-to-practice', {
+      'questionIds': questionIds,
+    });
+  }
 
   Future<List<dynamic>> practiceQuestions(int setId) async =>
       (await _get('/admin/practice-sets/$setId/questions'))['questions']
