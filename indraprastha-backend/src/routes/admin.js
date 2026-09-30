@@ -1913,7 +1913,7 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
 });
 router.post('/tests/:testId/move-to-practice', adminAuth, async (req, res) => {
   try {
-    const { questionIds } = req.body;
+    const { questionIds, targetPracticeSetId } = req.body;
     if (!questionIds || !Array.isArray(questionIds) || questionIds.length === 0) {
       return res.status(400).json({ error: 'questionIds array is required' });
     }
@@ -1925,28 +1925,91 @@ router.post('/tests/:testId/move-to-practice', adminAuth, async (req, res) => {
     const test = testRes.rows[0];
 
     let practiceSetId;
-    const psRes = await pool.query(
-      'SELECT id FROM practice_sets WHERE batch_id = $1 AND COALESCE(class_label, \'\') = COALESCE($2, \'\') AND COALESCE(subject, \'\') = COALESCE($3, \'\') AND COALESCE(topic, \'\') = COALESCE($4, \'\') LIMIT 1',
-      [test.batch_id, test.class_label, test.subject, test.topic]
-    );
 
-    if (psRes.rows.length > 0) {
-      practiceSetId = psRes.rows[0].id;
-    } else {
-      const newPsRes = await pool.query(
-        `INSERT INTO practice_sets (batch_id, class_label, subject, topic, title, difficulty, estimated_minutes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [
-          test.batch_id,
-          test.class_label || '',
-          test.subject || '',
-          test.topic || '',
-          `Practice: ${test.topic || test.title}`,
-          'Moderate',
-          30
-        ]
+    if (targetPracticeSetId) {
+      const psCheck = await pool.query('SELECT id FROM practice_sets WHERE id = $1', [targetPracticeSetId]);
+      if (psCheck.rows.length > 0) {
+        practiceSetId = psCheck.rows[0].id;
+      }
+    }
+
+    if (!practiceSetId) {
+      // Find existing practice sets in the same batch (or all practice sets as fallback)
+      let psRes = await pool.query(
+        'SELECT id, class_label, subject, topic, title FROM practice_sets WHERE batch_id = $1',
+        [test.batch_id]
       );
-      practiceSetId = newPsRes.rows[0].id;
+      if (psRes.rows.length === 0) {
+        psRes = await pool.query('SELECT id, class_label, subject, topic, title FROM practice_sets');
+      }
+      const candidates = psRes.rows;
+
+      const norm = (s) => (s || '').trim().toLowerCase();
+      const cleanTitle = (t) => norm(t).replace(/^practice:\s*/i, '');
+
+      const testTopic = norm(test.topic);
+      const testTitle = norm(test.title);
+      const cleanTestTitle = cleanTitle(test.title);
+      const testSubject = norm(test.subject);
+
+      // Strategy 1: Exact topic or title match
+      let match = candidates.find(ps => {
+        const psTopic = norm(ps.topic);
+        const psTitle = norm(ps.title);
+        const psCleanTitle = cleanTitle(ps.title);
+
+        const topicMatch = testTopic.length > 0 && (psTopic === testTopic || psTitle === testTopic || psCleanTitle === testTopic);
+        const titleMatch = testTitle.length > 0 && (psTopic === testTitle || psTitle === testTitle || psCleanTitle === cleanTestTitle);
+
+        return (topicMatch || titleMatch);
+      });
+
+      // Strategy 2: Substring / Partial match (e.g. "Semiconductors" matches "Semiconductors Electronics")
+      if (!match) {
+        const searchTerms = [testTopic, testTitle, cleanTestTitle].filter(t => t.length >= 3);
+
+        match = candidates.find(ps => {
+          const psTopic = norm(ps.topic);
+          const psTitle = norm(ps.title);
+          const psCleanTitle = cleanTitle(ps.title);
+          const psTerms = [psTopic, psTitle, psCleanTitle].filter(t => t.length >= 3);
+
+          return searchTerms.some(st => 
+            psTerms.some(pt => pt.includes(st) || st.includes(pt))
+          );
+        });
+      }
+
+      // Strategy 3: Same subject fallback if topic/title has partial word overlap
+      if (!match && testSubject.length > 0) {
+        const testWords = `${testTopic} ${testTitle}`.split(/\s+/).filter(w => w.length >= 3);
+        if (testWords.length > 0) {
+          match = candidates.find(ps => {
+            if (norm(ps.subject) !== testSubject) return false;
+            const psFull = `${norm(ps.topic)} ${norm(ps.title)}`.toLowerCase();
+            return testWords.some(w => psFull.includes(w));
+          });
+        }
+      }
+
+      if (match) {
+        practiceSetId = match.id;
+      } else {
+        const newPsRes = await pool.query(
+          `INSERT INTO practice_sets (batch_id, class_label, subject, topic, title, difficulty, estimated_minutes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+          [
+            test.batch_id,
+            test.class_label || '',
+            test.subject || '',
+            test.topic || test.title || '',
+            `Practice: ${test.topic || test.title}`,
+            'Moderate',
+            30
+          ]
+        );
+        practiceSetId = newPsRes.rows[0].id;
+      }
     }
 
     for (const qId of questionIds) {

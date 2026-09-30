@@ -3336,11 +3336,70 @@ class _TestsPageState extends State<TestsPage> {
                         onPressed: isMoving
                             ? null
                             : () async {
+                                List<dynamic> existingSets = [];
+                                try {
+                                  final res = await widget.api.practiceSets();
+                                  existingSets = (res['practiceSets'] as List<dynamic>?) ?? [];
+                                } catch (_) {}
+
+                                if (!sheetContext.mounted) return;
+
+                                final targetId = await showDialog<int?>(
+                                  context: sheetContext,
+                                  builder: (dialogContext) => AlertDialog(
+                                    title: const Text('Move to Practice Set'),
+                                    content: SizedBox(
+                                      width: double.maxFinite,
+                                      child: ListView(
+                                        shrinkWrap: true,
+                                        children: [
+                                          ListTile(
+                                            leading: const Icon(Icons.auto_awesome, color: Colors.deepPurple),
+                                            title: const Text('Auto-match / Create New'),
+                                            subtitle: const Text('Smartly matches existing set or creates a new one'),
+                                            onTap: () => Navigator.of(dialogContext).pop(-1),
+                                          ),
+                                          const Divider(),
+                                          if (existingSets.isNotEmpty)
+                                            const Padding(
+                                              padding: EdgeInsets.only(left: 16, top: 8, bottom: 4),
+                                              child: Text('Select Existing Practice Set:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                            ),
+                                          ...existingSets.map((set) {
+                                            final setMap = set as Map<String, dynamic>;
+                                            final sId = _asInt(setMap['id']);
+                                            final title = setMap['title']?.toString() ?? '';
+                                            final topic = setMap['topic']?.toString() ?? '';
+                                            final subj = setMap['subject']?.toString() ?? '';
+                                            return ListTile(
+                                              leading: const Icon(Icons.folder_open),
+                                              title: Text(title.isNotEmpty ? title : topic),
+                                              subtitle: Text([if (subj.isNotEmpty) subj, if (topic.isNotEmpty && topic != title) topic].join(' • ')),
+                                              onTap: () => Navigator.of(dialogContext).pop(sId),
+                                            );
+                                          }),
+                                        ],
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(dialogContext).pop(null),
+                                        child: const Text('Cancel'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (targetId == null) return; // Cancelled
+
+                                final actualTargetId = targetId == -1 ? null : targetId;
+
                                 setStateSheet(() => isMoving = true);
                                 try {
                                   await widget.api.moveTestQuestionsToPractice(
                                     _selectedTestId!,
                                     selectedQuestionIds,
+                                    targetPracticeSetId: actualTargetId,
                                   );
                                   if (sheetContext.mounted) {
                                     Navigator.of(sheetContext).pop();
@@ -3349,7 +3408,7 @@ class _TestsPageState extends State<TestsPage> {
                                   if (mounted) {
                                     _showActionSnackBar(
                                       context,
-                                      '${selectedQuestionIds.length} questions moved to practice.',
+                                      '${selectedQuestionIds.length} questions moved to practice set.',
                                     );
                                   }
                                 } catch (e, st) {
@@ -7589,9 +7648,14 @@ class AdminApi {
   Future<void> deleteTestQuestion(int id) =>
       _delete('/admin/test-questions/$id');
 
-  Future<void> moveTestQuestionsToPractice(int testId, List<int> questionIds) async {
+  Future<void> moveTestQuestionsToPractice(
+    int testId,
+    List<int> questionIds, {
+    int? targetPracticeSetId,
+  }) async {
     await _postMap('/admin/tests/$testId/move-to-practice', {
       'questionIds': questionIds,
+      if (targetPracticeSetId != null) 'targetPracticeSetId': targetPracticeSetId,
     });
   }
 
