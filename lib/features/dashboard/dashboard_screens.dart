@@ -16,6 +16,7 @@ import '../books/books_screens.dart';
 import '../practice/practice_screens.dart';
 import '../tests/tests_screens.dart';
 import '../videos/videos_screen.dart';
+import 'widgets/home_image_slider.dart';
 
 String _greetingLine(String firstName) {
   final h = DateTime.now().hour;
@@ -73,6 +74,7 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
   late Future<List<dynamic>> _statsFuture;
   late Future<List<Map<String, dynamic>>> _recentTestsFuture;
   late Future<Map<String, dynamic>> _analyticsFuture;
+  late Future<List<Map<String, dynamic>>> _sliderImagesFuture;
   DateTime? _lastReloadTime;
 
   @override
@@ -89,6 +91,7 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
     final repo = ref.read(contentRepositoryProvider);
     _recentTestsFuture = repo.fetchTests();
     _analyticsFuture = repo.fetchLatestAnalytics();
+    _sliderImagesFuture = repo.fetchSliderImages();
     _statsFuture = Future.wait([
       _recentTestsFuture,
       _analyticsFuture,
@@ -273,6 +276,23 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
                   ),
                 ),
               ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // ── Image Slider Section (5 images sliding right to left) ────
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _sliderImagesFuture,
+              builder: (context, snapshot) {
+                final images = snapshot.data ?? const [];
+                if (images.isEmpty &&
+                    snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(
+                    height: 160,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (images.isEmpty) return const SizedBox.shrink();
+                return HomeImageSlider(images: images);
+              },
             ),
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(),

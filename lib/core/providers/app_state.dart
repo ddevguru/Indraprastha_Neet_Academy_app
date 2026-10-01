@@ -29,7 +29,7 @@ final authBlocProvider = Provider<AuthBloc>((ref) {
 @immutable
 class AppUiState {
   const AppUiState({
-    this.themeMode = ThemeMode.light,
+    this.themeMode = ThemeMode.dark,
     this.hasActiveSubscription = false,
     this.selectedPlan = 'Starter',
     this.bookmarkedBookIds = const {'book_notes_bio'},
@@ -70,10 +70,24 @@ class AppUiState {
 
 class AppUiController extends Notifier<AppUiState> {
   @override
-  AppUiState build() => const AppUiState();
+  AppUiState build() {
+    try {
+      final prefs = ref.watch(sharedPreferencesProvider);
+      final savedMode = prefs.getString('theme_mode');
+      if (savedMode == 'light') {
+        return const AppUiState(themeMode: ThemeMode.light);
+      }
+    } catch (_) {}
+    return const AppUiState(themeMode: ThemeMode.dark);
+  }
 
   void toggleTheme(bool isDark) {
-    state = state.copyWith(themeMode: isDark ? ThemeMode.dark : ThemeMode.light);
+    final mode = isDark ? ThemeMode.dark : ThemeMode.light;
+    state = state.copyWith(themeMode: mode);
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      prefs.setString('theme_mode', isDark ? 'dark' : 'light');
+    } catch (_) {}
   }
 
   void selectPlan(String planName) {

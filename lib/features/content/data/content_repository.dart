@@ -43,6 +43,48 @@ class ContentRepository {
     return _mapsFromListKey(data, 'notifications');
   }
 
+  Future<List<Map<String, dynamic>>> fetchSliderImages() async {
+    try {
+      final data = await _get('/content/slider-images', bypassCache: true);
+      final list = _mapsFromListKey(data, 'sliderImages');
+      if (list.isNotEmpty) return list;
+    } catch (e) {
+      if (kDebugMode) print('fetchSliderImages error: $e');
+    }
+    return const [
+      {
+        'id': 1,
+        'title': 'NEET 2026/2027 Rank Booster',
+        'image_url': 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=1200&auto=format&fit=crop&q=80',
+        'target_link': '',
+      },
+      {
+        'id': 2,
+        'title': 'Biology NCERT Line-by-Line',
+        'image_url': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&auto=format&fit=crop&q=80',
+        'target_link': '',
+      },
+      {
+        'id': 3,
+        'title': 'Full Syllabus Mock Test Series',
+        'image_url': 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&auto=format&fit=crop&q=80',
+        'target_link': '',
+      },
+      {
+        'id': 4,
+        'title': 'Physics & Chemistry Formula Sheets',
+        'image_url': 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80',
+        'target_link': '',
+      },
+      {
+        'id': 5,
+        'title': 'Daily Revision & Target Practice',
+        'image_url': 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1200&auto=format&fit=crop&q=80',
+        'target_link': '',
+      },
+    ];
+  }
+
   Future<List<Map<String, dynamic>>> fetchBooks({
     String? subject,
     String? topic,

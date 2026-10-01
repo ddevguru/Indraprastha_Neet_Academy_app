@@ -223,7 +223,7 @@ class AppDrawer extends ConsumerWidget {
                       leading: const Icon(Icons.groups_rounded, color: AppColors.onDrawer),
                       onTap: () async {
                         Navigator.of(context).pop();
-                        final uri = Uri.parse('https://t.me/+yiL4ctVZQVMwNDY1');
+                        final uri = Uri.parse('https://t.me/+uhvoD-tFdkA5Zjc1');
                         await launchUrl(uri, mode: LaunchMode.externalApplication);
                       },
                     ),

@@ -193,7 +193,7 @@ class AdminApp extends StatefulWidget {
 }
 
 class _AdminAppState extends State<AdminApp> {
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.dark;
 
   @override
   Widget build(BuildContext context) {
@@ -385,6 +385,7 @@ class _AdminHomeState extends State<AdminHome> {
     'Users',
     'Complaints',
     'Notifications',
+    'Slider Banners',
   ];
   static const _navItems = [
     (Icons.dashboard_outlined, 'Dashboard'),
@@ -398,6 +399,7 @@ class _AdminHomeState extends State<AdminHome> {
     (Icons.people_outline_rounded, 'Users'),
     (Icons.report_outlined, 'Complaints'),
     (Icons.notifications_outlined, 'Notifications'),
+    (Icons.view_carousel_outlined, 'Slider Banners'),
   ];
 
   @override
@@ -463,6 +465,7 @@ class _AdminHomeState extends State<AdminHome> {
       UsersPage(api: _api),
       ComplaintsPage(api: _api),
       NotificationsPage(api: _api),
+      SliderBannersPage(api: _api),
     ];
     final isLoggedIn = _api.token != null;
     if (isLoggedIn && !_checkedDriveAfterLogin) {
@@ -3405,16 +3408,16 @@ class _TestsPageState extends State<TestsPage> {
                                     Navigator.of(sheetContext).pop();
                                   }
                                   await _openQuestionsForTest(_selectedTestId!);
-                                  if (mounted) {
+                                  if (sheetContext.mounted) {
                                     _showActionSnackBar(
-                                      context,
+                                      sheetContext,
                                       '${selectedQuestionIds.length} questions moved to practice set.',
                                     );
                                   }
                                 } catch (e, st) {
-                                  if (mounted) {
+                                  if (sheetContext.mounted) {
                                     await _handleTaskError(
-                                      context,
+                                      sheetContext,
                                       'Move test questions to practice',
                                       e,
                                       stackTrace: st,
@@ -7166,6 +7169,341 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 }
 
+class SliderBannersPage extends StatefulWidget {
+  const SliderBannersPage({super.key, required this.api});
+
+  final AdminApi api;
+
+  @override
+  State<SliderBannersPage> createState() => _SliderBannersPageState();
+}
+
+class _SliderBannersPageState extends State<SliderBannersPage> {
+  late Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    setState(() {
+      _future = widget.api.fetchSliderImages();
+    });
+  }
+
+  void _showBannerDialog([Map<String, dynamic>? item]) {
+    final isEdit = item != null;
+    final titleCtrl = TextEditingController(text: item?['title'] ?? '');
+    final urlCtrl = TextEditingController(text: item?['image_url'] ?? '');
+    final linkCtrl = TextEditingController(text: item?['target_link'] ?? '');
+    final orderCtrl = TextEditingController(text: (item?['display_order'] ?? 1).toString());
+    bool isActive = item?['is_active'] ?? true;
+    bool busy = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          return AlertDialog(
+            title: Text(isEdit ? 'Edit Slider Banner' : 'Add New Slider Banner'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Banner Title / Caption',
+                      hintText: 'e.g. NEET 2026 Rank Booster',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: urlCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Image URL *',
+                      hintText: 'https://...',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: linkCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Target Link (Optional)',
+                      hintText: 'https://...',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: orderCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Display Order (1, 2, 3...)',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Active Banner'),
+                    value: isActive,
+                    onChanged: (val) => setDialogState(() => isActive = val),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: busy ? null : () => Navigator.of(ctx).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: busy
+                    ? null
+                    : () async {
+                        final url = urlCtrl.text.trim();
+                        if (url.isEmpty) {
+                          _showActionSnackBar(ctx, 'Image URL enter karo', isError: true);
+                          return;
+                        }
+                        setDialogState(() => busy = true);
+                        try {
+                          if (isEdit) {
+                            await widget.api.updateSliderImage(
+                              item['id'] as int,
+                              title: titleCtrl.text.trim(),
+                              imageUrl: url,
+                              targetLink: linkCtrl.text.trim(),
+                              displayOrder: int.tryParse(orderCtrl.text) ?? 0,
+                              isActive: isActive,
+                            );
+                          } else {
+                            await widget.api.addSliderImage(
+                              title: titleCtrl.text.trim(),
+                              imageUrl: url,
+                              targetLink: linkCtrl.text.trim(),
+                              displayOrder: int.tryParse(orderCtrl.text) ?? 0,
+                              isActive: isActive,
+                            );
+                          }
+                          if (ctx.mounted) Navigator.of(ctx).pop();
+                          _load();
+                          if (mounted) {
+                            _showActionSnackBar(
+                              context,
+                              isEdit ? 'Slider banner updated' : 'Slider banner added',
+                            );
+                          }
+                        } catch (e) {
+                          setDialogState(() => busy = false);
+                          if (ctx.mounted) {
+                            _showActionSnackBar(ctx, 'Error: $e', isError: true);
+                          }
+                        }
+                      },
+                child: _busyButtonChild(busy, isEdit ? 'Save Changes' : 'Add Banner'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteBanner(int id) async {
+    final confirm = await _confirmDeleteDialog(
+      context,
+      title: 'Delete Slider Banner?',
+      body: 'Kya aap is banner image ko delete karna chahte ho?',
+    );
+    if (!confirm) return;
+    try {
+      await widget.api.deleteSliderImage(id);
+      _load();
+      if (mounted) _showActionSnackBar(context, 'Banner deleted successfully');
+    } catch (e) {
+      if (mounted) _showActionSnackBar(context, 'Delete failed: $e', isError: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Home Image Slider Banners',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Manage 5 auto-sliding images displayed right below "Today\'s MCQs" on student app.',
+                      style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: () => _showBannerDialog(),
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+                label: const Text('Add Banner'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(40),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text('Failed to load slider images: ${snapshot.error}'),
+                );
+              }
+              final list = snapshot.data ?? [];
+              if (list.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(40),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.image_outlined, size: 48, color: Colors.grey),
+                        const SizedBox(height: 12),
+                        const Text('No slider images yet.'),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () => _showBannerDialog(),
+                          child: const Text('Add First Slider Banner'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: list.length,
+                itemBuilder: (context, index) {
+                  final item = list[index];
+                  final id = item['id'] as int;
+                  final title = item['title']?.toString() ?? '';
+                  final url = item['image_url']?.toString() ?? '';
+                  final order = item['display_order'] ?? 0;
+                  final isActive = item['is_active'] == true;
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              width: 100,
+                              height: 60,
+                              child: Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: Colors.grey.shade300,
+                                  child: const Icon(Icons.broken_image),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title.isNotEmpty ? title : 'Banner #$id',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  url,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: scheme.onSurface.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Chip(
+                                      label: Text('Order: $order'),
+                                      padding: EdgeInsets.zero,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Chip(
+                                      label: Text(isActive ? 'Active' : 'Inactive'),
+                                      backgroundColor: isActive
+                                          ? Colors.green.withValues(alpha: 0.15)
+                                          : Colors.grey.withValues(alpha: 0.15),
+                                      labelStyle: TextStyle(
+                                        color: isActive ? Colors.green : Colors.grey,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () => _showBannerDialog(item),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            onPressed: () => _deleteBanner(id),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class AdminApi {
   static const _tokenKey = 'admin_auth_token';
   String? token;
@@ -7232,6 +7570,49 @@ class AdminApi {
       _get('/admin/drive/oauth/start');
   Future<Map<String, dynamic>> driveOAuthStatus() =>
       _get('/admin/drive/oauth/status');
+
+  Future<List<Map<String, dynamic>>> fetchSliderImages() async {
+    final res = await _get('/admin/slider-images');
+    final list = res['sliderImages'] as List? ?? [];
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<void> addSliderImage({
+    required String title,
+    required String imageUrl,
+    String? targetLink,
+    int? displayOrder,
+    bool? isActive,
+  }) async {
+    await _postMap('/admin/slider-images', {
+      'title': title,
+      'image_url': imageUrl,
+      'target_link': targetLink ?? '',
+      'display_order': displayOrder ?? 0,
+      'is_active': isActive ?? true,
+    });
+  }
+
+  Future<void> updateSliderImage(
+    int id, {
+    String? title,
+    String? imageUrl,
+    String? targetLink,
+    int? displayOrder,
+    bool? isActive,
+  }) async {
+    await _put('/admin/slider-images/$id', {
+      if (title != null) 'title': title,
+      if (imageUrl != null) 'image_url': imageUrl,
+      if (targetLink != null) 'target_link': targetLink,
+      if (displayOrder != null) 'display_order': displayOrder,
+      if (isActive != null) 'is_active': isActive,
+    });
+  }
+
+  Future<void> deleteSliderImage(int id) async {
+    await _delete('/admin/slider-images/$id');
+  }
 
   Future<void> createBatch({
     required String name,

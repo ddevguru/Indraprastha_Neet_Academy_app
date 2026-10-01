@@ -595,6 +595,30 @@ async function ensureDatabaseSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_test_attempts_user_test ON test_attempts(user_id, test_id, attempted_at DESC);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_practice_attempts_user_set ON practice_attempts(user_id, practice_set_id, attempted_at DESC);`);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS slider_images (
+      id SERIAL PRIMARY KEY,
+      title VARCHAR(200) DEFAULT '',
+      image_url TEXT NOT NULL,
+      target_link TEXT DEFAULT '',
+      display_order INT DEFAULT 0,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  const sliderCount = await pool.query('SELECT COUNT(*)::int AS count FROM slider_images');
+  if (sliderCount.rows[0].count === 0) {
+    await pool.query(`
+      INSERT INTO slider_images (title, image_url, display_order, is_active) VALUES
+      ('NEET 2026/2027 Rank Booster', 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=1200&auto=format&fit=crop&q=80', 1, TRUE),
+      ('Biology NCERT Line-by-Line', 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&auto=format&fit=crop&q=80', 2, TRUE),
+      ('Full Syllabus Mock Test Series', 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&auto=format&fit=crop&q=80', 3, TRUE),
+      ('Physics & Chemistry Formula Sheets', 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80', 4, TRUE),
+      ('Daily Revision & Target Practice', 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1200&auto=format&fit=crop&q=80', 5, TRUE);
+    `);
+  }
+
   const collegeCount = await pool.query('SELECT COUNT(*)::int AS count FROM colleges');
   if (collegeCount.rows[0].count === 0) {
     await pool.query(`

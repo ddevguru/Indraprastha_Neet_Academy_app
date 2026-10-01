@@ -2933,4 +2933,86 @@ router.get('/logs/recent', adminAuth, async (req, res) => {
   }
 });
 
+// ── Slider Images Management ────────────────────────────────────────────────
+
+router.get('/slider-images', adminAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, image_url, target_link, display_order, is_active, created_at 
+       FROM slider_images 
+       ORDER BY display_order ASC, id ASC`
+    );
+    return res.json({ sliderImages: result.rows });
+  } catch (e) {
+    logAdminRouteError('/slider-images GET', e);
+    return res.status(500).json({ error: 'Failed to fetch slider images' });
+  }
+});
+
+router.post('/slider-images', adminAuth, async (req, res) => {
+  try {
+    const { title, image_url, target_link, display_order, is_active } = req.body;
+    if (!image_url) {
+      return res.status(400).json({ error: 'image_url is required' });
+    }
+    const order = parseInt(display_order, 10) || 0;
+    const active = is_active !== false;
+
+    const result = await pool.query(
+      `INSERT INTO slider_images (title, image_url, target_link, display_order, is_active)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [title || '', image_url.trim(), target_link || '', order, active]
+    );
+    return res.json({ success: true, sliderImage: result.rows[0] });
+  } catch (e) {
+    logAdminRouteError('/slider-images POST', e);
+    return res.status(500).json({ error: 'Failed to create slider image' });
+  }
+});
+
+router.put('/slider-images/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, image_url, target_link, display_order, is_active } = req.body;
+
+    const result = await pool.query(
+      `UPDATE slider_images 
+       SET title = COALESCE($1, title),
+           image_url = COALESCE($2, image_url),
+           target_link = COALESCE($3, target_link),
+           display_order = COALESCE($4, display_order),
+           is_active = COALESCE($5, is_active)
+       WHERE id = $6
+       RETURNING *`,
+      [title, image_url, target_link, display_order, is_active, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Slider image not found' });
+    }
+    return res.json({ success: true, sliderImage: result.rows[0] });
+  } catch (e) {
+    logAdminRouteError('/slider-images/:id PUT', e);
+    return res.status(500).json({ error: 'Failed to update slider image' });
+  }
+});
+
+router.delete('/slider-images/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `DELETE FROM slider_images WHERE id = $1 RETURNING id`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Slider image not found' });
+    }
+    return res.json({ success: true, deletedId: id });
+  } catch (e) {
+    logAdminRouteError('/slider-images/:id DELETE', e);
+    return res.status(500).json({ error: 'Failed to delete slider image' });
+  }
+});
+
 module.exports = router;

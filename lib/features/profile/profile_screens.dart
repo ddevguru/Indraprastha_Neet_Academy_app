@@ -667,7 +667,7 @@ class _SettingsPanel extends ConsumerWidget {
                 .read(appUiControllerProvider.notifier)
                 .toggleTheme(value),
             title: const Text('Dark mode'),
-            subtitle: const Text('Light theme first, with a local toggle for preference.'),
+            subtitle: const Text('Dark theme enabled by default, with a local toggle.'),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,

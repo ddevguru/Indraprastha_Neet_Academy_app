@@ -947,4 +947,19 @@ router.get('/notifications', userAuth, async (req, res) => {
   }
 });
 
+router.get('/slider-images', userAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, image_url, target_link, display_order 
+       FROM slider_images 
+       WHERE is_active = TRUE 
+       ORDER BY display_order ASC, id ASC`
+    );
+    return res.json({ sliderImages: result.rows });
+  } catch (e) {
+    console.error('[API] /content/slider-images GET error:', e.message);
+    return res.status(500).json({ error: 'Failed to fetch slider images' });
+  }
+});
+
 module.exports = router;
