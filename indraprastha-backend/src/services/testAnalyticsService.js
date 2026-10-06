@@ -440,7 +440,10 @@ class TestAnalyticsService {
       ? await db.query(
           `SELECT question_id, is_correct, user_answer FROM test_attempt_details WHERE test_attempt_id = $1`,
           [attemptId]
-        )
+        ).catch((err) => {
+          console.error('[TEST_ATTEMPT_DETAILS_QUERY_ERROR]', err.message);
+          return { rows: [] };
+        })
       : { rows: [] };
 
     const ansMap = new Map();
@@ -542,7 +545,10 @@ class TestAnalyticsService {
       ? await db.query(
           `SELECT question_id, is_correct, user_answer FROM test_attempt_details WHERE test_attempt_id = $1`,
           [attemptId]
-        )
+        ).catch((err) => {
+          console.error('[TEST_ATTEMPT_DETAILS_QUERY_ERROR]', err.message);
+          return { rows: [] };
+        })
       : { rows: [] };
 
     const ansMap = new Map();

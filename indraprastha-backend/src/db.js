@@ -409,6 +409,83 @@ async function ensureDatabaseSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS test_attempt_details (
+      id SERIAL PRIMARY KEY,
+      test_attempt_id INTEGER REFERENCES test_attempts(id) ON DELETE CASCADE,
+      question_id INTEGER REFERENCES test_questions(id) ON DELETE SET NULL,
+      subject VARCHAR(80),
+      topic VARCHAR(140),
+      is_correct BOOLEAN DEFAULT FALSE,
+      time_taken_seconds INTEGER DEFAULT 0,
+      user_answer VARCHAR(10),
+      correct_answer VARCHAR(10),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_test_attempt_details_test_attempt ON test_attempt_details(test_attempt_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_test_attempt_details_subject_topic ON test_attempt_details(subject, topic);`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_analytics (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+      total_tests_taken INTEGER DEFAULT 0,
+      average_score NUMERIC(5,2) DEFAULT 0,
+      average_accuracy NUMERIC(5,2) DEFAULT 0,
+      physics_accuracy NUMERIC(5,2) DEFAULT 0,
+      chemistry_accuracy NUMERIC(5,2) DEFAULT 0,
+      biology_accuracy NUMERIC(5,2) DEFAULT 0,
+      topic_accuracy JSONB DEFAULT '{}',
+      weak_topics TEXT[] DEFAULT '{}',
+      strong_topics TEXT[] DEFAULT '{}',
+      average_time_per_question NUMERIC(5,2) DEFAULT 0,
+      speed_trend JSONB DEFAULT '{}',
+      daily_study_hours NUMERIC(5,2) DEFAULT 0,
+      study_hours_history JSONB DEFAULT '{}',
+      predicted_neet_score INTEGER DEFAULT 0,
+      predicted_neet_rank INTEGER DEFAULT 0,
+      prediction_confidence NUMERIC(5,2) DEFAULT 0,
+      current_study_streak INTEGER DEFAULT 0,
+      longest_study_streak INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_analytics_user_id ON user_analytics(user_id);`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS study_logs (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      date DATE,
+      study_hours NUMERIC(5,2) DEFAULT 0,
+      questions_attempted INTEGER DEFAULT 0,
+      questions_correct INTEGER DEFAULT 0,
+      tests_taken INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, date)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_study_logs_user_id_date ON study_logs(user_id, date);`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS topic_performance (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      subject VARCHAR(80),
+      topic VARCHAR(140),
+      accuracy NUMERIC(5,2) DEFAULT 0,
+      questions_attempted INTEGER DEFAULT 0,
+      questions_correct INTEGER DEFAULT 0,
+      last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, subject, topic)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_topic_performance_user_id ON topic_performance(user_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_topic_performance_accuracy ON topic_performance(accuracy);`);
+
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS practice_attempts (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
