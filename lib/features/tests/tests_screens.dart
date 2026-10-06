@@ -18,6 +18,7 @@ import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../core/utils/drive_image_url.dart';
+import 'test_performance_analytics_screen.dart';
 import '../../core/utils/question_fields.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
@@ -637,6 +638,15 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
         : ((correct * posPerQ) - (wrong * negPerQ)).round();
     final accuracy = _answers.isEmpty ? 0.0 : (correct / _answers.length) * 100;
     try {
+      final userAnswersList = _answers.entries.map((e) {
+        final qIdx = e.key;
+        final qId = (qIdx >= 0 && qIdx < questions.length) ? questions[qIdx]['id'] : null;
+        return {
+          'questionId': qId,
+          'selectedOption': e.value,
+        };
+      }).toList();
+
       final res = await ref.read(contentRepositoryProvider).submitTestAttempt(
         testId: widget.testId,
         score: score,
@@ -644,6 +654,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
         correctCount: correct,
         wrongCount: wrong,
         unattemptedCount: unattempted,
+        userAnswers: userAnswersList,
       );
       if (!mounted) return;
 
@@ -877,110 +888,65 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                 questions: questions,
                 test: test,
               );
-          return Scaffold(
-            appBar: AppBar(
-              title: Text(test['title']?.toString() ?? 'Test Result'),
-            ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: CenteredContent(
-                maxWidth: 980,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _ScoreSummaryCard(
-                      testTitle: test['title']?.toString() ?? 'Test',
-                      marks: (test['marks'] as num?)?.toInt() ?? 720,
-                      questions: questions.length,
-                      response: response,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    _AiInsightsPanel(
-                      insights: List<Map<String, dynamic>>.from(
-                        (response['insights'] as List<dynamic>?) ?? const [],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: PrimaryButton(
-                            label: 'Review answers',
-                            expanded: true,
-                            icon: Icons.fact_check_rounded,
-                            onPressed: () {
-                              final response = _submitResponse ??
-                                  _buildLocalSubmitResponse(
-                                    questions: questions,
-                                    test: test,
-                                  );
-                              final reviewQuestions = _questionsForReview(
-                                questions: questions,
-                                submitResponse: response,
-                              );
-                              final marks =
-                                  (test['marks'] as num?)?.toInt() ?? 720;
-                              final items = List.generate(
-                                reviewQuestions.length,
-                                (i) => AnswerReviewEntry.fromAbcdMap(
-                                  question: reviewQuestions[i],
-                                  index: i,
-                                  selectedOption: _answers[i],
-                                ),
-                              );
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      PaginatedAnswerReviewScreen(
-                                    title: 'Review Answers',
-                                    items: items,
-                                    score: _scoreFromSubmitResponse(response),
-                                    totalMarks: marks,
-                                    accuracy:
-                                        _accuracyFromSubmitResponse(response),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    SecondaryButton(
-                      label: 'Download Incorrect PDF',
-                      expanded: true,
-                      icon: Icons.picture_as_pdf_rounded,
-                      onPressed: () {
-                        final response = _submitResponse ??
-                            _buildLocalSubmitResponse(
-                              questions: questions,
-                              test: test,
-                            );
-                        final reviewQuestions = _questionsForReview(
-                          questions: questions,
-                          submitResponse: response,
-                        );
-                        final items = List.generate(
-                          reviewQuestions.length,
-                          (i) => AnswerReviewEntry.fromAbcdMap(
-                            question: reviewQuestions[i],
-                            index: i,
-                            selectedOption: _answers[i],
-                          ),
-                        );
-                        IncorrectPdfService.downloadFromReviewEntries(
-                          context: context,
-                          title: test['title']?.toString() ?? 'Test Result',
-                          entries: items,
-                        );
-                      },
-                    ),
-                  ],
+          final perfData = response['performance_analysis'] is Map
+              ? Map<String, dynamic>.from(response['performance_analysis'] as Map)
+              : (response['performanceAnalysis'] is Map
+                  ? Map<String, dynamic>.from(response['performanceAnalysis'] as Map)
+                  : null);
+
+          void handleReviewAnswers() {
+            final reviewQuestions = _questionsForReview(
+              questions: questions,
+              submitResponse: response,
+            );
+            final marks = (test['marks'] as num?)?.toInt() ?? 720;
+            final items = List.generate(
+              reviewQuestions.length,
+              (i) => AnswerReviewEntry.fromAbcdMap(
+                question: reviewQuestions[i],
+                index: i,
+                selectedOption: _answers[i],
+              ),
+            );
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PaginatedAnswerReviewScreen(
+                  title: 'Review Answers',
+                  items: items,
+                  score: _scoreFromSubmitResponse(response),
+                  totalMarks: marks,
+                  accuracy: _accuracyFromSubmitResponse(response),
                 ),
               ),
-            ),
+            );
+          }
+
+          void handleDownloadPdf() {
+            final reviewQuestions = _questionsForReview(
+              questions: questions,
+              submitResponse: response,
+            );
+            final items = List.generate(
+              reviewQuestions.length,
+              (i) => AnswerReviewEntry.fromAbcdMap(
+                question: reviewQuestions[i],
+                index: i,
+                selectedOption: _answers[i],
+              ),
+            );
+            IncorrectPdfService.downloadFromReviewEntries(
+              context: context,
+              title: test['title']?.toString() ?? 'Test Result',
+              entries: items,
+            );
+          }
+
+          return TestPerformanceAnalyticsScreen(
+            testId: widget.testId,
+            preloadedData: perfData,
+            onReviewAnswers: handleReviewAnswers,
+            onDownloadPdf: handleDownloadPdf,
           );
         }
 

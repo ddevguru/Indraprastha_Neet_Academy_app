@@ -150,6 +150,7 @@ class ContentRepository {
     required int correctCount,
     required int wrongCount,
     required int unattemptedCount,
+    List<Map<String, dynamic>>? userAnswers,
   }) async {
     final token = await _token;
     if (token == null) {
@@ -167,6 +168,7 @@ class ContentRepository {
         'correctCount': correctCount,
         'wrongCount': wrongCount,
         'unattemptedCount': unattemptedCount,
+        if (userAnswers != null) 'userAnswers': userAnswers,
       }),
     );
     final body = response.body.isEmpty
@@ -178,6 +180,30 @@ class ContentRepository {
     }
     throw Exception(body['error']?.toString() ?? 'Failed request');
   }
+
+  Future<Map<String, dynamic>> fetchTestPerformanceAnalysis(int testId) async {
+    final token = await _token;
+    if (token == null) {
+      throw Exception('Not logged in. Please login again.');
+    }
+    final response = await _client.get(
+      Uri.parse('$baseUrl/content/tests/$testId/performance-analysis'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return body['data'] is Map
+          ? Map<String, dynamic>.from(body['data'] as Map)
+          : body;
+    }
+    throw Exception(body['error']?.toString() ?? 'Failed to fetch performance analysis');
+  }
+
 
   Future<Map<String, dynamic>> submitPracticeAttempt({
     required int setId,

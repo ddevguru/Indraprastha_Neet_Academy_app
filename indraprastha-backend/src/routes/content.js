@@ -5,6 +5,7 @@ const pdfParse = require('pdf-parse');
 const { pool } = require('../db');
 const { normalizeTestCategory, getCategoryType } = require('../utils/categoryHelper');
 const { recordUserStreakActivity } = require('./streaks');
+const testAnalyticsService = require('../services/testAnalyticsService');
 const {
   normalizeDriveLink,
   extractDriveFileId,
@@ -661,6 +662,8 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
       correctCount = 0,
       wrongCount = 0,
       unattemptedCount = 0,
+      userAnswers = [],
+      answers = [],
     } = req.body || {};
 
     const attempt = await pool.query(
@@ -683,6 +686,21 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
       durationMinutes: 30,
       metadata: { testId, correctCount, wrongCount, score }
     }).catch(e => console.error('[STREAK_LOG_TEST_ERROR]', e.message));
+
+    // Advanced Test Performance Analytics Engine (Top 100 benchmark, topic breakdown, priority areas, AI mentor)
+    const answersPayload = Array.isArray(userAnswers) && userAnswers.length > 0 ? userAnswers : (Array.isArray(answers) ? answers : []);
+    let performanceAnalysis = null;
+    try {
+      performanceAnalysis = await testAnalyticsService.calculateTestAnalytics(
+        req.user.id,
+        testId,
+        attempt.rows[0].id,
+        answersPayload
+      );
+    } catch (analyticsErr) {
+      console.error('[TEST_PERFORMANCE_ANALYTICS_CALC_ERROR]', analyticsErr.message);
+    }
+
     const testMeta = testExists.rows[0];
     const subject = (testMeta.subject || 'this subject').toString();
     const topic = (testMeta.topic || 'current topic').toString();
@@ -788,6 +806,8 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
       success: true,
       attempt: attempt.rows[0],
       analytics: analytics.rows[0],
+      performance_analysis: performanceAnalysis,
+      performanceAnalysis: performanceAnalysis,
       donut: {
         correct: analytics.rows[0].correct_count,
         wrong: analytics.rows[0].wrong_count,
@@ -814,6 +834,31 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
       userId: req.user?.id,
     });
     return res.status(500).json({ error: e?.message || 'Submit failed' });
+  }
+});
+
+router.get('/tests/:testId/performance-analysis', userAuth, async (req, res) => {
+  try {
+    const testId = Number(req.params.testId);
+    if (!Number.isFinite(testId) || testId <= 0) {
+      return res.status(400).json({ error: 'Invalid testId' });
+    }
+
+    const performanceAnalysis = await testAnalyticsService.getPerformanceAnalysis(
+      req.user.id,
+      testId
+    );
+
+    return res.json({
+      success: true,
+      data: performanceAnalysis,
+      performance_analysis: performanceAnalysis,
+      ...performanceAnalysis,
+    });
+  } catch (e) {
+    console.error('[GET_PERFORMANCE_ANALYSIS_ERROR]', e.message);
+    const statusCode = e.statusCode || 500;
+    return res.status(statusCode).json({ error: e.message || 'Failed to fetch performance analysis' });
   }
 });
 

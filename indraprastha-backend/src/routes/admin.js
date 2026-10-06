@@ -2949,6 +2949,28 @@ router.get('/slider-images', adminAuth, async (req, res) => {
   }
 });
 
+router.post('/slider-images/upload', adminAuth, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'image file is required' });
+    }
+    const uploaded = await uploadQuestionImageFast({ file: req.file, batchId: 0 });
+    const link = uploaded.driveLink || '';
+    if (!link) {
+      return res.status(500).json({ error: 'Failed to upload image. Make sure Google Drive is connected.' });
+    }
+    return res.json({
+      success: true,
+      imageUrl: link,
+      imageLink: link,
+      driveFileId: uploaded.driveFileId,
+    });
+  } catch (e) {
+    logAdminRouteError('/slider-images/upload POST', e);
+    return res.status(500).json({ error: e.message || 'Failed to upload slider image' });
+  }
+});
+
 router.post('/slider-images', adminAuth, async (req, res) => {
   try {
     const { title, image_url, target_link, display_order, is_active } = req.body;

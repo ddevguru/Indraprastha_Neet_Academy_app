@@ -15,8 +15,28 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
+const testAnalyticsService = require('../services/testAnalyticsService');
+
 /**
- * GET /analytics/analyze-test/:testAttemptId
+ * GET /analytics/test-performance/:testId
+ * Advanced Test Performance Analytics, Top 100 Benchmark & AI Mentor
+ */
+router.get('/test-performance/:testId', async (req, res) => {
+  try {
+    const testId = Number(req.params.testId);
+    const userId = req.userId || req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const data = await testAnalyticsService.getPerformanceAnalysis(userId, testId);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error fetching test performance analytics:', error);
+    const status = error.statusCode || 400;
+    res.status(status).json({ error: error.message || 'Failed to fetch test performance analytics' });
+  }
+});
+
+/**
  * Analyze a specific test attempt
  */
 router.post('/analyze-test/:testAttemptId', requireAuth, async (req, res) => {

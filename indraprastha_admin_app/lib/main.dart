@@ -561,6 +561,8 @@ class _AdminHomeState extends State<AdminHome> {
                         color: selected ? scheme.primary : null, size: 20),
                     title: Text(
                       item.$2,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontWeight:
                             selected ? FontWeight.w700 : FontWeight.w500,
@@ -648,18 +650,20 @@ class _AdminHomeState extends State<AdminHome> {
           body: Row(
             children: [
               // Permanent sidebar
-              Container(
+              SizedBox(
                 width: 240,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1A1D26) : Colors.white,
-                  border:
-                      Border(right: BorderSide(color: scheme.outlineVariant)),
-                ),
-                child: Column(
-                  children: [
-                    sidebarHeader,
-                    Expanded(child: buildNavList()),
-                  ],
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1A1D26) : Colors.white,
+                    border:
+                        Border(right: BorderSide(color: scheme.outlineVariant)),
+                  ),
+                  child: Column(
+                    children: [
+                      sidebarHeader,
+                      Expanded(child: buildNavList()),
+                    ],
+                  ),
                 ),
               ),
               // Content area
@@ -7201,70 +7205,163 @@ class _SliderBannersPageState extends State<SliderBannersPage> {
     final orderCtrl = TextEditingController(text: (item?['display_order'] ?? 1).toString());
     bool isActive = item?['is_active'] ?? true;
     bool busy = false;
+    bool uploadingImage = false;
+    File? selectedLocalFile;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogCtx, setDialogState) {
+          final currentUrl = urlCtrl.text.trim();
           return AlertDialog(
             title: Text(isEdit ? 'Edit Slider Banner' : 'Add New Slider Banner'),
             content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: titleCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Banner Title / Caption',
-                      hintText: 'e.g. NEET 2026 Rank Booster',
+              child: SizedBox(
+                width: 480,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: titleCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Banner Title / Caption',
+                        hintText: 'e.g. NEET 2026 Rank Booster',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: urlCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Image URL *',
-                      hintText: 'https://...',
+                    const SizedBox(height: 14),
+                    Text(
+                      'Banner Image *',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: linkCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Target Link (Optional)',
-                      hintText: 'https://...',
+                    const SizedBox(height: 6),
+                    if (selectedLocalFile != null || currentUrl.isNotEmpty) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 140,
+                          width: double.infinity,
+                          color: Colors.black12,
+                          child: selectedLocalFile != null
+                              ? Image.file(selectedLocalFile!, fit: BoxFit.cover)
+                              : Image.network(
+                                  currentUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (c, e, s) => const Center(
+                                    child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: (uploadingImage || busy)
+                                ? null
+                                : () async {
+                                    try {
+                                      final result = await FilePicker.platform.pickFiles(
+                                        type: FileType.image,
+                                      );
+                                      if (result?.files.single.path == null) return;
+                                      final pickedFile = File(result!.files.single.path!);
+                                      setDialogState(() {
+                                        selectedLocalFile = pickedFile;
+                                        uploadingImage = true;
+                                      });
+
+                                      final uploadedUrl =
+                                          await widget.api.uploadSliderBannerImage(pickedFile);
+                                      if (dialogCtx.mounted) {
+                                        setDialogState(() {
+                                          urlCtrl.text = uploadedUrl;
+                                          uploadingImage = false;
+                                        });
+                                        _showActionSnackBar(dialogCtx, 'Image uploaded successfully!');
+                                      }
+                                    } catch (e) {
+                                      if (dialogCtx.mounted) {
+                                        setDialogState(() => uploadingImage = false);
+                                        _showActionSnackBar(
+                                          dialogCtx,
+                                          'Image upload failed: $e',
+                                          isError: true,
+                                        );
+                                      }
+                                    }
+                                  },
+                            icon: uploadingImage
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.upload_file_rounded),
+                            label: Text(
+                              uploadingImage
+                                  ? 'Uploading Image...'
+                                  : (selectedLocalFile != null || currentUrl.isNotEmpty
+                                      ? 'Change Image (Upload from Device)'
+                                      : 'Upload Image from Media / Device'),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: orderCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Display Order (1, 2, 3...)',
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: urlCtrl,
+                      onChanged: (_) => setDialogState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'Image URL',
+                        hintText: 'https://... (auto-filled on upload)',
+                        isDense: true,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Active Banner'),
-                    value: isActive,
-                    onChanged: (val) => setDialogState(() => isActive = val),
-                  ),
-                ],
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: linkCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Target Link (Optional)',
+                        hintText: 'https://...',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: orderCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Display Order (1, 2, 3...)',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Active Banner'),
+                      value: isActive,
+                      onChanged: (val) => setDialogState(() => isActive = val),
+                    ),
+                  ],
+                ),
               ),
             ),
             actions: [
               TextButton(
-                onPressed: busy ? null : () => Navigator.of(ctx).pop(),
+                onPressed: (busy || uploadingImage) ? null : () => Navigator.of(ctx).pop(),
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: busy
+                onPressed: (busy || uploadingImage)
                     ? null
                     : () async {
                         final url = urlCtrl.text.trim();
                         if (url.isEmpty) {
-                          _showActionSnackBar(ctx, 'Image URL enter karo', isError: true);
+                          _showActionSnackBar(ctx, 'Image upload step or URL required', isError: true);
                           return;
                         }
                         setDialogState(() => busy = true);
@@ -7336,32 +7433,59 @@ class _SliderBannersPageState extends State<SliderBannersPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 600;
+              final titleText = Text(
+                'Home Image Slider Banners',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              );
+              final subtitleText = Text(
+                'Manage 5 auto-sliding images displayed right below "Today\'s MCQs" on student app.',
+                style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
+              );
+
+              if (isNarrow) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Home Image Slider Banners',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
+                    titleText,
                     const SizedBox(height: 4),
-                    Text(
-                      'Manage 5 auto-sliding images displayed right below "Today\'s MCQs" on student app.',
-                      style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
+                    subtitleText,
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () => _showBannerDialog(),
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                      label: const Text('Add Banner'),
                     ),
                   ],
-                ),
-              ),
-              FilledButton.icon(
-                onPressed: () => _showBannerDialog(),
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: const Text('Add Banner'),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleText,
+                        const SizedBox(height: 4),
+                        subtitleText,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  FilledButton.icon(
+                    onPressed: () => _showBannerDialog(),
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: const Text('Add Banner'),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 20),
           FutureBuilder<List<Map<String, dynamic>>>(
@@ -7612,6 +7736,34 @@ class AdminApi {
 
   Future<void> deleteSliderImage(int id) async {
     await _delete('/admin/slider-images/$id');
+  }
+
+  Future<String> uploadSliderBannerImage(File file) async {
+    const path = '/admin/slider-images/upload';
+    if (token == null) throw Exception('Login first');
+    try {
+      final req = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
+      req.headers['Authorization'] = 'Bearer $token';
+      final bytes = await file.readAsBytes();
+      final name = file.path.split(Platform.pathSeparator).last;
+      req.files.add(http.MultipartFile.fromBytes('image', bytes, filename: name));
+      final streamed = await req.send();
+      final bodyText = await streamed.stream.bytesToString();
+      final json = _decodeApiJson(
+        bodyText,
+        statusCode: streamed.statusCode,
+        method: 'POST',
+        path: path,
+      );
+      if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+        throw Exception(json['error'] ?? 'Slider image upload failed');
+      }
+      final link = json['imageUrl']?.toString() ?? json['imageLink']?.toString() ?? '';
+      if (link.isEmpty) throw Exception('No image URL returned from server');
+      return link;
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<void> createBatch({
