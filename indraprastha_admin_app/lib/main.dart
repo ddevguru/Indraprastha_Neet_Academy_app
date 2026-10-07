@@ -1461,6 +1461,7 @@ class _BooksPageState extends State<BooksPage> {
   final _pyqOptionC = TextEditingController();
   final _pyqOptionD = TextEditingController();
   final _pyqExplanation = TextEditingController();
+  final _pyqExplanationVideoLink = TextEditingController();
   String _pyqCorrect = 'A';
   int? _editingPyqId;
   File? _pyqImage;
@@ -1839,6 +1840,15 @@ class _BooksPageState extends State<BooksPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                TextField(
+                  controller: _pyqExplanationVideoLink,
+                  decoration: const InputDecoration(
+                    labelText: 'Explanation Video Link (YouTube / Drive / MP4 URL)',
+                    hintText: 'e.g. https://www.youtube.com/watch?... or Google Drive link',
+                    prefixIcon: Icon(Icons.smart_display_outlined),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -1912,6 +1922,7 @@ class _BooksPageState extends State<BooksPage> {
                       : () async {
                           var imageLink = _pyqImageLink;
                           var expLink = _pyqExplanationImageLink;
+                          final videoLink = _pyqExplanationVideoLink.text.trim();
                           if (_editingPyqId != null) {
                             if (_pyqImage != null && _batchId != null) {
                               if (!await _validateImageFile(context, _pyqImage!)) {
@@ -1957,6 +1968,7 @@ class _BooksPageState extends State<BooksPage> {
                               explanation: _pyqExplanation.text.trim(),
                               questionImageLink: imageLink,
                               explanationImageLink: expLink,
+                              explanationVideoLink: videoLink,
                             );
                             setState(() => _editingPyqId = null);
                           } else {
@@ -1983,6 +1995,7 @@ class _BooksPageState extends State<BooksPage> {
                                 explanationImage: _pyqExplanationImage,
                                 questionImageLink: imageLink,
                                 explanationImageLink: expLink,
+                                explanationVideoLink: videoLink,
                               );
                             } else {
                               await widget.api.addPyq(
@@ -1996,6 +2009,7 @@ class _BooksPageState extends State<BooksPage> {
                                 explanation: _pyqExplanation.text.trim(),
                                 questionImageLink: imageLink,
                                 explanationImageLink: expLink,
+                                explanationVideoLink: videoLink,
                               );
                             }
                           }
@@ -2005,6 +2019,7 @@ class _BooksPageState extends State<BooksPage> {
                             _pyqImageLink = imageLink;
                             _pyqExplanationImage = null;
                             _pyqExplanationImageLink = expLink;
+                            _pyqExplanationVideoLink.clear();
                           });
                           if (context.mounted) {
                             _showActionSnackBar(
@@ -2104,6 +2119,10 @@ class _BooksPageState extends State<BooksPage> {
                                                                     'explanation']
                                                                 ?.toString() ??
                                                             '';
+                                                        _pyqExplanationVideoLink.text =
+                                                            q['explanation_video_link']?.toString() ??
+                                                                q['explanation_video_url']?.toString() ??
+                                                                '';
                                                         _pyqImageLink =
                                                             q['question_image_link']
                                                                     ?.toString() ??
@@ -2404,6 +2423,7 @@ class _PracticePageState extends State<PracticePage> {
   final _pqOptionC = TextEditingController();
   final _pqOptionD = TextEditingController();
   final _pqExplanation = TextEditingController();
+  final _pqExplanationVideoLink = TextEditingController();
   String _pqCorrect = 'A';
   File? _pqImage;
   String _pqImageLink = '';
@@ -2432,6 +2452,7 @@ class _PracticePageState extends State<PracticePage> {
     _pqOptionC.dispose();
     _pqOptionD.dispose();
     _pqExplanation.dispose();
+    _pqExplanationVideoLink.dispose();
     super.dispose();
   }
 
@@ -2515,7 +2536,14 @@ class _PracticePageState extends State<PracticePage> {
                                             'A';
                                     _pqExplanation.text =
                                         question['explanation']?.toString() ?? '';
+                                    _pqExplanationVideoLink.text =
+                                        question['explanation_video_link']?.toString() ??
+                                            question['explanation_video_url']?.toString() ??
+                                            '';
                                     _pqImageLink = question['question_image_link']
+                                            ?.toString() ??
+                                        '';
+                                    _pqExplanationImageLink = question['explanation_image_link']
                                             ?.toString() ??
                                         '';
                                     _pqImage = null;
@@ -2822,6 +2850,15 @@ class _PracticePageState extends State<PracticePage> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                TextField(
+                  controller: _pqExplanationVideoLink,
+                  decoration: const InputDecoration(
+                    labelText: 'Explanation Video Link (YouTube / Drive / MP4 URL)',
+                    hintText: 'e.g. https://www.youtube.com/watch?... or Google Drive link',
+                    prefixIcon: Icon(Icons.smart_display_outlined),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -2895,6 +2932,7 @@ class _PracticePageState extends State<PracticePage> {
                           try {
                             var imageLink = _pqImageLink;
                             var expLink = _pqExplanationImageLink;
+                            final videoLink = _pqExplanationVideoLink.text.trim();
                             if (_editingPracticeQuestionId == null) {
                               if (_pqImage != null &&
                                   !await _validateImageFile(context, _pqImage!)) {
@@ -2919,6 +2957,7 @@ class _PracticePageState extends State<PracticePage> {
                                   explanationImage: _pqExplanationImage,
                                   questionImageLink: imageLink,
                                   explanationImageLink: expLink,
+                                  explanationVideoLink: videoLink,
                                 );
                               } else {
                                 await widget.api.addPracticeQuestion(
@@ -2932,6 +2971,7 @@ class _PracticePageState extends State<PracticePage> {
                                   explanation: _pqExplanation.text.trim(),
                                   questionImageLink: imageLink,
                                   explanationImageLink: expLink,
+                                  explanationVideoLink: videoLink,
                                 );
                               }
                             } else {
@@ -2993,6 +3033,7 @@ class _PracticePageState extends State<PracticePage> {
                                 explanation: _pqExplanation.text.trim(),
                                 questionImageLink: imageLink,
                                 explanationImageLink: expLink,
+                                explanationVideoLink: videoLink,
                               );
                             }
                             _pqQuestion.clear();
@@ -3001,6 +3042,7 @@ class _PracticePageState extends State<PracticePage> {
                             _pqOptionC.clear();
                             _pqOptionD.clear();
                             _pqExplanation.clear();
+                            _pqExplanationVideoLink.clear();
                             setState(() {
                               _editingPracticeQuestionId = null;
                               _pqImage = null;
@@ -3219,6 +3261,7 @@ class _TestsPageState extends State<TestsPage> {
   final _testOptionC = TextEditingController();
   final _testOptionD = TextEditingController();
   final _testExplanation = TextEditingController();
+  final _testExplanationVideoLink = TextEditingController();
   String _testCorrect = 'A';
   int? _editingQuestionId;
   File? _testQuestionImage;
@@ -3288,6 +3331,7 @@ class _TestsPageState extends State<TestsPage> {
     _testOptionC.clear();
     _testOptionD.clear();
     _testExplanation.clear();
+    _testExplanationVideoLink.clear();
     setState(() {
       _editingQuestionId = null;
       _testCorrect = 'A';
@@ -3527,6 +3571,10 @@ class _TestsPageState extends State<TestsPage> {
                                                 'A';
                                             _testExplanation.text =
                                                 question['explanation']?.toString() ??
+                                                    '';
+                                            _testExplanationVideoLink.text =
+                                                question['explanation_video_link']?.toString() ??
+                                                    question['explanation_video_url']?.toString() ??
                                                     '';
                                             _testQuestionImageLink =
                                                 question['question_image_link']
@@ -3851,6 +3899,15 @@ class _TestsPageState extends State<TestsPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                TextField(
+                  controller: _testExplanationVideoLink,
+                  decoration: const InputDecoration(
+                    labelText: 'Explanation Video Link (YouTube / Drive / MP4 URL)',
+                    hintText: 'e.g. https://www.youtube.com/watch?... or Google Drive link',
+                    prefixIcon: Icon(Icons.smart_display_outlined),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 // Question image
                 Row(
                   children: [
@@ -3998,6 +4055,7 @@ class _TestsPageState extends State<TestsPage> {
                               try {
                                 var imageLink = _testQuestionImageLink;
                                 var expLink = _testExplanationImageLink;
+                                final videoLink = _testExplanationVideoLink.text.trim();
                                 var savedQuestionId = _editingQuestionId;
                                 final wasEditing = _editingQuestionId != null;
                                 final hasMedia = _testQuestionImage != null ||
@@ -4040,6 +4098,7 @@ class _TestsPageState extends State<TestsPage> {
                                               _pendingExtraExplanationImages),
                                       questionImageLink: imageLink,
                                       explanationImageLink: expLink,
+                                      explanationVideoLink: videoLink,
                                     );
                                     _pendingExtraExplanationImages.clear();
                                   } else {
@@ -4057,6 +4116,7 @@ class _TestsPageState extends State<TestsPage> {
                                       subject: _subject.text.trim(),
                                       questionImageLink: imageLink,
                                       explanationImageLink: expLink,
+                                      explanationVideoLink: videoLink,
                                     );
                                   }
                                 } else {
@@ -4121,6 +4181,7 @@ class _TestsPageState extends State<TestsPage> {
                                     subject: _subject.text.trim(),
                                     questionImageLink: imageLink,
                                     explanationImageLink: expLink,
+                                    explanationVideoLink: videoLink,
                                   );
                                 }
                                 if (wasEditing &&
@@ -8015,6 +8076,7 @@ class AdminApi {
     required String subject,
     String questionImageLink = '',
     String explanationImageLink = '',
+    String explanationVideoLink = '',
   }) async {
     final body = await _postMap('/admin/tests/$testId/questions', {
       'question': question,
@@ -8027,6 +8089,7 @@ class AdminApi {
       'subject': subject,
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
+      'explanationVideoLink': explanationVideoLink,
     });
     final questionObj = body['question'];
     if (questionObj is Map<String, dynamic>) {
@@ -8121,6 +8184,7 @@ class AdminApi {
     List<File> extraExplanationImages = const [],
     String questionImageLink = '',
     String explanationImageLink = '',
+    String explanationVideoLink = '',
   }) async {
     final body = await _postQuestionWithMedia(
       path: '/admin/tests/$testId/questions/with-media',
@@ -8135,6 +8199,7 @@ class AdminApi {
         'subject': subject,
         'questionImageLink': questionImageLink,
         'explanationImageLink': explanationImageLink,
+        'explanationVideoLink': explanationVideoLink,
       },
       questionImage: questionImage,
       explanationImage: explanationImage,
@@ -8163,6 +8228,7 @@ class AdminApi {
     required String subject,
     String questionImageLink = '',
     String explanationImageLink = '',
+    String explanationVideoLink = '',
   }) async {
     await _put('/admin/test-questions/$id', {
       'question': question,
@@ -8175,6 +8241,7 @@ class AdminApi {
       'subject': subject,
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
+      'explanationVideoLink': explanationVideoLink,
     });
   }
 
@@ -8207,6 +8274,7 @@ class AdminApi {
     required String explanation,
     String questionImageLink = '',
     String explanationImageLink = '',
+    String explanationVideoLink = '',
   }) async {
     await _postMap('/admin/practice-sets/$setId/questions', {
       'question': question,
@@ -8218,6 +8286,7 @@ class AdminApi {
       'explanation': explanation,
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
+      'explanationVideoLink': explanationVideoLink,
     });
   }
 
@@ -8234,6 +8303,7 @@ class AdminApi {
     File? explanationImage,
     String questionImageLink = '',
     String explanationImageLink = '',
+    String explanationVideoLink = '',
   }) async {
     await _postQuestionWithMedia(
       path: '/admin/practice-sets/$setId/questions/with-media',
@@ -8247,6 +8317,7 @@ class AdminApi {
         'explanation': explanation,
         'questionImageLink': questionImageLink,
         'explanationImageLink': explanationImageLink,
+        'explanationVideoLink': explanationVideoLink,
       },
       questionImage: questionImage,
       explanationImage: explanationImage,
@@ -8264,6 +8335,7 @@ class AdminApi {
     required String explanation,
     String questionImageLink = '',
     String explanationImageLink = '',
+    String explanationVideoLink = '',
   }) async {
     await _put('/admin/practice-questions/$id', {
       'question': question,
@@ -8275,6 +8347,7 @@ class AdminApi {
       'explanation': explanation,
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
+      'explanationVideoLink': explanationVideoLink,
     });
   }
 
@@ -8295,6 +8368,7 @@ class AdminApi {
     required String explanation,
     String questionImageLink = '',
     String explanationImageLink = '',
+    String explanationVideoLink = '',
   }) async {
     await _post('/admin/chapters/$chapterId/pyqs', {
       'question': question,
@@ -8307,6 +8381,7 @@ class AdminApi {
       'yearLabel': 'NEET',
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
+      'explanationVideoLink': explanationVideoLink,
     });
   }
 
@@ -8323,6 +8398,7 @@ class AdminApi {
     File? explanationImage,
     String questionImageLink = '',
     String explanationImageLink = '',
+    String explanationVideoLink = '',
   }) async {
     await _postQuestionWithMedia(
       path: '/admin/chapters/$chapterId/pyqs/with-media',
@@ -8337,6 +8413,7 @@ class AdminApi {
         'yearLabel': 'NEET',
         'questionImageLink': questionImageLink,
         'explanationImageLink': explanationImageLink,
+        'explanationVideoLink': explanationVideoLink,
       },
       questionImage: questionImage,
       explanationImage: explanationImage,
@@ -8357,6 +8434,7 @@ class AdminApi {
     required String explanation,
     String questionImageLink = '',
     String explanationImageLink = '',
+    String explanationVideoLink = '',
   }) async {
     await _put('/admin/pyqs/$id', {
       'question': question,
@@ -8369,6 +8447,7 @@ class AdminApi {
       'yearLabel': 'NEET',
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
+      'explanationVideoLink': explanationVideoLink,
     });
   }
 

@@ -1178,6 +1178,7 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
     yearLabel,
     questionImageLink,
     explanationImageLink,
+    explanationVideoLink,
   } = req.body;
   const result = await pool.query(
     `UPDATE pyqs
@@ -1194,7 +1195,9 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
          question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id),
          explanation_image_link = COALESCE($13, explanation_image_link),
          explanation_image_drive_file_id = COALESCE($14, explanation_image_drive_file_id),
-         explanation_image_drive_folder_id = COALESCE($15, explanation_image_drive_folder_id)
+         explanation_image_drive_folder_id = COALESCE($15, explanation_image_drive_folder_id),
+         explanation_video_link = COALESCE($16, explanation_video_link),
+         explanation_video_drive_file_id = COALESCE($17, explanation_video_drive_file_id)
      WHERE id = $1
      RETURNING *`,
     [
@@ -1213,6 +1216,8 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
       explanationImageLink == null ? null : normalizeDriveLink(explanationImageLink, 'image'),
       explanationImageLink == null ? null : extractDriveFileId(explanationImageLink),
       null,
+      explanationVideoLink == null ? null : explanationVideoLink,
+      explanationVideoLink == null ? null : extractDriveFileId(explanationVideoLink),
     ]
   );
   return res.json({
@@ -1940,6 +1945,7 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
     explanation,
     questionImageLink,
     explanationImageLink,
+    explanationVideoLink,
   } =
     req.body;
   const result = await pool.query(
@@ -1957,7 +1963,9 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
          question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id),
          explanation_image_link = COALESCE($13, explanation_image_link),
          explanation_image_drive_file_id = COALESCE($14, explanation_image_drive_file_id),
-         explanation_image_drive_folder_id = COALESCE($15, explanation_image_drive_folder_id)
+         explanation_image_drive_folder_id = COALESCE($15, explanation_image_drive_folder_id),
+         explanation_video_link = COALESCE($16, explanation_video_link),
+         explanation_video_drive_file_id = COALESCE($17, explanation_video_drive_file_id)
      WHERE id = $1
      RETURNING *`,
     [
@@ -1976,6 +1984,8 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
       explanationImageLink == null ? null : normalizeDriveLink(explanationImageLink, 'image'),
       explanationImageLink == null ? null : extractDriveFileId(explanationImageLink),
       null,
+      explanationVideoLink == null ? null : explanationVideoLink,
+      explanationVideoLink == null ? null : extractDriveFileId(explanationVideoLink),
     ]
   );
   res.json({
