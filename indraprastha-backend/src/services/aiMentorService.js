@@ -334,12 +334,24 @@ Strict Requirements:
     const requestedCount = Math.min(Math.max(Number(count) || 3, 1), 10);
     const apiKey = process.env.GEMINI_API_KEY || GEMINI_DIRECT_KEY || process.env.OPENAI_API_KEY;
 
+    // Detect subject strictly
+    let targetSubject = (subject || '').trim();
+    if (!targetSubject || targetSubject.toLowerCase() === 'general') {
+      const combined = `${questionText || ''} ${topic || ''}`.toLowerCase();
+      if (combined.includes('physics')) targetSubject = 'Physics';
+      else if (combined.includes('chemistry')) targetSubject = 'Chemistry';
+      else if (combined.includes('biology')) targetSubject = 'Biology';
+      else if (combined.includes('botany')) targetSubject = 'Botany';
+      else if (combined.includes('zoology')) targetSubject = 'Zoology';
+      else targetSubject = 'Physics';
+    }
+
     if (apiKey) {
       try {
         if (process.env.GEMINI_API_KEY || GEMINI_DIRECT_KEY) {
           return await this._callGeminiSimilarQuestions({
             questionText,
-            subject,
+            subject: targetSubject,
             topic,
             options,
             explanation,
@@ -353,7 +365,7 @@ Strict Requirements:
 
     return this._generateFallbackSimilarQuestions({
       questionText,
-      subject,
+      subject: targetSubject,
       topic,
       options,
       explanation,
@@ -370,41 +382,50 @@ Strict Requirements:
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const promptText = `
-You are a senior NEET exam subject matter expert at Indraprastha NEET Academy.
-A student got the following question WRONG in their test/practice:
+You are an elite NEET exam author creating new, unique practice questions for Indraprastha NEET Academy.
+A student answered the following NEET question INCORRECTLY:
 
-Question: ${questionText || 'NEET Practice Question'}
-Subject: ${subject || 'Physics'}
-Topic/Chapter: ${topic || 'General'}
-Options: ${Array.isArray(options) ? options.join(', ') : ''}
-Explanation: ${explanation || ''}
+[TARGET WRONG QUESTION DETAILS]
+Subject: ${subject}
+Chapter/Topic: ${topic || 'Core Concept'}
+Original Question: "${questionText || 'NEET Practice Problem'}"
+Options Provided: ${Array.isArray(options) && options.length > 0 ? options.join(' | ') : 'N/A'}
+Scientific Explanation: "${explanation || 'N/A'}"
 
-Task: Generate EXACTLY ${count} NEW, SIMILAR high-quality NEET-level multiple choice practice questions testing the same underlying scientific concepts and formulas.
+[TASK]
+Generate EXACTLY ${count} BRAND NEW, UNIQUE, HIGH-QUALITY NEET MCQs that test the EXACT SAME SCIENTIFIC CONCEPT, FORMULA, OR REASONING as the wrong question above.
+Request Randomizer Seed: ${Date.now()}_${Math.floor(Math.random() * 10000)}
 
-Strict Requirements:
-1. Respond ONLY with valid JSON.
-2. Output JSON format MUST be an object with a "questions" array containing EXACTLY ${count} objects:
+[STRICT QUALITY RULES]
+1. SUBJECT INTEGRITY: Every generated question MUST be strictly a ${subject} question. DO NOT switch subjects.
+2. FULL COMPLETENESS: Every question MUST be 100% self-contained and complete.
+   - NEVER ask "Which statement is correct?" UNLESS you write out all full statements inside the question_text itself or provide complete descriptive statements as the 4 options.
+   - NEVER reference figures, diagrams, tables, or external images (e.g., "as shown in the figure above" is STRICTLY FORBIDDEN). Write complete, text-based quantitative or conceptual problems.
+3. UNIQUE VARIATIONS: Do not repeat questions. Each of the ${count} questions must be a distinct numerical problem, conceptual scenario, or application of the underlying concept.
+4. JSON ONLY: Return ONLY valid JSON matching this exact schema:
 {
   "questions": [
     {
       "id": 1,
-      "question_text": "Clear concise question text...",
-      "option_a": "Option A text",
-      "option_b": "Option B text",
-      "option_c": "Option C text",
-      "option_d": "Option D text",
+      "question_text": "Complete, self-contained question text...",
+      "option_a": "First plausible option",
+      "option_b": "Second plausible option",
+      "option_c": "Third plausible option",
+      "option_d": "Fourth plausible option",
       "correct_option": "A",
-      "explanation": "Detailed step-by-step scientific explanation for why the correct option is right."
+      "explanation": "Clear, step-by-step scientific solution explaining why the correct option is right."
     }
   ]
 }
-3. Correct option MUST be one of "A", "B", "C", or "D".
-4. Content MUST be accurate for NEET UG syllabus in ${subject || 'Physics'}.
 `;
 
     const bodyData = JSON.stringify({
       contents: [{ parts: [{ text: promptText }] }],
-      generationConfig: { responseMimeType: 'application/json' },
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.8,
+        topP: 0.95,
+      },
     });
 
     return new Promise((resolve, reject) => {
@@ -417,7 +438,7 @@ Strict Requirements:
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(bodyData),
           },
-          timeout: 12000,
+          timeout: 14000,
         },
         (res) => {
           let data = '';
@@ -429,7 +450,7 @@ Strict Requirements:
                 const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (text) {
                   const jsonRes = JSON.parse(text);
-                  if (jsonRes && Array.isArray(jsonRes.questions)) {
+                  if (jsonRes && Array.isArray(jsonRes.questions) && jsonRes.questions.length > 0) {
                     return resolve(jsonRes);
                   }
                 }
@@ -457,50 +478,58 @@ Strict Requirements:
    */
   _generateFallbackSimilarQuestions({ questionText, subject, topic, count }) {
     const subj = subject || 'Physics';
-    const top = topic || 'General Concept';
+    const top = topic || 'Core Concept';
     const questions = [];
 
-    const samplePool = [
-      {
-        question_text: `[Similar Practice 1] Related to ${top}: Identify the correct physical statement regarding concept applications in ${subj}.`,
-        option_a: 'Statement A is correct under standard conditions',
-        option_b: 'Statement B is correct under non-standard conditions',
-        option_c: 'Both Statement A and Statement B are correct',
-        option_d: 'Neither Statement A nor Statement B is correct',
-        correct_option: 'A',
-        explanation: `Under standard NEET conditions for ${top} in ${subj}, Statement A holds true according to fundamental laws.`
-      },
-      {
-        question_text: `[Similar Practice 2] Numerical drill on ${top}: Calculate the resultant quantity when initial value doubles in ${subj}.`,
-        option_a: 'Increases by 2x',
-        option_b: 'Increases by 4x',
-        option_c: 'Decreases by 50%',
-        option_d: 'Remains unchanged',
-        correct_option: 'B',
-        explanation: `Because the physical relation in ${top} follows quadratic dependency, doubling the variable leads to a 4x increase.`
-      },
-      {
-        question_text: `[Similar Practice 3] Conceptual verification in ${subj} (${top}): Which parameter directly determines stability?`,
-        option_a: 'Potential Energy minimum',
-        option_b: 'Kinetic Energy maximum',
-        option_c: 'Work done along closed path',
-        option_d: 'Total momentum variance',
-        correct_option: 'A',
-        explanation: `In ${subj} systems (${top}), minimum potential energy corresponds to stable equilibrium.`
-      }
-    ];
+    const isPhysics = subj.toLowerCase().includes('phys');
+    const isChemistry = subj.toLowerCase().includes('chem');
 
     for (let i = 0; i < count; i++) {
-      const template = samplePool[i % samplePool.length];
+      let qText = '';
+      let optA = '';
+      let optB = '';
+      let optC = '';
+      let optD = '';
+      let corr = 'A';
+      let exp = '';
+
+      if (isPhysics) {
+        const multipliers = [2, 3, 4, 5, 6, 8, 10];
+        const m = multipliers[i % multipliers.length];
+        qText = `In a ${subj} experiment on ${top}, if the initial magnitude of the field parameter is increased by a factor of ${m}, what is the corresponding change in the resultant stored energy?`;
+        optA = `Increases by ${m * m} times (quadratic factor)`;
+        optB = `Increases by ${m} times (linear factor)`;
+        optC = `Decreases by ${m} times`;
+        optD = `Remains invariant regardless of ${top}`;
+        corr = 'A';
+        exp = `In ${subj} (${top}), stored energy is proportional to the square of the field parameter (E ∝ B²). Thus, increasing the field by ${m}x increases energy by ${m}² = ${m * m}x.`;
+      } else if (isChemistry) {
+        qText = `In ${subj} (${top}), which of the following statements correctly describes the thermodynamic equilibrium behaviour?`;
+        optA = 'At equilibrium, the Gibbs free energy change (ΔG) is zero and rate of forward reaction equals rate of backward reaction.';
+        optB = 'At equilibrium, the concentration of reactants is always zero.';
+        optC = 'The equilibrium constant increases continuously as reaction time progresses.';
+        optD = 'Activation energy of forward reaction becomes negative at equilibrium.';
+        corr = 'A';
+        exp = `For any chemical system in ${subj} at equilibrium, ΔG = 0 and dynamic balance occurs between forward and reverse rates.`;
+      } else {
+        qText = `Regarding ${top} in ${subj}, select the scientifically accurate statement:`;
+        optA = `The functional structure of ${top} is essential for maintaining physiological equilibrium.`;
+        optB = `The structure of ${top} operates independently of cellular ATP consumption.`;
+        optC = `${top} is found only in prokaryotic cell membranes.`;
+        optD = `All components of ${top} undergo rapid degeneration at body temperature.`;
+        corr = 'A';
+        exp = `In ${subj}, ${top} plays a direct functional role in maintaining homeostasis under normal physiological conditions.`;
+      }
+
       questions.push({
         id: i + 1,
-        question_text: `${template.question_text}${count > 3 ? ` (Variant ${i + 1})` : ''}`,
-        option_a: template.option_a,
-        option_b: template.option_b,
-        option_c: template.option_c,
-        option_d: template.option_d,
-        correct_option: template.correct_option,
-        explanation: template.explanation,
+        question_text: qText,
+        option_a: optA,
+        option_b: optB,
+        option_c: optC,
+        option_d: optD,
+        correct_option: corr,
+        explanation: exp,
       });
     }
 

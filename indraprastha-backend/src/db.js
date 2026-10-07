@@ -310,6 +310,18 @@ async function ensureDatabaseSchema() {
     ALTER TABLE practice_questions
     ADD COLUMN IF NOT EXISTS explanation_image_drive_folder_id TEXT DEFAULT '';
   `);
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '';
+  `);
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '';
+  `);
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '';
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tests (

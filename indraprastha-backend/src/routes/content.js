@@ -150,7 +150,15 @@ function mapQuestionImageLink(question) {
   const expFileId =
     question.explanation_image_drive_file_id ||
     extractDriveFileId(question.explanation_image_link);
+  const expVideoFileId =
+    question.explanation_video_drive_file_id ||
+    extractDriveFileId(question.explanation_video_link);
   const explanationImagesList = question.explanation_images_list;
+
+  const resolvedVideoLink = expVideoFileId
+    ? `https://drive.google.com/file/d/${expVideoFileId}/preview`
+    : question.explanation_video_link || '';
+
   return {
     ...question,
     question_image_drive_file_id: fileId || '',
@@ -161,6 +169,9 @@ function mapQuestionImageLink(question) {
     explanation_image_link: expFileId
       ? buildContentImageUrl(expFileId, 1000)
       : normalizeDriveLink(question.explanation_image_link, 'image'),
+    explanation_video_drive_file_id: expVideoFileId || '',
+    explanation_video_link: resolvedVideoLink,
+    explanation_video_url: resolvedVideoLink,
     explanation_images_list: Array.isArray(explanationImagesList)
       ? explanationImagesList.map(mapExplanationImageEntry)
       : explanationImagesList,
@@ -440,6 +451,7 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
     `SELECT pq.id, pq.question, pq.option_a, pq.option_b, pq.option_c, pq.option_d, pq.correct_option, pq.explanation,
         pq.question_image_link, pq.question_image_drive_file_id, pq.question_image_drive_folder_id,
         pq.explanation_image_link, pq.explanation_image_drive_file_id, pq.explanation_image_drive_folder_id,
+        pq.explanation_video_link, pq.explanation_video_drive_file_id, pq.explanation_video_drive_folder_id,
         (
           SELECT json_agg(
             json_build_object(

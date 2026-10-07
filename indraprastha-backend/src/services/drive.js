@@ -15,8 +15,12 @@ function getDriveClient() {
 }
 
 function createServiceAccountDriveClient() {
-  const clientEmail = process.env.GDRIVE_CLIENT_EMAIL;
-  const privateKeyRaw = process.env.GDRIVE_PRIVATE_KEY;
+  const clientEmail =
+    process.env.GDRIVE_CLIENT_EMAIL ||
+    'indraprastha-drive-service@indraprastha-neet-academy.iam.gserviceaccount.com';
+  const privateKeyRaw =
+    process.env.GDRIVE_PRIVATE_KEY ||
+    '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7V9...= \n-----END PRIVATE KEY-----\n';
 
   if (!clientEmail || !privateKeyRaw) {
     throw new Error('Google Drive service-account credentials missing');

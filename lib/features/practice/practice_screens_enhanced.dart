@@ -993,9 +993,10 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                       context,
                       ref,
                       questionText: question.questionText,
+                      subject: question.subject ?? widget.practiceTitle,
+                      topic: question.topic,
                       options: question.options,
                       explanation: question.explanation,
-                      topic: question.topic,
                     ),
                     icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 16),
                     label: const Text(
@@ -1309,6 +1310,7 @@ class PracticeQuestion {
   final List<String> options;
   final String correctAnswer;
   final String topic;
+  final String? subject;
   final String? explanation;
   final List<ExplanationImage> explanationImages;
   final Map<String, double> optionStats;
@@ -1319,6 +1321,7 @@ class PracticeQuestion {
     required this.options,
     required this.correctAnswer,
     required this.topic,
+    this.subject,
     this.explanation,
     this.explanationImages = const [],
     this.optionStats = const {},

@@ -17,6 +17,7 @@ import '../practice/practice_screens.dart';
 import '../tests/tests_screens.dart';
 import '../videos/videos_screen.dart';
 import 'widgets/home_image_slider.dart';
+import 'widgets/weekly_streak_widget.dart';
 
 String _greetingLine(String firstName) {
   final h = DateTime.now().hour;
@@ -294,6 +295,8 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
                 return HomeImageSlider(images: images);
               },
             ),
+            const SizedBox(height: AppSpacing.lg),
+            const WeeklyStreakWidget(),
             const SizedBox(height: AppSpacing.lg),
             const SearchBarWidget(),
             const SizedBox(height: AppSpacing.lg),
@@ -760,15 +763,9 @@ class _WeakTopicsPanel extends StatelessWidget {
                   icon: Icons.lightbulb_outline,
                 );
               }
-              if (insights.length < 6) {
-                insights.addAll(List.generate(6 - insights.length, (i) => {
-                  'insight_title': 'Popular AI Insight ${i + 1}',
-                  'insight_body': 'This is a popular AI recommendation based on your performance.'
-                }));
-              }
-              
+
               return Column(
-                children: insights.take(6).map((insight) {
+                children: insights.map((insight) {
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const CircleAvatar(

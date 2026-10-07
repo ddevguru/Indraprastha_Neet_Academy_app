@@ -5,6 +5,7 @@ import '../core/services/incorrect_pdf_service.dart';
 import '../core/utils/drive_image_url.dart';
 import '../core/utils/question_fields.dart';
 import '../theme/app_tokens.dart';
+import '../features/videos/video_player_screen.dart';
 import 'ai_similar_questions_dialog.dart';
 import 'app_widgets.dart';
 import 'fast_network_image.dart';
@@ -70,8 +71,11 @@ class AnswerReviewEntry {
     this.explanation,
     this.explanationImageUrl,
     this.explanationImagesList,
+    this.explanationVideoUrl,
     this.subtitle,
     this.optionPrefix = true,
+    this.subject,
+    this.topic,
   });
 
   final String questionText;
@@ -82,8 +86,11 @@ class AnswerReviewEntry {
   final String? explanation;
   final String? explanationImageUrl;
   final List<Map<String, dynamic>>? explanationImagesList;
+  final String? explanationVideoUrl;
   final String? subtitle;
   final bool optionPrefix;
+  final String? subject;
+  final String? topic;
 
   bool get isCorrect => selectedIndex != null && selectedIndex == correctIndex;
   bool get wasAttempted => selectedIndex != null;
@@ -122,6 +129,12 @@ class AnswerReviewEntry {
               ),
             )
           : null,
+      explanationVideoUrl: (question['explanation_video_link'] ??
+                            question['explanation_video_url'] ??
+                            question['explanation_video_drive_link'] ??
+                            question['video_url'] ?? '').toString().trim(),
+      subject: question['subject']?.toString(),
+      topic: question['topic']?.toString() ?? question['chapter']?.toString(),
     );
   }
 }
@@ -675,6 +688,95 @@ class _ReviewQuestionPage extends StatelessWidget {
                             ),
                           );
                         }),
+                      if (entry.explanationVideoUrl != null &&
+                          entry.explanationVideoUrl!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                          ),
+                          child: InkWell(
+                            onTap: () {
+                              final rawUrl = entry.explanationVideoUrl!;
+                              final uri = Uri.tryParse(rawUrl);
+                              String playableUrl = rawUrl;
+                              if (uri != null && rawUrl.contains('drive.google.com')) {
+                                final idFromQuery = uri.queryParameters['id'];
+                                if (idFromQuery != null && idFromQuery.isNotEmpty) {
+                                  playableUrl = 'https://drive.google.com/uc?export=download&id=$idFromQuery';
+                                } else {
+                                  final alt = RegExp(r'/file/d/([^/]+)').firstMatch(uri.toString());
+                                  if (alt != null && alt.group(1) != null) {
+                                    playableUrl = 'https://drive.google.com/uc?export=download&id=${alt.group(1)}';
+                                  }
+                                }
+                              }
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => VideoPlayerScreen(
+                                    title: 'Video Explanation',
+                                    subtitle: '${entry.subject ?? 'Practice'} • Question Explanation',
+                                    videoUrl: playableUrl,
+                                    fallbackUrl: rawUrl,
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.play_arrow_rounded,
+                                      color: AppColors.primary,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Watch Video Explanation',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark ? Colors.white : AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Tap to play video explanation from Google Drive',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isDark ? Colors.white60 : AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: AppColors.primary,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -688,6 +790,8 @@ class _ReviewQuestionPage extends StatelessWidget {
                         context,
                         ref,
                         questionText: entry.questionText,
+                        subject: entry.subject,
+                        topic: entry.topic,
                         options: entry.options,
                         explanation: entry.explanation,
                       ),

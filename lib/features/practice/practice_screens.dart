@@ -23,6 +23,7 @@ import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../widgets/ai_similar_questions_dialog.dart';
+import '../videos/video_player_screen.dart';
 import '../../core/utils/drive_image_url.dart';
 import '../../core/utils/question_fields.dart';
 import '../../core/constants/api_constants.dart';
@@ -1556,6 +1557,87 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                           if (hasExpText) const SizedBox(height: AppSpacing.sm),
                                           _buildQuestionImage(expImgUrl),
                                         ],
+                                        if ((qItem['explanation_video_link']?.toString().isNotEmpty ?? false) ||
+                                            (qItem['explanation_video_url']?.toString().isNotEmpty ?? false)) ...[
+                                          const SizedBox(height: AppSpacing.md),
+                                          Builder(
+                                            builder: (context) {
+                                              final rawUrl = (qItem['explanation_video_link'] ?? qItem['explanation_video_url'] ?? '').toString();
+                                              return Container(
+                                                width: double.infinity,
+                                                decoration: BoxDecoration(
+                                                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                                  borderRadius: BorderRadius.circular(AppRadii.md),
+                                                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                                                ),
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    final playableUrl = _resolvePlayableDriveVideoUrl(rawUrl);
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (_) => VideoPlayerScreen(
+                                                          title: 'Video Explanation',
+                                                          subtitle: '${qItem['subject'] ?? widget.chapterName ?? 'Practice'} • Question Explanation',
+                                                          videoUrl: playableUrl,
+                                                          fallbackUrl: rawUrl,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                  borderRadius: BorderRadius.circular(AppRadii.md),
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.all(AppSpacing.md),
+                                                    child: Row(
+                                                      children: [
+                                                        Container(
+                                                          padding: const EdgeInsets.all(8),
+                                                          decoration: BoxDecoration(
+                                                            color: AppColors.primary.withValues(alpha: 0.12),
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                          child: const Icon(
+                                                            Icons.play_arrow_rounded,
+                                                            color: AppColors.primary,
+                                                            size: 24,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: AppSpacing.md),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Text(
+                                                                'Watch Video Explanation',
+                                                                style: TextStyle(
+                                                                  fontSize: 14,
+                                                                  fontWeight: FontWeight.w700,
+                                                                  color: isDark ? Colors.white : AppColors.textPrimary,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(height: 2),
+                                                              Text(
+                                                                'Tap to play video explanation from Google Drive',
+                                                                style: TextStyle(
+                                                                  fontSize: 12,
+                                                                  color: isDark ? Colors.white60 : AppColors.textSecondary,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        const Icon(
+                                                          Icons.chevron_right_rounded,
+                                                          color: AppColors.primary,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                         ],
                                         if (hasExpList) ...[
                                           for (final imgData in expImagesList) ...[
                                             const SizedBox(height: AppSpacing.sm),
@@ -1588,8 +1670,8 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                         context,
                                         ref,
                                         questionText: readQuestionText(qItem),
-                                        subject: qItem['subject']?.toString(),
-                                        topic: qItem['topic']?.toString() ?? qItem['chapter']?.toString(),
+                                        subject: qItem['subject']?.toString() ?? _set['subject']?.toString() ?? widget.customTitle ?? widget.chapterName,
+                                        topic: qItem['topic']?.toString() ?? qItem['chapter']?.toString() ?? widget.chapterName,
                                         options: qOptions,
                                         explanation: qItem['explanation']?.toString(),
                                       ),
@@ -2660,7 +2742,7 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
                     const SizedBox(height: AppSpacing.sm),
                     Wrap(
                       spacing: AppSpacing.sm,
-                      children: [5, 10, 15, 20, 30].map((count) {
+                      children: [10, 25, 50, 75, 100].map((count) {
                         final selected = _questionCount == count;
                         return ChoiceChip(
                           label: Text('$count'),
@@ -2691,4 +2773,19 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
       ),
     );
   }
+}
+
+String _resolvePlayableDriveVideoUrl(String raw) {
+  final uri = Uri.tryParse(raw);
+  if (uri == null) return raw;
+  if (!raw.contains('drive.google.com')) return raw;
+  final idFromQuery = uri.queryParameters['id'];
+  if (idFromQuery != null && idFromQuery.isNotEmpty) {
+    return 'https://drive.google.com/uc?export=download&id=$idFromQuery';
+  }
+  final alt = RegExp(r'/file/d/([^/]+)').firstMatch(uri.toString());
+  if (alt != null && alt.group(1) != null) {
+    return 'https://drive.google.com/uc?export=download&id=${alt.group(1)}';
+  }
+  return raw;
 }

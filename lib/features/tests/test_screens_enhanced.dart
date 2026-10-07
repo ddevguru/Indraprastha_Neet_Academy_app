@@ -947,7 +947,7 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
                 const SizedBox(height: 32),
 
                 // Review Section with Page Dots
-                _buildReviewSection(),
+                _buildReviewSection(results),
 
                 const SizedBox(height: 24),
 
@@ -1151,15 +1151,18 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
     );
   }
 
-  Widget _buildReviewSection() {
-    final questionCount = widget.totalQuestions;
+  Widget _buildReviewSection(Map<String, dynamic> results) {
+    final rawQuestions = List<Map<String, dynamic>>.from(
+      (results['questions'] as List<dynamic>?) ?? const [],
+    );
+    final questionCount = rawQuestions.isNotEmpty ? rawQuestions.length : widget.totalQuestions;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Answer Review',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 16),
         // PageView for review questions
@@ -1171,7 +1174,7 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
               setState(() {});
             },
             itemCount: questionCount,
-            itemBuilder: (context, index) => _buildReviewCard(index),
+            itemBuilder: (context, index) => _buildReviewCard(index, results),
           ),
         ),
         const SizedBox(height: 12),
@@ -1198,11 +1201,37 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
     );
   }
 
-  Widget _buildReviewCard(int index) {
-    // Mock question data - in production fetch from results
-    final isCorrect = index % 3 != 0; // Mock: 2/3 correct
-    final userAnswer = ['A', 'B', 'C', 'D'][index % 4];
-    final correctAnswer = ['B', 'C', 'D', 'A'][index % 4];
+  Widget _buildReviewCard(int index, Map<String, dynamic> results) {
+    final rawQuestions = List<Map<String, dynamic>>.from(
+      (results['questions'] as List<dynamic>?) ?? const [],
+    );
+    final userAnswers = Map<dynamic, dynamic>.from(
+      (results['userAnswers'] as Map?) ?? const {},
+    );
+
+    final q = index < rawQuestions.length ? rawQuestions[index] : <String, dynamic>{};
+    final qText = (q['question_text'] ?? q['questionText'] ?? q['text'] ?? 'Sample Question ${index + 1}: What is the correct answer?').toString();
+    final explanation = (q['explanation'] ?? 'Study the correct option formulation carefully.').toString();
+    final subject = (q['subject'] ?? widget.testTitle).toString();
+    final topic = (q['topic'] ?? q['chapter'] ?? '').toString();
+
+    final optionsRaw = q['options'];
+    List<String> options = [];
+    if (optionsRaw is List) {
+      options = optionsRaw.map((e) => e.toString()).toList();
+    } else if (optionsRaw is Map) {
+      options = ['A', 'B', 'C', 'D'].map((k) => (optionsRaw[k] ?? optionsRaw[k.toLowerCase()] ?? '').toString()).where((e) => e.isNotEmpty).toList();
+    }
+    if (options.isEmpty) {
+      options = ['Option A', 'Option B', 'Option C', 'Option D'];
+    }
+
+    final correctAnsRaw = (q['correct_option'] ?? q['correctOption'] ?? q['answer'] ?? ['B', 'C', 'D', 'A'][index % 4]).toString().toUpperCase();
+    final userAnsRaw = (userAnswers[index] ?? userAnswers['$index'] ?? userAnswers[q['id']] ?? userAnswers['${q['id']}'] ?? ['A', 'B', 'C', 'D'][index % 4]).toString().toUpperCase();
+
+    final isCorrect = rawQuestions.isNotEmpty
+        ? (correctAnsRaw == userAnsRaw)
+        : (index % 3 != 0);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
@@ -1232,7 +1261,7 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Sample Question ${index + 1}: What is the correct answer?',
+              qText,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 12),
@@ -1252,7 +1281,7 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('Your Answer', style: TextStyle(fontSize: 11, color: Colors.red)),
-                        Text('Option $userAnswer', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text('Option $userAnsRaw', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -1276,7 +1305,7 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('Correct Answer', style: TextStyle(fontSize: 11, color: Colors.green)),
-                        Text('Option $correctAnswer', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text('Option $correctAnsRaw', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -1295,9 +1324,9 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              const Text(
-                'This is the explanation for why this answer is correct. Study this carefully.',
-                style: TextStyle(fontSize: 12),
+              Text(
+                explanation,
+                style: const TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 12),
               Consumer(
@@ -1306,8 +1335,11 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
                     onPressed: () => showSimilarQuestionsDialog(
                       context,
                       ref,
-                      questionText: 'Sample Question ${index + 1}: What is the correct answer?',
-                      explanation: 'Study the correct option formulation carefully.',
+                      questionText: qText,
+                      subject: subject,
+                      topic: topic,
+                      options: options,
+                      explanation: explanation,
                     ),
                     icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 16),
                     label: const Text(

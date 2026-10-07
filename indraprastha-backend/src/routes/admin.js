@@ -1486,8 +1486,73 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
   }
 });
 
+const practiceVideoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 250 * 1024 * 1024 }, // 250MB limit for video files
+}).single('video');
+
+router.post('/practice-questions/:id/explanation-video', adminAuth, practiceVideoUpload, async (req, res) => {
+  try {
+    const questionId = req.params.id;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: 'No video file provided' });
+    }
+
+    const qRes = await pool.query(
+      `SELECT pq.id, pq.practice_set_id, ps.subject, ps.title as set_title
+       FROM practice_questions pq
+       LEFT JOIN practice_sets ps ON ps.id = pq.practice_set_id
+       WHERE pq.id = $1 LIMIT 1`,
+      [questionId]
+    );
+
+    if (qRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Practice question not found' });
+    }
+
+    const row = qRes.rows[0];
+    const subject = row.subject || 'General';
+    const setTitle = row.set_title || `Set_${row.practice_set_id}`;
+    const folderPath = `Indraprastha/Practice/${subject}/${setTitle}/Videos`;
+
+    const folderId = await ensureDriveFolderPath(folderPath);
+    const fileName = `Question_${questionId}_Video_${Date.now()}${path.extname(file.originalname) || '.mp4'}`;
+
+    const uploaded = await uploadBufferToDrive({
+      fileBuffer: file.buffer,
+      fileName,
+      mimeType: file.mimetype || 'video/mp4',
+      folderId,
+    });
+
+    const previewLink = buildDrivePublicLinks(uploaded.fileId).previewLink;
+    const fileId = uploaded.fileId;
+
+    await pool.query(
+      `UPDATE practice_questions
+       SET explanation_video_link = $2,
+           explanation_video_drive_file_id = $3,
+           explanation_video_drive_folder_id = $4
+       WHERE id = $1`,
+      [questionId, previewLink, fileId, folderId || '']
+    );
+
+    return res.json({
+      success: true,
+      fileId,
+      videoLink: previewLink,
+      folderPath,
+    });
+  } catch (error) {
+    logAdminRouteError('/practice-questions/:id/explanation-video POST', error);
+    return res.status(500).json({ error: error.message || 'Failed to upload explanation video' });
+  }
+});
+
 router.put('/practice-questions/:id', adminAuth, async (req, res) => {
-  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, practiceSetId } =
+  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, explanationVideoLink, practiceSetId } =
     req.body;
 
   const updateFields = [];
@@ -1541,6 +1606,13 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
     updateFields.push(`explanation_image_drive_file_id = $${paramIndex + 1}`);
     params.push(normalizeDriveLink(explanationImageLink, 'image'));
     params.push(extractDriveFileId(explanationImageLink));
+    paramIndex += 2;
+  }
+  if (explanationVideoLink !== undefined && explanationVideoLink !== null) {
+    updateFields.push(`explanation_video_link = $${paramIndex}`);
+    updateFields.push(`explanation_video_drive_file_id = $${paramIndex + 1}`);
+    params.push(explanationVideoLink);
+    params.push(extractDriveFileId(explanationVideoLink));
     paramIndex += 2;
   }
   if (practiceSetId !== undefined && practiceSetId !== null) {
