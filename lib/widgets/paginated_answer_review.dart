@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/services/incorrect_pdf_service.dart';
 import '../core/utils/drive_image_url.dart';
 import '../core/utils/question_fields.dart';
 import '../theme/app_tokens.dart';
+import 'ai_similar_questions_dialog.dart';
 import 'app_widgets.dart';
 import 'fast_network_image.dart';
 
@@ -675,6 +677,31 @@ class _ReviewQuestionPage extends StatelessWidget {
                         }),
                     ],
                   ),
+                ),
+              ],
+              if (!entry.isCorrect) ...[
+                const SizedBox(height: AppSpacing.lg),
+                Consumer(
+                  builder: (context, ref, _) {
+                    return OutlinedButton.icon(
+                      onPressed: () => showSimilarQuestionsDialog(
+                        context,
+                        ref,
+                        questionText: entry.questionText,
+                        options: entry.options,
+                        explanation: entry.explanation,
+                      ),
+                      icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 18),
+                      label: const Text(
+                        'Solve Similar Questions (AI)',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(46),
+                        side: const BorderSide(color: AppColors.primary),
+                      ),
+                    );
+                  },
                 ),
               ],
             ],

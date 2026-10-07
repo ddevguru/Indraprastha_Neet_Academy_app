@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import '../../core/services/incorrect_pdf_service.dart';
 import '../../theme/app_tokens.dart';
+import '../../widgets/ai_similar_questions_dialog.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../widgets/question_report_dialog.dart';
 
@@ -980,6 +982,32 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
               Text(
                 question.explanation!,
                 style: const TextStyle(fontSize: 12),
+              ),
+            ],
+            if (!isCorrect) ...[
+              const SizedBox(height: 12),
+              Consumer(
+                builder: (context, ref, _) {
+                  return OutlinedButton.icon(
+                    onPressed: () => showSimilarQuestionsDialog(
+                      context,
+                      ref,
+                      questionText: question.questionText,
+                      options: question.options,
+                      explanation: question.explanation,
+                      topic: question.topic,
+                    ),
+                    icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 16),
+                    label: const Text(
+                      'Solve Similar Questions (AI)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(40),
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  );
+                },
               ),
             ],
           ],

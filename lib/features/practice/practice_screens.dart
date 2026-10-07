@@ -22,6 +22,7 @@ import '../../widgets/app_widgets.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/fast_network_image.dart';
+import '../../widgets/ai_similar_questions_dialog.dart';
 import '../../core/utils/drive_image_url.dart';
 import '../../core/utils/question_fields.dart';
 import '../../core/constants/api_constants.dart';
@@ -1578,6 +1579,33 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                   );
                                 },
                               ),
+                              if (_submitted && _selectedOption != qCorrectIndex) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                Consumer(
+                                  builder: (context, ref, _) {
+                                    return OutlinedButton.icon(
+                                      onPressed: () => showSimilarQuestionsDialog(
+                                        context,
+                                        ref,
+                                        questionText: readQuestionText(qItem),
+                                        subject: qItem['subject']?.toString(),
+                                        topic: qItem['topic']?.toString() ?? qItem['chapter']?.toString(),
+                                        options: qOptions,
+                                        explanation: qItem['explanation']?.toString(),
+                                      ),
+                                      icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 18),
+                                      label: const Text(
+                                        'Solve Similar Questions (AI)',
+                                        style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size.fromHeight(46),
+                                        side: const BorderSide(color: AppColors.primary),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ],
                             const SizedBox(height: AppSpacing.lg),
                             PrimaryButton(

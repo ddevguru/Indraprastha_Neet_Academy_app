@@ -6,6 +6,7 @@ const { pool } = require('../db');
 const { normalizeTestCategory, getCategoryType } = require('../utils/categoryHelper');
 const { recordUserStreakActivity } = require('./streaks');
 const testAnalyticsService = require('../services/testAnalyticsService');
+const aiMentorService = require('../services/aiMentorService');
 const {
   normalizeDriveLink,
   extractDriveFileId,
@@ -1004,6 +1005,30 @@ router.get('/slider-images', userAuth, async (req, res) => {
   } catch (e) {
     console.error('[API] /content/slider-images GET error:', e.message);
     return res.status(500).json({ error: 'Failed to fetch slider images' });
+  }
+});
+
+router.post('/ai/generate-similar-questions', userAuth, async (req, res) => {
+  try {
+    const { questionText, subject, topic, options, explanation, count } = req.body;
+    const requestedCount = Math.min(Math.max(Number(count) || 3, 1), 10);
+
+    const result = await aiMentorService.generateSimilarQuestions({
+      questionText: String(questionText || ''),
+      subject: String(subject || ''),
+      topic: String(topic || ''),
+      options: Array.isArray(options) ? options.map(String) : [],
+      explanation: String(explanation || ''),
+      count: requestedCount,
+    });
+
+    return res.json({
+      success: true,
+      questions: result.questions || [],
+    });
+  } catch (e) {
+    console.error('[GENERATE_SIMILAR_QUESTIONS_ERROR]', e.message);
+    return res.status(500).json({ error: e.message || 'Failed to generate similar questions' });
   }
 });
 

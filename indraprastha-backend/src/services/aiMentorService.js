@@ -326,6 +326,186 @@ Strict Requirements:
       motivation,
     };
   }
+
+  /**
+   * Generate similar MCQs for a wrong question using AI
+   */
+  async generateSimilarQuestions({ questionText, subject, topic, options, explanation, count = 3 }) {
+    const requestedCount = Math.min(Math.max(Number(count) || 3, 1), 10);
+    const apiKey = process.env.GEMINI_API_KEY || GEMINI_DIRECT_KEY || process.env.OPENAI_API_KEY;
+
+    if (apiKey) {
+      try {
+        if (process.env.GEMINI_API_KEY || GEMINI_DIRECT_KEY) {
+          return await this._callGeminiSimilarQuestions({
+            questionText,
+            subject,
+            topic,
+            options,
+            explanation,
+            count: requestedCount,
+          });
+        }
+      } catch (err) {
+        console.warn('[SIMILAR_QUESTIONS_LLM_WARNING] LLM API call failed, using fallback engine:', err.message);
+      }
+    }
+
+    return this._generateFallbackSimilarQuestions({
+      questionText,
+      subject,
+      topic,
+      options,
+      explanation,
+      count: requestedCount,
+    });
+  }
+
+  /**
+   * Call Gemini API for Similar Question Generation
+   * @private
+   */
+  async _callGeminiSimilarQuestions({ questionText, subject, topic, options, explanation, count }) {
+    const apiKey = process.env.GEMINI_API_KEY || GEMINI_DIRECT_KEY;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const promptText = `
+You are a senior NEET exam subject matter expert at Indraprastha NEET Academy.
+A student got the following question WRONG in their test/practice:
+
+Question: ${questionText || 'NEET Practice Question'}
+Subject: ${subject || 'Physics'}
+Topic/Chapter: ${topic || 'General'}
+Options: ${Array.isArray(options) ? options.join(', ') : ''}
+Explanation: ${explanation || ''}
+
+Task: Generate EXACTLY ${count} NEW, SIMILAR high-quality NEET-level multiple choice practice questions testing the same underlying scientific concepts and formulas.
+
+Strict Requirements:
+1. Respond ONLY with valid JSON.
+2. Output JSON format MUST be an object with a "questions" array containing EXACTLY ${count} objects:
+{
+  "questions": [
+    {
+      "id": 1,
+      "question_text": "Clear concise question text...",
+      "option_a": "Option A text",
+      "option_b": "Option B text",
+      "option_c": "Option C text",
+      "option_d": "Option D text",
+      "correct_option": "A",
+      "explanation": "Detailed step-by-step scientific explanation for why the correct option is right."
+    }
+  ]
+}
+3. Correct option MUST be one of "A", "B", "C", or "D".
+4. Content MUST be accurate for NEET UG syllabus in ${subject || 'Physics'}.
+`;
+
+    const bodyData = JSON.stringify({
+      contents: [{ parts: [{ text: promptText }] }],
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+
+    return new Promise((resolve, reject) => {
+      const u = new URL(url);
+      const req = https.request(
+        u,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(bodyData),
+          },
+          timeout: 12000,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk) => (data += chunk));
+          res.on('end', () => {
+            try {
+              if (res.statusCode >= 200 && res.statusCode < 300) {
+                const parsed = JSON.parse(data);
+                const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                  const jsonRes = JSON.parse(text);
+                  if (jsonRes && Array.isArray(jsonRes.questions)) {
+                    return resolve(jsonRes);
+                  }
+                }
+              }
+              reject(new Error(`Gemini API status: ${res.statusCode}`));
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }
+      );
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Gemini API timeout'));
+      });
+      req.write(bodyData);
+      req.end();
+    });
+  }
+
+  /**
+   * Rule-based fallback for similar questions
+   * @private
+   */
+  _generateFallbackSimilarQuestions({ questionText, subject, topic, count }) {
+    const subj = subject || 'Physics';
+    const top = topic || 'General Concept';
+    const questions = [];
+
+    const samplePool = [
+      {
+        question_text: `[Similar Practice 1] Related to ${top}: Identify the correct physical statement regarding concept applications in ${subj}.`,
+        option_a: 'Statement A is correct under standard conditions',
+        option_b: 'Statement B is correct under non-standard conditions',
+        option_c: 'Both Statement A and Statement B are correct',
+        option_d: 'Neither Statement A nor Statement B is correct',
+        correct_option: 'A',
+        explanation: `Under standard NEET conditions for ${top} in ${subj}, Statement A holds true according to fundamental laws.`
+      },
+      {
+        question_text: `[Similar Practice 2] Numerical drill on ${top}: Calculate the resultant quantity when initial value doubles in ${subj}.`,
+        option_a: 'Increases by 2x',
+        option_b: 'Increases by 4x',
+        option_c: 'Decreases by 50%',
+        option_d: 'Remains unchanged',
+        correct_option: 'B',
+        explanation: `Because the physical relation in ${top} follows quadratic dependency, doubling the variable leads to a 4x increase.`
+      },
+      {
+        question_text: `[Similar Practice 3] Conceptual verification in ${subj} (${top}): Which parameter directly determines stability?`,
+        option_a: 'Potential Energy minimum',
+        option_b: 'Kinetic Energy maximum',
+        option_c: 'Work done along closed path',
+        option_d: 'Total momentum variance',
+        correct_option: 'A',
+        explanation: `In ${subj} systems (${top}), minimum potential energy corresponds to stable equilibrium.`
+      }
+    ];
+
+    for (let i = 0; i < count; i++) {
+      const template = samplePool[i % samplePool.length];
+      questions.push({
+        id: i + 1,
+        question_text: `${template.question_text}${count > 3 ? ` (Variant ${i + 1})` : ''}`,
+        option_a: template.option_a,
+        option_b: template.option_b,
+        option_c: template.option_c,
+        option_d: template.option_d,
+        correct_option: template.correct_option,
+        explanation: template.explanation,
+      });
+    }
+
+    return { questions };
+  }
 }
 
 module.exports = new AIMentorService();

@@ -242,6 +242,46 @@ class ContentRepository {
   Future<Map<String, dynamic>> fetchLatestAnalytics() =>
       _get('/content/analytics/latest');
 
+  Future<List<Map<String, dynamic>>> generateSimilarQuestions({
+    required String questionText,
+    String? subject,
+    String? topic,
+    List<String>? options,
+    String? explanation,
+    int count = 3,
+  }) async {
+    final token = await _token;
+    if (token == null) {
+      throw Exception('Not logged in. Please login again.');
+    }
+    final response = await _client.post(
+      Uri.parse('$baseUrl/content/ai/generate-similar-questions'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'questionText': questionText,
+        'subject': subject ?? '',
+        'topic': topic ?? '',
+        'options': options ?? [],
+        'explanation': explanation ?? '',
+        'count': count,
+      }),
+    );
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final list = body['questions'];
+      if (list is List) {
+        return list.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      }
+      return [];
+    }
+    throw Exception(body['error']?.toString() ?? 'Failed to generate similar questions');
+  }
+
   Future<Map<String, dynamic>> submitComplaint({
     required String title,
     required String description,
