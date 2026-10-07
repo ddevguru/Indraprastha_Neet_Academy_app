@@ -13,11 +13,19 @@ class TestRadarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     if (subjects.isEmpty) {
       return SizedBox(
         height: height,
-        child: const Center(
-          child: Text('No subject data available for radar chart'),
+        child: Center(
+          child: Text(
+            'No subject data available for radar chart',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
       );
     }
@@ -31,16 +39,20 @@ class TestRadarChart extends StatelessWidget {
             painter: _RadarChartPainter(
               subjects: subjects,
               theme: Theme.of(context),
+              isDark: isDark,
             ),
           ),
         ),
         const SizedBox(height: 12),
-        _buildLegend(context),
+        _buildLegend(context, isDark),
       ],
     );
   }
 
-  Widget _buildLegend(BuildContext context) {
+  Widget _buildLegend(BuildContext context, bool isDark) {
+    final top100Color = isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
+    final studentColor = isDark ? const Color(0xFF34D399) : const Color(0xFF059669);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -50,19 +62,18 @@ class TestRadarChart extends StatelessWidget {
               width: 14,
               height: 14,
               decoration: BoxDecoration(
-                color: const Color(0xFFD97706).withValues(alpha: 0.3),
-                border: Border.all(color: const Color(0xFFD97706), width: 2),
-                shape: BoxShape.rectangle,
+                color: top100Color.withValues(alpha: 0.3),
+                border: Border.all(color: top100Color, width: 2),
                 borderRadius: BorderRadius.circular(3),
               ),
             ),
             const SizedBox(width: 6),
-            const Text(
+            Text(
               'Top 100 Average',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF92400E),
+                color: top100Color,
               ),
             ),
           ],
@@ -74,19 +85,18 @@ class TestRadarChart extends StatelessWidget {
               width: 14,
               height: 14,
               decoration: BoxDecoration(
-                color: const Color(0xFF059669).withValues(alpha: 0.4),
-                border: Border.all(color: const Color(0xFF059669), width: 2.5),
-                shape: BoxShape.rectangle,
+                color: studentColor.withValues(alpha: 0.35),
+                border: Border.all(color: studentColor, width: 2.5),
                 borderRadius: BorderRadius.circular(3),
               ),
             ),
             const SizedBox(width: 6),
-            const Text(
+            Text(
               'Your Performance',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF065F46),
+                color: studentColor,
               ),
             ),
           ],
@@ -99,10 +109,12 @@ class TestRadarChart extends StatelessWidget {
 class _RadarChartPainter extends CustomPainter {
   final List<Map<String, dynamic>> subjects;
   final ThemeData theme;
+  final bool isDark;
 
   _RadarChartPainter({
     required this.subjects,
     required this.theme,
+    required this.isDark,
   });
 
   @override
@@ -114,12 +126,12 @@ class _RadarChartPainter extends CustomPainter {
     if (count == 0 || radius <= 0) return;
 
     final gridPaint = Paint()
-      ..color = Colors.grey.withValues(alpha: 0.25)
+      ..color = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
     final axisPaint = Paint()
-      ..color = Colors.grey.withValues(alpha: 0.3)
+      ..color = isDark ? Colors.white.withValues(alpha: 0.18) : Colors.black.withValues(alpha: 0.18)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
@@ -142,16 +154,16 @@ class _RadarChartPainter extends CustomPainter {
     }
 
     // Draw radial axis lines and subject text labels
-    final textStyle = const TextStyle(
+    final textStyle = TextStyle(
       fontSize: 12,
       fontWeight: FontWeight.w700,
-      color: Color(0xFF1E293B),
+      color: theme.colorScheme.onSurface,
     );
 
-    final scoreSubStyle = const TextStyle(
+    final scoreSubStyle = TextStyle(
       fontSize: 10,
       fontWeight: FontWeight.w600,
-      color: Color(0xFF64748B),
+      color: theme.colorScheme.onSurfaceVariant,
     );
 
     for (int i = 0; i < count; i++) {
@@ -215,12 +227,15 @@ class _RadarChartPainter extends CustomPainter {
     }
     top100Path.close();
 
+    final top100FillColor = isDark ? const Color(0xFFF59E0B).withValues(alpha: 0.25) : const Color(0xFFF59E0B).withValues(alpha: 0.18);
+    final top100StrokeColor = isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
+
     final top100FillPaint = Paint()
-      ..color = const Color(0xFFF59E0B).withValues(alpha: 0.18)
+      ..color = top100FillColor
       ..style = PaintingStyle.fill;
 
     final top100StrokePaint = Paint()
-      ..color = const Color(0xFFD97706)
+      ..color = top100StrokeColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.2;
 
@@ -253,12 +268,15 @@ class _RadarChartPainter extends CustomPainter {
     }
     studentPath.close();
 
+    final studentFillColor = isDark ? const Color(0xFF10B981).withValues(alpha: 0.35) : const Color(0xFF059669).withValues(alpha: 0.25);
+    final studentStrokeColor = isDark ? const Color(0xFF34D399) : const Color(0xFF059669);
+
     final studentFillPaint = Paint()
-      ..color = const Color(0xFF059669).withValues(alpha: 0.35)
+      ..color = studentFillColor
       ..style = PaintingStyle.fill;
 
     final studentStrokePaint = Paint()
-      ..color = const Color(0xFF059669)
+      ..color = studentStrokeColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
@@ -266,9 +284,9 @@ class _RadarChartPainter extends CustomPainter {
     canvas.drawPath(studentPath, studentStrokePaint);
 
     // Vertex dots on Student Polygon
-    final dotPaint = Paint()..color = const Color(0xFF047857);
+    final dotPaint = Paint()..color = isDark ? const Color(0xFF34D399) : const Color(0xFF047857);
     final dotBorderPaint = Paint()
-      ..color = Colors.white
+      ..color = isDark ? const Color(0xFF11131A) : Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 
@@ -280,6 +298,7 @@ class _RadarChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RadarChartPainter oldDelegate) {
-    return oldDelegate.subjects != subjects;
+    return oldDelegate.subjects != subjects || oldDelegate.isDark != isDark;
   }
 }
+

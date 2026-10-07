@@ -678,19 +678,30 @@ class AnalyticsService {
     const data = analytics.rows[0];
 
     if (data.average_accuracy < 60) {
-      recs.push('Focus on fundamentals - your accuracy is below 60%');
+      recs.push('Focus on fundamentals - your overall accuracy is below 60%');
     }
-    if (data.physics_accuracy < 65) {
-      recs.push('Physics needs attention - practice Mechanics & Waves');
+
+    const subjAcc = [];
+    if (data.physics_accuracy != null && Number(data.physics_accuracy) > 0) {
+      subjAcc.push({ name: 'Physics', accuracy: Number(data.physics_accuracy), tip: 'practice Mechanics & Waves' });
     }
-    if (data.chemistry_accuracy < 65) {
-      recs.push('Chemistry is weak - revisit Organic Chemistry');
+    if (data.chemistry_accuracy != null && Number(data.chemistry_accuracy) > 0) {
+      subjAcc.push({ name: 'Chemistry', accuracy: Number(data.chemistry_accuracy), tip: 'revisit Organic Chemistry' });
     }
-    if (data.biology_accuracy < 65) {
-      recs.push('Biology can be improved - focus on Biology');
+    if (data.biology_accuracy != null && Number(data.biology_accuracy) > 0) {
+      subjAcc.push({ name: 'Biology', accuracy: Number(data.biology_accuracy), tip: 'focus on High-Yield topics' });
     }
+
+    subjAcc.sort((a, b) => a.accuracy - b.accuracy);
+
+    for (const item of subjAcc) {
+      if (item.accuracy < 65) {
+        recs.push(`${item.name} needs attention (${item.accuracy.toFixed(0)}%) - ${item.tip}`);
+      }
+    }
+
     if (data.current_study_streak < 5) {
-      recs.push('Build consistency - maintain a study streak');
+      recs.push('Build consistency - maintain a daily study streak');
     }
 
     return recs.slice(0, 4);

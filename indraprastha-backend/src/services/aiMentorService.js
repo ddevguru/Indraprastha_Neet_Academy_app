@@ -7,6 +7,8 @@
 const https = require('https');
 const http = require('http');
 
+const GEMINI_DIRECT_KEY = 'AQ.Ab8RN6KkjCy0yuPGxEGIngoRbNeaFRlqpuEEcMwaZXM09XsdFw';
+
 class AIMentorService {
   /**
    * Generate structured AI Mentor analysis for a student's test performance.
@@ -17,10 +19,10 @@ class AIMentorService {
     const anonymizedInput = this._anonymizeAnalytics(analytics);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || GEMINI_DIRECT_KEY || process.env.OPENAI_API_KEY;
       if (apiKey) {
-        if (process.env.GEMINI_API_KEY) {
-          return await this._callGeminiAPI(anonymizedInput);
+        if (process.env.GEMINI_API_KEY || GEMINI_DIRECT_KEY) {
+          return await this._callGeminiAPI(anonymizedInput, process.env.GEMINI_API_KEY || GEMINI_DIRECT_KEY);
         } else {
           return await this._callOpenAIAPI(anonymizedInput);
         }
@@ -67,8 +69,8 @@ class AIMentorService {
    * Call Google Gemini API
    * @private
    */
-  async _callGeminiAPI(inputData) {
-    const apiKey = process.env.GEMINI_API_KEY;
+  async _callGeminiAPI(inputData, keyOverride) {
+    const apiKey = keyOverride || process.env.GEMINI_API_KEY || GEMINI_DIRECT_KEY;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const promptText = `
@@ -96,6 +98,7 @@ Strict Requirements:
 }
 3. Never invent scores or topics outside the provided data.
 4. Keep tone academic, supportive, and focused on NEET rank optimization.
+5. IF the test is a single-subject test (e.g. Physics), ALL recommendations, priority subjects, strengths, and performance overview MUST be strictly relevant to that subject (Physics). DO NOT mention or suggest unrelated subjects (such as Biology or Chemistry) if the test was for Physics.
 `;
 
     const bodyData = JSON.stringify({
@@ -157,7 +160,7 @@ Strict Requirements:
       messages: [
         {
           role: 'system',
-          content: `You are an expert NEET Academic Mentor. Respond strictly with JSON matching schema: {"summary": "", "performance_overview": "", "priority_subject": "", "priority_topics": [], "strengths": [], "recommendations": [], "motivation": ""}. Do not invent data.`,
+          content: `You are an expert NEET Academic Mentor. Respond strictly with JSON matching schema: {"summary": "", "performance_overview": "", "priority_subject": "", "priority_topics": [], "strengths": [], "recommendations": [], "motivation": ""}. If the test is for a specific subject (e.g. Physics), all priority subjects and recommendations must be strictly for that subject. Do not invent data.`,
         },
         {
           role: 'user',
@@ -215,6 +218,7 @@ Strict Requirements:
   _generateFallbackResponse(data) {
     const {
       test_name = 'NEET Test',
+      test_subject = '',
       score = 0,
       maximum_score = 720,
       rank = 1,
@@ -225,37 +229,70 @@ Strict Requirements:
       strong_topics = [],
     } = data;
 
-    // Identify lowest scoring subject
-    let lowestSubject = subjects.length > 0 ? subjects[0] : null;
-    let highestSubject = subjects.length > 0 ? subjects[0] : null;
+    // Detect primary test subject from analytics inputs or test_name
+    let primarySubject = test_subject;
+    if (!primarySubject && test_name) {
+      const nameLower = test_name.toLowerCase();
+      if (nameLower.includes('physics')) primarySubject = 'Physics';
+      else if (nameLower.includes('chemistry')) primarySubject = 'Chemistry';
+      else if (nameLower.includes('biology')) primarySubject = 'Biology';
+      else if (nameLower.includes('botany')) primarySubject = 'Botany';
+      else if (nameLower.includes('zoology')) primarySubject = 'Zoology';
+    }
+    if (!primarySubject && subjects.length > 0 && subjects[0].subject) {
+      primarySubject = subjects[0].subject;
+    }
+    if (!primarySubject) {
+      primarySubject = 'Physics';
+    }
 
-    subjects.forEach((s) => {
-      const currentPct = s.max_score > 0 ? s.student_score / s.max_score : 0;
-      const lowestPct = lowestSubject && lowestSubject.max_score > 0 ? lowestSubject.student_score / lowestSubject.max_score : 0;
-      const highestPct = highestSubject && highestSubject.max_score > 0 ? highestSubject.student_score / highestSubject.max_score : 0;
+    const isSingleSubject = subjects.length <= 1;
 
-      if (currentPct < lowestPct) lowestSubject = s;
-      if (currentPct > highestPct) highestSubject = s;
-    });
+    let prioritySubjectName = primarySubject;
+    let strongSubjectName = primarySubject;
+    let lowestSubject = null;
+    let highestSubject = null;
 
-    const prioritySubjectName = lowestSubject ? lowestSubject.subject : 'Physics';
-    const strongSubjectName = highestSubject ? highestSubject.subject : 'Biology';
+    if (subjects.length > 0) {
+      lowestSubject = subjects[0];
+      highestSubject = subjects[0];
+
+      subjects.forEach((s) => {
+        const currentPct = s.max_score > 0 ? s.student_score / s.max_score : 0;
+        const lowestPct = lowestSubject && lowestSubject.max_score > 0 ? lowestSubject.student_score / lowestSubject.max_score : 0;
+        const highestPct = highestSubject && highestSubject.max_score > 0 ? highestSubject.student_score / highestSubject.max_score : 0;
+
+        if (currentPct < lowestPct) lowestSubject = s;
+        if (currentPct > highestPct) highestSubject = s;
+      });
+
+      if (lowestSubject && lowestSubject.subject) prioritySubjectName = lowestSubject.subject;
+      if (highestSubject && highestSubject.subject) strongSubjectName = highestSubject.subject;
+    }
 
     const summary = `You achieved ${score}/${maximum_score} (AIR #${rank} of ${total_participants} candidates). Your overall performance category is "${performance_category}".`;
 
-    let overview = `In ${test_name}, your strongest subject was ${strongSubjectName}`;
-    if (highestSubject && highestSubject.top100_average > 0) {
-      overview += ` (${highestSubject.student_score}/${highestSubject.max_score} vs Top 100 average of ${highestSubject.top100_average}).`;
+    let overview = '';
+    if (isSingleSubject) {
+      overview = `In ${test_name} (${primarySubject}), your total score is ${score}/${maximum_score}.`;
+      if (lowestSubject && lowestSubject.top100_average > 0) {
+        overview += ` Your performance is evaluated against a Top 100 average of ${lowestSubject.top100_average}.`;
+      }
     } else {
-      overview += `.`;
-    }
-
-    if (lowestSubject) {
-      overview += ` ${lowestSubject.subject} is currently your primary area of score growth, scoring ${lowestSubject.student_score}/${lowestSubject.max_score}`;
-      if (lowestSubject.top100_average > 0) {
-        overview += ` compared to the Top 100 benchmark average of ${lowestSubject.top100_average}.`;
+      overview = `In ${test_name}, your strongest subject was ${strongSubjectName}`;
+      if (highestSubject && highestSubject.top100_average > 0) {
+        overview += ` (${highestSubject.student_score}/${highestSubject.max_score} vs Top 100 average of ${highestSubject.top100_average}).`;
       } else {
         overview += `.`;
+      }
+
+      if (lowestSubject && lowestSubject.subject !== strongSubjectName) {
+        overview += ` ${lowestSubject.subject} is currently your primary area of score growth, scoring ${lowestSubject.student_score}/${lowestSubject.max_score}`;
+        if (lowestSubject.top100_average > 0) {
+          overview += ` compared to the Top 100 benchmark average of ${lowestSubject.top100_average}.`;
+        } else {
+          overview += `.`;
+        }
       }
     }
 
@@ -270,12 +307,14 @@ Strict Requirements:
       recommendations.push(`Focus on timed revision quizzes in ${prioritySubjectName}.`);
     }
 
-    if (lowestSubject) {
+    if (!isSingleSubject && lowestSubject && lowestSubject.subject) {
       recommendations.push(`Analyse all incorrect attempts in ${lowestSubject.subject} to eliminate silly mistakes.`);
+    } else {
+      recommendations.push(`Analyse all incorrect attempts in ${prioritySubjectName} to eliminate silly mistakes.`);
     }
-    recommendations.push(`Take a targeted subject booster test next week to verify retention.`);
+    recommendations.push(`Take a targeted ${prioritySubjectName} booster test next week to verify retention.`);
 
-    const motivation = `Consistency in daily practice bridge the gap to the Top 100 benchmark. Keep sharpening your weak chapters systematically!`;
+    const motivation = `Consistency in daily practice bridges the gap to top performance. Keep sharpening your ${prioritySubjectName} concepts systematically!`;
 
     return {
       summary,

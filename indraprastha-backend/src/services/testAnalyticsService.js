@@ -51,7 +51,7 @@ class TestAnalyticsService {
 
       // If detailed user answers were provided in payload, record them in test_attempt_details / user_answers
       if (Array.isArray(userAnswersPayload) && userAnswersPayload.length > 0 && attemptId) {
-        await this._storeUserAnswers(userId, testId, attemptId, userAnswersPayload, questions);
+        await this._storeUserAnswers(userId, testId, attemptId, userAnswersPayload, questions, testMeta);
       }
 
       // 3. Query Target Student's Attempt
@@ -159,6 +159,7 @@ class TestAnalyticsService {
       // 10. AI Mentor Analysis & Caching
       const aiInputPayload = {
         test_name: testMeta.title,
+        test_subject: testMeta.subject || this._inferSubject(null, testMeta),
         score: studentScore,
         maximum_score: maxMarks,
         rank: studentRank,
@@ -334,10 +335,30 @@ class TestAnalyticsService {
   }
 
   /**
+   * Helper: Infer subject from question or test metadata
+   * @private
+   */
+  _inferSubject(q, testMeta) {
+    if (q && q.subject && typeof q.subject === 'string' && q.subject.trim()) {
+      return q.subject.trim();
+    }
+    if (testMeta && testMeta.subject && typeof testMeta.subject === 'string' && testMeta.subject.trim()) {
+      return testMeta.subject.trim();
+    }
+    const title = (testMeta && testMeta.title ? testMeta.title : '').toLowerCase();
+    if (title.includes('physics')) return 'Physics';
+    if (title.includes('chemistry')) return 'Chemistry';
+    if (title.includes('biology')) return 'Biology';
+    if (title.includes('botany')) return 'Botany';
+    if (title.includes('zoology')) return 'Zoology';
+    return 'Physics';
+  }
+
+  /**
    * Helper: Store user answer records into user_answers and test_attempt_details
    * @private
    */
-  async _storeUserAnswers(userId, testId, attemptId, userAnswersPayload, questions) {
+  async _storeUserAnswers(userId, testId, attemptId, userAnswersPayload, questions, testMeta = {}) {
     try {
       const qMap = new Map();
       questions.forEach((q) => qMap.set(q.id, q));
@@ -365,7 +386,7 @@ class TestAnalyticsService {
             [
               attemptId,
               qId,
-              q.subject || 'Biology',
+              this._inferSubject(q, testMeta),
               q.topic || 'General',
               isCorrect,
               Number(item.timeTakenSeconds) || 0,
@@ -396,9 +417,17 @@ class TestAnalyticsService {
       if (testMeta.subject && testMeta.subject.trim()) {
         subjSet.add(testMeta.subject.trim());
       } else {
-        subjSet.add('Physics');
-        subjSet.add('Chemistry');
-        subjSet.add('Biology');
+        const titleLower = (testMeta.title || '').toLowerCase();
+        if (titleLower.includes('physics')) subjSet.add('Physics');
+        else if (titleLower.includes('chemistry')) subjSet.add('Chemistry');
+        else if (titleLower.includes('biology')) subjSet.add('Biology');
+        else if (titleLower.includes('botany')) subjSet.add('Botany');
+        else if (titleLower.includes('zoology')) subjSet.add('Zoology');
+        else {
+          subjSet.add('Physics');
+          subjSet.add('Chemistry');
+          subjSet.add('Biology');
+        }
       }
     }
 
@@ -558,7 +587,7 @@ class TestAnalyticsService {
     const topicGroupMap = new Map();
 
     questions.forEach((q) => {
-      const subject = (q.subject || testMeta.subject || 'Biology').trim();
+      const subject = (q.subject || testMeta.subject || this._inferSubject(q, testMeta)).trim();
       const chapter = (q.chapter || 'General Chapter').trim();
       const topic = (q.topic || testMeta.topic || 'General Topic').trim();
       const key = `${subject}::${chapter}::${topic}`;

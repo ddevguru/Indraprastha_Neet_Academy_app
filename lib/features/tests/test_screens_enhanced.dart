@@ -935,7 +935,7 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
                 const SizedBox(height: 24),
 
                 // Subject Wise Performance
-                _buildSubjectPerformance(),
+                _buildSubjectPerformance(results),
 
                 const SizedBox(height: 24),
 
@@ -1056,7 +1056,42 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
     );
   }
 
-  Widget _buildSubjectPerformance() {
+  Widget _buildSubjectPerformance(Map<String, dynamic> results) {
+    final titleLower = widget.testTitle.toLowerCase();
+    String detectedSubject = 'Physics';
+    if (titleLower.contains('chemistry')) {
+      detectedSubject = 'Chemistry';
+    } else if (titleLower.contains('biology') || titleLower.contains('botany') || titleLower.contains('zoology')) {
+      detectedSubject = 'Biology';
+    } else if (titleLower.contains('physics')) {
+      detectedSubject = 'Physics';
+    }
+
+    final accuracy = double.tryParse(results['accuracy']?.toString() ?? '0')?.toInt() ?? 80;
+
+    final isSingleSubject = titleLower.contains('physics') ||
+        titleLower.contains('chemistry') ||
+        titleLower.contains('biology') ||
+        titleLower.contains('botany') ||
+        titleLower.contains('zoology');
+
+    if (isSingleSubject) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Subject-wise Performance',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSubjectBar(detectedSubject, accuracy),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
