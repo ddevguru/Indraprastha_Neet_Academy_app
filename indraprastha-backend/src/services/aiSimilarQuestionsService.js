@@ -4,7 +4,12 @@
  * database persistence, and quality control validation.
  */
 
-const OpenAI = require('openai');
+let OpenAI = null;
+try {
+  OpenAI = require('openai');
+} catch (e) {
+  // Gracefully fallback to native fetch if openai package is not yet installed
+}
 const { pool } = require('../db');
 const neetQuestionEngine = require('./neetQuestionEngine');
 
@@ -17,11 +22,10 @@ class AISimilarQuestionsService {
   }
 
   /**
-   * Retrieves the configured OpenAI client.
-   * Throws clear configuration error if OPENAI_API_KEY is not set.
+   * Retrieves configured API key.
    * @private
    */
-  _getClient() {
+  _getApiKey() {
     let apiKey = process.env.OPENAI_API_KEY !== undefined ? process.env.OPENAI_API_KEY : DIRECT_OPENAI_KEY;
     if (!apiKey && process.env.CHATGPT_API_KEY) apiKey = process.env.CHATGPT_API_KEY;
     apiKey = (apiKey || '').trim();
@@ -34,11 +38,30 @@ class AISimilarQuestionsService {
       err.statusCode = 503;
       throw err;
     }
-    return new OpenAI({
-      apiKey,
-      timeout: 35000,
-      maxRetries: 2,
-    });
+    return apiKey;
+  }
+
+  /**
+   * Retrieves the configured OpenAI client if package installed.
+   * @private
+   */
+  _getClient() {
+    const apiKey = this._getApiKey();
+    if (!OpenAI) {
+      try {
+        OpenAI = require('openai');
+      } catch (e) {
+        // Not installed, will use native fetch fallback
+      }
+    }
+    if (OpenAI) {
+      return new OpenAI({
+        apiKey,
+        timeout: 35000,
+        maxRetries: 2,
+      });
+    }
+    return null;
   }
 
   /**
@@ -116,37 +139,87 @@ Return ONLY valid JSON matching the schema.`;
    * Calls real OpenAI API and parses JSON response.
    */
   async callOpenAIGeneration(prompt, count) {
+    const apiKey = this._getApiKey();
     const openai = this._getClient();
     const model = process.env.OPENAI_MODEL || this.defaultModel;
 
-    let completion;
-    try {
-      completion = await openai.chat.completions.create({
-        model,
-        messages: [
-          { role: 'system', content: prompt.system },
-          { role: 'user', content: prompt.user },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.75,
-      });
-    } catch (apiErr) {
-      console.error('[AI_SIMILAR_QUESTIONS_OPENAI_ERROR]', apiErr.message);
-      const isQuota = apiErr.status === 429 || apiErr.message?.includes('quota');
-      const isAuth = apiErr.status === 401;
-      const customErr = new Error(
-        isQuota
-          ? 'OpenAI API rate limit or quota exceeded. Please check your OpenAI account billing or try again later.'
-          : isAuth
-          ? 'Invalid OpenAI API key. Please check OPENAI_API_KEY in your server configuration.'
-          : `AI question generation service error: ${apiErr.message}`
-      );
-      customErr.status = isAuth ? 401 : isQuota ? 429 : 503;
-      customErr.statusCode = customErr.status;
-      throw customErr;
+    let content = null;
+    if (openai) {
+      let completion;
+      try {
+        completion = await openai.chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: prompt.system },
+            { role: 'user', content: prompt.user },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.75,
+        });
+      } catch (apiErr) {
+        console.error('[AI_SIMILAR_QUESTIONS_OPENAI_ERROR]', apiErr.message);
+        const isQuota = apiErr.status === 429 || apiErr.message?.includes('quota');
+        const isAuth = apiErr.status === 401;
+        const customErr = new Error(
+          isQuota
+            ? 'OpenAI API rate limit or quota exceeded. Please check your OpenAI account billing or try again later.'
+            : isAuth
+            ? 'Invalid OpenAI API key. Please check OPENAI_API_KEY in your server configuration.'
+            : `AI question generation service error: ${apiErr.message}`
+        );
+        customErr.status = isAuth ? 401 : isQuota ? 429 : 503;
+        customErr.statusCode = customErr.status;
+        throw customErr;
+      }
+      content = completion.choices?.[0]?.message?.content;
+    } else {
+      // Direct native fetch fallback if openai npm package is not installed on the server
+      try {
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: prompt.system },
+              { role: 'user', content: prompt.user },
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.75,
+          }),
+        });
+
+        if (!resp.ok) {
+          const errBody = await resp.text().catch(() => '');
+          const isQuota = resp.status === 429 || errBody.includes('quota');
+          const isAuth = resp.status === 401;
+          const customErr = new Error(
+            isQuota
+              ? 'OpenAI API rate limit or quota exceeded. Please check your OpenAI account billing or try again later.'
+              : isAuth
+              ? 'Invalid OpenAI API key. Please check OPENAI_API_KEY in your server configuration.'
+              : `AI question generation service error (HTTP ${resp.status})`
+          );
+          customErr.status = isAuth ? 401 : isQuota ? 429 : 503;
+          customErr.statusCode = customErr.status;
+          throw customErr;
+        }
+
+        const data = await resp.json();
+        content = data.choices?.[0]?.message?.content;
+      } catch (fetchErr) {
+        if (fetchErr.statusCode || fetchErr.status) throw fetchErr;
+        console.error('[AI_SIMILAR_QUESTIONS_FETCH_ERROR]', fetchErr.message);
+        const customErr = new Error(`AI question generation service error: ${fetchErr.message}`);
+        customErr.status = 503;
+        customErr.statusCode = 503;
+        throw customErr;
+      }
     }
 
-    const content = completion.choices?.[0]?.message?.content;
     if (!content) {
       const err = new Error('OpenAI returned an empty response. Please try again.');
       err.status = 502;

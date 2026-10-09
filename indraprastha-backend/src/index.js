@@ -120,17 +120,24 @@ async function startServer() {
     gcpLogInfo('Initializing database schema');
     await ensureDatabaseSchema();
     gcpLogInfo('Database schema ready');
-    await loadRuntimeConfigFromDb();
-    app.listen(PORT, () => {
-      gcpLogInfo('Backend server started', { port: PORT });
-    });
   } catch (error) {
-    gcpLogError('Failed to initialize database schema', {
+    gcpLogError('Database schema initialization warning (continuing server startup):', {
       message: error.message,
       stack: error.stack,
     });
-    process.exit(1);
+    console.error('[DB_INIT_ERROR] Database schema initialization warning:', error.message);
   }
+
+  try {
+    await loadRuntimeConfigFromDb();
+  } catch (cfgError) {
+    console.warn('[CONFIG_INIT_WARNING] Failed to load runtime config from DB:', cfgError.message);
+  }
+
+  app.listen(PORT, () => {
+    gcpLogInfo('Backend server started', { port: PORT });
+    console.log(`[SERVER_START] Indraprastha NEET Academy backend server listening on port ${PORT}`);
+  });
 }
 
 startServer();
