@@ -242,7 +242,7 @@ class ContentRepository {
   Future<Map<String, dynamic>> fetchLatestAnalytics() =>
       _get('/content/analytics/latest');
 
-  Future<List<Map<String, dynamic>>> generateSimilarQuestions({
+  Future<Map<String, dynamic>> fetchSimilarQuestionsData({
     required String questionText,
     String? subject,
     String? topic,
@@ -274,12 +274,36 @@ class ContentRepository {
         : jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final list = body['questions'];
-      if (list is List) {
-        return list.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
-      }
-      return [];
+      final questions = (list is List)
+          ? list.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList()
+          : <Map<String, dynamic>>[];
+      return {
+        'subject': body['subject']?.toString() ?? subject ?? '',
+        'topic': body['topic']?.toString() ?? topic ?? '',
+        'concept': body['concept']?.toString() ?? '',
+        'questions': questions,
+      };
     }
     throw Exception(body['error']?.toString() ?? 'Failed to generate similar questions');
+  }
+
+  Future<List<Map<String, dynamic>>> generateSimilarQuestions({
+    required String questionText,
+    String? subject,
+    String? topic,
+    List<String>? options,
+    String? explanation,
+    int count = 3,
+  }) async {
+    final res = await fetchSimilarQuestionsData(
+      questionText: questionText,
+      subject: subject,
+      topic: topic,
+      options: options,
+      explanation: explanation,
+      count: count,
+    );
+    return List<Map<String, dynamic>>.from(res['questions'] ?? const []);
   }
 
   Future<Map<String, dynamic>> submitComplaint({

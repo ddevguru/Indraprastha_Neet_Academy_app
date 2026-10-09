@@ -15,6 +15,7 @@ import '../../core/services/incorrect_pdf_service.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/question_report_dialog.dart';
 import '../../widgets/ai_similar_questions_dialog.dart';
+import '../../widgets/amazon_related_questions_view.dart';
 
 class TodaysMcqTestPreviewScreen extends ConsumerWidget {
   const TodaysMcqTestPreviewScreen({super.key});
@@ -550,26 +551,14 @@ class _TodaysMcqTestAttemptScreenState
                     onPressed: () => _next(active),
                   ),
                 const SizedBox(height: AppSpacing.sm),
-                if (_submitted && (_selected == null || _selected != item.correctOption)) ...[
-                  OutlinedButton.icon(
-                    onPressed: () => showSimilarQuestionsDialog(
-                      context,
-                      ref,
-                      questionText: item.preview,
-                      subject: item.subject.label,
-                      topic: item.chapterTitle,
-                      options: options,
-                      explanation: item.explanation,
-                    ),
-                    icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 18),
-                    label: const Text(
-                      'Solve Similar Questions (AI)',
-                      style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(46),
-                      side: const BorderSide(color: AppColors.primary),
-                    ),
+                if (_submitted) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  AmazonRelatedQuestionsView(
+                    questionText: item.preview,
+                    subject: item.subject.label,
+                    topic: item.chapterTitle,
+                    options: options,
+                    explanation: item.explanation,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                 ],

@@ -8,6 +8,7 @@ import '../core/utils/video_url_utils.dart';
 import '../theme/app_tokens.dart';
 import '../features/videos/video_player_screen.dart';
 import 'ai_similar_questions_dialog.dart';
+import 'amazon_related_questions_view.dart';
 import 'app_widgets.dart';
 import 'fast_network_image.dart';
 
@@ -770,33 +771,14 @@ class _ReviewQuestionPage extends StatelessWidget {
                   ),
                 ),
               ],
-              if (!entry.isCorrect) ...[
-                const SizedBox(height: AppSpacing.lg),
-                Consumer(
-                  builder: (context, ref, _) {
-                    return OutlinedButton.icon(
-                      onPressed: () => showSimilarQuestionsDialog(
-                        context,
-                        ref,
-                        questionText: entry.questionText,
-                        subject: entry.subject,
-                        topic: entry.topic,
-                        options: entry.options,
-                        explanation: entry.explanation,
-                      ),
-                      icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 18),
-                      label: const Text(
-                        'Solve Similar Questions (AI)',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(46),
-                        side: const BorderSide(color: AppColors.primary),
-                      ),
-                    );
-                  },
-                ),
-              ],
+              // Amazon-Style Related Questions Section
+              AmazonRelatedQuestionsView(
+                questionText: entry.questionText,
+                subject: entry.subject,
+                topic: entry.topic,
+                options: entry.options,
+                explanation: entry.explanation,
+              ),
             ],
           ),
         ),

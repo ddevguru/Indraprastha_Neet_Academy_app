@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/incorrect_pdf_service.dart';
 import '../../theme/app_tokens.dart';
 import '../../widgets/ai_similar_questions_dialog.dart';
+import '../../widgets/amazon_related_questions_view.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../widgets/question_report_dialog.dart';
 /// Enhanced Test Taking Screen with Progress Dots
@@ -1190,7 +1191,7 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
         const SizedBox(height: 16),
         // PageView for review questions
         SizedBox(
-          height: 380,
+          height: 520,
           child: PageView.builder(
             controller: _reviewController,
             onPageChanged: (index) {
@@ -1351,30 +1352,13 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
                 explanation,
                 style: const TextStyle(fontSize: 12),
               ),
-              const SizedBox(height: 12),
-              Consumer(
-                builder: (context, ref, _) {
-                  return OutlinedButton.icon(
-                    onPressed: () => showSimilarQuestionsDialog(
-                      context,
-                      ref,
-                      questionText: qText,
-                      subject: subject,
-                      topic: topic,
-                      options: options,
-                      explanation: explanation,
-                    ),
-                    icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 16),
-                    label: const Text(
-                      'Solve Similar Questions (AI)',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(40),
-                      side: const BorderSide(color: AppColors.primary),
-                    ),
-                  );
-                },
+              const SizedBox(height: 8),
+              AmazonRelatedQuestionsView(
+                questionText: qText,
+                subject: subject,
+                topic: topic,
+                options: options,
+                explanation: explanation,
               ),
             ],
           ],

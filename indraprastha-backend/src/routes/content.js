@@ -1044,6 +1044,9 @@ router.post('/ai/generate-similar-questions', userAuth, async (req, res) => {
 
     return res.json({
       success: true,
+      subject: result.subject,
+      topic: result.topic,
+      concept: result.concept,
       questions: result.questions || [],
     });
   } catch (e) {
