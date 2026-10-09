@@ -243,29 +243,38 @@ class ContentRepository {
       _get('/content/analytics/latest');
 
   Future<Map<String, dynamic>> fetchSimilarQuestionsData({
+    int? sourceQuestionId,
+    String? sourceType,
+    int? testId,
     required String questionText,
     String? subject,
     String? topic,
     List<String>? options,
     String? explanation,
-    int count = 3,
+    String? userAnswer,
+    int count = 5,
   }) async {
     final token = await _token;
     if (token == null) {
       throw Exception('Not logged in. Please login again.');
     }
     final response = await _client.post(
-      Uri.parse('$baseUrl/content/ai/generate-similar-questions'),
+      Uri.parse('$baseUrl/content/ai/similar-questions'),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
+        if (sourceQuestionId != null) 'source_question_id': sourceQuestionId,
+        'source_type': sourceType ?? 'test',
+        if (testId != null) 'test_id': testId,
         'questionText': questionText,
         'subject': subject ?? '',
         'topic': topic ?? '',
         'options': options ?? [],
         'explanation': explanation ?? '',
+        if (userAnswer != null) 'user_answer': userAnswer,
+        'requested_count': count,
         'count': count,
       }),
     );
@@ -278,7 +287,9 @@ class ContentRepository {
           ? list.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList()
           : <Map<String, dynamic>>[];
       return {
+        'batch_id': body['batch_id'],
         'subject': body['subject']?.toString() ?? subject ?? '',
+        'chapter': body['chapter']?.toString() ?? topic ?? '',
         'topic': body['topic']?.toString() ?? topic ?? '',
         'concept': body['concept']?.toString() ?? '',
         'questions': questions,
@@ -288,22 +299,55 @@ class ContentRepository {
   }
 
   Future<List<Map<String, dynamic>>> generateSimilarQuestions({
+    int? sourceQuestionId,
+    String? sourceType,
+    int? testId,
     required String questionText,
     String? subject,
     String? topic,
     List<String>? options,
     String? explanation,
-    int count = 3,
+    String? userAnswer,
+    int count = 5,
   }) async {
     final res = await fetchSimilarQuestionsData(
+      sourceQuestionId: sourceQuestionId,
+      sourceType: sourceType,
+      testId: testId,
       questionText: questionText,
       subject: subject,
       topic: topic,
       options: options,
       explanation: explanation,
+      userAnswer: userAnswer,
       count: count,
     );
     return List<Map<String, dynamic>>.from(res['questions'] ?? const []);
+  }
+
+  Future<Map<String, dynamic>> submitSimilarQuestionsBatchAnswers({
+    required int batchId,
+    required Map<String, String> answers,
+  }) async {
+    final token = await _token;
+    if (token == null) {
+      throw Exception('Not logged in. Please login again.');
+    }
+    final response = await _client.post(
+      Uri.parse('$baseUrl/content/ai/similar-questions/$batchId/submit'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'answers': answers}),
+    );
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return body;
+    }
+    throw Exception(body['error']?.toString() ?? 'Failed to submit answers');
   }
 
   Future<Map<String, dynamic>> submitComplaint({

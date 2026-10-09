@@ -554,6 +554,9 @@ class _TodaysMcqTestAttemptScreenState
                   const SizedBox(height: AppSpacing.sm),
                   AmazonRelatedQuestionsView(
                     questionText: item.preview,
+                    sourceQuestionId: int.tryParse(item.id.toString()),
+                    sourceType: 'test',
+                    userAnswer: _selected != null && _selected! >= 0 && _selected! < 4 ? ['A', 'B', 'C', 'D'][_selected!] : null,
                     subject: item.subject.label,
                     topic: item.chapterTitle,
                     options: options,
@@ -562,7 +565,7 @@ class _TodaysMcqTestAttemptScreenState
                   const SizedBox(height: AppSpacing.sm),
                 ],
                 QuestionDisclaimerReportMark(
-                  questionId: '${item.id}',
+                  questionId: item.id,
                   questionText: item.preview,
                   moduleTitle: "Today's MCQ test",
                 ),

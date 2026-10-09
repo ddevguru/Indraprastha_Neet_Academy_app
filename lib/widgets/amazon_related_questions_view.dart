@@ -9,13 +9,17 @@ import 'ai_similar_questions_dialog.dart';
 /// Global in-memory cache for related questions so switching between cards is instant
 final Map<String, Map<String, dynamic>> _relatedQuestionsMemoryCache = {};
 
-/// Amazon-Style Related Questions Carousel Component
+/// AI-Powered Similar Questions Component
 /// Displays similar questions directly underneath the current question and explanation,
 /// strictly matching the exact topic and core concept tested in this specific question.
 class AmazonRelatedQuestionsView extends ConsumerStatefulWidget {
   const AmazonRelatedQuestionsView({
     super.key,
     required this.questionText,
+    this.sourceQuestionId,
+    this.sourceType,
+    this.testId,
+    this.userAnswer,
     this.subject,
     this.topic,
     this.options,
@@ -24,6 +28,10 @@ class AmazonRelatedQuestionsView extends ConsumerStatefulWidget {
   });
 
   final String questionText;
+  final int? sourceQuestionId;
+  final String? sourceType;
+  final int? testId;
+  final String? userAnswer;
   final String? subject;
   final String? topic;
   final List<String>? options;
@@ -34,6 +42,8 @@ class AmazonRelatedQuestionsView extends ConsumerStatefulWidget {
   ConsumerState<AmazonRelatedQuestionsView> createState() =>
       _AmazonRelatedQuestionsViewState();
 }
+
+typedef AISimilarQuestionsInlineView = AmazonRelatedQuestionsView;
 
 class _AmazonRelatedQuestionsViewState
     extends ConsumerState<AmazonRelatedQuestionsView>
@@ -109,6 +119,10 @@ class _AmazonRelatedQuestionsViewState
 
       final data = await repo.fetchSimilarQuestionsData(
         questionText: widget.questionText,
+        sourceQuestionId: widget.sourceQuestionId,
+        sourceType: widget.sourceType,
+        testId: widget.testId,
+        userAnswer: widget.userAnswer,
         subject: widget.subject,
         topic: widget.topic,
         options: widget.options,
@@ -154,8 +168,11 @@ class _AmazonRelatedQuestionsViewState
         builder: (context) => AISimilarQuestionsQuizScreen(
           title: _resolvedConcept.isNotEmpty
               ? _resolvedConcept
-              : (_resolvedTopic.isNotEmpty ? _resolvedTopic : 'Related Practice Questions'),
+              : (_resolvedTopic.isNotEmpty ? _resolvedTopic : 'Similar Practice Questions'),
           questions: _questions,
+          subject: _resolvedSubject.isNotEmpty ? _resolvedSubject : widget.subject,
+          chapter: _resolvedTopic.isNotEmpty ? _resolvedTopic : widget.topic,
+          concept: _resolvedConcept,
         ),
       ),
     );
@@ -179,7 +196,7 @@ class _AmazonRelatedQuestionsViewState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section Header: Amazon style "Related to this item"
+          // Section Header: Solve Similar Questions
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -187,7 +204,7 @@ class _AmazonRelatedQuestionsViewState
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFFF9900), Color(0xFFFF6600)], // Amazon orange vibe
+                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -201,7 +218,7 @@ class _AmazonRelatedQuestionsViewState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Related to this Question (Amazon Style)',
+                      'Solve Similar Questions',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
@@ -210,7 +227,7 @@ class _AmazonRelatedQuestionsViewState
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Questions matching this exact topic and core formula/concept',
+                      'AI-Powered Personalized Practice • Same topic & concept',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -283,7 +300,7 @@ class _AmazonRelatedQuestionsViewState
                     onPressed: () => _openInteractiveQuiz(context),
                     icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
                     label: Text(
-                      'Practice All ${_questions.length} Related Qs (Quiz Mode)',
+                      'Practice All ${_questions.length} Qs',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -302,13 +319,17 @@ class _AmazonRelatedQuestionsViewState
                     context,
                     ref,
                     questionText: widget.questionText,
+                    sourceQuestionId: widget.sourceQuestionId,
+                    sourceType: widget.sourceType,
+                    testId: widget.testId,
+                    userAnswer: widget.userAnswer,
                     subject: _resolvedSubject.isNotEmpty ? _resolvedSubject : widget.subject,
                     topic: _resolvedTopic.isNotEmpty ? _resolvedTopic : widget.topic,
                     options: widget.options,
                     explanation: widget.explanation,
                   ),
                   icon: const Icon(Icons.tune_rounded, size: 16),
-                  label: const Text('Configure (1-10)', style: TextStyle(fontSize: 11)),
+                  label: const Text('Generate (1-10)', style: TextStyle(fontSize: 11)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
                     shape: RoundedRectangleBorder(
@@ -651,19 +672,45 @@ class _AmazonRelatedQuestionsViewState
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _error ?? 'Failed to load related questions.',
-              style: const TextStyle(fontSize: 11, color: Colors.red),
-            ),
+          Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _error ?? 'AI question generation encountered an issue.',
+                  style: const TextStyle(fontSize: 11, color: Colors.red),
+                ),
+              ),
+              TextButton(
+                onPressed: () => _loadRelatedQuestions(forceRefresh: true),
+                child: const Text('Retry', style: TextStyle(fontSize: 11)),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => _loadRelatedQuestions(forceRefresh: true),
-            child: const Text('Retry', style: TextStyle(fontSize: 11)),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: () => showSimilarQuestionsDialog(
+                context,
+                ref,
+                questionText: widget.questionText,
+                sourceQuestionId: widget.sourceQuestionId,
+                sourceType: widget.sourceType,
+                testId: widget.testId,
+                userAnswer: widget.userAnswer,
+                subject: _resolvedSubject.isNotEmpty ? _resolvedSubject : widget.subject,
+                topic: _resolvedTopic.isNotEmpty ? _resolvedTopic : widget.topic,
+                options: widget.options,
+                explanation: widget.explanation,
+              ),
+              icon: const Icon(Icons.auto_awesome, size: 14),
+              label: const Text('Solve Similar Questions (1-10)', style: TextStyle(fontSize: 11)),
+            ),
           ),
         ],
       ),
@@ -674,9 +721,31 @@ class _AmazonRelatedQuestionsViewState
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Text(
-          'No related questions available for this concept.',
-          style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        child: Column(
+          children: [
+            Text(
+              'No practice questions generated yet for this concept.',
+              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () => showSimilarQuestionsDialog(
+                context,
+                ref,
+                questionText: widget.questionText,
+                sourceQuestionId: widget.sourceQuestionId,
+                sourceType: widget.sourceType,
+                testId: widget.testId,
+                userAnswer: widget.userAnswer,
+                subject: _resolvedSubject.isNotEmpty ? _resolvedSubject : widget.subject,
+                topic: _resolvedTopic.isNotEmpty ? _resolvedTopic : widget.topic,
+                options: widget.options,
+                explanation: widget.explanation,
+              ),
+              icon: const Icon(Icons.auto_awesome, size: 16),
+              label: const Text('Solve Similar Questions (1-10)', style: TextStyle(fontSize: 12)),
+            ),
+          ],
         ),
       ),
     );

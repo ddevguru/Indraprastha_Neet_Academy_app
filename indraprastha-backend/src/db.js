@@ -966,6 +966,49 @@ async function ensureDatabaseSchema() {
     );
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_test_analysis_user_test ON ai_test_analysis(user_id, test_id);`);
+
+  // AI Similar Question Batches
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ai_similar_question_batches (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      source_question_id INTEGER,
+      source_type VARCHAR(20) DEFAULT 'test',
+      test_id INTEGER,
+      subject VARCHAR(100) NOT NULL,
+      chapter VARCHAR(150) NOT NULL,
+      topic VARCHAR(150) DEFAULT '',
+      concept VARCHAR(150) DEFAULT '',
+      difficulty VARCHAR(30) DEFAULT 'Medium',
+      requested_count INTEGER NOT NULL,
+      valid_count INTEGER NOT NULL,
+      model VARCHAR(60) NOT NULL,
+      status VARCHAR(30) DEFAULT 'completed',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_batches_user ON ai_similar_question_batches(user_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_batches_source_q ON ai_similar_question_batches(source_question_id);`);
+
+  // AI Similar Questions
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ai_similar_questions (
+      id SERIAL PRIMARY KEY,
+      batch_id INTEGER NOT NULL REFERENCES ai_similar_question_batches(id) ON DELETE CASCADE,
+      question_text TEXT NOT NULL,
+      option_a TEXT NOT NULL,
+      option_b TEXT NOT NULL,
+      option_c TEXT NOT NULL,
+      option_d TEXT NOT NULL,
+      correct_option CHAR(1) NOT NULL,
+      explanation TEXT NOT NULL,
+      user_answer CHAR(1),
+      is_correct BOOLEAN,
+      answered_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_similar_q_batch ON ai_similar_questions(batch_id);`);
 }
 
 async function loadRuntimeConfigFromDb() {

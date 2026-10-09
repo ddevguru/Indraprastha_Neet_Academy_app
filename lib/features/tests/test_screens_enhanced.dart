@@ -1353,6 +1353,10 @@ class _TestResultsScreenState extends State<TestResultsScreen> {
               const SizedBox(height: 8),
               AmazonRelatedQuestionsView(
                 questionText: qText,
+                sourceQuestionId: int.tryParse(q['id']?.toString() ?? ''),
+                sourceType: 'test',
+                testId: widget.testId,
+                userAnswer: userAnsRaw,
                 subject: subject,
                 topic: topic,
                 options: options,

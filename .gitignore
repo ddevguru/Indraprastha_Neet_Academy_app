@@ -44,6 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Backend secrets
+# Backend secrets and dependencies
 indraprastha-backend/.env
 indraprastha-backend/*.pem
+**/node_modules/

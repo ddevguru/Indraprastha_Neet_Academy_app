@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/providers/app_state.dart';
 import '../features/content/data/content_repository.dart';
@@ -9,23 +10,31 @@ import 'app_widgets.dart';
 /// Shows AI similar questions dialog allowing user to choose 1 to 10 questions to generate.
 Future<void> showSimilarQuestionsDialog(
   BuildContext context,
-  WidgetRef ref, {
+  WidgetRef? ref, {
   required String questionText,
+  int? sourceQuestionId,
+  String? sourceType,
+  int? testId,
   String? subject,
   String? topic,
   List<String>? options,
   String? explanation,
+  String? userAnswer,
 }) async {
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => _SimilarQuestionsConfigSheet(
+      sourceQuestionId: sourceQuestionId,
+      sourceType: sourceType,
+      testId: testId,
       questionText: questionText,
       subject: subject,
       topic: topic,
       options: options,
       explanation: explanation,
+      userAnswer: userAnswer,
       parentRef: ref,
     ),
   );
@@ -33,20 +42,28 @@ Future<void> showSimilarQuestionsDialog(
 
 class _SimilarQuestionsConfigSheet extends StatefulWidget {
   const _SimilarQuestionsConfigSheet({
+    this.sourceQuestionId,
+    this.sourceType,
+    this.testId,
     required this.questionText,
     this.subject,
     this.topic,
     this.options,
     this.explanation,
-    required this.parentRef,
+    this.userAnswer,
+    this.parentRef,
   });
 
+  final int? sourceQuestionId;
+  final String? sourceType;
+  final int? testId;
   final String questionText;
   final String? subject;
   final String? topic;
   final List<String>? options;
   final String? explanation;
-  final WidgetRef parentRef;
+  final String? userAnswer;
+  final WidgetRef? parentRef;
 
   @override
   State<_SimilarQuestionsConfigSheet> createState() =>
@@ -55,45 +72,73 @@ class _SimilarQuestionsConfigSheet extends StatefulWidget {
 
 class __SimilarQuestionsConfigSheetState
     extends State<_SimilarQuestionsConfigSheet> {
-  int _selectedCount = 3;
+  int _selectedCount = 5; // Default 5 questions as per requirement
   bool _generating = false;
   String? _error;
 
   Future<void> _startGeneration() async {
+    if (_generating) return; // Prevent duplicate submissions
+
     setState(() {
       _generating = true;
       _error = null;
     });
 
     try {
-      final prefs = widget.parentRef.read(sharedPreferencesProvider);
+      final SharedPreferences prefs;
+      if (widget.parentRef != null) {
+        prefs = widget.parentRef!.read(sharedPreferencesProvider);
+      } else {
+        prefs = await SharedPreferences.getInstance();
+      }
       final repo = ContentRepository(prefs: prefs);
 
-      final generated = await repo.generateSimilarQuestions(
+      final data = await repo.fetchSimilarQuestionsData(
+        sourceQuestionId: widget.sourceQuestionId,
+        sourceType: widget.sourceType,
+        testId: widget.testId,
         questionText: widget.questionText,
         subject: widget.subject,
         topic: widget.topic,
         options: widget.options,
         explanation: widget.explanation,
+        userAnswer: widget.userAnswer,
         count: _selectedCount,
       );
+
+      final generated =
+          List<Map<String, dynamic>>.from(data['questions'] ?? const []);
 
       if (!mounted) return;
       Navigator.pop(context); // Close bottom sheet
 
       if (generated.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not generate similar questions. Please try again.')),
+          const SnackBar(
+            content: Text(
+              'No practice questions generated. Please check server configuration or try again.',
+            ),
+          ),
         );
         return;
       }
 
-      // Navigate to interactive quiz screen
+      // Navigate to interactive practice screen
+      final resolvedTitle = (data['concept']?.toString().isNotEmpty == true)
+          ? data['concept'].toString()
+          : (data['topic']?.toString().isNotEmpty == true
+              ? data['topic'].toString()
+              : (widget.topic ?? widget.subject ?? 'Similar Practice'));
+
       await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => AISimilarQuestionsQuizScreen(
-            title: 'AI Practice: ${widget.topic ?? widget.subject ?? "Similar Concept"}',
+            title: resolvedTitle,
+            batchId: data['batch_id'] as int?,
+            subject: data['subject']?.toString() ?? widget.subject ?? '',
+            chapter: data['chapter']?.toString() ?? data['topic']?.toString() ?? widget.topic ?? '',
+            concept: data['concept']?.toString() ?? '',
             questions: generated,
           ),
         ),
@@ -161,41 +206,57 @@ class __SimilarQuestionsConfigSheetState
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if ((widget.topic?.trim().isNotEmpty ?? false) || (widget.subject?.trim().isNotEmpty ?? false)) ...[
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                        ),
-                        child: Text(
-                          [widget.subject?.trim(), widget.topic?.trim()].where((s) => s != null && s.isNotEmpty).join(' • '),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'AI-Powered Personalized Practice',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
                       ),
-                    ] else ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'AI will generate concept-matched NEET questions.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
+
+          // Context badges
+          if ((widget.topic?.trim().isNotEmpty ?? false) ||
+              (widget.subject?.trim().isNotEmpty ?? false)) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.menu_book_rounded, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      [widget.subject?.trim(), widget.topic?.trim()]
+                          .where((s) => s != null && s.isNotEmpty)
+                          .join(' • '),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+
           if (_error != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
@@ -204,75 +265,93 @@ class __SimilarQuestionsConfigSheetState
                 borderRadius: BorderRadius.circular(AppRadii.md),
                 border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
               ),
-              child: Text(
-                _error!,
-                style: const TextStyle(color: Colors.red, fontSize: 13),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          Text(
-            'Select number of similar questions (1 to 10):',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          // Count preset chips
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [1, 3, 5, 10].map((c) {
-              final isSel = _selectedCount == c;
-              return ChoiceChip(
-                label: Text('$c Qs'),
-                selected: isSel,
-                onSelected: (val) {
-                  if (val) setState(() => _selectedCount = c);
-                },
-                selectedColor: AppColors.primary,
-                labelStyle: TextStyle(
-                  color: isSel ? Colors.white : theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // Slider 1 to 10
-          Row(
-            children: [
-              const Text('1', style: TextStyle(fontWeight: FontWeight.bold)),
-              Expanded(
-                child: Slider(
-                  value: _selectedCount.toDouble(),
-                  min: 1,
-                  max: 10,
-                  divisions: 9,
-                  label: '$_selectedCount Questions',
-                  activeColor: AppColors.primary,
-                  onChanged: (v) => setState(() => _selectedCount = v.round()),
-                ),
-              ),
-              const Text('10', style: TextStyle(fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          if (_generating) ...[
-            Center(
-              child: Column(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'AI is generating $_selectedCount similar NEET questions...',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red, fontSize: 13),
+                    ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+
+          Text(
+            'Select number of similar questions to practice:',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+
+          // 1 to 10 question count chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(10, (idx) {
+              final count = idx + 1;
+              final isSel = _selectedCount == count;
+              return ChoiceChip(
+                label: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: isSel ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                  ),
+                ),
+                selected: isSel,
+                selectedColor: AppColors.primary,
+                backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isSel ? AppColors.primary : Colors.transparent,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                onSelected: _generating
+                    ? null
+                    : (val) {
+                        if (val) setState(() => _selectedCount = count);
+                      },
+              );
+            }),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+
+          if (_generating) ...[
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Column(
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.primary),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'AI is crafting $_selectedCount personalized questions for this concept...',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Strictly locked to chapter & difficulty',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ] else ...[
             PrimaryButton(
-              label: 'Generate $_selectedCount Questions ✨',
+              label: 'Generate Practice Questions ($_selectedCount)',
               icon: Icons.auto_awesome_rounded,
               expanded: true,
               onPressed: _startGeneration,
@@ -284,44 +363,90 @@ class __SimilarQuestionsConfigSheetState
   }
 }
 
-/// Interactive quiz screen for generated similar MCQs
-class AISimilarQuestionsQuizScreen extends StatefulWidget {
+/// Interactive practice quiz screen for generated similar MCQs
+class AISimilarQuestionsQuizScreen extends ConsumerStatefulWidget {
   const AISimilarQuestionsQuizScreen({
     super.key,
     required this.title,
     required this.questions,
+    this.batchId,
+    this.subject,
+    this.chapter,
+    this.concept,
   });
 
   final String title;
   final List<Map<String, dynamic>> questions;
+  final int? batchId;
+  final String? subject;
+  final String? chapter;
+  final String? concept;
 
   @override
-  State<AISimilarQuestionsQuizScreen> createState() =>
+  ConsumerState<AISimilarQuestionsQuizScreen> createState() =>
       _AISimilarQuestionsQuizScreenState();
 }
 
 class _AISimilarQuestionsQuizScreenState
-    extends State<AISimilarQuestionsQuizScreen> {
+    extends ConsumerState<AISimilarQuestionsQuizScreen> {
   int _currentIndex = 0;
   final Map<int, String> _selectedAnswers = {};
   int _correctCount = 0;
   bool _finished = false;
+  bool _reviewingAll = false;
 
   void _selectOption(int qIndex, String optionKey, String correctOption) {
-    if (_selectedAnswers.containsKey(qIndex)) return; // Already selected
+    if (_selectedAnswers.containsKey(qIndex)) return; // Already answered
     setState(() {
       _selectedAnswers[qIndex] = optionKey;
       if (optionKey.toUpperCase() == correctOption.toUpperCase()) {
         _correctCount++;
       }
     });
+
+    // If batchId exists and user has answered all, submit answers in background
+    if (_selectedAnswers.length == widget.questions.length && widget.batchId != null) {
+      _submitBatchResults();
+    }
+  }
+
+  Future<void> _submitBatchResults() async {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final repo = ContentRepository(prefs: prefs);
+      final answerMap = <String, String>{};
+      _selectedAnswers.forEach((idx, ans) {
+        final q = widget.questions[idx];
+        final idKey = q['db_id']?.toString() ?? '$idx';
+        answerMap[idKey] = ans;
+      });
+      await repo.submitSimilarQuestionsBatchAnswers(
+        batchId: widget.batchId!,
+        answers: answerMap,
+      );
+    } catch (e) {
+      // Background save error non-fatal to quiz UI
+      debugPrint('[BATCH_SUBMIT_WARNING]: $e');
+    }
   }
 
   void _nextQuestion() {
     if (_currentIndex < widget.questions.length - 1) {
       setState(() => _currentIndex++);
     } else {
-      setState(() => _finished = true);
+      setState(() {
+        _finished = true;
+        _reviewingAll = false;
+      });
+      if (widget.batchId != null) {
+        _submitBatchResults();
+      }
+    }
+  }
+
+  void _previousQuestion() {
+    if (_currentIndex > 0) {
+      setState(() => _currentIndex--);
     }
   }
 
@@ -329,15 +454,19 @@ class _AISimilarQuestionsQuizScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final total = widget.questions.length;
 
-    if (_finished) {
-      final total = widget.questions.length;
+    if (_finished && !_reviewingAll) {
       final accuracy = total > 0 ? (_correctCount / total * 100).round() : 0;
+      final wrongCount = total - _correctCount;
 
       return Scaffold(
-        appBar: AppBar(title: Text(widget.title)),
+        appBar: AppBar(
+          title: Text(widget.title),
+          automaticallyImplyLeading: false,
+        ),
         body: Center(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.xl),
             child: CenteredContent(
               maxWidth: 600,
@@ -352,31 +481,112 @@ class _AISimilarQuestionsQuizScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 64),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: accuracy >= 70
+                            ? AppColors.success.withValues(alpha: 0.15)
+                            : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        accuracy >= 70
+                            ? Icons.emoji_events_rounded
+                            : Icons.auto_awesome_rounded,
+                        color: accuracy >= 70 ? AppColors.success : const Color(0xFFF59E0B),
+                        size: 56,
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     Text(
-                      'Practice Completed!',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      'Personalized Practice Completed!',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
                       'Score: $_correctCount / $total ($accuracy%)',
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
+
+                    // Metrics row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildMetricPill(
+                          label: 'Correct',
+                          value: '$_correctCount',
+                          color: AppColors.success,
+                          icon: Icons.check_circle_outline,
+                        ),
+                        const SizedBox(width: 12),
+                        _buildMetricPill(
+                          label: 'Incorrect',
+                          value: '$wrongCount',
+                          color: AppColors.danger,
+                          icon: Icons.highlight_off,
+                        ),
+                        const SizedBox(width: 12),
+                        _buildMetricPill(
+                          label: 'Accuracy',
+                          value: '$accuracy%',
+                          color: AppColors.primary,
+                          icon: Icons.percent,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+
                     Text(
-                      accuracy >= 75
-                          ? '🎉 Excellent work! You have mastered this concept.'
-                          : '👍 Good effort! Review the explanations to strengthen weak points.',
+                      accuracy >= 80
+                          ? '🎉 Mastery Achieved! You have successfully mastered this core concept.'
+                          : '💡 Keep Practicing! Review the step-by-step explanations below to fix remaining gaps.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.white70 : AppColors.textSecondary,
+                        height: 1.4,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.xl),
-                    PrimaryButton(
-                      label: 'Done',
-                      icon: Icons.check_circle_rounded,
-                      expanded: true,
-                      onPressed: () => Navigator.pop(context),
+
+                    // Action buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.visibility_outlined, size: 18),
+                            label: const Text('Review Answers'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                              ),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _reviewingAll = true;
+                                _currentIndex = 0;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: PrimaryButton(
+                            label: 'Finish',
+                            icon: Icons.check_circle_rounded,
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -388,12 +598,18 @@ class _AISimilarQuestionsQuizScreenState
     }
 
     final currentQ = widget.questions[_currentIndex];
-    final qText = currentQ['question_text']?.toString() ?? currentQ['question']?.toString() ?? '';
+    final qText = currentQ['question_text']?.toString() ??
+        currentQ['question']?.toString() ??
+        '';
     final optA = currentQ['option_a']?.toString() ?? '';
     final optB = currentQ['option_b']?.toString() ?? '';
     final optC = currentQ['option_c']?.toString() ?? '';
     final optD = currentQ['option_d']?.toString() ?? '';
-    final correctOpt = (currentQ['correct_option'] ?? currentQ['correct_answer'] ?? 'A').toString().toUpperCase();
+    final correctOpt = (currentQ['correct_option'] ??
+            currentQ['correct_answer'] ??
+            'A')
+        .toString()
+        .toUpperCase();
     final explanation = currentQ['explanation']?.toString() ?? '';
 
     final options = {'A': optA, 'B': optB, 'C': optC, 'D': optD};
@@ -402,7 +618,18 @@ class _AISimilarQuestionsQuizScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.title} (${_currentIndex + 1}/${widget.questions.length})'),
+        title: Text(widget.title),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text(
+                '${_currentIndex + 1} / $total',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
@@ -415,9 +642,9 @@ class _AISimilarQuestionsQuizScreenState
               ClipRRect(
                 borderRadius: BorderRadius.circular(99),
                 child: LinearProgressIndicator(
-                  value: (_currentIndex + 1) / widget.questions.length,
+                  value: (_currentIndex + 1) / total,
                   minHeight: 6,
-                  backgroundColor: AppColors.border,
+                  backgroundColor: isDark ? const Color(0xFF334155) : AppColors.border,
                   valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
                 ),
               ),
@@ -437,14 +664,29 @@ class _AISimilarQuestionsQuizScreenState
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            'Question ${_currentIndex + 1}',
+                            'Question ${_currentIndex + 1} of $total',
                             style: const TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                              fontSize: 12,
                             ),
                           ),
                         ),
+                        if (widget.concept != null && widget.concept!.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              widget.concept!,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -472,11 +714,15 @@ class _AISimilarQuestionsQuizScreenState
 
                       if (isAnswered) {
                         if (isCorrect) {
-                          bg = isDark ? AppColors.success.withValues(alpha: 0.2) : const Color(0xFFE7F8EF);
+                          bg = isDark
+                              ? AppColors.success.withValues(alpha: 0.2)
+                              : const Color(0xFFE7F8EF);
                           border = AppColors.success;
                           textColor = AppColors.success;
                         } else if (isSelected) {
-                          bg = isDark ? AppColors.danger.withValues(alpha: 0.2) : const Color(0xFFFCEAEA);
+                          bg = isDark
+                              ? AppColors.danger.withValues(alpha: 0.2)
+                              : const Color(0xFFFCEAEA);
                           border = AppColors.danger;
                           textColor = AppColors.danger;
                         }
@@ -485,14 +731,19 @@ class _AISimilarQuestionsQuizScreenState
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                         child: InkWell(
-                          onTap: isAnswered ? null : () => _selectOption(_currentIndex, key, correctOpt),
+                          onTap: isAnswered
+                              ? null
+                              : () => _selectOption(_currentIndex, key, correctOpt),
                           borderRadius: BorderRadius.circular(AppRadii.md),
                           child: Container(
                             padding: const EdgeInsets.all(AppSpacing.md),
                             decoration: BoxDecoration(
                               color: bg,
                               borderRadius: BorderRadius.circular(AppRadii.md),
-                              border: Border.all(color: border, width: isSelected || (isAnswered && isCorrect) ? 2 : 1),
+                              border: Border.all(
+                                color: border,
+                                width: isSelected || (isAnswered && isCorrect) ? 2 : 1,
+                              ),
                             ),
                             child: Row(
                               children: [
@@ -514,9 +765,11 @@ class _AISimilarQuestionsQuizScreenState
                                   ),
                                 ),
                                 if (isAnswered && isCorrect)
-                                  const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
+                                  const Icon(Icons.check_circle_rounded,
+                                      color: AppColors.success, size: 20),
                                 if (isAnswered && isSelected && !isCorrect)
-                                  const Icon(Icons.cancel_rounded, color: AppColors.danger, size: 20),
+                                  const Icon(Icons.cancel_rounded,
+                                      color: AppColors.danger, size: 20),
                               ],
                             ),
                           ),
@@ -529,7 +782,7 @@ class _AISimilarQuestionsQuizScreenState
 
               const SizedBox(height: AppSpacing.lg),
 
-              // Explanation Card (shows after answer)
+              // Step-by-step scientific explanation
               if (isAnswered && explanation.isNotEmpty) ...[
                 Container(
                   width: double.infinity,
@@ -547,8 +800,12 @@ class _AISimilarQuestionsQuizScreenState
                           Icon(Icons.lightbulb_rounded, color: Color(0xFFF59E0B), size: 18),
                           SizedBox(width: 8),
                           Text(
-                            'AI Explanation',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF59E0B)),
+                            'Step-by-Step Solution & Concept Explanation',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFF59E0B),
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -557,7 +814,7 @@ class _AISimilarQuestionsQuizScreenState
                         explanation,
                         style: TextStyle(
                           fontSize: 14,
-                          height: 1.4,
+                          height: 1.45,
                           color: isDark ? Colors.white.withValues(alpha: 0.9) : AppColors.textPrimary,
                         ),
                       ),
@@ -567,17 +824,76 @@ class _AISimilarQuestionsQuizScreenState
                 const SizedBox(height: AppSpacing.lg),
               ],
 
-              if (isAnswered) ...[
-                PrimaryButton(
-                  label: _currentIndex < widget.questions.length - 1 ? 'Next Question' : 'Finish Practice',
-                  icon: _currentIndex < widget.questions.length - 1 ? Icons.arrow_forward_rounded : Icons.check_circle_rounded,
-                  expanded: true,
-                  onPressed: _nextQuestion,
-                ),
-              ],
+              // Navigation row
+              Row(
+                children: [
+                  if (_currentIndex > 0) ...[
+                    OutlinedButton.icon(
+                      onPressed: _previousQuestion,
+                      icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                      label: const Text('Previous'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                  ],
+                  if (isAnswered)
+                    Expanded(
+                      child: PrimaryButton(
+                        label: _currentIndex < total - 1
+                            ? 'Next Question'
+                            : (_reviewingAll ? 'Return to Summary' : 'Finish Practice'),
+                        icon: _currentIndex < total - 1
+                            ? Icons.arrow_forward_rounded
+                            : Icons.check_circle_rounded,
+                        onPressed: _nextQuestion,
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMetricPill({
+    required String label,
+    required String value,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 4),
+              Text(
+                value,
+                style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }

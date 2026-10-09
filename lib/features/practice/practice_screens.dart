@@ -1666,6 +1666,9 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                 const SizedBox(height: AppSpacing.md),
                                 AmazonRelatedQuestionsView(
                                   questionText: readQuestionText(qItem),
+                                  sourceQuestionId: int.tryParse(qItem['id']?.toString() ?? ''),
+                                  sourceType: 'practice',
+                                  userAnswer: _selectedOption != null && _selectedOption! >= 0 && _selectedOption! < 4 ? ['A', 'B', 'C', 'D'][_selectedOption!] : null,
                                   subject: qItem['subject']?.toString() ?? _set['subject']?.toString() ?? widget.customTitle ?? widget.chapterName,
                                   topic: qItem['topic']?.toString() ?? qItem['chapter']?.toString() ?? widget.chapterName,
                                   options: qOptions,

@@ -7,6 +7,7 @@ const { normalizeTestCategory, getCategoryType } = require('../utils/categoryHel
 const { recordUserStreakActivity } = require('./streaks');
 const testAnalyticsService = require('../services/testAnalyticsService');
 const aiMentorService = require('../services/aiMentorService');
+const aiSimilarQuestionsService = require('../services/aiSimilarQuestionsService');
 const {
   normalizeDriveLink,
   extractDriveFileId,
@@ -606,7 +607,7 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
      FROM test_questions tq
      WHERE tq.test_id = $1
      ORDER BY tq.id ASC`,
-    [req.params.testId, (testMetaObj.subject || '').trim(), (testMetaObj.topic || testMetaObj.chapter || '').trim()]
+    [req.params.testId, (testMetaObj.subject || '').trim(), (testMetaObj.topic || testMetaObj.chapter || testMetaObj.title || '').trim()]
   );
   res.json({
     success: true,
@@ -820,7 +821,7 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
        FROM test_questions tq
        WHERE tq.test_id = $1
        ORDER BY tq.id ASC`,
-      [testId, (testMeta.subject || '').trim(), (testMeta.topic || testMeta.chapter || '').trim()]
+      [testId, (testMeta.subject || '').trim(), (testMeta.topic || testMeta.chapter || testMeta.title || '').trim()]
     );
 
     return res.json({
@@ -1028,30 +1029,105 @@ router.get('/slider-images', userAuth, async (req, res) => {
   }
 });
 
-router.post('/ai/generate-similar-questions', userAuth, async (req, res) => {
+const handleSimilarQuestions = async (req, res) => {
   try {
-    const { questionText, subject, topic, options, explanation, count } = req.body;
-    const requestedCount = Math.min(Math.max(Number(count) || 3, 1), 10);
+    const {
+      source_question_id,
+      sourceQuestionId,
+      source_type,
+      sourceType,
+      test_id,
+      testId,
+      questionText,
+      subject,
+      topic,
+      options,
+      explanation,
+      user_answer,
+      userAnswer,
+      count,
+      requested_count,
+    } = req.body;
 
-    const result = await aiMentorService.generateSimilarQuestions({
-      questionText: String(questionText || ''),
-      subject: String(subject || ''),
-      topic: String(topic || ''),
-      options: Array.isArray(options) ? options.map(String) : [],
-      explanation: String(explanation || ''),
-      count: requestedCount,
+    const reqCount = Number(requested_count || count || 5);
+    if (!Number.isInteger(reqCount) || reqCount < 1 || reqCount > 10) {
+      return res.status(400).json({
+        success: false,
+        error: 'Requested question count must be an integer between 1 and 10.',
+      });
+    }
+
+    const effectiveSourceId = source_question_id || sourceQuestionId;
+    const effectiveSourceType = source_type || sourceType || 'test';
+    const effectiveTestId = test_id || testId;
+
+    const result = await aiSimilarQuestionsService.generateSimilarQuestions({
+      userId: req.user?.id,
+      sourceQuestionId: effectiveSourceId,
+      sourceType: effectiveSourceType,
+      testId: effectiveTestId,
+      questionText,
+      subject,
+      topic,
+      options: Array.isArray(options) ? options : [],
+      explanation,
+      userAnswer: user_answer || userAnswer,
+      count: reqCount,
     });
 
     return res.json({
       success: true,
+      batch_id: result.batch_id,
       subject: result.subject,
+      chapter: result.chapter,
       topic: result.topic,
       concept: result.concept,
-      questions: result.questions || [],
+      requested_count: result.requested_count,
+      valid_count: result.valid_count,
+      model: result.model,
+      questions: result.questions,
     });
   } catch (e) {
-    console.error('[GENERATE_SIMILAR_QUESTIONS_ERROR]', e.message);
-    return res.status(500).json({ error: e.message || 'Failed to generate similar questions' });
+    console.error('[SIMILAR_QUESTIONS_ENDPOINT_ERROR]', e.message);
+    const statusCode = e.status || (e.code === 'OPENAI_KEY_MISSING' ? 503 : 500);
+    return res.status(statusCode).json({
+      success: false,
+      error: e.message || 'AI question generation is currently unavailable. Please try again.',
+      code: e.code || 'GENERATION_FAILED',
+    });
+  }
+};
+
+router.post('/ai/similar-questions', userAuth, handleSimilarQuestions);
+router.post('/ai/generate-similar-questions', userAuth, handleSimilarQuestions);
+
+router.post('/ai/similar-questions/:batchId/submit', userAuth, async (req, res) => {
+  try {
+    const batchId = parseInt(req.params.batchId, 10);
+    const { answers } = req.body;
+    const result = await aiSimilarQuestionsService.submitBatchAnswers({
+      userId: req.user?.id,
+      batchId,
+      answers: answers || {},
+    });
+    return res.json(result);
+  } catch (e) {
+    console.error('[SIMILAR_QUESTIONS_SUBMIT_ERROR]', e.message);
+    return res.status(e.status || 500).json({ error: e.message || 'Failed to submit batch answers' });
+  }
+});
+
+router.get('/ai/similar-questions/:batchId', userAuth, async (req, res) => {
+  try {
+    const batchId = parseInt(req.params.batchId, 10);
+    const result = await aiSimilarQuestionsService.getBatchDetails({
+      userId: req.user?.id,
+      batchId,
+    });
+    return res.json(result);
+  } catch (e) {
+    console.error('[SIMILAR_QUESTIONS_GET_ERROR]', e.message);
+    return res.status(e.status || 500).json({ error: e.message || 'Failed to get batch details' });
   }
 });
 

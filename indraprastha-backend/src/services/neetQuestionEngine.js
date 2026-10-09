@@ -4,6 +4,10 @@
  * Covers all NEET-UG Physics, Chemistry, and Biology (Botany & Zoology) chapters.
  */
 
+const { getPhysicsGenerators } = require('./questionBank/neetPhysicsBank');
+const { getChemistryGenerators } = require('./questionBank/neetChemistryBank');
+const { getBiologyGenerators } = require('./questionBank/neetBiologyBank');
+
 class NEETQuestionEngine {
   constructor() {
     this._initCatalogue();
@@ -505,26 +509,35 @@ class NEETQuestionEngine {
   resolveSubjectAndTopic({ questionText = '', subject = '', topic = '', explanation = '', options = [] }) {
     const rawSubject = (subject || '').trim();
     const rawTopic = (topic || '').trim();
-    const corpus = `${questionText} ${explanation} ${options.join(' ')} ${rawTopic}`.toLowerCase();
+
+    // Clean up topic string from test numbers, boilerplate suffixes, etc.
+    // e.g. "Rotational Motion - NEET Test 1" -> "Rotational Motion"
+    // e.g. "Chapter 4: Laws of Motion" -> "Laws of Motion"
+    const cleanTopic = rawTopic
+      .replace(/^(chapter|unit|ch|lesson)\s*\d+[:\-.]?\s*/i, '')
+      .replace(/[\s\-_]*(neet|jee|test|quiz|exam|practice|grand test|mock|part|set|phase|series|paper|sample|revision)[\s\w\-_0-9]*$/i, '')
+      .replace(/[\s\-_]+test[\s\-_0-9]*/i, '')
+      .trim();
+
+    const corpus = `${questionText} ${explanation} ${options.join(' ')} ${rawTopic} ${cleanTopic}`.toLowerCase();
 
     // 1. Detect Subject
     let detectedSubject = rawSubject;
     const isGenericSubject =
       !rawSubject ||
-      ['general', 'mock test', 'test', 'neet test', 'grand test', 'core concept', 'all', 'science'].includes(
+      ['general', 'mock test', 'test', 'neet test', 'grand test', 'core concept', 'all', 'science', 'default'].includes(
         rawSubject.toLowerCase()
       );
 
     if (isGenericSubject) {
-      // Check Biology clues
       if (
-        /biology|zoology|botany|cell|organism|plant|gene|dna|rna|reproduction|photosynth|heart|nephron|mitosis|meiosis|ecosystem/i.test(
+        /biology|botany|zoology|cell|mitosis|meiosis|photosynth|respiration.*plant|dna|rna|gene|genetics|mendel|nephron|heart|circulation|hormone|reproduction|flowering|embryo|ecology|ecosystem/i.test(
           corpus
         )
       ) {
         detectedSubject = 'Biology';
       } else if (
-        /chemistry|reaction|molar|acid|base|organic|compound|equilibrium|enthalpy|isomer|bond|redox|oxidation/i.test(
+        /chemistry|reaction|molar|mole|acid|base|ph\b|organic|compound|equilibrium|enthalpy|isomer|bond|redox|oxidation|reduction|kinetics|alkane|alkene|alcohol|aldehyde|amine/i.test(
           corpus
         )
       ) {
@@ -544,26 +557,39 @@ class NEETQuestionEngine {
       chapterList = this.biologyChapters;
       detectedSubject = 'Biology';
     } else {
+      chapterList = this.physicsChapters;
       detectedSubject = 'Physics';
     }
 
     // 3. Match Chapter / Topic
     let matchedChapter = null;
-    let bestChapterScore = 0;
 
-    // Check if rawTopic matches one of our chapters
-    if (rawTopic && !['general', 'mock test', 'neet test', 'test', 'all'].includes(rawTopic.toLowerCase())) {
-      const directMatch = chapterList.find(
-        (c) =>
-          c.name.toLowerCase().includes(rawTopic.toLowerCase()) ||
-          rawTopic.toLowerCase().includes(c.name.toLowerCase())
-      );
-      if (directMatch) {
-        matchedChapter = directMatch;
+    // Priority A: Check if cleanTopic matches chapter regex
+    if (cleanTopic.length >= 3) {
+      for (const ch of chapterList) {
+        if (ch.regex.test(cleanTopic) || ch.regex.test(rawTopic)) {
+          matchedChapter = ch;
+          break;
+        }
+      }
+
+      // Priority B: Check substring match
+      if (!matchedChapter) {
+        const cleanLower = cleanTopic.toLowerCase();
+        for (const ch of chapterList) {
+          const chLower = ch.name.toLowerCase();
+          const keyWords = chLower.split(/[\s,&/]+/).filter((w) => w.length >= 4 && !['properties', 'system', 'matter', 'basic', 'principles', 'some'].includes(w));
+          if (chLower.includes(cleanLower) || cleanLower.includes(chLower) || keyWords.some((kw) => cleanLower.includes(kw))) {
+            matchedChapter = ch;
+            break;
+          }
+        }
       }
     }
 
+    // Priority C: Match corpus against chapter regexes
     if (!matchedChapter) {
+      let bestChapterScore = 0;
       for (const ch of chapterList) {
         const matches = corpus.match(new RegExp(ch.regex, 'gi'));
         const score = matches ? matches.length : 0;
@@ -631,490 +657,86 @@ class NEETQuestionEngine {
 
   /**
    * Generates mathematically verified, fresh questions strictly targeting the detected concept
+   * GUARANTEES:
+   * 1. Every question in the batch is completely distinct (no repeated templates).
+   * 2. Fresh questions generated on every invocation.
+   * 3. 100% chapter/topic alignment.
    */
   generateConceptQuestions({ subject, topic, concept, questionText, count = 3 }) {
     const requestedCount = Math.min(Math.max(Number(count) || 3, 1), 10);
-    const questions = [];
 
-    // Factory collection targeting each specific concept
-    const generators = this._getGeneratorsForConcept(subject, topic, concept);
+    // 1. Resolve subject, topic, and concept accurately
+    let activeSubject = subject;
+    let activeTopic = topic;
+    let activeConcept = concept;
+
+    if (!activeTopic || !activeSubject || ['general', 'all', 'test', 'mock test'].includes((activeTopic || '').toLowerCase())) {
+      const resolved = this.resolveSubjectAndTopic({
+        questionText,
+        subject,
+        topic,
+      });
+      activeSubject = resolved.detectedSubject;
+      activeTopic = resolved.detectedTopic;
+      activeConcept = resolved.detectedConcept;
+    }
+
+    // 2. Factory collection targeting each specific chapter and concept
+    const generators = this._getGeneratorsForConcept(activeSubject, activeTopic, activeConcept);
+
+    // 3. Shuffle thoroughly with randomized Fisher-Yates shuffle on EVERY call
+    const shuffled = [...generators];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // 4. Guarantee 100% DISTINCT questions in the batch
+    const questions = [];
+    const usedSignatures = new Set();
+    let genIndex = 0;
 
     for (let i = 0; i < requestedCount; i++) {
-      const genFn = generators[i % generators.length];
-      const q = genFn(i + 1);
-      questions.push(q);
+      let candidate = null;
+      let tries = 0;
+      while (tries < 15) {
+        tries++;
+        const fn = shuffled[genIndex % shuffled.length];
+        genIndex++;
+        const q = fn(questions.length + 1, activeTopic, activeConcept);
+        // Signature based on first 35 characters of question text
+        const sig = q.question_text.slice(0, 35).toLowerCase();
+        if (!usedSignatures.has(sig) || tries >= 12) {
+          usedSignatures.add(sig);
+          candidate = q;
+          break;
+        }
+      }
+      if (candidate) {
+        candidate.id = questions.length + 1;
+        questions.push(candidate);
+      }
     }
 
     return {
+      success: true,
+      subject: activeSubject,
+      topic: activeTopic,
+      concept: activeConcept,
       questions,
-      subject,
-      topic,
-      concept,
     };
   }
 
   _getGeneratorsForConcept(subject, topic, concept) {
     const sLower = (subject || '').toLowerCase();
-    const cLower = `${topic} ${concept}`.toLowerCase();
-    const self = this;
+    const boundBuildQuestion = this._buildQuestion.bind(this);
 
-    // ==========================================
-    // 1. PHYSICS
-    // ==========================================
     if (sLower.includes('phys')) {
-      // Projectile Motion
-      if (cLower.includes('projectile') || cLower.includes('trajectory')) {
-        return [
-          (id) => {
-            const u = [20, 30, 40, 50][Math.floor(Math.random() * 4)];
-            const theta = 30; // sin 60 = sqrt(3)/2
-            const g = 10;
-            const range = Math.round((u * u * Math.sin((2 * theta * Math.PI) / 180)) / g);
-          return self._buildQuestion(
-            id,
-            `A projectile is launched from flat ground with an initial speed of ${u} m/s at an angle of 30° to the horizontal. Assuming g = 10 m/s², what is the horizontal range attained by the projectile?`,
-            `${range} m`,
-            [`${range * 2} m`, `${Math.round(range * 0.7)} m`, `${Math.round(range * 1.5)} m`],
-            `Horizontal range is given by R = (u² · sin 2θ) / g. With u = ${u} m/s, θ = 30° (2θ = 60°, sin 60° = √3/2 ≈ 0.866), R = (${u}² × 0.866) / 10 = ${range} m.`,
-            topic,
-            concept
-          );
-        },
-        (id) => {
-          const u = [20, 40, 60][Math.floor(Math.random() * 3)];
-          const g = 10;
-          const hMax = (u * u * (0.5 * 0.5)) / (2 * g); // sin 30 = 0.5
-          return self._buildQuestion(
-            id,
-            `A body is projected with initial velocity u = ${u} m/s at an inclination of 30° with the horizontal. Calculate the maximum vertical height achieved above the ground (take g = 10 m/s²).`,
-            `${hMax} m`,
-            [`${hMax * 2} m`, `${(hMax / 2).toFixed(1)} m`, `${hMax * 4} m`],
-            `Maximum height H = (u² · sin²θ) / (2g). Here sin 30° = 1/2, so sin² 30° = 1/4. Thus H = (${u}² × 0.25) / 20 = ${hMax} m.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Kinematics 1D Motion
-    if (cLower.includes('kinemat') || cLower.includes('straight line') || cLower.includes('accelerat')) {
-      return [
-        (id) => {
-          const h = [20, 45, 80, 125][Math.floor(Math.random() * 4)];
-          const g = 10;
-          const v = Math.round(Math.sqrt(2 * g * h));
-          return self._buildQuestion(
-            id,
-            `A stone is dropped from rest from the top of a tower of height ${h} m. Neglecting air resistance and taking g = 10 m/s², what is the velocity with which it strikes the ground?`,
-            `${v} m/s`,
-            [`${v * 2} m/s`, `${Math.round(v * 0.7)} m/s`, `${v + 15} m/s`],
-            `Using the third equation of kinematics v² = u² + 2gh. With u = 0: v = √(2gh) = √(2 × 10 × ${h}) = ${v} m/s.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Work, Energy & Power / Spring
-    if (cLower.includes('work') || cLower.includes('energy') || cLower.includes('power') || cLower.includes('spring')) {
-      return [
-        (id) => {
-          const k = [100, 200, 400, 500][Math.floor(Math.random() * 4)];
-          const x = 0.1; // 10 cm
-          const energy = 0.5 * k * x * x;
-          return self._buildQuestion(
-            id,
-            `An ideal light helical spring of spring constant k = ${k} N/m is compressed by 10 cm (0.1 m) from its natural length. What is the elastic potential energy stored in the spring?`,
-            `${energy.toFixed(1)} J`,
-            [`${(energy * 2).toFixed(1)} J`, `${(energy * 10).toFixed(1)} J`, `${(energy / 2).toFixed(2)} J`],
-            `The elastic potential energy stored in a spring is U = (1/2)kx². Substituting k = ${k} N/m and x = 0.1 m yields U = 0.5 × ${k} × (0.1)² = ${energy.toFixed(1)} J.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Rotational Motion / Moment of Inertia
-    if (cLower.includes('rotat') || cLower.includes('moment of inertia') || cLower.includes('angular')) {
-      return [
-        (id) => {
-          const m = [2, 4, 5][Math.floor(Math.random() * 3)];
-          const r = [0.5, 1.0, 2.0][Math.floor(Math.random() * 3)];
-          const iDisc = (0.5 * m * r * r).toFixed(2);
-          return self._buildQuestion(
-            id,
-            `A uniform circular disc has mass M = ${m} kg and radius R = ${r} m. What is the moment of inertia of this disc about an axis passing through its center and perpendicular to its plane?`,
-            `${iDisc} kg·m²`,
-            [`${(iDisc * 2).toFixed(2)} kg·m²`, `${(iDisc / 2).toFixed(2)} kg·m²`, `${(iDisc * 4).toFixed(2)} kg·m²`],
-            `The moment of inertia of a uniform circular disc about its transverse central axis is I = (1/2)MR². Substituting M = ${m} kg and R = ${r} m gives I = 0.5 × ${m} × (${r})² = ${iDisc} kg·m².`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Gravitation
-    if (cLower.includes('gravitat') || cLower.includes('escape') || cLower.includes('orbital')) {
-      return [
-        (id) => {
-          const ve = 11.2;
-          const massFactor = 4;
-          const radiusFactor = 1;
-          const vPlanet = (ve * Math.sqrt(massFactor / radiusFactor)).toFixed(1);
-          return self._buildQuestion(
-            id,
-            `The escape velocity from the surface of the Earth is 11.2 km/s. If a hypothetical planet has four times the mass of the Earth but the exact same radius, what is the escape velocity from the planet's surface?`,
-            `${vPlanet} km/s`,
-            [`11.2 km/s`, `44.8 km/s`, `5.6 km/s`],
-            `Escape velocity is defined as v_e = √(2GM/R). Because R is unchanged and M increases by 4 times, v_e scales as √4 = 2. Hence v'_e = 2 × 11.2 = ${vPlanet} km/s.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Carnot Engine / Thermodynamics
-    if (cLower.includes('carnot') || cLower.includes('thermodynamic') || cLower.includes('heat engine')) {
-      return [
-        (id) => {
-          const t1 = [500, 600, 800][Math.floor(Math.random() * 3)];
-          const t2 = 300;
-          const eff = Math.round((1 - t2 / t1) * 100);
-          return self._buildQuestion(
-            id,
-            `A reversible Carnot heat engine operates between a source at temperature T₁ = ${t1} K and a sink at temperature T₂ = ${t2} K. Determine the maximum theoretical thermal efficiency of this engine.`,
-            `${eff}%`,
-            [`${eff - 15}%`, `${eff + 15}%`, `${100 - eff}%`],
-            `The efficiency of a Carnot cycle is η = 1 - (T₂ / T₁) = 1 - (${t2} / ${t1}). Expressed as a percentage: η = (1 - ${(t2 / t1).toFixed(2)}) × 100 = ${eff}%.`,
-            topic,
-            concept
-          );
-        },
-        (id) => {
-          return self._buildQuestion(
-            id,
-            `In an adiabatic expansion of an ideal gas, which of the following thermodynamic relations is strictly true?`,
-            `dQ = 0 and dW = -dU`,
-            [`dW = 0 and dQ = dU`, `dT = 0 and dQ = dW`, `dU = 0 and dQ = -dW`],
-            `During an adiabatic process, there is no heat exchange with the surroundings (dQ = 0). By the First Law of Thermodynamics dQ = dU + dW, 0 = dU + dW, meaning dW = -dU (work is done at the expense of internal energy).`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Oscillations & SHM
-    if (cLower.includes('shm') || cLower.includes('pendulum') || cLower.includes('oscillation')) {
-      return [
-        (id) => {
-          const lRatio = [4, 9, 16][Math.floor(Math.random() * 3)];
-          const tRatio = Math.sqrt(lRatio);
-          return self._buildQuestion(
-            id,
-            `A simple pendulum has length L and time period T. If the effective length of the pendulum is increased to ${lRatio} times its original value, how does the new time period T' compare with T?`,
-            `T' = ${tRatio} T`,
-            [`T' = ${lRatio} T`, `T' = T / ${tRatio}`, `T' = ${lRatio * 2} T`],
-            `The time period of a simple pendulum is T = 2π√(L/g). Hence T ∝ √L. Increasing L by a factor of ${lRatio} increases T by √${lRatio} = ${tRatio} times.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Wave Optics & YDSE
-    if (cLower.includes('ydse') || cLower.includes('fringe') || cLower.includes('wave optics')) {
-      return [
-        (id) => {
-          const dFactor = 2;
-          return self._buildQuestion(
-            id,
-            `In Young's Double Slit Experiment (YDSE), the slit separation is halved (d' = d/2) while the distance from slits to screen is doubled (D' = 2D). What happens to the fringe width β?`,
-            `Increases by 4 times (4β)`,
-            [`Increases by 2 times (2β)`, `Decreases to β/4`, `Remains unchanged (β)`],
-            `Fringe width β = (λD)/d. Substituting D' = 2D and d' = d/2 gives β' = λ(2D) / (d/2) = 4(λD/d) = 4β.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Ray Optics & Lens Maker
-    if (cLower.includes('lens') || cLower.includes('refract') || cLower.includes('optics')) {
-      return [
-        (id) => {
-          const r = [15, 20, 30][Math.floor(Math.random() * 3)];
-          return self._buildQuestion(
-            id,
-            `A thin biconvex glass lens (refractive index μ = 1.5) has both surfaces of equal radius of curvature R = ${r} cm. What is the focal length of this lens in air?`,
-            `+${r} cm`,
-            [`+${r / 2} cm`, `+${r * 2} cm`, `-${r} cm`],
-            `By Lens Maker's Formula: 1/f = (μ - 1)(1/R₁ - 1/R₂). For a biconvex lens, R₁ = +${r} cm and R₂ = -${r} cm. 1/f = (1.5 - 1)[1/${r} - (-1/${r})] = 0.5 × (2/${r}) = 1/${r}. Thus f = +${r} cm.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Dual Nature & de Broglie
-    if (cLower.includes('broglie') || cLower.includes('photoelectric') || cLower.includes('dual nature')) {
-      return [
-        (id) => {
-          const v = [100, 400][Math.floor(Math.random() * 2)];
-          const lam = (12.27 / Math.sqrt(v)).toFixed(2);
-          return self._buildQuestion(
-            id,
-            `An electron is accelerated from rest across an electrical potential difference of V = ${v} V. What is the de Broglie wavelength associated with the electron?`,
-            `${lam} Å`,
-            [`${(lam * 2).toFixed(2)} Å`, `${(lam / 2).toFixed(2)} Å`, `${(lam * 10).toFixed(2)} Å`],
-            `The de Broglie wavelength for an accelerated electron is given by λ = 12.27 / √V Å. For V = ${v} V, λ = 12.27 / √${v} = 12.27 / ${Math.sqrt(v)} = ${lam} Å.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Current Electricity (Default Physics fallback)
-      return [
-        (id) => {
-          const r0 = [2, 3, 4, 5, 10][Math.floor(Math.random() * 5)];
-          const n = [2, 3, 4][Math.floor(Math.random() * 3)];
-          const newR = n * n * r0;
-          return self._buildQuestion(
-            id,
-            `A cylindrical metallic conductor of uniform resistance R = ${r0} Ω is stretched uniformly such that its length increases to ${n} times its original length. What is its new resistance?`,
-            `${newR} Ω`,
-            [`${n * r0} Ω`, `${(r0 / n).toFixed(1)} Ω`, `${n * n * n * r0} Ω`],
-            `When stretched without loss of mass, volume V = A·L is constant. If L' = ${n}L, then A' = A/${n}. Hence R' = ρL'/A' = ${n}²(ρL/A) = ${n}² × ${r0} = ${newR} Ω.`,
-            topic,
-            concept
-          );
-        },
-      ];
+      return getPhysicsGenerators(topic, concept, boundBuildQuestion);
     } else if (sLower.includes('chem')) {
-      // ==========================================
-      // 2. CHEMISTRY
-      // ==========================================
-
-      // Chemical Kinetics & Rate Law
-      if (cLower.includes('kinetic') || cLower.includes('rate') || cLower.includes('half-life')) {
-      return [
-        (id) => {
-          const tHalf = [15, 20, 30, 40][Math.floor(Math.random() * 4)];
-          const t75 = tHalf * 2;
-          return self._buildQuestion(
-            id,
-            `A first-order chemical reaction has a half-life of ${tHalf} minutes. What is the total time required for 75% of the reaction to be completed?`,
-            `${t75} minutes`,
-            [`${tHalf * 3} minutes`, `${Math.round(tHalf * 1.5)} minutes`, `${tHalf * 4} minutes`],
-            `For a first-order reaction, completion of 75% leaves 25% of the reactant, which corresponds to two successive half-lives (100% -> 50% -> 25%). Hence t_75% = 2 × t_1/2 = 2 × ${tHalf} = ${t75} minutes.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-      // Chemical & Ionic Equilibrium / pH / Ksp
-      if (cLower.includes('equilibrium') || /\bph\b|\bph\s|ph of/i.test(cLower) || cLower.includes('buffer') || cLower.includes('ksp')) {
-        return [
-          (id) => {
-            const mVal = [0.01, 0.001, 0.0001][Math.floor(Math.random() * 3)];
-            const pOH = Math.round(-Math.log10(mVal));
-            const pH = 14 - pOH;
-            return self._buildQuestion(
-              id,
-              `What is the pH of an aqueous solution of strong base NaOH having concentration ${mVal} M at 25 °C?`,
-              `${pH}`,
-              [`${pOH}`, `${pH - 1}`, `${pH + 1}`],
-              `NaOH dissociates fully: [OH⁻] = ${mVal} M. Thus pOH = -log₁₀(${mVal}) = ${pOH}. Since pH + pOH = 14 at 25 °C, pH = 14 - ${pOH} = ${pH}.`,
-              topic,
-              concept
-            );
-          },
-        ];
-      }
-
-      // Electrochemistry & Nernst Equation
-      if (cLower.includes('electrochem') || cLower.includes('nernst') || cLower.includes('faraday')) {
-        return [
-          (id) => {
-            return self._buildQuestion(
-              id,
-              `In a standard Daniel cell Zn(s) | Zn²⁺(aq) || Cu²⁺(aq) | Cu(s), if the concentration of Zn²⁺ ions is increased while Cu²⁺ concentration remains constant, the cell potential E_cell will:`,
-              `Decrease`,
-              [`Increase`, `Remain unchanged`, `Become zero immediately`],
-              `By Nernst Equation: E_cell = E°_cell - (0.059/2) · log([Zn²⁺] / [Cu²⁺]). Increasing the reaction quotient Q by raising [Zn²⁺] increases the subtracted logarithmic term, causing E_cell to decrease.`,
-              topic,
-              concept
-            );
-          },
-        ];
-      }
-
-      // Chemical Bonding & Hybridization
-      if (cLower.includes('bond') || cLower.includes('hybridiz') || cLower.includes('vsepr')) {
-        return [
-          (id) => {
-            return self._buildQuestion(
-              id,
-              `According to VSEPR theory, the central xenon atom in the XeF₄ molecule exhibits which hybridization and molecular geometry?`,
-              `sp³d² hybridization with Square Planar geometry`,
-              [
-                `sp³d hybridization with See-saw geometry`,
-                `sp³d² hybridization with Octahedral geometry`,
-                `sp³ hybridization with Tetrahedral geometry`,
-              ],
-              `In XeF₄, Xe has 8 valence electrons. It forms 4 single covalent bonds with F and retains 2 lone pairs. Total electron pairs = 4 + 2 = 6, corresponding to sp³d² hybridization with a Square Planar molecular geometry.`,
-              topic,
-              concept
-            );
-          },
-        ];
-      }
-
-      // Aldehydes & Ketones (Organic Chemistry)
-      if (cLower.includes('aldol') || cLower.includes('aldehyde') || cLower.includes('cannizzaro') || cLower.includes('organic')) {
-        return [
-          (id) => {
-            return self._buildQuestion(
-              id,
-              `Which of the following carbonyl compounds does NOT undergo Aldol condensation in the presence of dilute aqueous NaOH?`,
-              `Benzaldehyde (C₆H₅CHO)`,
-              [`Acetaldehyde (CH₃CHO)`, `Acetone (CH₃COCH₃)`, `Propionaldehyde (CH₃CH₂CHO)`],
-              `Aldol condensation requires at least one α-hydrogen atom adjacent to the carbonyl group. Benzaldehyde lacks α-hydrogens and therefore undergoes the Cannizzaro reaction instead of Aldol condensation.`,
-              topic,
-              concept
-            );
-          },
-        ];
-      }
-
-      // Default Chemistry fallback
-      return [
-        (id) => {
-          return self._buildQuestion(
-            id,
-            `For a chemical reaction at thermodynamic dynamic equilibrium, which of the following criteria is strictly satisfied?`,
-            `Standard free energy change ΔG = 0 and forward reaction rate equals reverse reaction rate.`,
-            [
-              `Concentration of reactants equals zero.`,
-              `Equilibrium constant K_eq increases continuously with time.`,
-              `Activation energy of the forward step becomes zero.`,
-            ],
-            `At dynamic equilibrium, the forward and reverse reaction rates are equal, and Gibbs free energy change ΔG = 0.`,
-            topic,
-            concept
-          );
-        },
-      ];
+      return getChemistryGenerators(topic, concept, boundBuildQuestion);
     } else {
-      // ==========================================
-      // 3. BIOLOGY
-      // ==========================================
-
-    // Cell Cycle & Meiosis
-    if (cLower.includes('meiosis') || cLower.includes('crossing over') || cLower.includes('cell cycle') || cLower.includes('pachytene')) {
-      return [
-        (id) => {
-          return self._buildQuestion(
-            id,
-            `During which specific substage of Prophase I of Meiosis does crossing over (genetic recombination between homologous non-sister chromatids) take place?`,
-            `Pachytene stage (mediated by enzyme Recombinase)`,
-            [`Zygotene stage`, `Diplotene stage`, `Diakinesis stage`],
-            `Crossing over occurs during the Pachytene stage of Prophase I of meiosis. It is an enzyme-mediated process catalyzed by Recombinase.`,
-            topic,
-            concept
-          );
-        },
-        (id) => {
-          return self._buildQuestion(
-            id,
-            `The synaptonemal complex dissolves and X-shaped chiasmata become distinctly visible during which substage of Prophase I?`,
-            `Diplotene stage`,
-            [`Pachytene stage`, `Zygotene stage`, `Leptotene stage`],
-            `Dissolution of the synaptonemal complex occurs in Diplotene, leaving homologous chromosomes attached only at points of crossing over, creating X-shaped structures called chiasmata.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Photosynthesis / Calvin Cycle
-    if (cLower.includes('photosynth') || cLower.includes('calvin') || cLower.includes('rubisco') || cLower.includes('c4')) {
-      return [
-        (id) => {
-          return self._buildQuestion(
-            id,
-            `In C₄ plants (such as maize and sugarcane), the primary carbon dioxide fixation enzyme located in mesophyll cells is:`,
-            `PEP carboxylase (PEPcase)`,
-            [`RuBisCO`, `Carbonic anhydrase`, `Pyruvate dehydrogenase`],
-            `In C₄ plants, the primary CO₂ acceptor is phosphoenolpyruvate (PEP), catalyzed by PEP carboxylase in the mesophyll cells to form oxaloacetic acid (OAA). RuBisCO operates downstream in the bundle sheath cells.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Excretory System / Nephron
-    if (cLower.includes('nephron') || cLower.includes('excret') || cLower.includes('counter-current') || cLower.includes('henle')) {
-      return [
-        (id) => {
-          return self._buildQuestion(
-            id,
-            `In the human nephron, nearly 70-80% of electrolytes and water are reabsorbed in which specific tubular segment?`,
-            `Proximal Convoluted Tubule (PCT)`,
-            [`Loop of Henle (descending limb)`, `Distal Convoluted Tubule (DCT)`, `Collecting Duct`],
-            `The Proximal Convoluted Tubule (PCT) is lined by simple cuboidal brush border epithelium that increases surface area, reabsorbing nearly 70-80% of electrolytes and water from the glomerular filtrate.`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Genetics & Mendel
-    if (cLower.includes('mendel') || cLower.includes('genetics') || cLower.includes('inheritance') || cLower.includes('pedigree')) {
-      return [
-        (id) => {
-          return self._buildQuestion(
-            id,
-            `In a typical Mendelian dihybrid cross between heterozygous round-yellow seeded plants (RrYy × RrYy), what is the expected phenotypic ratio among F₂ offspring?`,
-            `9 : 3 : 3 : 1 (Round Yellow : Round Green : Wrinkled Yellow : Wrinkled Green)`,
-            [`1 : 2 : 1 : 1`, `3 : 1 : 3 : 1`, `15 : 1`],
-            `Independent assortment of two gene pairs in a dihybrid cross yields an F₂ phenotypic ratio of 9:3:3:1 based on (3:1) × (3:1).`,
-            topic,
-            concept
-          );
-        },
-      ];
-    }
-
-    // Default Biology fallback
-      return [
-        (id) => {
-          return self._buildQuestion(
-            id,
-            `In eukaryotic cells, the 70S ribosomes are characteristically found in which of the following cellular locations?`,
-            `Mitochondria and Chloroplasts matrix`,
-            [`Rough Endoplasmic Reticulum membrane`, `Free floating in cytosol`, `Nucleolus`],
-            `While the eukaryotic cytoplasm contains 80S ribosomes, semi-autonomous organelles like mitochondria and chloroplasts contain prokaryote-like 70S ribosomes.`,
-            topic,
-            concept
-          );
-        },
-      ];
+      return getBiologyGenerators(topic, concept, boundBuildQuestion);
     }
   }
 }

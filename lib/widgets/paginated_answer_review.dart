@@ -6,6 +6,7 @@ import '../core/utils/question_fields.dart';
 import '../core/utils/video_url_utils.dart';
 import '../theme/app_tokens.dart';
 import '../features/videos/video_player_screen.dart';
+import 'ai_similar_questions_dialog.dart';
 import 'amazon_related_questions_view.dart';
 import 'app_widgets.dart';
 import 'fast_network_image.dart';
@@ -76,6 +77,8 @@ class AnswerReviewEntry {
     this.optionPrefix = true,
     this.subject,
     this.topic,
+    this.id,
+    this.selectedOption,
   });
 
   final String questionText;
@@ -91,6 +94,8 @@ class AnswerReviewEntry {
   final bool optionPrefix;
   final String? subject;
   final String? topic;
+  final int? id;
+  final String? selectedOption;
 
   bool get isCorrect => selectedIndex != null && selectedIndex == correctIndex;
   bool get wasAttempted => selectedIndex != null;
@@ -111,6 +116,8 @@ class AnswerReviewEntry {
         : keys.indexOf(selectedOption.toUpperCase()).clamp(0, 3);
 
     return AnswerReviewEntry(
+      id: int.tryParse(question['id']?.toString() ?? ''),
+      selectedOption: selectedOption,
       questionText: readQuestionText(question),
       questionImageUrl: questionImageRawUrl(question).isEmpty
           ? null
@@ -769,9 +776,93 @@ class _ReviewQuestionPage extends StatelessWidget {
                   ),
                 ),
               ],
-              // Amazon-Style Related Questions Section
+              if (!entry.isCorrect) ...[
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadii.lg),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Got this question wrong?',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Practice similar questions on this exact concept (1-10)',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => showSimilarQuestionsDialog(
+                          context,
+                          null,
+                          questionText: entry.questionText,
+                          sourceQuestionId: entry.id,
+                          userAnswer: entry.selectedOption,
+                          subject: entry.subject,
+                          topic: entry.topic,
+                          options: entry.options,
+                          explanation: entry.explanation,
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF4F46E5),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                          ),
+                        ),
+                        child: const Text('Solve Similar Questions'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              // Solve Similar Questions Section
               AmazonRelatedQuestionsView(
                 questionText: entry.questionText,
+                sourceQuestionId: entry.id,
+                userAnswer: entry.selectedOption,
                 subject: entry.subject,
                 topic: entry.topic,
                 options: entry.options,

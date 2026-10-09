@@ -988,6 +988,9 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
             const SizedBox(height: 8),
             AmazonRelatedQuestionsView(
               questionText: question.questionText,
+              sourceQuestionId: question.id,
+              sourceType: 'practice',
+              userAnswer: userAnswer,
               subject: question.subject ?? widget.practiceTitle,
               topic: question.topic,
               options: question.options,
