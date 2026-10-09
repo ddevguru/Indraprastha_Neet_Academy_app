@@ -224,8 +224,8 @@ class _PaymentCheckoutScreenState extends ConsumerState<PaymentCheckoutScreen> {
                       _processing
                           ? 'Verifying payment...'
                           : _userCancelled
-                              ? 'Payment cancel ho gaya. Retry dabayein ya wapas jayein.'
-                              : 'Razorpay checkout open karne ke liye "Retry Razorpay" dabayein.',
+                              ? 'Payment was cancelled. Tap Retry Payment to try again.'
+                              : 'Tap "Retry Payment" to launch Razorpay checkout.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
@@ -236,7 +236,7 @@ class _PaymentCheckoutScreenState extends ConsumerState<PaymentCheckoutScreen> {
                 Text(_error!, style: const TextStyle(color: AppColors.danger)),
                 const SizedBox(height: AppSpacing.xs),
                 const Text(
-                  'Agar payment cut ho chuka hai to "Confirm payment" dabayein.',
+                  'If payment was deducted from your account, tap "Verify Payment".',
                   style:
                       TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),

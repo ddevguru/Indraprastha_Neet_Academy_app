@@ -161,13 +161,35 @@ class __SimilarQuestionsConfigSheetState
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'AI will generate concept-matched NEET questions.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
+                    if ((widget.topic?.trim().isNotEmpty ?? false) || (widget.subject?.trim().isNotEmpty ?? false)) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          [widget.subject?.trim(), widget.topic?.trim()].where((s) => s != null && s.isNotEmpty).join(' • '),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
+                    ] else ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'AI will generate concept-matched NEET questions.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

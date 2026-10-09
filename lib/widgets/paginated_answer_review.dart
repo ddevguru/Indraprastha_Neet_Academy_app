@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/services/incorrect_pdf_service.dart';
 import '../core/utils/drive_image_url.dart';
 import '../core/utils/question_fields.dart';
+import '../core/utils/video_url_utils.dart';
 import '../theme/app_tokens.dart';
 import '../features/videos/video_player_screen.dart';
 import 'ai_similar_questions_dialog.dart';
@@ -701,19 +702,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                           child: InkWell(
                             onTap: () {
                               final rawUrl = entry.explanationVideoUrl!;
-                              final uri = Uri.tryParse(rawUrl);
-                              String playableUrl = rawUrl;
-                              if (uri != null && rawUrl.contains('drive.google.com')) {
-                                final idFromQuery = uri.queryParameters['id'];
-                                if (idFromQuery != null && idFromQuery.isNotEmpty) {
-                                  playableUrl = 'https://drive.google.com/uc?export=download&id=$idFromQuery';
-                                } else {
-                                  final alt = RegExp(r'/file/d/([^/]+)').firstMatch(uri.toString());
-                                  if (alt != null && alt.group(1) != null) {
-                                    playableUrl = 'https://drive.google.com/uc?export=download&id=${alt.group(1)}';
-                                  }
-                                }
-                              }
+                              final playableUrl = resolveInAppEmbedUrl(rawUrl);
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(

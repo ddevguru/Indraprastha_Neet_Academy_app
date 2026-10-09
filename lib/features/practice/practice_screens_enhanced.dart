@@ -375,7 +375,7 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                           Text(
                             (currentQuestion.explanation?.isNotEmpty ?? false)
                                 ? currentQuestion.explanation!
-                                : 'Is question ka explanation available nahi hai.',
+                                : 'No explanation available for this question.',
                             style: const TextStyle(fontSize: 14, height: 1.4),
                           ),
                         ],
@@ -607,6 +607,8 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
     final wrong = userAnswers.length - correct;
     final unattempted = practiceQuestions.length - userAnswers.length;
     final accuracy = userAnswers.isEmpty ? 0.0 : (correct / userAnswers.length) * 100;
+    final score = (correct * 4) - (wrong * 1);
+    final totalMarks = practiceQuestions.length * 4;
 
     return Scaffold(
       appBar: AppBar(
@@ -677,7 +679,7 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '$correct / ${practiceQuestions.length}',
+                    '$score / $totalMarks',
                     style: const TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.w800,

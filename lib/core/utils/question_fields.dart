@@ -69,12 +69,12 @@ Widget buildQuestionTextBlock(
   }
   if (hasQuestionImage(question)) {
     return Text(
-      'Question image neeche hai',
+      'Question image below',
       style: resolved.copyWith(color: AppColors.textSecondary),
     );
   }
   return Text(
-    'Question text load nahi hua',
+    'Question text unavailable',
     style: resolved.copyWith(color: AppColors.danger),
   );
 }

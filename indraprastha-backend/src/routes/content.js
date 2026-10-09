@@ -579,8 +579,13 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
   if (testMeta.rows.length === 0) {
     return res.status(404).json({ error: 'Test not found' });
   }
+  const testMetaObj = testMeta.rows[0];
   const questions = await pool.query(
-    `SELECT tq.id, tq.subject, tq.question, tq.option_a, tq.option_b, tq.option_c, tq.option_d,
+    `SELECT tq.id,
+        COALESCE(NULLIF(TRIM(tq.subject), ''), $2) as subject,
+        COALESCE(NULLIF(TRIM(tq.topic), ''), NULLIF(TRIM(tq.chapter), ''), $3) as topic,
+        COALESCE(NULLIF(TRIM(tq.chapter), ''), $3) as chapter,
+        tq.question, tq.option_a, tq.option_b, tq.option_c, tq.option_d,
         tq.correct_option, tq.explanation,
         tq.question_image_link, tq.question_image_drive_file_id, tq.question_image_drive_folder_id,
         tq.explanation_image_link, tq.explanation_image_drive_file_id, tq.explanation_image_drive_folder_id,
@@ -601,7 +606,7 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
      FROM test_questions tq
      WHERE tq.test_id = $1
      ORDER BY tq.id ASC`,
-    [req.params.testId]
+    [req.params.testId, (testMetaObj.subject || '').trim(), (testMetaObj.topic || testMetaObj.chapter || '').trim()]
   );
   res.json({
     success: true,
@@ -782,6 +787,9 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
     const questionsWithExplanations = await pool.query(
       `SELECT
         tq.id,
+        COALESCE(NULLIF(TRIM(tq.subject), ''), $2) as subject,
+        COALESCE(NULLIF(TRIM(tq.topic), ''), NULLIF(TRIM(tq.chapter), ''), $3) as topic,
+        COALESCE(NULLIF(TRIM(tq.chapter), ''), $3) as chapter,
         tq.question,
         tq.option_a,
         tq.option_b,
@@ -812,7 +820,7 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
        FROM test_questions tq
        WHERE tq.test_id = $1
        ORDER BY tq.id ASC`,
-      [testId]
+      [testId, (testMeta.subject || '').trim(), (testMeta.topic || testMeta.chapter || '').trim()]
     );
 
     return res.json({

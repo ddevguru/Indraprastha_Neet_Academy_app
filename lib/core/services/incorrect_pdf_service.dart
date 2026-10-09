@@ -94,7 +94,7 @@ class IncorrectPdfService {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Sahi kaam! Iss set me koi incorrect question nahi hai.'),
+            content: Text('Great job! No incorrect questions in this set.'),
             backgroundColor: Colors.green,
           ),
         );

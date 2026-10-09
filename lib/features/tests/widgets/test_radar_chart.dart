@@ -69,7 +69,7 @@ class TestRadarChart extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text(
-              'Top 100 Average',
+              'Top 20 Average',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -177,7 +177,7 @@ class _RadarChartPainter extends CustomPainter {
       final item = subjects[i];
       final subjName = (item['subject'] ?? 'Subject').toString();
       final studentScore = (item['student_score'] as num?)?.toInt() ?? 0;
-      final top100Avg = (item['top100_average'] as num?)?.toInt() ?? 0;
+      final top100Avg = (item['top20_average'] ?? item['top100_average'] as num?)?.toInt() ?? 0;
 
       final labelRadius = radius + 28;
       final lx = center.dx + labelRadius * math.cos(angle);
@@ -206,11 +206,11 @@ class _RadarChartPainter extends CustomPainter {
       tpTitle.paint(canvas, textOffset);
     }
 
-    // Dataset 1: Top 100 Average Polygon
+    // Dataset 1: Top 20 Average Polygon
     final top100Path = Path();
     for (int i = 0; i < count; i++) {
       final item = subjects[i];
-      final top100Avg = (item['top100_average'] as num?)?.toDouble() ?? 0.0;
+      final top100Avg = (item['top20_average'] ?? item['top100_average'] as num?)?.toDouble() ?? 0.0;
       final maxScore = (item['max_score'] as num?)?.toDouble() ?? 180.0;
       final ratio = maxScore > 0 ? (top100Avg / maxScore).clamp(0.0, 1.0) : 0.0;
 

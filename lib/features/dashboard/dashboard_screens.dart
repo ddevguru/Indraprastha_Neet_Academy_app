@@ -394,7 +394,7 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
               builder: (context, constraints) {
                 return const EmptyStateWidget(
                   title: 'Notes list moved to Notes tab',
-                  subtitle: 'Ab yahan dummy cards nahi dikhaye ja rahe. Real content Notes tab se load hota hai.',
+                  subtitle: 'Explore all notes and study materials in the Notes section.',
                   icon: Icons.menu_book_rounded,
                 );
               },
@@ -700,7 +700,7 @@ class _RecentTestsPanel extends StatelessWidget {
               if (tests.isEmpty) {
                 return const EmptyStateWidget(
                   title: 'No tests yet',
-                  subtitle: 'Admin panel se test add hone ke baad yahan dikhेंगे.',
+                  subtitle: 'Upcoming test series will appear here.',
                   icon: Icons.assignment_outlined,
                 );
               }
@@ -759,7 +759,7 @@ class _WeakTopicsPanel extends StatelessWidget {
               if (insights.isEmpty) {
                 return const EmptyStateWidget(
                   title: 'No insights yet',
-                  subtitle: 'Test submit hone ke baad AI insights yahan आएंगे.',
+                  subtitle: 'AI insights will appear after completing tests.',
                   icon: Icons.lightbulb_outline,
                 );
               }

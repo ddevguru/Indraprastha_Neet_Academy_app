@@ -34,7 +34,8 @@ num? _asNum(dynamic value) {
 String _formatTestScoreLabel(Map<String, dynamic> test) {
   final score = _asNum(test['last_score']);
   if (score == null) return '--';
-  final marks = (_asNum(test['marks']) ?? 720).toInt();
+  final qCount = _asNum(test['question_count'])?.toInt() ?? (test['questions'] as List?)?.length;
+  final marks = qCount != null && qCount > 0 ? qCount * 4 : ((_asNum(test['marks']) ?? 720).toInt());
   return '${score.toInt()} / $marks';
 }
 
@@ -321,7 +322,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                 }
                 if (snapshot.hasError) {
                   return EmptyStateWidget(
-                    title: 'Tests load nahi ho paye',
+                    title: 'Unable to load tests',
                     subtitle: snapshot.error.toString(),
                     icon: Icons.error_outline_rounded,
                   );
@@ -332,7 +333,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                   return const EmptyStateWidget(
                     title: 'No tests yet',
                     subtitle:
-                        'Admin panel se test series add hone ke baad yahan list dikhegi.',
+                        'Available test series will appear here.',
                     icon: Icons.assignment_rounded,
                   );
                 }
@@ -341,7 +342,7 @@ class _TestsScreenState extends ConsumerState<TestsScreen> {
                     title:
                         'No ${_activeFilter?.toLowerCase() ?? 'tests'} found',
                     subtitle:
-                        'Is category mein abhi koi test available nahi hai.',
+                        'No tests currently available for this category.',
                     icon: Icons.filter_list_rounded,
                   );
                 }
@@ -623,20 +624,22 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
     if (_submitted || _submitting) return;
     setState(() => _submitting = true);
     int correct = 0;
+    int wrong = 0;
+    int unattempted = 0;
     for (var i = 0; i < questions.length; i++) {
       final marked = _answers[i];
-      final actual = questions[i]['correct_option']?.toString().toUpperCase() ?? '';
-      if (marked == actual) correct++;
+      final actual = questions[i]['correct_option']?.toString().trim().toUpperCase() ?? '';
+      if (marked == null || marked.toString().trim().isEmpty) {
+        unattempted++;
+      } else if (marked.toString().trim().toUpperCase() == actual) {
+        correct++;
+      } else {
+        wrong++;
+      }
     }
-    final wrong = _answers.length - correct;
-    final unattempted = questions.length - _answers.length;
-    final marks = (test['marks'] as num?)?.toInt() ?? (questions.length * 4);
-    final double posPerQ = questions.isEmpty ? 4.0 : (marks / questions.length);
-    final double negPerQ = posPerQ / 4.0;
-    final score = questions.isEmpty
-        ? 0
-        : ((correct * posPerQ) - (wrong * negPerQ)).round();
-    final accuracy = _answers.isEmpty ? 0.0 : (correct / _answers.length) * 100;
+    final score = (correct * 4) - (wrong * 1);
+    final attempted = correct + wrong;
+    final accuracy = attempted == 0 ? 0.0 : (correct / attempted) * 100;
     try {
       final userAnswersList = _answers.entries.map((e) {
         final qIdx = e.key;
@@ -729,22 +732,24 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
     required List<Map<String, dynamic>> questions,
     required Map<String, dynamic> test,
   }) {
-    var correct = 0;
+    int correct = 0;
+    int wrong = 0;
+    int unattempted = 0;
     for (var i = 0; i < questions.length; i++) {
       final marked = _answers[i];
       final actual =
-          questions[i]['correct_option']?.toString().toUpperCase() ?? '';
-      if (marked == actual) correct++;
+          questions[i]['correct_option']?.toString().trim().toUpperCase() ?? '';
+      if (marked == null || marked.toString().trim().isEmpty) {
+        unattempted++;
+      } else if (marked.toString().trim().toUpperCase() == actual) {
+        correct++;
+      } else {
+        wrong++;
+      }
     }
-    final wrong = _answers.length - correct;
-    final unattempted = questions.length - _answers.length;
-    final marks = (test['marks'] as num?)?.toInt() ?? (questions.length * 4);
-    final double posPerQ = questions.isEmpty ? 4.0 : (marks / questions.length);
-    final double negPerQ = posPerQ / 4.0;
-    final score = questions.isEmpty
-        ? 0
-        : ((correct * posPerQ) - (wrong * negPerQ)).round();
-    final accuracy = _answers.isEmpty ? 0.0 : (correct / _answers.length) * 100;
+    final score = (correct * 4) - (wrong * 1);
+    final attempted = correct + wrong;
+    final accuracy = attempted == 0 ? 0.0 : (correct / attempted) * 100;
     return {
       'attempt': {
         'score': score,
@@ -838,7 +843,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
             appBar: AppBar(title: const Text('Test')),
             body: Center(
               child: EmptyStateWidget(
-                title: 'Questions load nahi hue',
+                title: 'Unable to load questions',
                 subtitle: snapshot.error.toString(),
                 icon: Icons.wifi_off_rounded,
               ),
@@ -876,7 +881,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
             body: Center(
               child: EmptyStateWidget(
                 title: 'No questions in this test',
-                subtitle: 'Admin panel me test questions add karein.',
+                subtitle: 'No questions added to this test yet.',
                 icon: Icons.help_outline_rounded,
               ),
             ),
@@ -899,14 +904,27 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
               questions: questions,
               submitResponse: response,
             );
-            final marks = (test['marks'] as num?)?.toInt() ?? 720;
+            final marks = questions.length * 4;
+            final testSubject = test['subject']?.toString().trim();
+            final testTopic = (test['topic'] ?? test['chapter'] ?? test['title'])?.toString().trim();
             final items = List.generate(
               reviewQuestions.length,
-              (i) => AnswerReviewEntry.fromAbcdMap(
-                question: reviewQuestions[i],
-                index: i,
-                selectedOption: _answers[i],
-              ),
+              (i) {
+                final q = Map<String, dynamic>.from(reviewQuestions[i]);
+                final currentSubj = q['subject']?.toString().trim();
+                final currentTop = (q['topic'] ?? q['chapter'])?.toString().trim();
+                if ((currentSubj == null || currentSubj.isEmpty) && testSubject != null && testSubject.isNotEmpty) {
+                  q['subject'] = testSubject;
+                }
+                if ((currentTop == null || currentTop.isEmpty) && testTopic != null && testTopic.isNotEmpty) {
+                  q['topic'] = testTopic;
+                }
+                return AnswerReviewEntry.fromAbcdMap(
+                  question: q,
+                  index: i,
+                  selectedOption: _answers[i],
+                );
+              },
             );
             Navigator.push(
               context,
@@ -927,13 +945,26 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
               questions: questions,
               submitResponse: response,
             );
+            final testSubject = test['subject']?.toString().trim();
+            final testTopic = (test['topic'] ?? test['chapter'] ?? test['title'])?.toString().trim();
             final items = List.generate(
               reviewQuestions.length,
-              (i) => AnswerReviewEntry.fromAbcdMap(
-                question: reviewQuestions[i],
-                index: i,
-                selectedOption: _answers[i],
-              ),
+              (i) {
+                final q = Map<String, dynamic>.from(reviewQuestions[i]);
+                final currentSubj = q['subject']?.toString().trim();
+                final currentTop = (q['topic'] ?? q['chapter'])?.toString().trim();
+                if ((currentSubj == null || currentSubj.isEmpty) && testSubject != null && testSubject.isNotEmpty) {
+                  q['subject'] = testSubject;
+                }
+                if ((currentTop == null || currentTop.isEmpty) && testTopic != null && testTopic.isNotEmpty) {
+                  q['topic'] = testTopic;
+                }
+                return AnswerReviewEntry.fromAbcdMap(
+                  question: q,
+                  index: i,
+                  selectedOption: _answers[i],
+                );
+              },
             );
             IncorrectPdfService.downloadFromReviewEntries(
               context: context,
@@ -1114,40 +1145,22 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
 
                                         setState(() => _submitting = true);
                                         int correct = 0;
-                                        for (var i = 0;
-                                            i < questions.length;
-                                            i++) {
+                                        int wrong = 0;
+                                        int unattempted = 0;
+                                        for (var i = 0; i < questions.length; i++) {
                                           final marked = _answers[i];
-                                          final actual = questions[i]
-                                                      ['correct_option']
-                                                  ?.toString()
-                                                  .toUpperCase() ??
-                                              '';
-                                          if (marked == actual) correct++;
+                                          final actual = questions[i]['correct_option']?.toString().trim().toUpperCase() ?? '';
+                                          if (marked == null || marked.toString().trim().isEmpty) {
+                                            unattempted++;
+                                          } else if (marked.toString().trim().toUpperCase() == actual) {
+                                            correct++;
+                                          } else {
+                                            wrong++;
+                                          }
                                         }
-                                        final wrong =
-                                            _answers.length - correct;
-                                        final unattempted =
-                                            questions.length -
-                                                _answers.length;
-                                        final marks =
-                                            (test['marks'] as num?)
-                                                    ?.toInt() ??
-                                                (questions.length * 4);
-                                        final double posPerQ =
-                                            questions.isEmpty
-                                                ? 4.0
-                                                : (marks / questions.length);
-                                        final double negPerQ = posPerQ / 4.0;
-                                        final score = questions.isEmpty
-                                            ? 0
-                                            : ((correct * posPerQ) -
-                                                    (wrong * negPerQ))
-                                                .round();
-                                        final accuracy = _answers.isEmpty
-                                            ? 0.0
-                                            : (correct / _answers.length) *
-                                                100;
+                                        final score = (correct * 4) - (wrong * 1);
+                                        final attempted = correct + wrong;
+                                        final accuracy = attempted == 0 ? 0.0 : (correct / attempted) * 100;
                                         try {
                                           final res = await ref
                                               .read(

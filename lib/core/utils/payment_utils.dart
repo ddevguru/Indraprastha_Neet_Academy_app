@@ -15,10 +15,10 @@ bool isPaymentVerified(Map<String, dynamic> result) {
 String paymentErrorMessage(Object error) {
   final text = error.toString();
   if (text.contains('Invalid payment signature')) {
-    return 'Payment verify failed (signature). Server Razorpay keys check karein.';
+    return 'Payment verification failed. Please contact support if amount was deducted.';
   }
   if (text.contains('Not logged in')) {
-    return 'Session expire ho gaya. Dobara login karke verify karein.';
+    return 'Session expired. Please log in again.';
   }
   return text.replaceFirst('Exception: ', '');
 }

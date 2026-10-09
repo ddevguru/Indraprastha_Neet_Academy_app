@@ -52,8 +52,7 @@ class TodaysMcqsScreen extends ConsumerWidget {
                   SectionHeader(
                     title: "Today's MCQs",
                     subtitle:
-                        'Sirf aaj ke MCQs ka test de sakte ho. Purane MCQs neeche archive mein dikhte hain — '
-                        'unhe sirf dekh sakte ho, test nahi.',
+                        'Take today\'s daily practice quiz. Past questions are archived below for reference.',
                   ),
                   if (!hasSubscription) ...[
                     const SizedBox(height: AppSpacing.md),
@@ -62,10 +61,10 @@ class TodaysMcqsScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.lg),
                   if (active.isEmpty)
                     const EmptyStateWidget(
-                      title: 'Aaj ke liye koi MCQ nahi hai',
+                      title: 'No MCQs available today',
                       subtitle:
-                          'Admin jab aaj ka MCQ of the Day add karega, yahan dikhega. '
-                          'Purane MCQs archive section mein milenge.',
+                          'Today\'s MCQs will appear here once published. '
+                          'Past MCQs can be accessed in the archive below.',
                       icon: Icons.quiz_outlined,
                     )
                   else
@@ -89,7 +88,7 @@ class TodaysMcqsScreen extends ConsumerWidget {
                     SectionHeader(
                       title: 'Archived MCQs (view only)',
                       subtitle:
-                          'Purane din ke MCQs — sirf questions dekh sakte ho, test nahi de sakte.',
+                          'Previous daily MCQs — available for question & answer review.',
                     ),
                     const SizedBox(height: AppSpacing.md),
                     ...archived.asMap().entries.map((entry) {

@@ -44,8 +44,8 @@ class TodaysMcqTestPreviewScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      'Aaj ke MCQ of the Day ka test yahan dikhega. '
-                      'Tests section wale alag tests hain — yahan sirf daily MCQs.',
+                      'Today\'s MCQ of the Day test will appear here. '
+                      'This section is dedicated exclusively to daily practice questions.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
@@ -603,7 +603,10 @@ class _McqResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = history.length;
-    final accuracy = total > 0 ? (correctCount / total * 100) : 0.0;
+    final attempted = correctCount + wrongCount;
+    final accuracy = attempted > 0 ? (correctCount / attempted * 100) : 0.0;
+    final score = (correctCount * 4) - (wrongCount * 1);
+    final totalMarks = total * 4;
 
     return Scaffold(
       appBar: AppBar(title: const Text('MCQ Results')),
@@ -626,7 +629,7 @@ class _McqResultScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     Text(
-                      '$correctCount/$total',
+                      '$score/$totalMarks',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 52,
@@ -636,7 +639,7 @@ class _McqResultScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     const Text(
-                      'Correct answers',
+                      'Your Score (Marks)',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 16,

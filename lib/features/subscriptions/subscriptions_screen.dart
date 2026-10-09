@@ -139,7 +139,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                   error: (error, _) => Column(
                     children: [
                       EmptyStateWidget(
-                        title: 'Plans load nahi ho paaye',
+                        title: 'Unable to load plans',
                         subtitle: error.toString(),
                         icon: Icons.error_outline_rounded,
                       ),
@@ -160,7 +160,7 @@ class _SubscriptionsScreenState extends ConsumerState<SubscriptionsScreen> {
                           const EmptyStateWidget(
                             title: 'No plans available',
                             subtitle:
-                                'Server par Starter plan active nahi hai. Admin panel se package check karein.',
+                                'Subscription plans are currently unavailable. Please try again later.',
                             icon: Icons.workspace_premium_outlined,
                           ),
                           const SizedBox(height: AppSpacing.md),

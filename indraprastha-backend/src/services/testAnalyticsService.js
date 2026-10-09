@@ -94,8 +94,8 @@ class TestAnalyticsService {
         studentRank = studentRankIndex + 1;
       }
 
-      // Select Top 100 Students for THIS test
-      const top100Count = Math.min(totalParticipantsCount, 100);
+      // Select Top 20 Students for THIS test
+      const top100Count = Math.min(totalParticipantsCount, 20);
       const top100Participants = participants.slice(0, top100Count);
 
       const overallScores = participants.map((p) => Number(p.score) || 0);
@@ -198,9 +198,11 @@ class TestAnalyticsService {
           performance_category: performanceCategory,
         },
         benchmark: {
+          top20_count: top100Count,
           top100_count: top100Count,
           overall_participant_count: totalParticipantsCount,
           overall_average_score: overallAverageTotalScore,
+          top20_average_score: top100AverageTotalScore,
           top100_average_score: top100AverageTotalScore,
         },
         subjects: subjectAnalysis,
@@ -387,7 +389,7 @@ class TestAnalyticsService {
               attemptId,
               qId,
               this._inferSubject(q, testMeta),
-              q.topic || 'General',
+              q.topic || q.chapter || testMeta.topic || testMeta.chapter || 'General',
               isCorrect,
               Number(item.timeTakenSeconds) || 0,
               selectedOption,
@@ -546,6 +548,7 @@ class TestAnalyticsService {
         subject: s,
         student_score: studentScore,
         max_score: maxScore,
+        top20_average: top100Avg,
         top100_average: top100Avg,
         overall_average: overallAvg,
         status: status,

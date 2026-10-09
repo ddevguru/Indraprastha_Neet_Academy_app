@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
@@ -8,6 +7,7 @@ import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/fast_network_image.dart';
+import '../../core/utils/video_url_utils.dart';
 import 'video_player_screen.dart';
 
 class VideosScreen extends ConsumerWidget {
@@ -47,7 +47,7 @@ class VideosScreen extends ConsumerWidget {
                   }
                   if (snapshot.hasError) {
                     return EmptyStateWidget(
-                      title: 'Videos load nahi ho paye',
+                      title: 'Unable to load videos',
                       subtitle: snapshot.error.toString(),
                       icon: Icons.error_outline_rounded,
                     );
@@ -56,7 +56,7 @@ class VideosScreen extends ConsumerWidget {
                   if (videos.isEmpty) {
                     return const EmptyStateWidget(
                       title: 'No videos available',
-                      subtitle: 'Admin panel se videos upload karne ke baad yahan dikhenge.',
+                      subtitle: 'Uploaded video lectures will appear here.',
                       icon: Icons.video_library_outlined,
                     );
                   }
@@ -161,62 +161,24 @@ class VideosScreen extends ConsumerWidget {
     Map<String, dynamic> video,
     String url,
   ) async {
-    if (url.isEmpty) {
+    if (url.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Video link missing for this item.')),
       );
       return;
     }
-    final playableUrl = _toPlayableVideoUrl(url);
-    final isDirectPlayable =
-        playableUrl.contains('.mp4') ||
-        playableUrl.contains('storage.googleapis.com') ||
-        playableUrl.contains('googleusercontent.com') ||
-        playableUrl.contains('drive.google.com/uc?');
-    if (isDirectPlayable) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => VideoPlayerScreen(
-            title: video['title']?.toString() ?? 'Video',
-            subtitle:
-                '${video['subject'] ?? ''} • ${video['chapter_hint'] ?? video['topic'] ?? ''}',
-            videoUrl: playableUrl,
-            fallbackUrl: url,
-          ),
+    final playableUrl = resolveInAppEmbedUrl(url);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VideoPlayerScreen(
+          title: video['title']?.toString() ?? 'Video Lecture',
+          subtitle:
+              '${video['subject'] ?? ''} • ${video['chapter_hint'] ?? video['topic'] ?? ''}',
+          videoUrl: playableUrl,
+          fallbackUrl: url,
         ),
-      );
-      return;
-    }
-    final launched = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    if (!launched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open video link')),
-      );
-    }
-  }
-
-  String _toPlayableVideoUrl(String raw) {
-    final uri = Uri.tryParse(raw);
-    if (uri == null) return raw;
-    if (!raw.contains('drive.google.com')) return raw;
-    final id = _extractGoogleDriveFileId(uri);
-    if (id == null || id.isEmpty) return raw;
-    return 'https://drive.google.com/uc?export=download&id=$id';
-  }
-
-  String? _extractGoogleDriveFileId(Uri uri) {
-    final idFromQuery = uri.queryParameters['id'];
-    if (idFromQuery != null && idFromQuery.isNotEmpty) {
-      return idFromQuery;
-    }
-    final segments = uri.pathSegments;
-    final fileIndex = segments.indexOf('d');
-    if (fileIndex >= 0 && fileIndex + 1 < segments.length) {
-      return segments[fileIndex + 1];
-    }
-    final alt = RegExp(r'/file/d/([^/]+)').firstMatch(uri.toString());
-    if (alt != null) return alt.group(1);
-    return null;
+      ),
+    );
   }
 }

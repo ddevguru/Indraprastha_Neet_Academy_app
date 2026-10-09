@@ -130,7 +130,7 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                 }
                 if (snapshot.hasError) {
                   return EmptyStateWidget(
-                    title: 'Notes load nahi ho paye',
+                    title: 'Unable to load notes',
                     subtitle: snapshot.error.toString(),
                     icon: Icons.error_outline_rounded,
                   );
@@ -168,7 +168,7 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                     if (books.isEmpty)
                       const EmptyStateWidget(
                         title: 'No books available',
-                        subtitle: 'Admin panel se add karne par books yahan dikhengi.',
+                        subtitle: 'Study modules and books will appear here.',
                         icon: Icons.menu_book_outlined,
                       )
                     else
@@ -646,7 +646,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
       return const _DetailPanel(
         title: 'PYQs',
         content: 'No PYQs added yet.',
-        bullets: ['Admin panel se PYQs add hone ke baad yahan solve kar sakte ho.'],
+        bullets: ['Previous year questions will appear here once published.'],
       );
     }
 
@@ -660,8 +660,10 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
       }
       final wrong = _answers.length - correct;
       final unattempted = widget.pyqs.length - _answers.length;
-      final accuracy =
-          widget.pyqs.isEmpty ? 0.0 : (correct / widget.pyqs.length) * 100;
+      final attempted = correct + wrong;
+      final accuracy = attempted == 0 ? 0.0 : (correct / attempted) * 100;
+      final score = (correct * 4) - (wrong * 1);
+      final totalMarks = widget.pyqs.length * 4;
 
       return SizedBox.expand(
         child: SingleChildScrollView(
@@ -680,7 +682,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                 child: Column(
                   children: [
                     Text(
-                      '$correct/${widget.pyqs.length}',
+                      '$score/$totalMarks',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 48,
@@ -690,7 +692,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     const Text(
-                      'Correct answers',
+                      'Your Score (Marks)',
                       style: TextStyle(color: Colors.white70, fontSize: 16),
                     ),
                   ],
@@ -945,7 +947,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                               ],
                               if (!hasExpText && !hasExpImg && !hasExpList)
                                 Text(
-                                  'Is question ka explanation available nahi hai.',
+                                  'No explanation available for this question.',
                                   style: questionContentTextStyle(
                                     context,
                                     fontSize: 14,

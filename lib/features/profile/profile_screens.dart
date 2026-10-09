@@ -302,7 +302,7 @@ class _SavedRevisionScreenState extends ConsumerState<SavedRevisionScreen> {
                             if (books.isEmpty)
                               const EmptyStateWidget(
                                 title: 'No recent material',
-                                subtitle: 'Books add hone ke baad recent materials yahan dikhenge.',
+                                subtitle: 'Recently added study materials will appear here.',
                                 icon: Icons.history_toggle_off_rounded,
                               )
                             else
@@ -417,7 +417,7 @@ class NotificationsScreen extends ConsumerWidget {
                     if (notifications.isEmpty)
                       const EmptyStateWidget(
                         title: 'No notifications yet',
-                        subtitle: 'Notes, tests ya videos add hone par yahan dikhenge.',
+                        subtitle: 'Updates on notes, tests, and videos will appear here.',
                         icon: Icons.notifications_off_outlined,
                       )
                     else

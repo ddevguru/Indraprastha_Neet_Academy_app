@@ -26,6 +26,7 @@ import '../../widgets/ai_similar_questions_dialog.dart';
 import '../videos/video_player_screen.dart';
 import '../../core/utils/drive_image_url.dart';
 import '../../core/utils/question_fields.dart';
+import '../../core/utils/video_url_utils.dart';
 import '../../core/constants/api_constants.dart';
 import '../../widgets/question_report_dialog.dart';
 
@@ -397,7 +398,7 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
                           const SizedBox(height: 8),
                           Text(
                             hasSubscription
-                                ? 'Admin panel se practice sets add karne ke baad yahan dikhenge.'
+                                ? 'Uploaded practice sets will appear here.'
                                 : 'Unlock all practice sets with Premium subscription.',
                             textAlign: TextAlign.center,
                             style: const TextStyle(fontSize: 12, color: Colors.grey),
@@ -1073,7 +1074,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
         body: Center(
           child: EmptyStateWidget(
             title: 'No questions found',
-            subtitle: _loadError ?? 'Is set ke liye abhi questions add nahi hue.',
+            subtitle: _loadError ?? 'No questions available in this practice set yet.',
             icon: Icons.help_outline_rounded,
           ),
         ),
@@ -1974,7 +1975,7 @@ class _TopicWiseMcqsScreenState extends ConsumerState<TopicWiseMcqsScreen> {
               child: EmptyStateWidget(
                 title: 'No practice sets yet',
                 subtitle:
-                    'Admin panel se practice sets add karne ke baad yahan dikhenge.',
+                    'Uploaded practice sets will appear here.',
                 icon: Icons.grid_view_rounded,
               ),
             );
@@ -2117,7 +2118,7 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
       if (pyqs.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Is chapter ke liye PYQs filhaal available nahi hain.'),
+            content: Text('No previous year questions available for this chapter yet.'),
           ),
         );
         return;
@@ -2137,7 +2138,7 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
       if (mounted) Navigator.of(context).pop();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PYQs load nahi ho paye: $e')),
+          SnackBar(content: Text('Unable to load PYQs: $e')),
         );
       }
     }
@@ -2245,7 +2246,7 @@ class BookmarkedQuestionsScreen extends ConsumerWidget {
       title: 'Bookmarked questions',
       emptyTitle: 'No bookmarked questions yet',
       emptySubtitle:
-          'Practice karte waqt app bar par bookmark icon dabao — saved questions yahan dikhenge.',
+          'Bookmark questions while practicing to review them here.',
       emptyIcon: Icons.bookmark_border_rounded,
       questions: saved.bookmarked,
       onRemove: (id) => ref
@@ -2266,7 +2267,7 @@ class IncorrectQuestionsScreen extends ConsumerWidget {
       title: 'Incorrect questions',
       emptyTitle: 'No incorrect questions yet',
       emptySubtitle:
-          'Galat answer dene par questions yahan save honge taaki aap unhe dobara practice kar saken.',
+          'Incorrectly answered questions will be saved here for review.',
       emptyIcon: Icons.refresh_rounded,
       questions: saved.incorrect,
       onRemove: (id) =>
@@ -2493,7 +2494,7 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
     final sets = _filteredSets;
     if (sets.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Is filter ke liye koi practice set nahi mila.')),
+        const SnackBar(content: Text('No practice sets match the selected filter.')),
       );
       return;
     }
@@ -2518,7 +2519,7 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
       if (!mounted) return;
       if (allQuestions.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Selected filters ke liye questions nahi mile.')),
+          const SnackBar(content: Text('No questions match the selected filters.')),
         );
         return;
       }
@@ -2541,10 +2542,10 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
           SnackBar(
             content: Text(
               _filterBookmarked && _filterWrong
-                  ? 'Bookmarked aur wrong answer wale questions nahi mile.'
+                  ? 'No bookmarked or incorrect questions found.'
                   : _filterBookmarked
-                      ? 'Bookmarked questions nahi mile.'
-                      : 'Wrong answer wale questions nahi mile.',
+                      ? 'No bookmarked questions found.'
+                      : 'No incorrect questions found.',
             ),
           ),
         );
@@ -2575,7 +2576,7 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Practice load nahi ho payi: $e')),
+        SnackBar(content: Text('Unable to load practice sets: $e')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -2776,16 +2777,5 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
 }
 
 String _resolvePlayableDriveVideoUrl(String raw) {
-  final uri = Uri.tryParse(raw);
-  if (uri == null) return raw;
-  if (!raw.contains('drive.google.com')) return raw;
-  final idFromQuery = uri.queryParameters['id'];
-  if (idFromQuery != null && idFromQuery.isNotEmpty) {
-    return 'https://drive.google.com/uc?export=download&id=$idFromQuery';
-  }
-  final alt = RegExp(r'/file/d/([^/]+)').firstMatch(uri.toString());
-  if (alt != null && alt.group(1) != null) {
-    return 'https://drive.google.com/uc?export=download&id=${alt.group(1)}';
-  }
-  return raw;
+  return resolveInAppEmbedUrl(raw);
 }

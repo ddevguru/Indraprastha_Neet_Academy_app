@@ -391,7 +391,7 @@ class _TestPerformanceAnalyticsScreenState extends ConsumerState<TestPerformance
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Performance vs Top 100 Benchmark',
+            'Performance vs Top 20 Benchmark',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -400,7 +400,7 @@ class _TestPerformanceAnalyticsScreenState extends ConsumerState<TestPerformance
           ),
           const SizedBox(height: 4),
           Text(
-            'Visual radar comparison of your score polygon vs Top 100 average polygon.',
+            'Visual radar comparison of your score polygon vs Top 20 average polygon.',
             style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 16),
@@ -489,7 +489,7 @@ class _TestPerformanceAnalyticsScreenState extends ConsumerState<TestPerformance
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'Top 100 Avg: ${(s['top100_average'] as num?)?.toInt() ?? 0}',
+                      'Top 20 Avg: ${(s['top20_average'] ?? s['top100_average'] as num?)?.toInt() ?? 0}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -523,8 +523,8 @@ class _TestPerformanceAnalyticsScreenState extends ConsumerState<TestPerformance
 
   Widget _buildOverallBenchmarkCard(BuildContext context, Map<String, dynamic> benchmark, bool isDark) {
     final overallAvg = (benchmark['overall_average_score'] as num?)?.toInt() ?? 0;
-    final top100Avg = (benchmark['top100_average_score'] as num?)?.toInt() ?? 0;
-    final top100Count = (benchmark['top100_count'] as num?)?.toInt() ?? 100;
+    final top100Avg = (benchmark['top20_average_score'] ?? benchmark['top100_average_score'] as num?)?.toInt() ?? 0;
+    final top100Count = (benchmark['top20_count'] ?? benchmark['top100_count'] as num?)?.toInt() ?? 20;
     final totalCount = (benchmark['overall_participant_count'] as num?)?.toInt() ?? 1;
 
     final scheme = Theme.of(context).colorScheme;
