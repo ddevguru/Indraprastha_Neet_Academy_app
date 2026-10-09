@@ -9,7 +9,7 @@ const http = require('http');
 const neetQuestionEngine = require('./neetQuestionEngine');
 
 // Direct OpenAI API Key
-const OPENAI_DIRECT_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_DIRECT_KEY = process.env.OPENAI_API_KEY || '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';
 
 class AIMentorService {
   /**

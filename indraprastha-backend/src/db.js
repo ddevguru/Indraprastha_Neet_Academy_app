@@ -971,7 +971,7 @@ async function ensureDatabaseSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ai_similar_question_batches (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       source_question_id INTEGER,
       source_type VARCHAR(20) DEFAULT 'test',
       test_id INTEGER,
@@ -984,9 +984,18 @@ async function ensureDatabaseSchema() {
       valid_count INTEGER NOT NULL,
       model VARCHAR(60) NOT NULL,
       status VARCHAR(30) DEFAULT 'completed',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      score INTEGER DEFAULT 0,
+      accuracy NUMERIC(5,2) DEFAULT 0,
+      error_message TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+  await pool.query(`ALTER TABLE ai_similar_question_batches ALTER COLUMN user_id DROP NOT NULL;`).catch(() => {});
+  await pool.query(`ALTER TABLE ai_similar_question_batches ADD COLUMN IF NOT EXISTS score INTEGER DEFAULT 0;`).catch(() => {});
+  await pool.query(`ALTER TABLE ai_similar_question_batches ADD COLUMN IF NOT EXISTS accuracy NUMERIC(5,2) DEFAULT 0;`).catch(() => {});
+  await pool.query(`ALTER TABLE ai_similar_question_batches ADD COLUMN IF NOT EXISTS error_message TEXT;`).catch(() => {});
+  await pool.query(`ALTER TABLE ai_similar_question_batches ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`).catch(() => {});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_batches_user ON ai_similar_question_batches(user_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_batches_source_q ON ai_similar_question_batches(source_question_id);`);
 
@@ -995,6 +1004,7 @@ async function ensureDatabaseSchema() {
     CREATE TABLE IF NOT EXISTS ai_similar_questions (
       id SERIAL PRIMARY KEY,
       batch_id INTEGER NOT NULL REFERENCES ai_similar_question_batches(id) ON DELETE CASCADE,
+      source_question_id INTEGER,
       question_text TEXT NOT NULL,
       option_a TEXT NOT NULL,
       option_b TEXT NOT NULL,
@@ -1002,13 +1012,32 @@ async function ensureDatabaseSchema() {
       option_d TEXT NOT NULL,
       correct_option CHAR(1) NOT NULL,
       explanation TEXT NOT NULL,
+      subject VARCHAR(100),
+      chapter VARCHAR(150),
+      topic VARCHAR(150),
+      concept VARCHAR(150),
+      difficulty VARCHAR(30) DEFAULT 'Medium',
       user_answer CHAR(1),
       is_correct BOOLEAN,
       answered_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+  await pool.query(`ALTER TABLE ai_similar_questions ADD COLUMN IF NOT EXISTS source_question_id INTEGER;`).catch(() => {});
+  await pool.query(`ALTER TABLE ai_similar_questions ADD COLUMN IF NOT EXISTS subject VARCHAR(100);`).catch(() => {});
+  await pool.query(`ALTER TABLE ai_similar_questions ADD COLUMN IF NOT EXISTS chapter VARCHAR(150);`).catch(() => {});
+  await pool.query(`ALTER TABLE ai_similar_questions ADD COLUMN IF NOT EXISTS topic VARCHAR(150);`).catch(() => {});
+  await pool.query(`ALTER TABLE ai_similar_questions ADD COLUMN IF NOT EXISTS concept VARCHAR(150);`).catch(() => {});
+  await pool.query(`ALTER TABLE ai_similar_questions ADD COLUMN IF NOT EXISTS difficulty VARCHAR(30) DEFAULT 'Medium';`).catch(() => {});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_similar_q_batch ON ai_similar_questions(batch_id);`);
+
+  // Auto-backfill blank topic in test_questions from tests title
+  await pool.query(`
+    UPDATE test_questions tq
+    SET topic = COALESCE(NULLIF(tq.topic, ''), NULLIF(t.title, ''), 'General')
+    FROM tests t
+    WHERE tq.test_id = t.id AND (tq.topic IS NULL OR tq.topic = '');
+  `).catch(() => {});
 }
 
 async function loadRuntimeConfigFromDb() {

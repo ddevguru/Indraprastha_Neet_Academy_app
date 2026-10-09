@@ -8,6 +8,9 @@ const OpenAI = require('openai');
 const { pool } = require('../db');
 const neetQuestionEngine = require('./neetQuestionEngine');
 
+// Direct OpenAI Key provided for deployment without environment variable configuration
+const DIRECT_OPENAI_KEY = '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';
+
 class AISimilarQuestionsService {
   constructor() {
     this.defaultModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -19,7 +22,9 @@ class AISimilarQuestionsService {
    * @private
    */
   _getClient() {
-    const apiKey = (process.env.OPENAI_API_KEY || process.env.CHATGPT_API_KEY || '').trim();
+    let apiKey = process.env.OPENAI_API_KEY !== undefined ? process.env.OPENAI_API_KEY : DIRECT_OPENAI_KEY;
+    if (!apiKey && process.env.CHATGPT_API_KEY) apiKey = process.env.CHATGPT_API_KEY;
+    apiKey = (apiKey || '').trim();
     if (!apiKey) {
       const err = new Error(
         'OPENAI_API_KEY is not configured on the server. Please configure OPENAI_API_KEY in the server environment.'

@@ -234,8 +234,8 @@ async function runTests() {
     const savedKey = process.env.OPENAI_API_KEY;
     const savedChatGptKey = process.env.CHATGPT_API_KEY;
     try {
-      delete process.env.OPENAI_API_KEY;
-      delete process.env.CHATGPT_API_KEY;
+      process.env.OPENAI_API_KEY = '';
+      process.env.CHATGPT_API_KEY = '';
       await aiSimilarQuestionsService.generateSimilarQuestions({
         studentId: 1,
         sourceQuestionId: 1,
