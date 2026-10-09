@@ -22,7 +22,6 @@ import '../../widgets/app_widgets.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/fast_network_image.dart';
-import '../../widgets/ai_similar_questions_dialog.dart';
 import '../../widgets/amazon_related_questions_view.dart';
 import '../videos/video_player_screen.dart';
 import '../../core/utils/drive_image_url.dart';

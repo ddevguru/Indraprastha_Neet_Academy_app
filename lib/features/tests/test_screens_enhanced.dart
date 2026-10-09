@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/incorrect_pdf_service.dart';
 import '../../theme/app_tokens.dart';
-import '../../widgets/ai_similar_questions_dialog.dart';
 import '../../widgets/amazon_related_questions_view.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../widgets/question_report_dialog.dart';

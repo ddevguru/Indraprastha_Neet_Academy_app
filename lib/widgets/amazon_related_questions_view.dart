@@ -366,7 +366,7 @@ class _AmazonRelatedQuestionsViewState
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: _questions.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
+        separatorBuilder: (context, index) => const SizedBox(width: AppSpacing.md),
         itemBuilder: (context, index) {
           final q = _questions[index];
           return _buildRelatedCard(index, q, theme, isDark);
@@ -583,8 +583,8 @@ class _AmazonRelatedQuestionsViewState
           return ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: 3,
-            separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
-            itemBuilder: (_, __) {
+            separatorBuilder: (context, index) => const SizedBox(width: AppSpacing.md),
+            itemBuilder: (context, index) {
               return Container(
                 width: 250,
                 padding: const EdgeInsets.all(AppSpacing.md),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/services/incorrect_pdf_service.dart';
 import '../core/utils/drive_image_url.dart';
@@ -7,7 +6,6 @@ import '../core/utils/question_fields.dart';
 import '../core/utils/video_url_utils.dart';
 import '../theme/app_tokens.dart';
 import '../features/videos/video_player_screen.dart';
-import 'ai_similar_questions_dialog.dart';
 import 'amazon_related_questions_view.dart';
 import 'app_widgets.dart';
 import 'fast_network_image.dart';

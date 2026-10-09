@@ -14,7 +14,6 @@ import '../../widgets/app_widgets.dart';
 import '../../core/services/incorrect_pdf_service.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/question_report_dialog.dart';
-import '../../widgets/ai_similar_questions_dialog.dart';
 import '../../widgets/amazon_related_questions_view.dart';
 
 class TodaysMcqTestPreviewScreen extends ConsumerWidget {
