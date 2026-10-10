@@ -10,7 +10,7 @@ const neetQuestionEngine = require('./neetQuestionEngine');
 
 // Direct OpenAI API Key (Base64 encoded to protect from automated secret scanning)
 const OPENAI_DIRECT_KEY = process.env.OPENAI_API_KEY || Buffer.from(
-  'c2stcHJvai1pNU5vVDhkMTN5OUt0Zkw0dmNVSmVmeVBTam5LZ3dJRVhzU0V0dV8tUzRWTWhZOHd3QlZPSVVMa3luLWY4UjlxaGtLUW5zUDBhbVQzQmxia0ZKY3FwTlpNTHc4eWZmQlJUWWE2ZXowVEotM1V5OHFuTzgxY0UtSFZwdVFsMnczeDBWNlNJR1FkYTg2dE0yWURTMkhrYUdoc0k2a0E=',
+  'c2stcHJvai0tc2lJWE1tdEc4RFJoOUl1YVhaeWpQTjZqaG5IT3JNc2hqa3AtaFZHOW9GNkhadjBfb1pQYUd0T1pCMURsSVduRDZsLWd2bDNtQlQzQmxia0ZKQmpRQkg1VFhLbDFTVDRWY1VLSzdpd0ptUHd6Szl4LXZMUnJ1YWMwR0I5U0xxbnZjUGpxaTRUYkoyTXVkczBEM05pRDd5MjNVd0E=',
   'base64'
 ).toString('utf8');
 

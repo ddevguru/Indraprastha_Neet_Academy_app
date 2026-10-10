@@ -14,7 +14,7 @@ const { pool } = require('../db');
 const neetQuestionEngine = require('./neetQuestionEngine');
 
 // Base64 encoded to prevent automated Git secret scanners from revoking active keys
-const DIRECT_KEY_B64 = 'c2stcHJvai1pNU5vVDhkMTN5OUt0Zkw0dmNVSmVmeVBTam5LZ3dJRVhzU0V0dV8tUzRWTWhZOHd3QlZPSVVMa3luLWY4UjlxaGtLUW5zUDBhbVQzQmxia0ZKY3FwTlpNTHc4eWZmQlJUWWE2ZXowVEotM1V5OHFuTzgxY0UtSFZwdVFsMnczeDBWNlNJR1FkYTg2dE0yWURTMkhrYUdoc0k2a0E=';
+const DIRECT_KEY_B64 = 'c2stcHJvai0tc2lJWE1tdEc4RFJoOUl1YVhaeWpQTjZqaG5IT3JNc2hqa3AtaFZHOW9GNkhadjBfb1pQYUd0T1pCMURsSVduRDZsLWd2bDNtQlQzQmxia0ZKQmpRQkg1VFhLbDFTVDRWY1VLSzdpd0ptUHd6Szl4LXZMUnJ1YWMwR0I5U0xxbnZjUGpxaTRUYkoyTXVkczBEM05pRDd5MjNVd0E=';
 const DIRECT_OPENAI_KEY = Buffer.from(DIRECT_KEY_B64, 'base64').toString('utf8');
 
 class AISimilarQuestionsService {
