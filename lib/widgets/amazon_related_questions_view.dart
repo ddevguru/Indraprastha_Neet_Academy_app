@@ -24,6 +24,7 @@ class AmazonRelatedQuestionsView extends ConsumerStatefulWidget {
     this.topic,
     this.options,
     this.explanation,
+    this.similarQuestion,
     this.initialCount = 3,
   });
 
@@ -36,6 +37,7 @@ class AmazonRelatedQuestionsView extends ConsumerStatefulWidget {
   final String? topic;
   final List<String>? options;
   final String? explanation;
+  final Map<String, dynamic>? similarQuestion;
   final int initialCount;
 
   @override
@@ -94,70 +96,15 @@ class _AmazonRelatedQuestionsViewState
   }
 
   Future<void> _loadRelatedQuestions({bool forceRefresh = false}) async {
-    final key = _cacheKey;
-    if (!forceRefresh && _relatedQuestionsMemoryCache.containsKey(key)) {
-      final cached = _relatedQuestionsMemoryCache[key]!;
-      setState(() {
-        _isLoading = false;
-        _error = null;
-        _questions = List<Map<String, dynamic>>.from(cached['questions'] ?? const []);
-        _resolvedSubject = cached['subject']?.toString() ?? widget.subject ?? '';
-        _resolvedTopic = cached['topic']?.toString() ?? widget.topic ?? '';
-        _resolvedConcept = cached['concept']?.toString() ?? '';
-      });
-      return;
-    }
-
     setState(() {
-      _isLoading = true;
+      _isLoading = false;
       _error = null;
+      if (widget.similarQuestion != null) {
+        _questions = [widget.similarQuestion!];
+      } else {
+        _questions = const [];
+      }
     });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final repo = ContentRepository(prefs: prefs);
-
-      final data = await repo.fetchSimilarQuestionsData(
-        questionText: widget.questionText,
-        sourceQuestionId: widget.sourceQuestionId,
-        sourceType: widget.sourceType,
-        testId: widget.testId,
-        userAnswer: widget.userAnswer,
-        subject: widget.subject,
-        topic: widget.topic,
-        options: widget.options,
-        explanation: widget.explanation,
-        count: widget.initialCount,
-      );
-
-      final fetchedQuestions =
-          List<Map<String, dynamic>>.from(data['questions'] ?? const []);
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _questions = fetchedQuestions;
-          _resolvedSubject = data['subject']?.toString() ?? widget.subject ?? '';
-          _resolvedTopic = data['topic']?.toString() ?? widget.topic ?? '';
-          _resolvedConcept = data['concept']?.toString() ?? '';
-        });
-
-        // Store in cache
-        _relatedQuestionsMemoryCache[key] = {
-          'subject': _resolvedSubject,
-          'topic': _resolvedTopic,
-          'concept': _resolvedConcept,
-          'questions': fetchedQuestions,
-        };
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = e.toString().replaceAll('Exception: ', '');
-        });
-      }
-    }
   }
 
   void _openInteractiveQuiz(BuildContext context) {
@@ -180,166 +127,82 @@ class _AmazonRelatedQuestionsViewState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final sq = widget.similarQuestion ?? (_questions.isNotEmpty ? _questions.first : null);
+    if (sq == null) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.md),
+      width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section Header: Solve Similar Questions
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.auto_awesome, color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Solve Similar Questions',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'AI-Powered Personalized Practice • Same topic & concept',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!_isLoading)
-                IconButton(
-                  tooltip: 'Refresh similar questions',
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  color: AppColors.textSecondary,
-                  onPressed: () => _loadRelatedQuestions(forceRefresh: true),
-                ),
-            ],
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-
-          // Topic & Concept Pills
-          if (_resolvedTopic.isNotEmpty || _resolvedConcept.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                if (_resolvedSubject.isNotEmpty)
-                  _buildTagPill(
-                    icon: Icons.school_outlined,
-                    text: _resolvedSubject,
-                    color: const Color(0xFF6366F1),
-                    isDark: isDark,
-                  ),
-                if (_resolvedTopic.isNotEmpty)
-                  _buildTagPill(
-                    icon: Icons.menu_book_rounded,
-                    text: _resolvedTopic,
-                    color: AppColors.primary,
-                    isDark: isDark,
-                  ),
-                if (_resolvedConcept.isNotEmpty)
-                  _buildTagPill(
-                    icon: Icons.lightbulb_rounded,
-                    text: _resolvedConcept,
-                    color: const Color(0xFFD97706),
-                    isDark: isDark,
-                  ),
-              ],
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
             ),
-          ],
-
-          const SizedBox(height: AppSpacing.md),
-
-          // Content body: Loading skeleton, Error retry, or Carousel
-          if (_isLoading)
-            _buildLoadingCarousel(isDark)
-          else if (_error != null)
-            _buildErrorState(theme)
-          else if (_questions.isEmpty)
-            _buildEmptyState(theme)
-          else
-            _buildQuestionCarousel(theme, isDark),
-
-          // Bottom Bar Action
-          if (_questions.isNotEmpty && !_isLoading) ...[
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _openInteractiveQuiz(context),
-                    icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
-                    label: Text(
-                      'Practice All ${_questions.length} Qs',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.md),
-                      ),
-                    ),
+            child: const Icon(Icons.psychology_alt_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Got this question wrong?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                OutlinedButton.icon(
-                  onPressed: () => showSimilarQuestionsDialog(
-                    context,
-                    ref,
-                    questionText: widget.questionText,
-                    sourceQuestionId: widget.sourceQuestionId,
-                    sourceType: widget.sourceType,
-                    testId: widget.testId,
-                    userAnswer: widget.userAnswer,
-                    subject: _resolvedSubject.isNotEmpty ? _resolvedSubject : widget.subject,
-                    topic: _resolvedTopic.isNotEmpty ? _resolvedTopic : widget.topic,
-                    options: widget.options,
-                    explanation: widget.explanation,
-                  ),
-                  icon: const Icon(Icons.tune_rounded, size: 16),
-                  label: const Text('Generate (1-10)', style: TextStyle(fontSize: 11)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.md),
-                    ),
+                SizedBox(height: 2),
+                Text(
+                  'Practice a similar question set by your teacher',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
                   ),
                 ),
               ],
             ),
-          ],
+          ),
+          ElevatedButton(
+            onPressed: () => showSingleSimilarQuestionSheet(
+              context,
+              similarQuestion: sq,
+              questionTitle: 'Similar Question Practice',
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF4F46E5),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.md),
+              ),
+            ),
+            child: const Text('Solve Similar Question'),
+          ),
         ],
       ),
     );

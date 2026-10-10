@@ -23,6 +23,7 @@ import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../widgets/amazon_related_questions_view.dart';
+import '../../widgets/ai_similar_questions_dialog.dart';
 import '../videos/video_player_screen.dart';
 import '../../core/utils/drive_image_url.dart';
 import '../../core/utils/question_fields.dart';
@@ -1151,6 +1152,115 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                     ),
                   ],
                 ),
+                if (_correctCount == total && total > 0) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF059669), Color(0xFF10B981)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(AppRadii.lg),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF059669).withValues(alpha: 0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: const [
+                                  Text(
+                                    'Out-off Score! 100% Correct 🎉',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Want to solve more similar questions?',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Practice parallel questions set by your teacher for all questions one by one.',
+                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              final allSimilar = _questions
+                                  .map((q) => q['similar_question'])
+                                  .whereType<Map<String, dynamic>>()
+                                  .toList();
+                              if (allSimilar.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('No similar questions available for this practice set yet.'),
+                                  ),
+                                );
+                                return;
+                              }
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => SimilarQuestionsQuizScreen(
+                                    title: '${_set['title'] ?? 'Practice'} - Similar Questions',
+                                    questions: allSimilar,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.play_arrow_rounded, color: Color(0xFF059669)),
+                            label: const Text('Solve All Similar Questions'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFF059669),
+                              textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 PrimaryButton(
                   label: 'Review answers',
@@ -1662,17 +1772,83 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                   );
                                 },
                               ),
-                              if (_submitted) ...[
+                              if (_submitted && _selectedOption != qCorrectIndex) ...[
                                 const SizedBox(height: AppSpacing.md),
-                                AmazonRelatedQuestionsView(
-                                  questionText: readQuestionText(qItem),
-                                  sourceQuestionId: int.tryParse(qItem['id']?.toString() ?? ''),
-                                  sourceType: 'practice',
-                                  userAnswer: _selectedOption != null && _selectedOption! >= 0 && _selectedOption! < 4 ? ['A', 'B', 'C', 'D'][_selectedOption!] : null,
-                                  subject: qItem['subject']?.toString() ?? _set['subject']?.toString() ?? widget.customTitle ?? widget.chapterName,
-                                  topic: qItem['topic']?.toString() ?? qItem['chapter']?.toString() ?? widget.chapterName,
-                                  options: qOptions,
-                                  explanation: qItem['explanation']?.toString(),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(AppSpacing.md),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(AppRadii.lg),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.2),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.psychology_alt_rounded, color: Colors.white, size: 20),
+                                      ),
+                                      const SizedBox(width: AppSpacing.md),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: const [
+                                            Text(
+                                              'Got this question wrong?',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            SizedBox(height: 2),
+                                            Text(
+                                              'Practice a similar question set by your teacher',
+                                              style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          final simQ = qItem['similar_question'];
+                                          showSingleSimilarQuestionSheet(
+                                            context,
+                                            similarQuestion: simQ is Map ? Map<String, dynamic>.from(simQ) : null,
+                                            questionTitle: 'Question ${qIdx + 1} - Similar Practice',
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor: const Color(0xFF4F46E5),
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(AppRadii.md),
+                                          ),
+                                        ),
+                                        child: const Text('Solve Similar Question'),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ],

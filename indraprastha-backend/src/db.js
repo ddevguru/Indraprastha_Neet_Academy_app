@@ -322,6 +322,10 @@ async function ensureDatabaseSchema() {
     ALTER TABLE practice_questions
     ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '';
   `);
+  await pool.query(`
+    ALTER TABLE practice_questions
+    ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tests (
@@ -407,6 +411,22 @@ async function ensureDatabaseSchema() {
   await pool.query(`
     ALTER TABLE test_questions
     ADD COLUMN IF NOT EXISTS explanation_image_drive_folder_id TEXT DEFAULT '';
+  `);
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '';
+  `);
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '';
+  `);
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '';
+  `);
+  await pool.query(`
+    ALTER TABLE test_questions
+    ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
   `);
 
   await pool.query(`

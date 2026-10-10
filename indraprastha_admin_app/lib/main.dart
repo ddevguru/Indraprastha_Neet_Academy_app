@@ -2429,6 +2429,16 @@ class _PracticePageState extends State<PracticePage> {
   String _pqImageLink = '';
   File? _pqExplanationImage;
   String _pqExplanationImageLink = '';
+  // Similar Question for Practice MCQ
+  final _pqSimilarQuestion = TextEditingController();
+  final _pqSimilarOptionA = TextEditingController();
+  final _pqSimilarOptionB = TextEditingController();
+  final _pqSimilarOptionC = TextEditingController();
+  final _pqSimilarOptionD = TextEditingController();
+  final _pqSimilarExplanation = TextEditingController();
+  String _pqSimilarCorrect = 'A';
+  bool _pqShowSimilarQuestion = false;
+
   List<dynamic> _batches = const [];
   List<dynamic> _items = const [];
   bool _savingPracticeQuestion = false;
@@ -2453,6 +2463,12 @@ class _PracticePageState extends State<PracticePage> {
     _pqOptionD.dispose();
     _pqExplanation.dispose();
     _pqExplanationVideoLink.dispose();
+    _pqSimilarQuestion.dispose();
+    _pqSimilarOptionA.dispose();
+    _pqSimilarOptionB.dispose();
+    _pqSimilarOptionC.dispose();
+    _pqSimilarOptionD.dispose();
+    _pqSimilarExplanation.dispose();
     super.dispose();
   }
 
@@ -2511,7 +2527,26 @@ class _PracticePageState extends State<PracticePage> {
                         children: [
                           Text(question['question']?.toString() ?? ''),
                           const SizedBox(height: 4),
-                          Text('Correct: ${question['correct_option'] ?? '-'}'),
+                          Row(
+                            children: [
+                              Text('Correct: ${question['correct_option'] ?? '-'}'),
+                              if (question['similar_question'] != null) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
+                                  ),
+                                  child: const Text(
+                                    'Similar Q Added',
+                                    style: TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
@@ -2547,6 +2582,37 @@ class _PracticePageState extends State<PracticePage> {
                                             ?.toString() ??
                                         '';
                                     _pqImage = null;
+
+                                    // Populate Similar Question if present
+                                    final sq = question['similar_question'];
+                                    Map<String, dynamic>? sqMap;
+                                    if (sq is Map) {
+                                      sqMap = Map<String, dynamic>.from(sq);
+                                    } else if (sq is String && sq.trim().isNotEmpty) {
+                                      try {
+                                        final dec = jsonDecode(sq);
+                                        if (dec is Map) sqMap = Map<String, dynamic>.from(dec);
+                                      } catch (_) {}
+                                    }
+                                    if (sqMap != null && (sqMap['question']?.toString().trim().isNotEmpty ?? false)) {
+                                      _pqSimilarQuestion.text = sqMap['question']?.toString() ?? '';
+                                      _pqSimilarOptionA.text = sqMap['option_a']?.toString() ?? sqMap['optionA']?.toString() ?? '';
+                                      _pqSimilarOptionB.text = sqMap['option_b']?.toString() ?? sqMap['optionB']?.toString() ?? '';
+                                      _pqSimilarOptionC.text = sqMap['option_c']?.toString() ?? sqMap['optionC']?.toString() ?? '';
+                                      _pqSimilarOptionD.text = sqMap['option_d']?.toString() ?? sqMap['optionD']?.toString() ?? '';
+                                      _pqSimilarCorrect = sqMap['correct_option']?.toString() ?? sqMap['correctOption']?.toString() ?? 'A';
+                                      _pqSimilarExplanation.text = sqMap['explanation']?.toString() ?? '';
+                                      _pqShowSimilarQuestion = true;
+                                    } else {
+                                      _pqSimilarQuestion.clear();
+                                      _pqSimilarOptionA.clear();
+                                      _pqSimilarOptionB.clear();
+                                      _pqSimilarOptionC.clear();
+                                      _pqSimilarOptionD.clear();
+                                      _pqSimilarCorrect = 'A';
+                                      _pqSimilarExplanation.clear();
+                                      _pqShowSimilarQuestion = false;
+                                    }
                                   });
                                   Navigator.of(sheetContext).pop();
                                 },
@@ -2923,159 +2989,323 @@ class _PracticePageState extends State<PracticePage> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                FilledButton.tonal(
-                  onPressed: _selectedSetId == null || _savingPracticeQuestion
-                      ? null
-                      : () async {
-                          setState(() => _savingPracticeQuestion = true);
-                          try {
-                            var imageLink = _pqImageLink;
-                            var expLink = _pqExplanationImageLink;
-                            final videoLink = _pqExplanationVideoLink.text.trim();
-                            if (_editingPracticeQuestionId == null) {
-                              if (_pqImage != null &&
-                                  !await _validateImageFile(context, _pqImage!)) {
-                                throw Exception('Question image too large');
-                              }
-                              if (_pqExplanationImage != null &&
-                                  !await _validateImageFile(
-                                      context, _pqExplanationImage!)) {
-                                throw Exception('Explanation image too large');
-                              }
-                              if (_pqImage != null || _pqExplanationImage != null) {
-                                await widget.api.addPracticeQuestionWithMedia(
-                                  setId: _selectedSetId!,
-                                  question: _pqQuestion.text.trim(),
-                                  optionA: _pqOptionA.text.trim(),
-                                  optionB: _pqOptionB.text.trim(),
-                                  optionC: _pqOptionC.text.trim(),
-                                  optionD: _pqOptionD.text.trim(),
-                                  correctOption: _pqCorrect,
-                                  explanation: _pqExplanation.text.trim(),
-                                  questionImage: _pqImage,
-                                  explanationImage: _pqExplanationImage,
-                                  questionImageLink: imageLink,
-                                  explanationImageLink: expLink,
-                                  explanationVideoLink: videoLink,
-                                );
-                              } else {
-                                await widget.api.addPracticeQuestion(
-                                  setId: _selectedSetId!,
-                                  question: _pqQuestion.text.trim(),
-                                  optionA: _pqOptionA.text.trim(),
-                                  optionB: _pqOptionB.text.trim(),
-                                  optionC: _pqOptionC.text.trim(),
-                                  optionD: _pqOptionD.text.trim(),
-                                  correctOption: _pqCorrect,
-                                  explanation: _pqExplanation.text.trim(),
-                                  questionImageLink: imageLink,
-                                  explanationImageLink: expLink,
-                                  explanationVideoLink: videoLink,
-                                );
-                              }
-                            } else {
-                              if (_batchId != null) {
-                                final uploads = <Future<void>>[];
-                                if (_pqImage != null) {
-                                  uploads.add(() async {
-                                    if (!await _validateImageFile(
-                                        context, _pqImage!)) {
-                                      throw Exception('Question image too large');
-                                    }
-                                    imageLink =
-                                        await widget.api.uploadQuestionImage(
-                                      batchId: _batchId!,
-                                      classLabel: _classLabel.text.trim(),
-                                      subject: _subject.text.trim(),
-                                      topic: _topic.text.trim().isEmpty
-                                          ? 'Practice Questions'
-                                          : _topic.text.trim(),
-                                      file: _pqImage!,
-                                      contentType: 'practice',
-                                      contentId: _selectedSetId,
-                                    );
-                                  }());
-                                }
-                                if (_pqExplanationImage != null) {
-                                  uploads.add(() async {
-                                    if (!await _validateImageFile(
-                                        context, _pqExplanationImage!)) {
-                                      throw Exception(
-                                          'Explanation image too large');
-                                    }
-                                    expLink =
-                                        await widget.api.uploadQuestionImage(
-                                      batchId: _batchId!,
-                                      classLabel: _classLabel.text.trim(),
-                                      subject: _subject.text.trim(),
-                                      topic: _topic.text.trim().isEmpty
-                                          ? 'Practice Questions'
-                                          : _topic.text.trim(),
-                                      file: _pqExplanationImage!,
-                                      contentType: 'practice_explanation',
-                                      contentId: _selectedSetId,
-                                    );
-                                  }());
-                                }
-                                if (uploads.isNotEmpty) {
-                                  await Future.wait(uploads);
-                                }
-                              }
-                              await widget.api.updatePracticeQuestion(
-                                id: _editingPracticeQuestionId!,
-                                question: _pqQuestion.text.trim(),
-                                optionA: _pqOptionA.text.trim(),
-                                optionB: _pqOptionB.text.trim(),
-                                optionC: _pqOptionC.text.trim(),
-                                optionD: _pqOptionD.text.trim(),
-                                correctOption: _pqCorrect,
-                                explanation: _pqExplanation.text.trim(),
-                                questionImageLink: imageLink,
-                                explanationImageLink: expLink,
-                                explanationVideoLink: videoLink,
-                              );
-                            }
-                            _pqQuestion.clear();
-                            _pqOptionA.clear();
-                            _pqOptionB.clear();
-                            _pqOptionC.clear();
-                            _pqOptionD.clear();
-                            _pqExplanation.clear();
-                            _pqExplanationVideoLink.clear();
-                            setState(() {
-                              _editingPracticeQuestionId = null;
-                              _pqImage = null;
-                              _pqImageLink = '';
-                              _pqExplanationImage = null;
-                              _pqExplanationImageLink = '';
-                              _pqCorrect = 'A';
-                            });
-                            if (!mounted) return;
-                            if (context.mounted) {
-                              _showActionSnackBar(
-                                  context, 'Practice question saved');
-                            }
-                          } catch (e, st) {
-                            if (!context.mounted) return;
-                            await _handleTaskError(
-                              context,
-                              'Practice question save',
-                              e,
-                              stackTrace: st,
-                            );
-                          } finally {
-                            if (mounted) {
-                              setState(() => _savingPracticeQuestion = false);
-                            }
-                          }
-                        },
-                  child: _busyButtonChild(
-                    _savingPracticeQuestion,
-                    _editingPracticeQuestionId == null
-                        ? 'Add Practice Question'
-                        : 'Update Practice Question',
+                const SizedBox(height: 12),
+                // Similar Question Section (Admin adds for this practice MCQ)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _pqSimilarQuestion.text.trim().isNotEmpty
+                          ? Colors.indigo.shade400
+                          : Theme.of(context).colorScheme.outlineVariant,
+                    ),
                   ),
+                  child: ExpansionTile(
+                    initiallyExpanded: _pqShowSimilarQuestion,
+                    onExpansionChanged: (val) => setState(() => _pqShowSimilarQuestion = val),
+                    leading: const Icon(Icons.help_center_outlined, color: Color(0xFF4F46E5)),
+                    title: Row(
+                      children: [
+                        const Text(
+                          'Solve Similar Question',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        const SizedBox(width: 8),
+                        if (_pqSimilarQuestion.text.trim().isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('Added', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                          )
+                        else
+                          Text('(Optional)', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                      ],
+                    ),
+                    subtitle: const Text(
+                      'Shown to student if they get this question wrong, or when solving all similar questions.',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              controller: _pqSimilarQuestion,
+                              minLines: 2,
+                              maxLines: 4,
+                              decoration: const InputDecoration(
+                                labelText: 'Similar Question text',
+                                hintText: 'Enter a parallel question on this concept',
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pqSimilarOptionA,
+                              decoration: const InputDecoration(labelText: 'Similar Option A'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pqSimilarOptionB,
+                              decoration: const InputDecoration(labelText: 'Similar Option B'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pqSimilarOptionC,
+                              decoration: const InputDecoration(labelText: 'Similar Option C'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pqSimilarOptionD,
+                              decoration: const InputDecoration(labelText: 'Similar Option D'),
+                            ),
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              initialValue: _pqSimilarCorrect,
+                              items: const [
+                                DropdownMenuItem(value: 'A', child: Text('Correct: A')),
+                                DropdownMenuItem(value: 'B', child: Text('Correct: B')),
+                                DropdownMenuItem(value: 'C', child: Text('Correct: C')),
+                                DropdownMenuItem(value: 'D', child: Text('Correct: D')),
+                              ],
+                              onChanged: (v) => setState(() => _pqSimilarCorrect = v ?? 'A'),
+                              decoration: const InputDecoration(labelText: 'Correct Option for Similar Question'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pqSimilarExplanation,
+                              minLines: 2,
+                              maxLines: 4,
+                              decoration: const InputDecoration(
+                                labelText: 'Explanation for Similar Question (Optional)',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: _selectedSetId == null || _savingPracticeQuestion
+                          ? null
+                          : () async {
+                              setState(() => _savingPracticeQuestion = true);
+                              try {
+                                var imageLink = _pqImageLink;
+                                var expLink = _pqExplanationImageLink;
+                                final videoLink = _pqExplanationVideoLink.text.trim();
+
+                                Map<String, dynamic>? similarQuestionData;
+                                if (_pqSimilarQuestion.text.trim().isNotEmpty) {
+                                  similarQuestionData = {
+                                    'question': _pqSimilarQuestion.text.trim(),
+                                    'option_a': _pqSimilarOptionA.text.trim(),
+                                    'option_b': _pqSimilarOptionB.text.trim(),
+                                    'option_c': _pqSimilarOptionC.text.trim(),
+                                    'option_d': _pqSimilarOptionD.text.trim(),
+                                    'correct_option': _pqSimilarCorrect,
+                                    'explanation': _pqSimilarExplanation.text.trim(),
+                                  };
+                                }
+
+                                if (_editingPracticeQuestionId == null) {
+                                  if (_pqImage != null &&
+                                      !await _validateImageFile(context, _pqImage!)) {
+                                    throw Exception('Question image too large');
+                                  }
+                                  if (_pqExplanationImage != null &&
+                                      !await _validateImageFile(
+                                          context, _pqExplanationImage!)) {
+                                    throw Exception('Explanation image too large');
+                                  }
+                                  if (_pqImage != null || _pqExplanationImage != null) {
+                                    await widget.api.addPracticeQuestionWithMedia(
+                                      setId: _selectedSetId!,
+                                      question: _pqQuestion.text.trim(),
+                                      optionA: _pqOptionA.text.trim(),
+                                      optionB: _pqOptionB.text.trim(),
+                                      optionC: _pqOptionC.text.trim(),
+                                      optionD: _pqOptionD.text.trim(),
+                                      correctOption: _pqCorrect,
+                                      explanation: _pqExplanation.text.trim(),
+                                      questionImage: _pqImage,
+                                      explanationImage: _pqExplanationImage,
+                                      questionImageLink: imageLink,
+                                      explanationImageLink: expLink,
+                                      explanationVideoLink: videoLink,
+                                      similarQuestion: similarQuestionData,
+                                    );
+                                  } else {
+                                    await widget.api.addPracticeQuestion(
+                                      setId: _selectedSetId!,
+                                      question: _pqQuestion.text.trim(),
+                                      optionA: _pqOptionA.text.trim(),
+                                      optionB: _pqOptionB.text.trim(),
+                                      optionC: _pqOptionC.text.trim(),
+                                      optionD: _pqOptionD.text.trim(),
+                                      correctOption: _pqCorrect,
+                                      explanation: _pqExplanation.text.trim(),
+                                      questionImageLink: imageLink,
+                                      explanationImageLink: expLink,
+                                      explanationVideoLink: videoLink,
+                                      similarQuestion: similarQuestionData,
+                                    );
+                                  }
+                                } else {
+                                  if (_batchId != null) {
+                                    final uploads = <Future<void>>[];
+                                    if (_pqImage != null) {
+                                      uploads.add(() async {
+                                        if (!await _validateImageFile(
+                                            context, _pqImage!)) {
+                                          throw Exception('Question image too large');
+                                        }
+                                        imageLink =
+                                            await widget.api.uploadQuestionImage(
+                                          batchId: _batchId!,
+                                          classLabel: _classLabel.text.trim(),
+                                          subject: _subject.text.trim(),
+                                          topic: _topic.text.trim().isEmpty
+                                              ? 'Practice Questions'
+                                              : _topic.text.trim(),
+                                          file: _pqImage!,
+                                          contentType: 'practice',
+                                          contentId: _selectedSetId,
+                                        );
+                                      }());
+                                    }
+                                    if (_pqExplanationImage != null) {
+                                      uploads.add(() async {
+                                        if (!await _validateImageFile(
+                                            context, _pqExplanationImage!)) {
+                                          throw Exception(
+                                              'Explanation image too large');
+                                        }
+                                        expLink =
+                                            await widget.api.uploadQuestionImage(
+                                          batchId: _batchId!,
+                                          classLabel: _classLabel.text.trim(),
+                                          subject: _subject.text.trim(),
+                                          topic: _topic.text.trim().isEmpty
+                                              ? 'Practice Questions'
+                                              : _topic.text.trim(),
+                                          file: _pqExplanationImage!,
+                                          contentType: 'practice_explanation',
+                                          contentId: _selectedSetId,
+                                        );
+                                      }());
+                                    }
+                                    if (uploads.isNotEmpty) {
+                                      await Future.wait(uploads);
+                                    }
+                                  }
+                                  await widget.api.updatePracticeQuestion(
+                                    id: _editingPracticeQuestionId!,
+                                    question: _pqQuestion.text.trim(),
+                                    optionA: _pqOptionA.text.trim(),
+                                    optionB: _pqOptionB.text.trim(),
+                                    optionC: _pqOptionC.text.trim(),
+                                    optionD: _pqOptionD.text.trim(),
+                                    correctOption: _pqCorrect,
+                                    explanation: _pqExplanation.text.trim(),
+                                    questionImageLink: imageLink,
+                                    explanationImageLink: expLink,
+                                    explanationVideoLink: videoLink,
+                                    similarQuestion: similarQuestionData,
+                                  );
+                                }
+                                _pqQuestion.clear();
+                                _pqOptionA.clear();
+                                _pqOptionB.clear();
+                                _pqOptionC.clear();
+                                _pqOptionD.clear();
+                                _pqExplanation.clear();
+                                _pqExplanationVideoLink.clear();
+                                _pqSimilarQuestion.clear();
+                                _pqSimilarOptionA.clear();
+                                _pqSimilarOptionB.clear();
+                                _pqSimilarOptionC.clear();
+                                _pqSimilarOptionD.clear();
+                                _pqSimilarExplanation.clear();
+                                setState(() {
+                                  _editingPracticeQuestionId = null;
+                                  _pqImage = null;
+                                  _pqImageLink = '';
+                                  _pqExplanationImage = null;
+                                  _pqExplanationImageLink = '';
+                                  _pqCorrect = 'A';
+                                  _pqSimilarCorrect = 'A';
+                                  _pqShowSimilarQuestion = false;
+                                });
+                                if (!mounted) return;
+                                if (context.mounted) {
+                                  _showActionSnackBar(
+                                      context, 'Practice question saved');
+                                }
+                              } catch (e, st) {
+                                if (!context.mounted) return;
+                                await _handleTaskError(
+                                  context,
+                                  'Practice question save',
+                                  e,
+                                  stackTrace: st,
+                                  details: {
+                                    'setId': _selectedSetId,
+                                    'editingPracticeQuestionId':
+                                        _editingPracticeQuestionId,
+                                  },
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _savingPracticeQuestion = false);
+                                }
+                              }
+                            },
+                      child: Text(_editingPracticeQuestionId == null
+                          ? 'Add Question'
+                          : 'Update Question'),
+                    ),
+                    if (_editingPracticeQuestionId != null) ...[
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        onPressed: () {
+                          _pqQuestion.clear();
+                          _pqOptionA.clear();
+                          _pqOptionB.clear();
+                          _pqOptionC.clear();
+                          _pqOptionD.clear();
+                          _pqExplanation.clear();
+                          _pqExplanationVideoLink.clear();
+                          _pqSimilarQuestion.clear();
+                          _pqSimilarOptionA.clear();
+                          _pqSimilarOptionB.clear();
+                          _pqSimilarOptionC.clear();
+                          _pqSimilarOptionD.clear();
+                          _pqSimilarExplanation.clear();
+                          setState(() {
+                            _editingPracticeQuestionId = null;
+                            _pqImage = null;
+                            _pqImageLink = '';
+                            _pqExplanationImage = null;
+                            _pqExplanationImageLink = '';
+                            _pqCorrect = 'A';
+                            _pqSimilarCorrect = 'A';
+                            _pqShowSimilarQuestion = false;
+                          });
+                        },
+                        child: const Text('Cancel edit'),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 8),
                 FilledButton.tonal(
@@ -3268,6 +3498,16 @@ class _TestsPageState extends State<TestsPage> {
   String _testQuestionImageLink = '';
   File? _testExplanationImage;
   String _testExplanationImageLink = '';
+  // Similar Question for Test MCQ
+  final _testSimilarQuestion = TextEditingController();
+  final _testSimilarOptionA = TextEditingController();
+  final _testSimilarOptionB = TextEditingController();
+  final _testSimilarOptionC = TextEditingController();
+  final _testSimilarOptionD = TextEditingController();
+  final _testSimilarExplanation = TextEditingController();
+  String _testSimilarCorrect = 'A';
+  bool _testShowSimilarQuestion = false;
+
   final List<File> _pendingExtraExplanationImages = [];
   List<dynamic> _savedExplanationImages = const [];
   int? _batchId;
@@ -3332,9 +3572,17 @@ class _TestsPageState extends State<TestsPage> {
     _testOptionD.clear();
     _testExplanation.clear();
     _testExplanationVideoLink.clear();
+    _testSimilarQuestion.clear();
+    _testSimilarOptionA.clear();
+    _testSimilarOptionB.clear();
+    _testSimilarOptionC.clear();
+    _testSimilarOptionD.clear();
+    _testSimilarExplanation.clear();
     setState(() {
       _editingQuestionId = null;
       _testCorrect = 'A';
+      _testSimilarCorrect = 'A';
+      _testShowSimilarQuestion = false;
       _testQuestionImage = null;
       _testQuestionImageLink = '';
       _testExplanationImage = null;
@@ -3587,6 +3835,37 @@ class _TestsPageState extends State<TestsPage> {
                                             _testQuestionImage = null;
                                             _testExplanationImage = null;
                                             _pendingExtraExplanationImages.clear();
+                                            Map<String, dynamic>? simQ;
+                                            if (question['similar_question'] is Map) {
+                                              simQ = Map<String, dynamic>.from(question['similar_question'] as Map);
+                                            } else if (question['similar_question'] is String &&
+                                                (question['similar_question'] as String).isNotEmpty) {
+                                              try {
+                                                final decoded = jsonDecode(question['similar_question'] as String);
+                                                if (decoded is Map) {
+                                                  simQ = Map<String, dynamic>.from(decoded);
+                                                }
+                                              } catch (_) {}
+                                            }
+                                            if (simQ != null) {
+                                              _testSimilarQuestion.text = simQ['question']?.toString() ?? '';
+                                              _testSimilarOptionA.text = simQ['option_a']?.toString() ?? '';
+                                              _testSimilarOptionB.text = simQ['option_b']?.toString() ?? '';
+                                              _testSimilarOptionC.text = simQ['option_c']?.toString() ?? '';
+                                              _testSimilarOptionD.text = simQ['option_d']?.toString() ?? '';
+                                              _testSimilarCorrect = simQ['correct_option']?.toString() ?? 'A';
+                                              _testSimilarExplanation.text = simQ['explanation']?.toString() ?? '';
+                                              _testShowSimilarQuestion = true;
+                                            } else {
+                                              _testSimilarQuestion.clear();
+                                              _testSimilarOptionA.clear();
+                                              _testSimilarOptionB.clear();
+                                              _testSimilarOptionC.clear();
+                                              _testSimilarOptionD.clear();
+                                              _testSimilarCorrect = 'A';
+                                              _testSimilarExplanation.clear();
+                                              _testShowSimilarQuestion = false;
+                                            }
                                           });
                                           await _loadTestExplanationImages(questionId);
                                           if (sheetContext.mounted) {
@@ -3662,6 +3941,13 @@ class _TestsPageState extends State<TestsPage> {
     _testOptionC.dispose();
     _testOptionD.dispose();
     _testExplanation.dispose();
+    _testExplanationVideoLink.dispose();
+    _testSimilarQuestion.dispose();
+    _testSimilarOptionA.dispose();
+    _testSimilarOptionB.dispose();
+    _testSimilarOptionC.dispose();
+    _testSimilarOptionD.dispose();
+    _testSimilarExplanation.dispose();
     super.dispose();
   }
 
@@ -3817,11 +4103,16 @@ class _TestsPageState extends State<TestsPage> {
                               }
                             }
                             await _load();
-                          } catch (e) {
-                            setState(() => _status = 'Test save failed: $e');
+                          } catch (e, st) {
+                            setState(() => _status = 'Test save failed: ${_friendlyError(e)}');
                             if (context.mounted) {
-                              _showActionSnackBar(context, 'Test save failed',
-                                  isError: true);
+                              await _handleTaskError(
+                                context,
+                                'Test save',
+                                e,
+                                stackTrace: st,
+                                details: {'editingId': _editingId},
+                              );
                             }
                           }
                         },
@@ -4042,6 +4333,95 @@ class _TestsPageState extends State<TestsPage> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        title: const Text(
+                          'Add Solve Similar Question',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                        subtitle: const Text(
+                          'Shown to student if they answer wrong, or in review if 100% correct',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        value: _testShowSimilarQuestion || _testSimilarQuestion.text.isNotEmpty,
+                        onChanged: (val) {
+                          setState(() {
+                            _testShowSimilarQuestion = val;
+                          });
+                        },
+                      ),
+                      if (_testShowSimilarQuestion || _testSimilarQuestion.text.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextField(
+                                controller: _testSimilarQuestion,
+                                minLines: 2,
+                                maxLines: 4,
+                                decoration: const InputDecoration(
+                                  labelText: 'Similar Question Text',
+                                  hintText: 'Enter a parallel / similar practice question...',
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _testSimilarOptionA,
+                                decoration: const InputDecoration(labelText: 'Similar Option A'),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _testSimilarOptionB,
+                                decoration: const InputDecoration(labelText: 'Similar Option B'),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _testSimilarOptionC,
+                                decoration: const InputDecoration(labelText: 'Similar Option C'),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _testSimilarOptionD,
+                                decoration: const InputDecoration(labelText: 'Similar Option D'),
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                initialValue: _testSimilarCorrect,
+                                items: const [
+                                  DropdownMenuItem(value: 'A', child: Text('Correct: A')),
+                                  DropdownMenuItem(value: 'B', child: Text('Correct: B')),
+                                  DropdownMenuItem(value: 'C', child: Text('Correct: C')),
+                                  DropdownMenuItem(value: 'D', child: Text('Correct: D')),
+                                ],
+                                onChanged: (v) => setState(() => _testSimilarCorrect = v ?? 'A'),
+                                decoration: const InputDecoration(labelText: 'Correct Option for Similar Question'),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _testSimilarExplanation,
+                                minLines: 2,
+                                maxLines: 4,
+                                decoration: const InputDecoration(
+                                  labelText: 'Explanation for Similar Question (Optional)',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -4056,6 +4436,20 @@ class _TestsPageState extends State<TestsPage> {
                                 var imageLink = _testQuestionImageLink;
                                 var expLink = _testExplanationImageLink;
                                 final videoLink = _testExplanationVideoLink.text.trim();
+
+                                Map<String, dynamic>? similarQuestionData;
+                                if (_testSimilarQuestion.text.trim().isNotEmpty) {
+                                  similarQuestionData = {
+                                    'question': _testSimilarQuestion.text.trim(),
+                                    'option_a': _testSimilarOptionA.text.trim(),
+                                    'option_b': _testSimilarOptionB.text.trim(),
+                                    'option_c': _testSimilarOptionC.text.trim(),
+                                    'option_d': _testSimilarOptionD.text.trim(),
+                                    'correct_option': _testSimilarCorrect,
+                                    'explanation': _testSimilarExplanation.text.trim(),
+                                  };
+                                }
+
                                 var savedQuestionId = _editingQuestionId;
                                 final wasEditing = _editingQuestionId != null;
                                 final hasMedia = _testQuestionImage != null ||
@@ -4099,6 +4493,7 @@ class _TestsPageState extends State<TestsPage> {
                                       questionImageLink: imageLink,
                                       explanationImageLink: expLink,
                                       explanationVideoLink: videoLink,
+                                      similarQuestion: similarQuestionData,
                                     );
                                     _pendingExtraExplanationImages.clear();
                                   } else {
@@ -4117,6 +4512,7 @@ class _TestsPageState extends State<TestsPage> {
                                       questionImageLink: imageLink,
                                       explanationImageLink: expLink,
                                       explanationVideoLink: videoLink,
+                                      similarQuestion: similarQuestionData,
                                     );
                                   }
                                 } else {
@@ -4182,6 +4578,7 @@ class _TestsPageState extends State<TestsPage> {
                                     questionImageLink: imageLink,
                                     explanationImageLink: expLink,
                                     explanationVideoLink: videoLink,
+                                    similarQuestion: similarQuestionData,
                                   );
                                 }
                                 if (wasEditing &&
@@ -8077,6 +8474,7 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    Map<String, dynamic>? similarQuestion,
   }) async {
     final body = await _postMap('/admin/tests/$testId/questions', {
       'question': question,
@@ -8090,6 +8488,7 @@ class AdminApi {
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
       'explanationVideoLink': explanationVideoLink,
+      if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
     final questionObj = body['question'];
     if (questionObj is Map<String, dynamic>) {
@@ -8185,6 +8584,7 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    Map<String, dynamic>? similarQuestion,
   }) async {
     final body = await _postQuestionWithMedia(
       path: '/admin/tests/$testId/questions/with-media',
@@ -8200,6 +8600,7 @@ class AdminApi {
         'questionImageLink': questionImageLink,
         'explanationImageLink': explanationImageLink,
         'explanationVideoLink': explanationVideoLink,
+        if (similarQuestion != null) 'similarQuestion': jsonEncode(similarQuestion),
       },
       questionImage: questionImage,
       explanationImage: explanationImage,
@@ -8229,6 +8630,7 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    Map<String, dynamic>? similarQuestion,
   }) async {
     await _put('/admin/test-questions/$id', {
       'question': question,
@@ -8241,7 +8643,9 @@ class AdminApi {
       'subject': subject,
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
-      'explanationVideoLink': explanationVideoLink,
+      if (explanationVideoLink.trim().isNotEmpty)
+        'explanationVideoLink': explanationVideoLink.trim(),
+      if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
   }
 
@@ -8275,6 +8679,7 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    Map<String, dynamic>? similarQuestion,
   }) async {
     await _postMap('/admin/practice-sets/$setId/questions', {
       'question': question,
@@ -8287,6 +8692,7 @@ class AdminApi {
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
       'explanationVideoLink': explanationVideoLink,
+      if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
   }
 
@@ -8304,6 +8710,7 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    Map<String, dynamic>? similarQuestion,
   }) async {
     await _postQuestionWithMedia(
       path: '/admin/practice-sets/$setId/questions/with-media',
@@ -8318,6 +8725,7 @@ class AdminApi {
         'questionImageLink': questionImageLink,
         'explanationImageLink': explanationImageLink,
         'explanationVideoLink': explanationVideoLink,
+        if (similarQuestion != null) 'similarQuestion': jsonEncode(similarQuestion),
       },
       questionImage: questionImage,
       explanationImage: explanationImage,
@@ -8336,6 +8744,7 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    Map<String, dynamic>? similarQuestion,
   }) async {
     await _put('/admin/practice-questions/$id', {
       'question': question,
@@ -8347,7 +8756,9 @@ class AdminApi {
       'explanation': explanation,
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
-      'explanationVideoLink': explanationVideoLink,
+      if (explanationVideoLink.trim().isNotEmpty)
+        'explanationVideoLink': explanationVideoLink.trim(),
+      if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
   }
 

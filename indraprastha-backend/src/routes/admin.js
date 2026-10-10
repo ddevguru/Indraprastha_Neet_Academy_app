@@ -284,6 +284,30 @@ function mapQuestionImageLink(question) {
   };
 }
 
+function parseSimilarQuestionPayload(input) {
+  if (!input) return null;
+  let parsed = input;
+  if (typeof input === 'string') {
+    try {
+      parsed = JSON.parse(input);
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const questionText = (parsed.question || '').toString().trim();
+  if (!questionText) return null;
+  return {
+    question: questionText,
+    option_a: (parsed.option_a ?? parsed.optionA ?? '').toString().trim(),
+    option_b: (parsed.option_b ?? parsed.optionB ?? '').toString().trim(),
+    option_c: (parsed.option_c ?? parsed.optionC ?? '').toString().trim(),
+    option_d: (parsed.option_d ?? parsed.optionD ?? '').toString().trim(),
+    correct_option: (parsed.correct_option ?? parsed.correctOption ?? 'A').toString().trim().toUpperCase(),
+    explanation: (parsed.explanation ?? '').toString().trim(),
+  };
+}
+
 async function uploadQuestionImageByHierarchy({
   file,
   batchId,
@@ -1284,7 +1308,7 @@ router.delete('/practice-sets/:id', adminAuth, async (req, res) => {
 
 router.get('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
+    `SELECT id, practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_video_link, similar_question
      FROM practice_questions
      WHERE practice_set_id = $1
      ORDER BY id ASC`,
@@ -1360,7 +1384,7 @@ router.post('/practice-sets/:setId/questions/batch', adminAuth, async (req, res)
 
 router.post('/practice-sets/:setId/questions/with-media', adminAuth, questionMediaUpload, async (req, res) => {
   try {
-    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink = '', explanationImageLink = '' } =
+    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink = '', explanationImageLink = '', similarQuestion } =
       req.body;
 
     if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
@@ -1391,10 +1415,12 @@ router.post('/practice-sets/:setId/questions/with-media', adminAuth, questionMed
       }
     }
 
+    const parsedSimilarQuestion = parseSimilarQuestionPayload(similarQuestion);
+
     const result = await pool.query(
       `INSERT INTO practice_questions (
-        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [
         req.params.setId,
         question,
@@ -1410,6 +1436,7 @@ router.post('/practice-sets/:setId/questions/with-media', adminAuth, questionMed
         normalizeDriveLink(eLink || '', 'image'),
         eFileId,
         '',
+        parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
       ]
     );
 
@@ -1423,7 +1450,7 @@ router.post('/practice-sets/:setId/questions/with-media', adminAuth, questionMed
 // Single insert (keep existing for backward compatibility)
 router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
   try {
-    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink } =
+    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, similarQuestion } =
       req.body;
 
     // Validation
@@ -1441,10 +1468,12 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields', details: 'question, optionA, optionB, optionC, optionD, correctOption are required' });
     }
 
+    const parsedSimilarQuestion = parseSimilarQuestionPayload(similarQuestion);
+
     const result = await pool.query(
       `INSERT INTO practice_questions (
-        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [
         req.params.setId,
         question,
@@ -1460,6 +1489,7 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
         normalizeDriveLink(explanationImageLink || '', 'image'),
         extractDriveFileId(explanationImageLink || ''),
         '',
+        parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
       ]
     );
 
@@ -1557,7 +1587,7 @@ router.post('/practice-questions/:id/explanation-video', adminAuth, practiceVide
 });
 
 router.put('/practice-questions/:id', adminAuth, async (req, res) => {
-  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, explanationVideoLink, practiceSetId } =
+  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, explanationVideoLink, practiceSetId, similarQuestion } =
     req.body;
 
   const updateFields = [];
@@ -1623,6 +1653,12 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
   if (practiceSetId !== undefined && practiceSetId !== null) {
     updateFields.push(`practice_set_id = $${paramIndex}`);
     params.push(practiceSetId);
+    paramIndex++;
+  }
+  if (similarQuestion !== undefined) {
+    const parsedSimilar = parseSimilarQuestionPayload(similarQuestion);
+    updateFields.push(`similar_question = $${paramIndex}`);
+    params.push(parsedSimilar ? JSON.stringify(parsedSimilar) : null);
     paramIndex++;
   }
 
@@ -1716,42 +1752,50 @@ router.get('/tests', adminAuth, async (_req, res) => {
 });
 
 router.put('/tests/:id', adminAuth, async (req, res) => {
-  const { id } = req.params;
-  const { title, category, durationMinutes, marks, questionCount, syllabusCoverage, scheduleLabel } =
-    req.body;
-  const { classLabel, subject, topic } = hierarchyFromBody(req.body);
+  try {
+    const { id } = req.params;
+    const { title, category, durationMinutes, marks, questionCount, syllabusCoverage, scheduleLabel } =
+      req.body;
+    const { classLabel, subject, topic } = hierarchyFromBody(req.body);
 
-  const existingRes = await pool.query('SELECT * FROM tests WHERE id = $1 LIMIT 1', [id]);
-  const existing = existingRes.rows[0] || {};
-  const mergedTitle = title !== undefined ? title : existing.title;
-  const mergedCategory = category !== undefined ? category : existing.category;
-  const mergedSubject = subject !== undefined ? subject : existing.subject;
-  const mergedTopic = topic !== undefined ? topic : existing.topic;
+    const existingRes = await pool.query('SELECT * FROM tests WHERE id = $1 LIMIT 1', [id]);
+    if (existingRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Test not found' });
+    }
+    const existing = existingRes.rows[0];
+    const mergedTitle = title !== undefined ? title : existing.title;
+    const mergedCategory = category !== undefined ? category : existing.category;
+    const mergedSubject = subject !== undefined ? subject : existing.subject;
+    const mergedTopic = topic !== undefined ? topic : existing.topic;
 
-  const canonicalCategory = normalizeTestCategory({
-    title: mergedTitle,
-    category: mergedCategory,
-    subject: mergedSubject,
-    topic: mergedTopic,
-  });
+    const canonicalCategory = normalizeTestCategory({
+      title: mergedTitle,
+      category: mergedCategory,
+      subject: mergedSubject,
+      topic: mergedTopic,
+    });
 
-  const result = await pool.query(
-    `UPDATE tests
-     SET title = COALESCE($2, title),
-         class_label = COALESCE($3, class_label),
-         subject = COALESCE($4, subject),
-         topic = COALESCE($5, topic),
-         category = $6,
-         duration_minutes = COALESCE($7, duration_minutes),
-         marks = COALESCE($8, marks),
-         question_count = COALESCE($9, question_count),
-         syllabus_coverage = COALESCE($10, syllabus_coverage),
-         schedule_label = COALESCE($11, schedule_label)
-     WHERE id = $1
-     RETURNING *`,
-    [id, title, classLabel, subject, topic, canonicalCategory, durationMinutes, marks, questionCount, syllabusCoverage, scheduleLabel]
-  );
-  res.json({ success: true, test: result.rows[0] });
+    const result = await pool.query(
+      `UPDATE tests
+       SET title = COALESCE($2, title),
+           class_label = COALESCE($3, class_label),
+           subject = COALESCE($4, subject),
+           topic = COALESCE($5, topic),
+           category = $6,
+           duration_minutes = COALESCE($7, duration_minutes),
+           marks = COALESCE($8, marks),
+           question_count = COALESCE($9, question_count),
+           syllabus_coverage = COALESCE($10, syllabus_coverage),
+           schedule_label = COALESCE($11, schedule_label)
+       WHERE id = $1
+       RETURNING *`,
+      [id, title, classLabel, subject, topic, canonicalCategory, durationMinutes, marks, questionCount, syllabusCoverage, scheduleLabel]
+    );
+    res.json({ success: true, test: result.rows[0] });
+  } catch (e) {
+    logAdminRouteError('/tests/:id PUT', e);
+    return res.status(500).json({ error: e.message || 'Failed to update test' });
+  }
 });
 
 router.delete('/tests/:id', adminAuth, async (req, res) => {
@@ -1784,6 +1828,7 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
       explanation,
       questionImageLink = '',
       explanationImageLink = '',
+      similarQuestion,
     } = req.body;
 
     if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
@@ -1805,6 +1850,16 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
     let eFileId = extractDriveFileId(explanationImageLink || '');
     let eFolder = '';
 
+    const parsedSimilarQuestion = parseSimilarQuestionPayload(similarQuestion);
+
+    await pool.query(`
+      ALTER TABLE test_questions
+      ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
+    `).catch(() => {});
+
     if (batchId && (questionFile || explanationFile || extraFiles.length)) {
       const [media, ...extraUploads] = await Promise.all([
         uploadQuestionMediaPair(batchId, questionFile, explanationFile),
@@ -1823,8 +1878,8 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
 
       const result = await pool.query(
         `INSERT INTO test_questions (
-          test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+          test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
         [
           testId,
           subject || 'Biology',
@@ -1841,6 +1896,7 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
           normalizeDriveLink(eLink || '', 'image'),
           eFileId,
           eFolder,
+          parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
         ]
       );
       const explanationImages = await insertTestExplanationImages(
@@ -1856,8 +1912,8 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
 
     const result = await pool.query(
       `INSERT INTO test_questions (
-        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [
         testId,
         subject || 'Biology',
@@ -1874,6 +1930,7 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
         normalizeDriveLink(eLink || '', 'image'),
         eFileId,
         eFolder,
+        parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
       ]
     );
     return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
@@ -1896,6 +1953,7 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
       explanation,
       questionImageLink,
       explanationImageLink,
+      similarQuestion,
     } = req.body;
 
     if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
@@ -1904,10 +1962,20 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
       });
     }
 
+    const parsedSimilarQuestion = parseSimilarQuestionPayload(similarQuestion);
+
+    await pool.query(`
+      ALTER TABLE test_questions
+      ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
+    `).catch(() => {});
+
     const result = await pool.query(
       `INSERT INTO test_questions (
-        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [
         req.params.testId,
         subject || 'Biology',
@@ -1924,6 +1992,7 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
         normalizeDriveLink(explanationImageLink || '', 'image'),
         extractDriveFileId(explanationImageLink || ''),
         '',
+        parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
       ]
     );
     return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
@@ -1934,42 +2003,8 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
 });
 
 router.put('/test-questions/:id', adminAuth, async (req, res) => {
-  const {
-    subject,
-    question,
-    optionA,
-    optionB,
-    optionC,
-    optionD,
-    correctOption,
-    explanation,
-    questionImageLink,
-    explanationImageLink,
-    explanationVideoLink,
-  } =
-    req.body;
-  const result = await pool.query(
-    `UPDATE test_questions
-     SET subject = COALESCE($2, subject),
-         question = COALESCE($3, question),
-         option_a = COALESCE($4, option_a),
-         option_b = COALESCE($5, option_b),
-         option_c = COALESCE($6, option_c),
-         option_d = COALESCE($7, option_d),
-         correct_option = COALESCE($8, correct_option),
-         explanation = COALESCE($9, explanation),
-         question_image_link = COALESCE($10, question_image_link),
-         question_image_drive_file_id = COALESCE($11, question_image_drive_file_id),
-         question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id),
-         explanation_image_link = COALESCE($13, explanation_image_link),
-         explanation_image_drive_file_id = COALESCE($14, explanation_image_drive_file_id),
-         explanation_image_drive_folder_id = COALESCE($15, explanation_image_drive_folder_id),
-         explanation_video_link = COALESCE($16, explanation_video_link),
-         explanation_video_drive_file_id = COALESCE($17, explanation_video_drive_file_id)
-     WHERE id = $1
-     RETURNING *`,
-    [
-      req.params.id,
+  try {
+    const {
       subject,
       question,
       optionA,
@@ -1978,20 +2013,135 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
       optionD,
       correctOption,
       explanation,
-      questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
-      questionImageLink == null ? null : extractDriveFileId(questionImageLink),
-      null,
-      explanationImageLink == null ? null : normalizeDriveLink(explanationImageLink, 'image'),
-      explanationImageLink == null ? null : extractDriveFileId(explanationImageLink),
-      null,
-      explanationVideoLink == null ? null : explanationVideoLink,
-      explanationVideoLink == null ? null : extractDriveFileId(explanationVideoLink),
-    ]
-  );
-  res.json({
-    success: true,
-    question: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
-  });
+      questionImageLink,
+      explanationImageLink,
+      explanationVideoLink,
+      similarQuestion,
+    } = req.body;
+
+    // Self-healing: ensure all columns exist in test_questions table
+    await pool.query(`
+      ALTER TABLE test_questions
+      ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
+    `).catch(() => {});
+
+    const updates = [];
+
+    if (subject !== undefined && subject !== null) {
+      updates.push({ sql: 'subject = $INDEX', values: [subject] });
+    }
+    if (question !== undefined && question !== null) {
+      updates.push({ sql: 'question = $INDEX', values: [question] });
+    }
+    if (optionA !== undefined && optionA !== null) {
+      updates.push({ sql: 'option_a = $INDEX', values: [optionA] });
+    }
+    if (optionB !== undefined && optionB !== null) {
+      updates.push({ sql: 'option_b = $INDEX', values: [optionB] });
+    }
+    if (optionC !== undefined && optionC !== null) {
+      updates.push({ sql: 'option_c = $INDEX', values: [optionC] });
+    }
+    if (optionD !== undefined && optionD !== null) {
+      updates.push({ sql: 'option_d = $INDEX', values: [optionD] });
+    }
+    if (correctOption !== undefined && correctOption !== null) {
+      updates.push({ sql: 'correct_option = $INDEX', values: [correctOption] });
+    }
+    if (explanation !== undefined && explanation !== null) {
+      updates.push({ sql: 'explanation = $INDEX', values: [explanation] });
+    }
+    if (questionImageLink !== undefined && questionImageLink !== null) {
+      updates.push({
+        sql: 'question_image_link = $INDEX1, question_image_drive_file_id = $INDEX2',
+        values: [
+          normalizeDriveLink(questionImageLink, 'image'),
+          extractDriveFileId(questionImageLink),
+        ],
+      });
+    }
+    if (explanationImageLink !== undefined && explanationImageLink !== null) {
+      updates.push({
+        sql: 'explanation_image_link = $INDEX1, explanation_image_drive_file_id = $INDEX2',
+        values: [
+          normalizeDriveLink(explanationImageLink, 'image'),
+          extractDriveFileId(explanationImageLink),
+        ],
+      });
+    }
+    if (explanationVideoLink !== undefined && explanationVideoLink !== null && explanationVideoLink !== '') {
+      updates.push({
+        optional: true,
+        sql: 'explanation_video_link = $INDEX1, explanation_video_drive_file_id = $INDEX2',
+        values: [
+          explanationVideoLink,
+          extractDriveFileId(explanationVideoLink),
+        ],
+      });
+    }
+    if (similarQuestion !== undefined) {
+      const parsedSimilar = parseSimilarQuestionPayload(similarQuestion);
+      updates.push({
+        optional: true,
+        sql: 'similar_question = $INDEX',
+        values: [parsedSimilar ? JSON.stringify(parsedSimilar) : null],
+      });
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+
+    const buildQuery = (list) => {
+      const sqlParts = [];
+      const queryParams = [req.params.id];
+      let pIdx = 2;
+      for (const item of list) {
+        if (item.values.length === 1) {
+          sqlParts.push(item.sql.replace('$INDEX', `$${pIdx}`));
+          queryParams.push(item.values[0]);
+          pIdx++;
+        } else if (item.values.length === 2) {
+          sqlParts.push(item.sql.replace('$INDEX1', `$${pIdx}`).replace('$INDEX2', `$${pIdx + 1}`));
+          queryParams.push(item.values[0], item.values[1]);
+          pIdx += 2;
+        }
+      }
+      return {
+        query: `UPDATE test_questions SET ${sqlParts.join(', ')} WHERE id = $1 RETURNING *`,
+        params: queryParams,
+      };
+    };
+
+    let result;
+    try {
+      const { query, params: qParams } = buildQuery(updates);
+      result = await pool.query(query, qParams);
+    } catch (dbErr) {
+      if (dbErr?.message?.includes('does not exist')) {
+        const coreUpdates = updates.filter((u) => !u.optional);
+        if (coreUpdates.length > 0) {
+          const { query, params: qParams } = buildQuery(coreUpdates);
+          result = await pool.query(query, qParams);
+        } else {
+          throw dbErr;
+        }
+      } else {
+        throw dbErr;
+      }
+    }
+
+    return res.json({
+      success: true,
+      question: result?.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
+    });
+  } catch (e) {
+    logAdminRouteError('/test-questions/:id PUT', e);
+    return res.status(500).json({ error: e.message || 'Failed to update test question' });
+  }
 });
 router.post('/tests/:testId/move-to-practice', adminAuth, async (req, res) => {
   try {

@@ -6,7 +6,37 @@ import '../features/content/data/content_repository.dart';
 import '../theme/app_tokens.dart';
 import 'app_widgets.dart';
 
-/// Shows AI similar questions dialog allowing user to choose 1 to 10 questions to generate.
+typedef SimilarQuestionsQuizScreen = AISimilarQuestionsQuizScreen;
+
+/// Shows single similar question sheet directly (no AI generation, no question count selector)
+Future<void> showSingleSimilarQuestionSheet(
+  BuildContext context, {
+  required Map<String, dynamic>? similarQuestion,
+  String? questionTitle,
+}) async {
+  if (similarQuestion == null ||
+      (similarQuestion['question']?.toString().trim().isEmpty ?? true)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No similar question available for this question yet.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    return;
+  }
+
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => SolveSingleSimilarQuestionSheet(
+      similarQuestion: similarQuestion,
+      title: questionTitle ?? 'Solve Similar Question',
+    ),
+  );
+}
+
+/// Backwards compatible helper for solving similar questions
 Future<void> showSimilarQuestionsDialog(
   BuildContext context,
   WidgetRef? ref, {
@@ -19,24 +49,355 @@ Future<void> showSimilarQuestionsDialog(
   List<String>? options,
   String? explanation,
   String? userAnswer,
+  Map<String, dynamic>? similarQuestion,
 }) async {
-  await showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => _SimilarQuestionsConfigSheet(
-      sourceQuestionId: sourceQuestionId,
-      sourceType: sourceType,
-      testId: testId,
-      questionText: questionText,
-      subject: subject,
-      topic: topic,
-      options: options,
-      explanation: explanation,
-      userAnswer: userAnswer,
-      parentRef: ref,
-    ),
-  );
+  if (similarQuestion != null) {
+    await showSingleSimilarQuestionSheet(
+      context,
+      similarQuestion: similarQuestion,
+      questionTitle: topic ?? 'Solve Similar Question',
+    );
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No similar question available for this question yet.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+}
+
+class SolveSingleSimilarQuestionSheet extends StatefulWidget {
+  const SolveSingleSimilarQuestionSheet({
+    super.key,
+    required this.similarQuestion,
+    this.title = 'Solve Similar Question',
+  });
+
+  final Map<String, dynamic> similarQuestion;
+  final String title;
+
+  @override
+  State<SolveSingleSimilarQuestionSheet> createState() =>
+      _SolveSingleSimilarQuestionSheetState();
+}
+
+class _SolveSingleSimilarQuestionSheetState
+    extends State<SolveSingleSimilarQuestionSheet> {
+  String? _selectedOption;
+  bool _checked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final sq = widget.similarQuestion;
+    final qText = sq['question']?.toString() ?? sq['question_text']?.toString() ?? '';
+    final optA = sq['option_a']?.toString() ?? sq['optionA']?.toString() ?? '';
+    final optB = sq['option_b']?.toString() ?? sq['optionB']?.toString() ?? '';
+    final optC = sq['option_c']?.toString() ?? sq['optionC']?.toString() ?? '';
+    final optD = sq['option_d']?.toString() ?? sq['optionD']?.toString() ?? '';
+    final correctOpt = (sq['correct_option'] ?? sq['correctOption'] ?? sq['correct_answer'] ?? 'A').toString().toUpperCase().trim();
+    final explanation = sq['explanation']?.toString() ?? '';
+
+    final options = <String, String>{
+      'A': optA,
+      'B': optB,
+      'C': optC,
+      'D': optD,
+    };
+
+    final isCorrect = _checked && _selectedOption == correctOpt;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.xl)),
+          boxShadow: AppShadows.soft,
+        ),
+        child: Column(
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.psychology_alt_rounded, color: AppColors.primary, size: 22),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Practice this parallel question added by your teacher',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white70 : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                children: [
+                  SurfaceCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Similar Question',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          qText,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  ...options.entries.map((entry) {
+                    final key = entry.key;
+                    final text = entry.value;
+                    if (text.isEmpty) return const SizedBox.shrink();
+
+                    final isSelected = _selectedOption == key;
+                    final isThisCorrect = key == correctOpt;
+
+                    Color bg = theme.cardColor;
+                    Color border = isDark ? const Color(0xFF343B49) : AppColors.border;
+                    Color textColor = theme.colorScheme.onSurface;
+
+                    if (_checked) {
+                      if (isThisCorrect) {
+                        bg = isDark
+                            ? AppColors.success.withValues(alpha: 0.2)
+                            : const Color(0xFFE7F8EF);
+                        border = AppColors.success;
+                        textColor = AppColors.success;
+                      } else if (isSelected) {
+                        bg = isDark
+                            ? AppColors.danger.withValues(alpha: 0.2)
+                            : const Color(0xFFFCEAEA);
+                        border = AppColors.danger;
+                        textColor = AppColors.danger;
+                      }
+                    } else if (isSelected) {
+                      bg = AppColors.primary.withValues(alpha: 0.08);
+                      border = AppColors.primary;
+                      textColor = AppColors.primary;
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: InkWell(
+                        onTap: _checked
+                            ? null
+                            : () => setState(() => _selectedOption = key),
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            border: Border.all(
+                              color: border,
+                              width: isSelected || (_checked && isThisCorrect) ? 2 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isSelected
+                                      ? (_checked
+                                          ? (isThisCorrect ? AppColors.success : AppColors.danger)
+                                          : AppColors.primary)
+                                      : (isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05)),
+                                ),
+                                child: Text(
+                                  key,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: isSelected ? Colors.white : textColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  text,
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              if (_checked && isThisCorrect)
+                                const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20)
+                              else if (_checked && isSelected && !isThisCorrect)
+                                const Icon(Icons.cancel_rounded, color: AppColors.danger, size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  if (_checked) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: isCorrect
+                            ? AppColors.success.withValues(alpha: 0.12)
+                            : AppColors.danger.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        border: Border.all(
+                          color: isCorrect ? AppColors.success : AppColors.danger,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isCorrect ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                            color: isCorrect ? AppColors.success : AppColors.danger,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              isCorrect
+                                  ? 'Correct Answer! Great work! 🎉'
+                                  : 'Incorrect. The correct answer is Option $correctOpt.',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: isCorrect ? AppColors.success : AppColors.danger,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (explanation.trim().isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      SurfaceCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(Icons.lightbulb_outline_rounded, size: 18, color: AppColors.warning),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Explanation',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              explanation,
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.4,
+                                color: isDark ? Colors.white70 : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: PrimaryButton(
+                    label: _checked ? 'Done' : 'Check Answer',
+                    icon: _checked ? Icons.check_rounded : Icons.arrow_forward_rounded,
+                    onPressed: _selectedOption == null
+                        ? null
+                        : () {
+                            if (!_checked) {
+                              setState(() => _checked = true);
+                            } else {
+                              Navigator.pop(context);
+                            }
+                          },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SimilarQuestionsConfigSheet extends StatefulWidget {

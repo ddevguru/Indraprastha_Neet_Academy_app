@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../core/services/incorrect_pdf_service.dart';
@@ -7,7 +8,6 @@ import '../core/utils/video_url_utils.dart';
 import '../theme/app_tokens.dart';
 import '../features/videos/video_player_screen.dart';
 import 'ai_similar_questions_dialog.dart';
-import 'amazon_related_questions_view.dart';
 import 'app_widgets.dart';
 import 'fast_network_image.dart';
 
@@ -79,6 +79,7 @@ class AnswerReviewEntry {
     this.topic,
     this.id,
     this.selectedOption,
+    this.similarQuestion,
   });
 
   final String questionText;
@@ -96,6 +97,7 @@ class AnswerReviewEntry {
   final String? topic;
   final int? id;
   final String? selectedOption;
+  final Map<String, dynamic>? similarQuestion;
 
   bool get isCorrect => selectedIndex != null && selectedIndex == correctIndex;
   bool get wasAttempted => selectedIndex != null;
@@ -114,6 +116,17 @@ class AnswerReviewEntry {
     final selectedIndex = selectedOption == null
         ? null
         : keys.indexOf(selectedOption.toUpperCase()).clamp(0, 3);
+
+    Map<String, dynamic>? simQ;
+    final rawSim = question['similar_question'] ?? question['similarQuestion'];
+    if (rawSim is Map) {
+      simQ = Map<String, dynamic>.from(rawSim);
+    } else if (rawSim is String && rawSim.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawSim);
+        if (decoded is Map) simQ = Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
 
     return AnswerReviewEntry(
       id: int.tryParse(question['id']?.toString() ?? ''),
@@ -142,6 +155,7 @@ class AnswerReviewEntry {
                             question['video_url'] ?? '').toString().trim(),
       subject: question['subject']?.toString(),
       topic: question['topic']?.toString() ?? question['chapter']?.toString(),
+      similarQuestion: simQ,
     );
   }
 }
@@ -235,6 +249,37 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
+          if (widget.items.isNotEmpty && widget.items.every((e) => e.isCorrect))
+            TextButton.icon(
+              onPressed: () {
+                final allSimilar = widget.items
+                    .map((e) => e.similarQuestion)
+                    .whereType<Map<String, dynamic>>()
+                    .toList();
+                if (allSimilar.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('No similar questions available for this review set yet.'),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SimilarQuestionsQuizScreen(
+                      title: '${widget.title} - Similar Questions',
+                      questions: allSimilar,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.psychology_alt_rounded, color: AppColors.success),
+              label: const Text(
+                'Similar MCQs',
+                style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_rounded),
             tooltip: 'Download Incorrect PDF',
@@ -357,6 +402,9 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
               itemBuilder: (context, i) => _ReviewQuestionPage(
                 index: i,
                 entry: widget.items[i],
+                isLast: i == total - 1,
+                isAllCorrect: widget.items.isNotEmpty && widget.items.every((e) => e.isCorrect),
+                allItems: widget.items,
               ),
             ),
           ),
@@ -497,10 +545,16 @@ class _ReviewQuestionPage extends StatelessWidget {
   const _ReviewQuestionPage({
     required this.index,
     required this.entry,
+    this.isLast = false,
+    this.isAllCorrect = false,
+    this.allItems = const [],
   });
 
   final int index;
   final AnswerReviewEntry entry;
+  final bool isLast;
+  final bool isAllCorrect;
+  final List<AnswerReviewEntry> allItems;
 
   static const _optionLetters = ['A', 'B', 'C', 'D'];
 
@@ -804,7 +858,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+                        child: const Icon(Icons.psychology_alt_rounded, color: Colors.white, size: 20),
                       ),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
@@ -821,7 +875,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'Practice similar questions on this exact concept (1-10)',
+                              'Practice a similar question set by your teacher',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 11,
@@ -831,16 +885,10 @@ class _ReviewQuestionPage extends StatelessWidget {
                         ),
                       ),
                       ElevatedButton(
-                        onPressed: () => showSimilarQuestionsDialog(
+                        onPressed: () => showSingleSimilarQuestionSheet(
                           context,
-                          null,
-                          questionText: entry.questionText,
-                          sourceQuestionId: entry.id,
-                          userAnswer: entry.selectedOption,
-                          subject: entry.subject,
-                          topic: entry.topic,
-                          options: entry.options,
-                          explanation: entry.explanation,
+                          similarQuestion: entry.similarQuestion,
+                          questionTitle: 'Question ${index + 1} - Similar Practice',
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
@@ -852,22 +900,121 @@ class _ReviewQuestionPage extends StatelessWidget {
                             borderRadius: BorderRadius.circular(AppRadii.md),
                           ),
                         ),
-                        child: const Text('Solve Similar Questions'),
+                        child: const Text('Solve Similar Question'),
                       ),
                     ],
                   ),
                 ),
               ],
-              // Solve Similar Questions Section
-              AmazonRelatedQuestionsView(
-                questionText: entry.questionText,
-                sourceQuestionId: entry.id,
-                userAnswer: entry.selectedOption,
-                subject: entry.subject,
-                topic: entry.topic,
-                options: entry.options,
-                explanation: entry.explanation,
-              ),
+              if (isAllCorrect && isLast) ...[
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF059669), Color(0xFF10B981)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadii.lg),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF059669).withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 22),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'Out-off Score! 100% Correct 🎉',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Want to solve more similar questions?',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Challenge yourself by solving similar questions for all questions one by one.',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            final allSimilar = allItems
+                                .map((e) => e.similarQuestion)
+                                .whereType<Map<String, dynamic>>()
+                                .toList();
+                            if (allSimilar.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('No similar questions available for this review set yet.'),
+                                ),
+                              );
+                              return;
+                            }
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SimilarQuestionsQuizScreen(
+                                  title: 'Similar Questions Practice',
+                                  questions: allSimilar,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.play_arrow_rounded, color: Color(0xFF059669)),
+                          label: const Text('Solve All Similar Questions'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF059669),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
