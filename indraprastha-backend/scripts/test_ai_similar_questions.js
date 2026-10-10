@@ -233,9 +233,11 @@ async function runTests() {
   await asyncTest('Test 14: Missing API key returns genuine 503 error, never mock questions', async () => {
     const savedKey = process.env.OPENAI_API_KEY;
     const savedChatGptKey = process.env.CHATGPT_API_KEY;
+    const savedRapidApiKey = process.env.RAPIDAPI_KEY;
     try {
       process.env.OPENAI_API_KEY = '';
       process.env.CHATGPT_API_KEY = '';
+      process.env.RAPIDAPI_KEY = '';
       await aiSimilarQuestionsService.generateSimilarQuestions({
         studentId: 1,
         sourceQuestionId: 1,
@@ -255,6 +257,7 @@ async function runTests() {
     } finally {
       if (savedKey) process.env.OPENAI_API_KEY = savedKey;
       if (savedChatGptKey) process.env.CHATGPT_API_KEY = savedChatGptKey;
+      if (savedRapidApiKey) process.env.RAPIDAPI_KEY = savedRapidApiKey;
     }
   });
 

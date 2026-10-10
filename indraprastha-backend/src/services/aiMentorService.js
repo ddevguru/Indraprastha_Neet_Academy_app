@@ -14,10 +14,15 @@ const OPENAI_DIRECT_KEY = process.env.OPENAI_API_KEY || Buffer.from(
   'base64'
 ).toString('utf8');
 
+// RapidAPI ChatGPT-42 GPT-5 configuration
+const RAPIDAPI_DIRECT_KEY = '33620810a4mshe5ea758fa0991fcp1cd2f2jsn21d2eb13d156';
+const RAPIDAPI_HOST = process.env.RAPIDAPI_CHATGPT_HOST || 'chatgpt-42.p.rapidapi.com';
+const RAPIDAPI_URL = process.env.RAPIDAPI_CHATGPT_URL || 'https://chatgpt-42.p.rapidapi.com/gpt5';
+
 class AIMentorService {
   /**
    * Generate structured AI Mentor analysis for a student's test performance.
-   * Prioritizes OpenAI ChatGPT API.
+   * Prioritizes RapidAPI ChatGPT-42 GPT-5 endpoint.
    * @param {Object} analytics - Anonymized test performance metrics
    * @returns {Promise<Object>} Structured mentor guidance JSON
    */
@@ -25,6 +30,10 @@ class AIMentorService {
     const anonymizedInput = this._anonymizeAnalytics(analytics);
 
     try {
+      const rapidApiKey = (process.env.RAPIDAPI_KEY || RAPIDAPI_DIRECT_KEY || '').trim();
+      if (rapidApiKey && process.env.RAPIDAPI_KEY !== '') {
+        return await this._callRapidAPIMentor(anonymizedInput);
+      }
       const openAiKey = process.env.OPENAI_API_KEY || process.env.CHATGPT_API_KEY || OPENAI_DIRECT_KEY;
       if (openAiKey) {
         return await this._callOpenAIAPI(anonymizedInput);
@@ -148,6 +157,75 @@ Strict Requirements:
       req.on('timeout', () => {
         req.destroy();
         reject(new Error('Gemini API timeout'));
+      });
+      req.write(bodyData);
+      req.end();
+    });
+  }
+
+  /**
+   * Call RapidAPI ChatGPT-42 GPT-5 for Academic Mentor
+   * @private
+   */
+  async _callRapidAPIMentor(inputData) {
+    const apiKey = (process.env.RAPIDAPI_KEY || RAPIDAPI_DIRECT_KEY || '').trim();
+    if (!apiKey) {
+      throw new Error('RAPIDAPI_KEY is not configured');
+    }
+
+    const systemPrompt = `You are an expert NEET Academic Mentor at Indraprastha NEET Academy. Respond strictly with JSON matching schema: {"summary": "", "performance_overview": "", "priority_subject": "", "priority_topics": [], "strengths": [], "recommendations": [], "motivation": ""}. If the test is for a specific subject (e.g. Physics), all priority subjects and recommendations must be strictly for that subject. Benchmark against Top 20 candidates. Do not invent data.`;
+
+    const bodyData = JSON.stringify({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: JSON.stringify(inputData) },
+      ],
+      web_access: false,
+    });
+
+    const parsedUrl = new URL(process.env.RAPIDAPI_CHATGPT_URL || RAPIDAPI_URL);
+    const host = process.env.RAPIDAPI_CHATGPT_HOST || RAPIDAPI_HOST;
+
+    return new Promise((resolve, reject) => {
+      const req = https.request(
+        parsedUrl,
+        {
+          method: 'POST',
+          headers: {
+            'x-rapidapi-key': apiKey,
+            'x-rapidapi-host': host,
+            'x-rapidapi-ua': 'RapidAPI-Playground',
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(bodyData),
+          },
+          timeout: 20000,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk) => (data += chunk));
+          res.on('end', () => {
+            try {
+              if (res.statusCode >= 200 && res.statusCode < 300) {
+                const parsed = JSON.parse(data);
+                let text = parsed.result || parsed.content || parsed.response || data;
+                if (typeof text === 'string') {
+                  text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+                  return resolve(JSON.parse(text));
+                } else if (typeof text === 'object') {
+                  return resolve(text);
+                }
+              }
+              reject(new Error(`RapidAPI Mentor status: ${res.statusCode} - ${data.slice(0, 200)}`));
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }
+      );
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('RapidAPI Mentor timeout'));
       });
       req.write(bodyData);
       req.end();
@@ -361,8 +439,35 @@ Strict Requirements:
       options,
     });
 
+    const rapidApiKey = (process.env.RAPIDAPI_KEY || RAPIDAPI_DIRECT_KEY || '').trim();
     const openAiKey = process.env.OPENAI_API_KEY || process.env.CHATGPT_API_KEY || OPENAI_DIRECT_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
+
+    if (rapidApiKey && process.env.RAPIDAPI_KEY !== '') {
+      try {
+        console.log(`[AI_MENTOR] Generating ${requestedCount} similar questions via RapidAPI GPT-5 for ${detectedSubject} -> ${detectedTopic} [${detectedConcept}]...`);
+        const result = await this._callRapidAPISimilarQuestions({
+          questionText,
+          subject: detectedSubject,
+          topic: detectedTopic,
+          concept: detectedConcept,
+          options,
+          explanation,
+          count: requestedCount,
+        });
+        if (result && Array.isArray(result.questions) && result.questions.length > 0) {
+          return {
+            success: true,
+            subject: detectedSubject,
+            topic: detectedTopic,
+            concept: detectedConcept,
+            questions: result.questions,
+          };
+        }
+      } catch (err) {
+        console.warn('[SIMILAR_QUESTIONS_RAPIDAPI_WARNING] RapidAPI call failed:', err.message);
+      }
+    }
 
     if (openAiKey) {
       try {
@@ -425,6 +530,122 @@ Strict Requirements:
       concept: detectedConcept,
       questionText,
       count: requestedCount,
+    });
+  }
+
+  /**
+   * Call RapidAPI ChatGPT-42 GPT-5 for Similar Question Generation
+   * @private
+   */
+  async _callRapidAPISimilarQuestions({ questionText, subject, topic, concept, options, explanation, count }) {
+    const apiKey = (process.env.RAPIDAPI_KEY || RAPIDAPI_DIRECT_KEY || '').trim();
+    if (!apiKey) {
+      throw new Error('RAPIDAPI_KEY is not configured');
+    }
+
+    const randomSeed = `${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+
+    const systemPrompt = `You are an elite NTA NEET-UG Senior Question Paper Author & Master Faculty at Indraprastha NEET Academy.
+Your mission is to generate authentic, high-yield NEET Multiple Choice Questions.
+
+CRITICAL RULES:
+1. STRICT SUBJECT & TOPIC ACCURACY:
+   - Subject MUST be strictly: "${subject}".
+   - Chapter/Topic MUST be strictly: "${topic}".
+   - Core Concept tested MUST be strictly: "${concept}".
+   - Absolutely DO NOT generate questions from other subjects or unrelated topics.
+2. RELEVANCE TO WRONG QUESTION:
+   - Target the exact same core concept, formula, or physical principle (${concept}) tested in the wrong question.
+3. 100% SELF-CONTAINED (NO DIAGRAMS):
+   - Never reference external figures, diagrams, tables, or images. State all parameters clearly in the question text.
+4. UNIQUE & DIVERSE:
+   - Each generated question must be fresh, distinct, and mathematically verified. Random Seed: ${randomSeed}.
+5. STRICT JSON OUTPUT ONLY:
+{
+  "questions": [
+    {
+      "id": 1,
+      "question_text": "Complete question text...",
+      "option_a": "First plausible option",
+      "option_b": "Second plausible option",
+      "option_c": "Third plausible option",
+      "option_d": "Fourth plausible option",
+      "correct_option": "A",
+      "explanation": "Detailed, step-by-step scientific solution with relevant formulas and values."
+    }
+  ]
+}`;
+
+    const userPrompt = `A NEET student answered this question INCORRECTLY:
+Subject: ${subject}
+Chapter/Topic: ${topic}
+Core Concept: ${concept}
+Wrong Question: "${questionText || 'NEET Practice Problem'}"
+Options: ${Array.isArray(options) && options.length > 0 ? options.join(' | ') : 'N/A'}
+Explanation: "${explanation || 'N/A'}"
+
+TASK:
+Generate EXACTLY ${count} brand-new, unique, high-yield NEET practice MCQs strictly testing ${subject} -> ${topic} -> ${concept}.`;
+
+    const bodyData = JSON.stringify({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      web_access: false,
+    });
+
+    const parsedUrl = new URL(process.env.RAPIDAPI_CHATGPT_URL || RAPIDAPI_URL);
+    const host = process.env.RAPIDAPI_CHATGPT_HOST || RAPIDAPI_HOST;
+
+    return new Promise((resolve, reject) => {
+      const req = https.request(
+        parsedUrl,
+        {
+          method: 'POST',
+          headers: {
+            'x-rapidapi-key': apiKey,
+            'x-rapidapi-host': host,
+            'x-rapidapi-ua': 'RapidAPI-Playground',
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(bodyData),
+          },
+          timeout: 25000,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk) => (data += chunk));
+          res.on('end', () => {
+            try {
+              if (res.statusCode >= 200 && res.statusCode < 300) {
+                const parsed = JSON.parse(data);
+                let content = parsed.result || parsed.content || parsed.response || data;
+                if (typeof content === 'string') {
+                  content = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+                  const jsonRes = JSON.parse(content);
+                  if (jsonRes && Array.isArray(jsonRes.questions) && jsonRes.questions.length > 0) {
+                    return resolve(jsonRes);
+                  }
+                } else if (typeof content === 'object') {
+                  if (content.questions && Array.isArray(content.questions)) {
+                    return resolve(content);
+                  }
+                }
+              }
+              reject(new Error(`RapidAPI Similar Questions error ${res.statusCode}: ${data.slice(0, 300)}`));
+            } catch (err) {
+              reject(err);
+            }
+          });
+        }
+      );
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('RapidAPI Similar Questions timeout'));
+      });
+      req.write(bodyData);
+      req.end();
     });
   }
 

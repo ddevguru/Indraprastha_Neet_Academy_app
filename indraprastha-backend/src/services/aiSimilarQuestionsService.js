@@ -4,6 +4,7 @@
  * database persistence, and quality control validation.
  */
 
+const https = require('https');
 let OpenAI = null;
 try {
   OpenAI = require('openai');
@@ -17,9 +18,25 @@ const neetQuestionEngine = require('./neetQuestionEngine');
 const DIRECT_KEY_B64 = 'c2stcHJvai0tc2lJWE1tdEc4RFJoOUl1YVhaeWpQTjZqaG5IT3JNc2hqa3AtaFZHOW9GNkhadjBfb1pQYUd0T1pCMURsSVduRDZsLWd2bDNtQlQzQmxia0ZKQmpRQkg1VFhLbDFTVDRWY1VLSzdpd0ptUHd6Szl4LXZMUnJ1YWMwR0I5U0xxbnZjUGpxaTRUYkoyTXVkczBEM05pRDd5MjNVd0E=';
 const DIRECT_OPENAI_KEY = Buffer.from(DIRECT_KEY_B64, 'base64').toString('utf8');
 
+// RapidAPI ChatGPT-42 GPT-5 configuration
+const DIRECT_RAPIDAPI_KEY = '33620810a4mshe5ea758fa0991fcp1cd2f2jsn21d2eb13d156';
+const RAPIDAPI_HOST = process.env.RAPIDAPI_CHATGPT_HOST || 'chatgpt-42.p.rapidapi.com';
+const RAPIDAPI_URL = process.env.RAPIDAPI_CHATGPT_URL || 'https://chatgpt-42.p.rapidapi.com/gpt5';
+
 class AISimilarQuestionsService {
   constructor() {
     this.defaultModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  }
+
+  /**
+   * Retrieves configured RapidAPI key.
+   * @private
+   */
+  _getRapidApiKey() {
+    if (process.env.RAPIDAPI_KEY === '') {
+      return null;
+    }
+    return (process.env.RAPIDAPI_KEY || DIRECT_RAPIDAPI_KEY || '').trim();
   }
 
   /**
@@ -28,7 +45,11 @@ class AISimilarQuestionsService {
    * @private
    */
   _getApiKey() {
-    if (process.env.OPENAI_API_KEY === '' && process.env.CHATGPT_API_KEY === '') {
+    if (
+      process.env.OPENAI_API_KEY === '' &&
+      process.env.CHATGPT_API_KEY === '' &&
+      process.env.RAPIDAPI_KEY === ''
+    ) {
       const err = new Error(
         'OPENAI_API_KEY is not configured on the server. Please configure OPENAI_API_KEY in the server environment.'
       );
@@ -43,6 +64,9 @@ class AISimilarQuestionsService {
     }
     if (!apiKey && process.env.CHATGPT_API_KEY) {
       apiKey = (process.env.CHATGPT_API_KEY || '').trim();
+    }
+    if (!apiKey && this._getRapidApiKey()) {
+      apiKey = this._getRapidApiKey();
     }
     if (!apiKey) {
       const err = new Error(
@@ -264,6 +288,107 @@ Return ONLY valid JSON matching the schema.`;
   }
 
   /**
+   * Calls RapidAPI ChatGPT-42 GPT-5 endpoint and parses JSON questions.
+   */
+  async callRapidAPIGeneration(prompt, count) {
+    const rapidApiKey = this._getRapidApiKey();
+    if (!rapidApiKey) {
+      throw new Error('RapidAPI key is not configured');
+    }
+
+    const payload = {
+      messages: [
+        { role: 'system', content: prompt.system },
+        { role: 'user', content: prompt.user },
+      ],
+      web_access: false,
+    };
+
+    const bodyData = JSON.stringify(payload);
+    const apiUrl = process.env.RAPIDAPI_CHATGPT_URL || RAPIDAPI_URL;
+    const apiHost = process.env.RAPIDAPI_CHATGPT_HOST || RAPIDAPI_HOST;
+
+    const parsedUrl = new URL(apiUrl);
+    const options = {
+      protocol: parsedUrl.protocol,
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || 443,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: 'POST',
+      headers: {
+        'x-rapidapi-key': rapidApiKey,
+        'x-rapidapi-host': apiHost,
+        'x-rapidapi-ua': 'RapidAPI-Playground',
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyData),
+      },
+      timeout: 35000,
+    };
+
+    const resBody = await new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            return resolve(data);
+          }
+          const isAuth = res.statusCode === 401 || res.statusCode === 403;
+          const isQuota = res.statusCode === 429;
+          const err = new Error(
+            isAuth
+              ? `RapidAPI authentication failed (${res.statusCode}): Invalid RapidAPI key.`
+              : isQuota
+              ? 'RapidAPI rate limit or quota exceeded (429).'
+              : `RapidAPI error (${res.statusCode}): ${data.slice(0, 200)}`
+          );
+          err.status = res.statusCode;
+          err.statusCode = res.statusCode;
+          reject(err);
+        });
+      });
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        const err = new Error('RapidAPI request timed out.');
+        err.status = 504;
+        err.statusCode = 504;
+        reject(err);
+      });
+      req.write(bodyData);
+      req.end();
+    });
+
+    let parsedResult;
+    try {
+      const jsonRes = JSON.parse(resBody);
+      let content = jsonRes.result || jsonRes.content || jsonRes.response || resBody;
+      if (typeof content === 'string') {
+        content = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+        parsedResult = JSON.parse(content);
+      } else if (typeof content === 'object') {
+        parsedResult = content;
+      }
+    } catch (parseErr) {
+      console.error('[AI_SIMILAR_QUESTIONS_RAPIDAPI_PARSE_ERROR]', parseErr.message, resBody);
+      const err = new Error('AI generation produced invalid JSON. Please try again.');
+      err.status = 502;
+      err.statusCode = 502;
+      throw err;
+    }
+
+    const rawList = parsedResult?.questions || parsedResult?.mcqs || parsedResult?.data || (Array.isArray(parsedResult) ? parsedResult : null);
+    if (!Array.isArray(rawList) || rawList.length === 0) {
+      const err = new Error('AI response did not contain a valid list of questions.');
+      err.status = 502;
+      err.statusCode = 502;
+      throw err;
+    }
+
+    return rawList;
+  }
+
+  /**
    * Validates and normalizes generated questions against source constraints.
    */
   validateGeneratedQuestions(rawList, sourceContext, requestedCount) {
@@ -468,9 +593,26 @@ Return ONLY valid JSON matching the schema.`;
       explanation: effectiveExplanation,
     };
 
-    // 4. Construct strict prompts and call real OpenAI API
+    // 4. Construct strict prompts and call AI generation (RapidAPI prioritized)
     const prompts = this.buildStrictPrompt(sourceContext, requestedCount);
-    const rawList = await this.callOpenAIGeneration(prompts, requestedCount);
+    let rawList = null;
+    let usedModel = 'chatgpt-42-gpt5';
+
+    const rapidApiKey = this._getRapidApiKey();
+    if (rapidApiKey) {
+      try {
+        console.log(`[AI_SIMILAR_QUESTIONS] Generating ${requestedCount} questions via RapidAPI ChatGPT-42 GPT-5...`);
+        rawList = await this.callRapidAPIGeneration(prompts, requestedCount);
+        usedModel = 'chatgpt-42-gpt5';
+      } catch (rapidErr) {
+        console.warn('[AI_SIMILAR_QUESTIONS_RAPIDAPI_WARNING] RapidAPI call failed, attempting OpenAI fallback:', rapidErr.message);
+        rawList = await this.callOpenAIGeneration(prompts, requestedCount);
+        usedModel = process.env.OPENAI_MODEL || this.defaultModel;
+      }
+    } else {
+      rawList = await this.callOpenAIGeneration(prompts, requestedCount);
+      usedModel = process.env.OPENAI_MODEL || this.defaultModel;
+    }
 
     // 5. Strictly validate, deduplicate, and normalize questions
     const validQuestions = this.validateGeneratedQuestions(rawList, sourceContext, requestedCount);
@@ -495,7 +637,7 @@ Return ONLY valid JSON matching the schema.`;
           'Medium',
           requestedCount,
           validQuestions.length,
-          model,
+          usedModel,
         ]
       );
       batchId = batchRes.rows[0].id;
