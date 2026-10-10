@@ -830,188 +830,135 @@ class _ReviewQuestionPage extends StatelessWidget {
                   ),
                 ),
               ],
-              if (!entry.isCorrect) ...[
-                const SizedBox(height: AppSpacing.md),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(AppRadii.lg),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+              const SizedBox(height: AppSpacing.md),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => showSingleSimilarQuestionSheet(
+                    context,
+                    similarQuestion: entry.similarQuestion,
+                    questionTitle: 'Question ${index + 1} - Similar Practice',
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.psychology_alt_rounded, color: Colors.white, size: 20),
+                  borderRadius: BorderRadius.circular(AppRadii.lg),
+                  child: Ink(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'Got this question wrong?',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Practice a similar question set by your teacher',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
+                      borderRadius: BorderRadius.circular(AppRadii.lg),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => showSingleSimilarQuestionSheet(
-                          context,
-                          similarQuestion: entry.similarQuestion,
-                          questionTitle: 'Question ${index + 1} - Similar Practice',
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.psychology_alt_rounded, color: Colors.white, size: 18),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF4F46E5),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.md),
+                        const SizedBox(width: AppSpacing.md),
+                        const Expanded(
+                          child: Text(
+                            'Solve Similar Questions',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              letterSpacing: 0.2,
+                            ),
                           ),
                         ),
-                        child: const Text('Solve Similar Question'),
-                      ),
-                    ],
+                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
               if (isAllCorrect && isLast) ...[
                 const SizedBox(height: AppSpacing.md),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF059669), Color(0xFF10B981)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      final allSimilar = allItems
+                          .map((e) => e.similarQuestion)
+                          .whereType<Map<String, dynamic>>()
+                          .toList();
+                      if (allSimilar.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('No similar questions available for this review set yet.'),
+                          ),
+                        );
+                        return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SimilarQuestionsQuizScreen(
+                            title: 'Similar Questions Practice',
+                            questions: allSimilar,
+                          ),
+                        ),
+                      );
+                    },
                     borderRadius: BorderRadius.circular(AppRadii.lg),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF059669).withValues(alpha: 0.25),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                    child: Ink(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(AppRadii.lg),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                      child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(7),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 22),
+                            child: const Icon(Icons.psychology_alt_rounded, color: Colors.white, size: 18),
                           ),
                           const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  'Out-off Score! 100% Correct 🎉',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Want to solve more similar questions?',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
+                          const Expanded(
+                            child: Text(
+                              'Solve Similar Questions',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                letterSpacing: 0.2,
+                              ),
                             ),
                           ),
+                          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Challenge yourself by solving similar questions for all questions one by one.',
-                        style: TextStyle(color: Colors.white70, fontSize: 11),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            final allSimilar = allItems
-                                .map((e) => e.similarQuestion)
-                                .whereType<Map<String, dynamic>>()
-                                .toList();
-                            if (allSimilar.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('No similar questions available for this review set yet.'),
-                                ),
-                              );
-                              return;
-                            }
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SimilarQuestionsQuizScreen(
-                                  title: 'Similar Questions Practice',
-                                  questions: allSimilar,
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.play_arrow_rounded, color: Color(0xFF059669)),
-                          label: const Text('Solve All Similar Questions'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF059669),
-                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],

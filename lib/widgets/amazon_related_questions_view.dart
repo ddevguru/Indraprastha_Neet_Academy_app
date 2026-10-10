@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import '../features/content/data/content_repository.dart';
 import '../theme/app_tokens.dart';
 import 'ai_similar_questions_dialog.dart';
 
@@ -50,7 +47,6 @@ typedef AISimilarQuestionsInlineView = AmazonRelatedQuestionsView;
 class _AmazonRelatedQuestionsViewState
     extends ConsumerState<AmazonRelatedQuestionsView>
     with SingleTickerProviderStateMixin {
-  bool _isLoading = false;
   String? _error;
   List<Map<String, dynamic>> _questions = [];
   String _resolvedTopic = '';
@@ -97,7 +93,6 @@ class _AmazonRelatedQuestionsViewState
 
   Future<void> _loadRelatedQuestions({bool forceRefresh = false}) async {
     setState(() {
-      _isLoading = false;
       _error = null;
       if (widget.similarQuestion != null) {
         _questions = [widget.similarQuestion!];
@@ -128,82 +123,63 @@ class _AmazonRelatedQuestionsViewState
   @override
   Widget build(BuildContext context) {
     final sq = widget.similarQuestion ?? (_questions.isNotEmpty ? _questions.first : null);
-    if (sq == null) {
-      return const SizedBox.shrink();
-    }
 
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.md),
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => showSingleSimilarQuestionSheet(
+            context,
+            similarQuestion: sq,
+            questionTitle: 'Similar Question Practice',
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          child: Ink(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.psychology_alt_rounded, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Got this question wrong?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Practice a similar question set by your teacher',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                  ),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(AppRadii.lg),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-          ),
-          ElevatedButton(
-            onPressed: () => showSingleSimilarQuestionSheet(
-              context,
-              similarQuestion: sq,
-              questionTitle: 'Similar Question Practice',
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.psychology_alt_rounded, color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                const Expanded(
+                  child: Text(
+                    'Solve Similar Questions',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+              ],
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFF4F46E5),
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.md),
-              ),
-            ),
-            child: const Text('Solve Similar Question'),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -572,7 +548,7 @@ class _AmazonRelatedQuestionsViewState
                 explanation: widget.explanation,
               ),
               icon: const Icon(Icons.auto_awesome, size: 14),
-              label: const Text('Solve Similar Questions (1-10)', style: TextStyle(fontSize: 11)),
+              label: const Text('Solve Similar Questions', style: TextStyle(fontSize: 11)),
             ),
           ),
         ],
@@ -606,7 +582,7 @@ class _AmazonRelatedQuestionsViewState
                 explanation: widget.explanation,
               ),
               icon: const Icon(Icons.auto_awesome, size: 16),
-              label: const Text('Solve Similar Questions (1-10)', style: TextStyle(fontSize: 12)),
+              label: const Text('Solve Similar Questions', style: TextStyle(fontSize: 12)),
             ),
           ],
         ),
