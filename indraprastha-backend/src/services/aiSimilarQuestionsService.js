@@ -675,7 +675,7 @@ Return ONLY valid JSON matching the schema.`;
       concept: lockedConcept,
       requested_count: requestedCount,
       valid_count: validQuestions.length,
-      model,
+      model: usedModel,
       questions: validQuestions,
     };
   }
