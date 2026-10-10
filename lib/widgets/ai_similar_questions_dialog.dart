@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../core/providers/app_state.dart';
 import '../features/content/data/content_repository.dart';
 import '../theme/app_tokens.dart';
 import 'app_widgets.dart';
@@ -85,12 +84,7 @@ class __SimilarQuestionsConfigSheetState
     });
 
     try {
-      final SharedPreferences prefs;
-      if (widget.parentRef != null) {
-        prefs = widget.parentRef!.read(sharedPreferencesProvider);
-      } else {
-        prefs = await SharedPreferences.getInstance();
-      }
+      final prefs = await SharedPreferences.getInstance();
       final repo = ContentRepository(prefs: prefs);
 
       final data = await repo.fetchSimilarQuestionsData(
@@ -412,7 +406,7 @@ class _AISimilarQuestionsQuizScreenState
 
   Future<void> _submitBatchResults() async {
     try {
-      final prefs = ref.read(sharedPreferencesProvider);
+      final prefs = await SharedPreferences.getInstance();
       final repo = ContentRepository(prefs: prefs);
       final answerMap = <String, String>{};
       _selectedAnswers.forEach((idx, ans) {
