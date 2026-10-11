@@ -211,6 +211,14 @@ class AppDrawer extends ConsumerWidget {
                       },
                     ),
                     _DrawerTile(
+                      title: 'Leaderboard',
+                      leading: const Icon(Icons.leaderboard_rounded, color: AppColors.onDrawer),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/leaderboard');
+                      },
+                    ),
+                    _DrawerTile(
                       title: 'Help Center',
                       leading: const Icon(Icons.help_rounded, color: AppColors.onDrawer),
                       onTap: () {

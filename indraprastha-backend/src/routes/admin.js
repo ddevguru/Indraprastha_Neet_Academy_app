@@ -646,6 +646,18 @@ router.post('/books', adminAuth, async (req, res) => {
      RETURNING *`,
     [batchId, classLabel, title, subject, topic, level || 'Core', category || 'NCERT books']
   );
+  const newBook = result.rows[0];
+  const defaultChapterTitle =
+    (topic && String(topic).trim()) || (title && String(title).trim()) || 'Chapter 1';
+  try {
+    await pool.query(
+      `INSERT INTO book_chapters (book_id, title, overview, note_summary, highlight, material_type)
+       VALUES ($1, $2, '', '', '', 'text')`,
+      [newBook.id, defaultChapterTitle]
+    );
+  } catch (err) {
+    logger.warn?.('Auto-create default book chapter warning:', err);
+  }
   sendNotificationToAll(pool, {
     title: '📚 New Book Added',
     body: `${title}${subject ? ` — ${subject}` : ''}`,
@@ -666,13 +678,47 @@ router.get('/books', adminAuth, async (_req, res) => {
 
 router.get('/books/:bookId/chapters', adminAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, book_id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id
+    `SELECT id, book_id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id,
+        (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = book_chapters.id) AS linked_pyq_count
      FROM book_chapters
      WHERE book_id = $1
      ORDER BY id ASC`,
     [req.params.bookId]
   );
-  return res.json({ success: true, chapters: result.rows.map(mapChapterLinks) });
+  if (result.rows.length > 0) {
+    return res.json({ success: true, chapters: result.rows.map(mapChapterLinks) });
+  }
+
+  // Backward-compatible fallback:
+  // if an existing book has no chapters in book_chapters table,
+  // automatically create a default chapter from the book's topic or title.
+  const bookResult = await pool.query(
+    `SELECT id, title, topic
+     FROM books
+     WHERE id = $1
+     LIMIT 1`,
+    [req.params.bookId]
+  );
+  if (bookResult.rows.length === 0) {
+    return res.json({ success: true, chapters: [] });
+  }
+
+  const book = bookResult.rows[0];
+  const defaultChapterTitle =
+    (book.topic && String(book.topic).trim()) ||
+    (book.title && String(book.title).trim()) ||
+    'Chapter 1';
+  const created = await pool.query(
+    `INSERT INTO book_chapters (book_id, title, overview, note_summary, highlight, material_type)
+     VALUES ($1, $2, '', '', '', 'text')
+     RETURNING id, book_id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id`,
+    [book.id, defaultChapterTitle]
+  );
+
+  return res.json({
+    success: true,
+    chapters: [mapChapterLinks({ ...created.rows[0], linked_pyq_count: 0 })],
+  });
 });
 
 router.put('/books/:id', adminAuth, async (req, res) => {
@@ -1285,7 +1331,7 @@ router.get('/practice-sets', adminAuth, async (_req, res) => {
 router.put('/practice-sets/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
   const { title, difficulty, estimatedMinutes } = req.body;
-  const { classLabel, subject, topic } = hierarchyFromBody(req.body);
+  const { batchId, classLabel, subject, topic } = hierarchyFromBody(req.body);
   const result = await pool.query(
     `UPDATE practice_sets
      SET title = COALESCE($2, title),
@@ -1293,10 +1339,11 @@ router.put('/practice-sets/:id', adminAuth, async (req, res) => {
          subject = COALESCE($4, subject),
          topic = COALESCE($5, topic),
          difficulty = COALESCE($6, difficulty),
-         estimated_minutes = COALESCE($7, estimated_minutes)
+         estimated_minutes = COALESCE($7, estimated_minutes),
+         batch_id = COALESCE($8, batch_id)
      WHERE id = $1
      RETURNING *`,
-    [id, title, classLabel, subject, topic, difficulty, estimatedMinutes]
+    [id, title, classLabel, subject, topic, difficulty, estimatedMinutes, batchId || null]
   );
   res.json({ success: true, practiceSet: result.rows[0] });
 });

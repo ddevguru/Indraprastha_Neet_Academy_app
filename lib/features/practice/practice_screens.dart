@@ -202,7 +202,8 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription;
+    final hasSubscription = ref.watch(appUiControllerProvider).hasActiveSubscription ||
+        (ref.watch(authBlocProvider).state.user?.hasActiveSubscription ?? false);
     final savedPractice = ref.watch(practiceSavedControllerProvider);
     const categories = [
       ('Topic-wise MCQs', Icons.grid_view_rounded),
@@ -675,7 +676,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   }
 
   Future<void> _persistDraft() async {
-    if (_finished || widget.customQuestions != null) return;
+    if (_finished || widget.customQuestions != null || widget.chapterQuestions != null) return;
     await _draftStore.savePracticeDraft(_draftSetId, {
       'currentIndex': _currentIndex,
       'correctCount': _correctCount,
@@ -692,20 +693,22 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     if (total == 0) return;
     final accuracy = total > 0 ? (_correctCount / total) * 100 : 0.0;
     try {
-      await ref.read(contentRepositoryProvider).submitPracticeAttempt(
-            setId: widget.setId,
-            score: _correctCount,
-            accuracy: accuracy,
-            correctCount: _correctCount,
-            wrongCount: _wrongCount,
-          );
+      if (widget.setId > 0) {
+        await ref.read(contentRepositoryProvider).submitPracticeAttempt(
+              setId: widget.setId,
+              score: _correctCount,
+              accuracy: accuracy,
+              correctCount: _correctCount,
+              wrongCount: _wrongCount,
+            );
 
-      // Log activity to Streaks
-      _logPracticeActivity(total);
+        // Log activity to Streaks
+        _logPracticeActivity(total);
+      }
     } catch (_) {
       // Keep local completion even if server submit fails.
     } finally {
-      if (widget.customQuestions == null) {
+      if (widget.customQuestions == null && widget.chapterQuestions == null) {
         await _completedStore.saveCompletedPractice(_draftSetId, {
           'setId': widget.setId,
           'correctCount': _correctCount,
@@ -1572,12 +1575,12 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                   final isDark = Theme.of(context).brightness == Brightness.dark;
                                   final expText = qItem['explanation']?.toString().trim() ?? '';
                                   final expImgUrl = explanationImageRawUrl(qItem);
-                                  final expImagesList = qItem['explanation_images_list'] != null
-                                      ? List<Map<String, dynamic>>.from(
-                                          (qItem['explanation_images_list'] as List).map(
-                                            (e) => Map<String, dynamic>.from(e as Map),
-                                          ),
-                                        )
+                                  final expImagesRaw = qItem['explanation_images_list'];
+                                  final expImagesList = expImagesRaw is List
+                                      ? expImagesRaw
+                                          .whereType<Map>()
+                                          .map((e) => Map<String, dynamic>.from(e))
+                                          .toList()
                                       : <Map<String, dynamic>>[];
 
                                   final hasExpText = expText.isNotEmpty;
@@ -2036,6 +2039,7 @@ class _TopicWiseMcqsScreenState extends ConsumerState<TopicWiseMcqsScreen> {
               'question_count': _parseInt(ch['linked_pyq_count']),
               'is_book_chapter': true,
               'book_id': bookId,
+              'order_index': _parseInt(ch['order_index'] ?? ch['id']),
             });
           }
         }
@@ -2213,16 +2217,22 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
     final chapterId = _parseInt(set['chapter_id']);
     if (chapterId <= 0) return;
 
+    bool dialogShowing = true;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
+    ).then((_) {
+      dialogShowing = false;
+    });
 
     try {
       final repo = ref.read(contentRepositoryProvider);
       final pyqs = await repo.fetchPyqs(chapterId);
-      if (mounted) Navigator.of(context).pop();
+      if (mounted && dialogShowing) {
+        Navigator.of(context).pop();
+        dialogShowing = false;
+      }
 
       if (!mounted) return;
       if (pyqs.isEmpty) {
@@ -2245,7 +2255,10 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
       );
       _refreshSets();
     } catch (e) {
-      if (mounted) Navigator.of(context).pop();
+      if (mounted && dialogShowing) {
+        Navigator.of(context).pop();
+        dialogShowing = false;
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Unable to load PYQs: $e')),
@@ -2256,12 +2269,15 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasSubscription = widget.hasActiveSubscription ||
+        ref.watch(appUiControllerProvider).hasActiveSubscription ||
+        (ref.watch(authBlocProvider).state.user?.hasActiveSubscription ?? false);
     final sortedSets = List<Map<String, dynamic>>.from(_sets)
       ..sort(ContentAccess.comparePracticeSetOrder);
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.subject)),
-      body: sortedSets.isEmpty && !widget.hasActiveSubscription
+      body: sortedSets.isEmpty && !hasSubscription
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -2308,7 +2324,7 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
                     final set = sortedSets[i];
                     final locked = !ContentAccess.isItemUnlocked(
                       index: i,
-                      hasActiveSubscription: widget.hasActiveSubscription,
+                      hasActiveSubscription: hasSubscription,
                     );
                     final completed = isTruthyCompletionFlag(set['is_completed']);
                     final lastAccuracy = _parseDouble(set['last_accuracy']);

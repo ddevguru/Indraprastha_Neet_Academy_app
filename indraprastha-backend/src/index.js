@@ -84,6 +84,7 @@ app.use('/api/ai', contentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/streaks', require('./routes/streaks'));
+app.use('/api/leaderboard', require('./routes/leaderboard'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/support', require('./routes/support'));
 

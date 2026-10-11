@@ -21,6 +21,7 @@ import '../features/subscriptions/subscriptions_screen.dart';
 import '../features/tests/tests_screens.dart';
 import '../features/support/help_center_screen.dart';
 import '../features/streaks/streaks_screen.dart';
+import '../features/leaderboard/leaderboard_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final authBloc = ref.read(authBlocProvider);
@@ -160,6 +161,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/streaks',
         builder: (context, state) => const StreaksScreen(),
+      ),
+      GoRoute(
+        path: '/leaderboard',
+        builder: (context, state) => const LeaderboardScreen(),
       ),
       GoRoute(
         path: '/subscriptions',

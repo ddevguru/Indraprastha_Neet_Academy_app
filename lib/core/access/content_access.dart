@@ -60,9 +60,24 @@ class ContentAccess {
     Map<String, dynamic> a,
     Map<String, dynamic> b,
   ) {
-    final idA = (a['id'] as num?)?.toInt() ?? 0;
-    final idB = (b['id'] as num?)?.toInt() ?? 0;
+    final orderA = _parseId(a['order_index']);
+    final orderB = _parseId(b['order_index']);
+    if (orderA > 0 && orderB > 0 && orderA != orderB) {
+      return orderA.compareTo(orderB);
+    }
+    final idA = _parseId(a['chapter_id'] ?? a['id']);
+    final idB = _parseId(b['chapter_id'] ?? b['id']);
     return idA.compareTo(idB);
+  }
+
+  static int _parseId(dynamic val) {
+    if (val == null) return 0;
+    if (val is num) return val.toInt();
+    if (val is String) {
+      final digits = val.replaceAll(RegExp(r'[^0-9]'), '');
+      return int.tryParse(digits) ?? 0;
+    }
+    return 0;
   }
 
   static List<Map<String, dynamic>> setsInSameSubject(
