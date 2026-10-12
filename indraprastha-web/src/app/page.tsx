@@ -1,13 +1,15 @@
 "use client";
 import Image from "next/image";
 import { useState } from "react";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 /* ─── DATA ─── */
 const navItems = [
-  { label: "Home", href: "#" },
+  { label: "Home", href: "/" },
   { label: "Target Batches", href: "/target-batches" },
-  { label: "Achievers Wall", href: "#achievers" },
-  { label: "Methodology", href: "#methodology" },
+  { label: "AI Rank Predictor", href: "/ai-rank-predictor" },
+  { label: "Methodology", href: "/methodology" },
   { label: "Mobile App", href: "#app" },
   { label: "Help & Support", href: "#footer" },
 ];
@@ -141,45 +143,8 @@ export default function Page() {
 
   return (
     <>
-      {/* ════════ NAVBAR ════════ */}
-      <nav className="navbar" role="navigation" aria-label="Main navigation">
-        <div className="navbar-inner">
-          {/* Logo */}
-          <a href="#" className="navbar-brand" aria-label="Indraprastha NEET Academy">
-            <Image
-              src="/logo_app.jpeg"
-              alt="Indraprastha NEET Logo"
-              width={38}
-              height={38}
-              priority
-              style={{ objectFit: "cover" }}
-            />
-            <div>
-              <span className="brand-title">IndraprasthaNEET</span>
-              <span className="brand-sub">ACADEMY</span>
-            </div>
-          </a>
-
-          {/* Nav Items */}
-          <ul className="navbar-nav">
-            {navItems.map((item) => (
-              <li key={item.label}>
-                <a href={item.href}>{item.label}</a>
-              </li>
-            ))}
-          </ul>
-
-          {/* Right Actions */}
-          <div className="navbar-actions">
-            <a href="tel:+919000000000" className="phone-badge">
-              📞 +91 90000 00000
-            </a>
-            <a href="#courses" className="btn-enroll-nav btn-orange-leather" id="nav-enroll-btn">
-              <span>Enroll Now</span>
-            </a>
-          </div>
-        </div>
-      </nav>
+      {/* ════════ MAIN NAVBAR ════════ */}
+      <Navbar activePage="home" />
 
       {/* ════════ HERO SECTION ════════ */}
       <section className="hero-section has-texture" id="home">
@@ -536,106 +501,7 @@ export default function Page() {
       </section>
 
       {/* ════════ FOOTER ════════ */}
-      <footer className="footer-section has-dark-texture" id="footer">
-        <div className="footer-container">
-          <div className="footer-top-grid">
-            {/* Col 1: Bio */}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <Image
-                  src="/logo_app.jpeg"
-                  alt="Indraprastha Logo"
-                  width={34}
-                  height={34}
-                  style={{ borderRadius: "7px", objectFit: "cover" }}
-                />
-                <div>
-                  <span style={{ fontFamily: "Outfit, sans-serif", fontSize: "15px", fontWeight: "900", color: "#FFFFFF" }}>
-                    IndraprasthaNEET
-                  </span>
-                  <span style={{ fontSize: "9px", color: "var(--orange)", fontWeight: "800", display: "block", letterSpacing: "1px" }}>
-                    ACADEMY
-                  </span>
-                </div>
-              </div>
-
-              <p className="footer-bio-text">
-                Pioneering India&apos;s top NEET aspirants with rigorous cognitive analytics, strategy-led NCERT exemplar modules and AIR Top 100 Producing Faculty.
-              </p>
-
-              <span className="footer-badge-pill">🏆 AIR Top 100 Producing Faculty</span>
-            </div>
-
-            {/* Col 2: Quick Access */}
-            <div>
-              <h4 className="footer-col-title">Quick Access</h4>
-              <ul className="footer-links-list">
-                <li><a href="#home">Home Overview</a></li>
-                <li><a href="#courses">Target Batches 2026/27</a></li>
-                <li><a href="#methodology">Indraprastha Method</a></li>
-                <li><a href="#app">Mobile App Features</a></li>
-                <li><a href="#footer">Help Desk & FAQs</a></li>
-              </ul>
-            </div>
-
-            {/* Col 3: Helpline & Campus */}
-            <div>
-              <h4 className="footer-col-title">Helpline & Campus</h4>
-              <div className="footer-contact-item">
-                <span>📞</span>
-                <div>
-                  <strong style={{ color: "#FFFFFF" }}>+91 77020 22682</strong>
-                  <div style={{ fontSize: "11px" }}>Primary Academic Helpline</div>
-                </div>
-              </div>
-
-              <div className="footer-contact-item">
-                <span>✉️</span>
-                <div>
-                  <div style={{ color: "#FFFFFF" }}>support@indraprastha-neetacademy.com</div>
-                </div>
-              </div>
-
-              <div className="footer-contact-item">
-                <span>⏰</span>
-                <div>Mon - Sat: 08:00AM - 08:00PM</div>
-              </div>
-            </div>
-
-            {/* Col 4: Digital Study App */}
-            <div>
-              <h4 className="footer-col-title">Digital Study App</h4>
-              <div className="app-store-btns">
-                <a href="#" className="btn-app-store-badge">
-                  <span>▶</span>
-                  <div>
-                    <span className="store-badge-sub">GET IT ON</span>
-                    <span className="store-badge-title">Google Play</span>
-                  </div>
-                </a>
-
-                <a href="#" className="btn-app-store-badge">
-                  <span>🍎</span>
-                  <div>
-                    <span className="store-badge-sub">DOWNLOAD ON THE</span>
-                    <span className="store-badge-title">App Store</span>
-                  </div>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div className="footer-bottom-bar">
-            <div>© 2026 Indraprastha NEET Academy. All rights reserved.</div>
-            <div className="footer-legal-links">
-              <a href="#">Privacy Policy</a>
-              <a href="#">Terms of Admission</a>
-              <a href="#">Honor Code</a>
-              <a href="#">Grievance Redressal</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }

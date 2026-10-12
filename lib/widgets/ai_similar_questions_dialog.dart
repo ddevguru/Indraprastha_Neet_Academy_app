@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../features/content/data/content_repository.dart';
 import '../theme/app_tokens.dart';
 import 'app_widgets.dart';
+import 'fast_network_image.dart';
 
 typedef SimilarQuestionsQuizScreen = AISimilarQuestionsQuizScreen;
 
@@ -99,6 +100,20 @@ class _SolveSingleSimilarQuestionSheetState
     final optD = sq['option_d']?.toString() ?? sq['optionD']?.toString() ?? '';
     final correctOpt = (sq['correct_option'] ?? sq['correctOption'] ?? sq['correct_answer'] ?? 'A').toString().toUpperCase().trim();
     final explanation = sq['explanation']?.toString() ?? '';
+    final qImage = (sq['question_image_link'] ?? sq['questionImageLink'] ?? sq['image_url'] ?? sq['question_image'] ?? '').toString().trim();
+    final explanationImage = (sq['explanation_image_link'] ?? sq['explanationImageLink'] ?? sq['explanation_image'] ?? '').toString().trim();
+    final rawExtraImages = sq['explanation_images'] ?? sq['explanation_images_list'] ?? sq['extra_explanation_images'];
+    final List<String> extraExplanationImages = [];
+    if (rawExtraImages is List) {
+      for (final item in rawExtraImages) {
+        if (item is String && item.trim().isNotEmpty) {
+          extraExplanationImages.add(item.trim());
+        } else if (item is Map) {
+          final url = (item['image_url'] ?? item['imageLink'] ?? item['image_drive_link'] ?? item['url'] ?? '').toString().trim();
+          if (url.isNotEmpty) extraExplanationImages.add(url);
+        }
+      }
+    }
 
     final options = <String, String>{
       'A': optA,
@@ -205,6 +220,13 @@ class _SolveSingleSimilarQuestionSheetState
                             height: 1.4,
                           ),
                         ),
+                        if (qImage.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            child: buildFastReviewImage(qImage),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -338,7 +360,7 @@ class _SolveSingleSimilarQuestionSheetState
                         ],
                       ),
                     ),
-                    if (explanation.trim().isNotEmpty) ...[
+                    if (explanation.trim().isNotEmpty || explanationImage.isNotEmpty || extraExplanationImages.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.md),
                       SurfaceCard(
                         child: Column(
@@ -354,15 +376,36 @@ class _SolveSingleSimilarQuestionSheetState
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              explanation,
-                              style: TextStyle(
-                                fontSize: 13,
-                                height: 1.4,
-                                color: isDark ? Colors.white70 : AppColors.textSecondary,
+                            if (explanation.trim().isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                explanation,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  height: 1.4,
+                                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                                ),
                               ),
-                            ),
+                            ],
+                            if (explanationImage.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                child: buildFastReviewImage(explanationImage),
+                              ),
+                            ],
+                            if (extraExplanationImages.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              ...extraExplanationImages.map(
+                                (imgUrl) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(AppRadii.md),
+                                    child: buildFastReviewImage(imgUrl),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -961,11 +1004,26 @@ class _AISimilarQuestionsQuizScreenState
     final optC = currentQ['option_c']?.toString() ?? '';
     final optD = currentQ['option_d']?.toString() ?? '';
     final correctOpt = (currentQ['correct_option'] ??
+            currentQ['correctOption'] ??
             currentQ['correct_answer'] ??
             'A')
         .toString()
         .toUpperCase();
     final explanation = currentQ['explanation']?.toString() ?? '';
+    final qImage = (currentQ['question_image_link'] ?? currentQ['questionImageLink'] ?? currentQ['image_url'] ?? currentQ['question_image'] ?? '').toString().trim();
+    final explanationImage = (currentQ['explanation_image_link'] ?? currentQ['explanationImageLink'] ?? currentQ['explanation_image'] ?? '').toString().trim();
+    final rawExtraImages = currentQ['explanation_images'] ?? currentQ['explanation_images_list'] ?? currentQ['extra_explanation_images'];
+    final List<String> extraExplanationImages = [];
+    if (rawExtraImages is List) {
+      for (final item in rawExtraImages) {
+        if (item is String && item.trim().isNotEmpty) {
+          extraExplanationImages.add(item.trim());
+        } else if (item is Map) {
+          final url = (item['image_url'] ?? item['imageLink'] ?? item['image_drive_link'] ?? item['url'] ?? '').toString().trim();
+          if (url.isNotEmpty) extraExplanationImages.add(url);
+        }
+      }
+    }
 
     final options = {'A': optA, 'B': optB, 'C': optC, 'D': optD};
     final userAns = _selectedAnswers[_currentIndex];
@@ -1052,6 +1110,13 @@ class _AISimilarQuestionsQuizScreenState
                         height: 1.4,
                       ),
                     ),
+                    if (qImage.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        child: buildFastReviewImage(qImage),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.lg),
 
                     // Option Buttons
@@ -1138,7 +1203,7 @@ class _AISimilarQuestionsQuizScreenState
               const SizedBox(height: AppSpacing.lg),
 
               // Step-by-step scientific explanation
-              if (isAnswered && explanation.isNotEmpty) ...[
+              if (isAnswered && (explanation.isNotEmpty || explanationImage.isNotEmpty || extraExplanationImages.isNotEmpty)) ...[
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppSpacing.md),
@@ -1164,15 +1229,36 @@ class _AISimilarQuestionsQuizScreenState
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        explanation,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.45,
-                          color: isDark ? Colors.white.withValues(alpha: 0.9) : AppColors.textPrimary,
+                      if (explanation.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          explanation,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.45,
+                            color: isDark ? Colors.white.withValues(alpha: 0.9) : AppColors.textPrimary,
+                          ),
                         ),
-                      ),
+                      ],
+                      if (explanationImage.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                          child: buildFastReviewImage(explanationImage),
+                        ),
+                      ],
+                      if (extraExplanationImages.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ...extraExplanationImages.map(
+                          (imgUrl) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(AppRadii.md),
+                              child: buildFastReviewImage(imgUrl),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

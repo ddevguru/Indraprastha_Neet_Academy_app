@@ -1,0 +1,941 @@
+/* ═════════════════════════════════════════════════════════════
+   METHODOLOGY PAGE STYLES (Clean White Theme by Default & Dark Support)
+   ═════════════════════════════════════════════════════════════ */
+
+.methodology-page {
+  --meth-bg: #FAF6F0;
+  --meth-card-bg: #FFFFFF;
+  --meth-card-border: #EDE3DA;
+  --meth-card-subtle: #FFF9F5;
+  --meth-text-main: #140A03;
+  --meth-text-muted: #6E5B50;
+  --meth-text-light: #9B877B;
+  --meth-accent: #E55200;
+  --meth-accent-hover: #D04800;
+  --meth-accent-soft: #FFF0E6;
+  --meth-accent-border: #FFD4BC;
+  --meth-success: #1E8E3E;
+  --meth-success-bg: #E6F4EA;
+  --meth-cyan: #0EA5E9;
+  --meth-cyan-soft: #E0F2FE;
+  --meth-dark-card: #18110B;
+  
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--meth-text-main);
+  background-color: var(--meth-bg);
+  min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ── DARK THEME OVERRIDES ── */
+.methodology-page.dark-theme {
+  --meth-bg: #0F0905;
+  --meth-card-bg: #18110B;
+  --meth-card-border: #2D2017;
+  --meth-card-subtle: #21160F;
+  --meth-text-main: #FBF6F1;
+  --meth-text-muted: #BBA99C;
+  --meth-text-light: #837266;
+  --meth-accent: #FF6B1A;
+  --meth-accent-hover: #FF7E33;
+  --meth-accent-soft: rgba(229, 82, 0, 0.16);
+  --meth-accent-border: rgba(229, 82, 0, 0.35);
+  --meth-success: #34D399;
+  --meth-success-bg: rgba(16, 185, 129, 0.15);
+  --meth-cyan: #38BDF8;
+  --meth-cyan-soft: rgba(14, 165, 233, 0.15);
+}
+
+/* ── METHODOLOGY NAVBAR ── */
+.pred-navbar {
+  background: var(--meth-card-bg);
+  border-bottom: 1px solid var(--meth-card-border);
+  position: sticky;
+  top: 0;
+  z-index: 99;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+}
+
+.pred-navbar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap !important;
+}
+
+.pred-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 1;
+  white-space: nowrap !important;
+}
+
+.pred-nav-link {
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--meth-text-muted);
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  white-space: nowrap !important;
+  flex-shrink: 0;
+}
+
+.pred-nav-link:hover {
+  color: var(--meth-accent);
+  background: var(--meth-accent-soft);
+}
+
+.pred-nav-link.active-pill {
+  background: var(--meth-accent);
+  background-image: linear-gradient(135deg, #FF6B00 0%, #C04800 100%);
+  color: #FFFFFF !important;
+  font-weight: 700;
+  box-shadow: 0 3px 12px rgba(229, 82, 0, 0.35);
+}
+
+.pred-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--meth-card-border);
+  background: var(--meth-card-subtle);
+  color: var(--meth-text-main);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  line-height: 1;
+  user-select: none;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--meth-accent);
+}
+
+.pred-phone-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--meth-card-border);
+  background: var(--meth-card-subtle);
+  color: var(--meth-text-main);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  line-height: 1.2;
+  transition: all 0.15s ease;
+}
+
+.pred-phone-pill:hover {
+  border-color: var(--meth-accent);
+  color: var(--meth-accent);
+}
+
+.btn-enroll-nav {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  padding: 9px 18px !important;
+  line-height: 1.2 !important;
+}
+
+.methodology-page.dark-theme .brand-title {
+  color: #FBF6F1;
+}
+
+@media (max-width: 1180px) {
+  .pred-phone-pill {
+    display: none !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .pred-nav-links {
+    display: none !important;
+  }
+}
+
+/* ── HERO SECTION ── */
+.meth-hero {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 56px 24px 44px;
+  text-align: center;
+}
+
+.meth-tagline-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 50px;
+  background: var(--meth-accent-soft);
+  border: 1px solid var(--meth-accent-border);
+  color: var(--meth-accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.meth-hero-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 1.15;
+  color: var(--meth-text-main);
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+
+.meth-title-highlight {
+  background: linear-gradient(135deg, #FF6B00 0%, #D84200 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.meth-hero-sub {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--meth-text-muted);
+  max-width: 720px;
+  margin: 0 auto 36px;
+}
+
+/* ── 4 STAT CARDS ROW ── */
+.meth-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.meth-stat-card {
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 14px;
+  padding: 18px 16px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+  transition: transform 0.15s ease;
+}
+
+.meth-stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.meth-stat-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--meth-accent);
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.meth-stat-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--meth-text-muted);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+/* ═════════════════════════════════════════
+   FOUR PILLARS SECTION
+   ═════════════════════════════════════════ */
+.meth-pillars-section {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 70px;
+}
+
+.meth-section-header {
+  margin-bottom: 40px;
+}
+
+.meth-section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--meth-text-main);
+  margin-top: 6px;
+  margin-bottom: 6px;
+  letter-spacing: -0.3px;
+}
+
+.meth-section-subtitle {
+  font-size: 14px;
+  color: var(--meth-text-muted);
+  max-width: 760px;
+}
+
+/* Pillar Row Container */
+.meth-pillar-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: center;
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 20px;
+  padding: 36px 38px;
+  margin-bottom: 32px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.04);
+}
+
+/* Column Content Side */
+.pillar-badge-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pillar-num-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--meth-accent-soft);
+  color: var(--meth-accent);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 900;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pillar-category-tag {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--meth-accent);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.pillar-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--meth-text-main);
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+
+.pillar-desc {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--meth-text-muted);
+  margin-bottom: 20px;
+}
+
+.pillar-bullets {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.pillar-bullet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--meth-text-main);
+  font-weight: 500;
+}
+
+.bullet-check-icon {
+  color: var(--meth-accent);
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pillar-footer-banner {
+  padding: 12px 16px;
+  background: var(--meth-card-subtle);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pillar-footer-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--meth-text-main);
+}
+
+.pillar-footer-sub {
+  font-size: 11px;
+  color: var(--meth-text-muted);
+}
+
+/* ── INTERACTIVE MOCKUPS (PILLARS 1-4) ── */
+.mockup-card {
+  background: var(--meth-card-subtle);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+}
+
+.mockup-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--meth-card-border);
+}
+
+.mockup-badge-orange {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--meth-accent);
+  background: var(--meth-accent-soft);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.mockup-badge-cyan {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--meth-cyan);
+  background: var(--meth-cyan-soft);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.mockup-question-box {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--meth-text-main);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.mockup-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mockup-opt-item {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--meth-card-border);
+  background: var(--meth-card-bg);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--meth-text-main);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mockup-opt-item.selected {
+  border-color: var(--meth-success);
+  background: var(--meth-success-bg);
+  color: var(--meth-success);
+  font-weight: 700;
+}
+
+.mockup-citation-box {
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-left: 3px solid var(--meth-accent);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--meth-text-muted);
+}
+
+.citation-header {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--meth-accent);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+/* Heatmap Rows (Pillar 2) */
+.heatmap-topic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.heatmap-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--meth-text-main);
+}
+
+.heatmap-sub {
+  font-size: 10.5px;
+  color: var(--meth-text-muted);
+}
+
+.heatmap-bars-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--meth-accent);
+  padding: 4px 8px;
+  background: var(--meth-accent-soft);
+  border-radius: 6px;
+}
+
+.trap-spotted-box {
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+
+/* Speed Tracker (Pillar 3) */
+.velocity-stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.velocity-bar-track {
+  height: 8px;
+  background: var(--meth-card-border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.velocity-bar-fill {
+  width: 78%;
+  height: 100%;
+  background: linear-gradient(90deg, #FF6B00 0%, #10B981 100%);
+  border-radius: 4px;
+}
+
+.accuracy-trio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.accuracy-pill-box {
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+
+.accuracy-pill-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--meth-accent);
+}
+
+.accuracy-pill-label {
+  font-size: 9.5px;
+  color: var(--meth-text-muted);
+  font-weight: 600;
+}
+
+/* Doubt Desk Chat (Pillar 4) */
+.doubt-chat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-bubble-student {
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.chat-sender-name {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--meth-accent);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.chat-msg-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--meth-text-main);
+}
+
+.chat-bubble-faculty {
+  background: var(--meth-accent-soft);
+  border: 1px solid var(--meth-accent-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.voice-audio-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: var(--meth-card-bg);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--meth-accent);
+  width: fit-content;
+}
+
+/* ═════════════════════════════════════════
+   DAILY MICRO-HABIT LOOP (3 CARDS)
+   ═════════════════════════════════════════ */
+.meth-habits-section {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 24px 70px;
+}
+
+.habits-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.habit-card {
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 18px;
+  padding: 26px 24px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease;
+}
+
+.habit-card:hover {
+  transform: translateY(-3px);
+}
+
+.habit-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.habit-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--meth-accent-soft);
+  color: var(--meth-accent);
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.habit-time-tag {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--meth-text-muted);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.habit-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--meth-text-main);
+  margin-bottom: 8px;
+}
+
+.habit-desc {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--meth-text-muted);
+  margin-bottom: 20px;
+}
+
+.habit-footer-link {
+  margin-top: auto;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--meth-accent);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ═════════════════════════════════════════
+   FACULTY & ADVISORY BOARD SECTION
+   ═════════════════════════════════════════ */
+.meth-faculty-section {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 24px 70px;
+}
+
+.faculty-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.faculty-card {
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 18px;
+  padding: 24px 22px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.faculty-avatar-box {
+  width: 100%;
+  height: 180px;
+  border-radius: 12px;
+  background: var(--meth-card-subtle);
+  border: 1px solid var(--meth-card-border);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.faculty-avatar-icon {
+  font-size: 64px;
+}
+
+.faculty-badge-overlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(20, 10, 3, 0.85);
+  color: #FFFFFF;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.faculty-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--meth-text-main);
+  margin-bottom: 3px;
+}
+
+.faculty-creds {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--meth-accent);
+  margin-bottom: 10px;
+}
+
+.faculty-bio {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--meth-text-muted);
+  margin-bottom: 16px;
+}
+
+.faculty-stat-tags {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--meth-card-border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--meth-text-main);
+}
+
+/* ═════════════════════════════════════════
+   BOTTOM CALLOUT BANNER
+   ═════════════════════════════════════════ */
+.meth-bottom-callout {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px 70px;
+}
+
+.meth-callout-card {
+  background: var(--meth-card-bg);
+  border: 1px solid var(--meth-card-border);
+  border-radius: 20px;
+  padding: 36px 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.05);
+}
+
+.callout-left {
+  max-width: 660px;
+}
+
+.callout-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--meth-text-main);
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.callout-desc {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--meth-text-muted);
+  margin-bottom: 16px;
+}
+
+.callout-bullets-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--meth-text-main);
+  flex-wrap: wrap;
+}
+
+.callout-right-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.btn-schedule-audit {
+  padding: 13px 24px;
+  border-radius: 10px;
+  background: var(--meth-accent);
+  background-image: linear-gradient(135deg, #FF6B00 0%, #C04800 100%);
+  color: #FFFFFF;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14.5px;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(229, 82, 0, 0.35);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.callout-phone-text {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--meth-text-muted);
+  text-decoration: none;
+}
+
+/* ── RESPONSIVE BREAKPOINTS ── */
+@media (max-width: 1024px) {
+  .meth-pillar-row {
+    grid-template-columns: 1fr;
+  }
+  .habits-grid {
+    grid-template-columns: 1fr;
+  }
+  .faculty-grid {
+    grid-template-columns: 1fr;
+  }
+  .meth-callout-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .callout-right-actions {
+    align-items: flex-start;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .meth-hero-title {
+    font-size: 32px;
+  }
+  .meth-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pillar-title {
+    font-size: 22px;
+  }
+}

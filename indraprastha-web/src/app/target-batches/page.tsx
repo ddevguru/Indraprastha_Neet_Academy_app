@@ -2,13 +2,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 /* ─── DATA ─── */
 const navItems = [
   { label: "Home", href: "/" },
   { label: "Target Batches", href: "/target-batches", active: true },
-  { label: "AI Rank Predictor", href: "/#quiz" },
-  { label: "Methodology", href: "/#methodology" },
+  { label: "AI Rank Predictor", href: "/ai-rank-predictor" },
+  { label: "Methodology", href: "/methodology" },
   { label: "Mobile App", href: "/#app" },
   { label: "Help & Support", href: "#footer" },
 ];
@@ -211,11 +213,9 @@ export default function TargetBatchesPage() {
     <>
       {/* ════════ TOP ANNOUNCEMENT BAR ════════ */}
       <div
+        className="top-announcement-bar"
         style={{
-          background: "#FFF4EC",
-          borderBottom: "1px solid #FFD4BC",
           fontSize: "12px",
-          color: "#4A3225",
           padding: "8px 24px",
           display: "flex",
           alignItems: "center",
@@ -246,55 +246,8 @@ export default function TargetBatchesPage() {
         </div>
       </div>
 
-      {/* ════════ NAVBAR ════════ */}
-      <nav className="navbar" role="navigation" aria-label="Main navigation">
-        <div className="navbar-inner">
-          {/* Logo */}
-          <Link href="/" className="navbar-brand" aria-label="Indraprastha NEET Academy">
-            <Image
-              src="/logo_app.jpeg"
-              alt="Indraprastha NEET Logo"
-              width={38}
-              height={38}
-              priority
-              style={{ objectFit: "cover" }}
-            />
-            <div>
-              <span className="brand-title">IndraprasthaNEET</span>
-              <span className="brand-sub">ACADEMY</span>
-            </div>
-          </Link>
-
-          {/* Nav Items */}
-          <ul className="navbar-nav">
-            {navItems.map((item) => (
-              <li key={item.label}>
-                <Link
-                  href={item.href}
-                  className={item.active ? "nav-link-active" : ""}
-                  style={
-                    item.active
-                      ? { background: "rgba(229,82,0,0.1)", color: "var(--orange)", fontWeight: 800 }
-                      : {}
-                  }
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          {/* Right Actions */}
-          <div className="navbar-actions">
-            <a href="tel:+917702022682" className="phone-badge">
-              📞 +91 77020 22682
-            </a>
-            <a href="#itre" className="btn-enroll-nav btn-orange-leather">
-              <span>Enroll Now</span>
-            </a>
-          </div>
-        </div>
-      </nav>
+      {/* ════════ MAIN NAVBAR ════════ */}
+      <Navbar activePage="target-batches" />
 
       {/* ════════ PAGE HERO BANNER & FILTERS ════════ */}
       <section className="hero-section has-texture" style={{ paddingTop: "96px", paddingBottom: "48px" }}>
@@ -343,40 +296,12 @@ export default function TargetBatchesPage() {
 
             {/* Right Trust Cards */}
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <div
-                style={{
-                  background: "#FFF",
-                  border: "1px solid var(--border-light)",
-                  borderRadius: "10px",
-                  padding: "10px 16px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "#3B2B23",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  boxShadow: "var(--shadow-sm)",
-                }}
-              >
+              <div className="tb-trust-pill">
                 <span style={{ fontSize: "16px" }}>🎓</span>
                 <span>1:25 Mentor Ratio Guaranteed</span>
               </div>
 
-              <div
-                style={{
-                  background: "#FFF",
-                  border: "1px solid var(--border-light)",
-                  borderRadius: "10px",
-                  padding: "10px 16px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "#3B2B23",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  boxShadow: "var(--shadow-sm)",
-                }}
-              >
+              <div className="tb-trust-pill">
                 <span style={{ fontSize: "16px" }}>⚡</span>
                 <span>Daily Live Error-Desk Diagnosis</span>
               </div>
@@ -384,21 +309,7 @@ export default function TargetBatchesPage() {
           </div>
 
           {/* ── FILTER CONTROLS BAR ── */}
-          <div
-            style={{
-              marginTop: "40px",
-              background: "#FFF",
-              borderRadius: "12px",
-              border: "1px solid var(--border-light)",
-              padding: "14px 20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "20px",
-              flexWrap: "wrap",
-              boxShadow: "var(--shadow-sm)",
-            }}
-          >
+          <div className="tb-filter-bar">
             {/* Year Filters */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "11px", fontWeight: 800, color: "#8C786B", marginRight: "6px" }}>
@@ -407,48 +318,21 @@ export default function TargetBatchesPage() {
               <button
                 type="button"
                 onClick={() => setYearFilter("all")}
-                style={{
-                  padding: "7px 16px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  border: "none",
-                  cursor: "pointer",
-                  background: yearFilter === "all" ? "var(--orange)" : "#F5ECE5",
-                  color: yearFilter === "all" ? "#FFF" : "#4A362B",
-                }}
+                className={`tb-filter-btn ${yearFilter === "all" ? "active-orange" : ""}`}
               >
                 All Batches
               </button>
               <button
                 type="button"
                 onClick={() => setYearFilter("2026")}
-                style={{
-                  padding: "7px 16px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  border: "none",
-                  cursor: "pointer",
-                  background: yearFilter === "2026" ? "var(--orange)" : "#F5ECE5",
-                  color: yearFilter === "2026" ? "#FFF" : "#4A362B",
-                }}
+                className={`tb-filter-btn ${yearFilter === "2026" ? "active-orange" : ""}`}
               >
                 NEET 2026
               </button>
               <button
                 type="button"
                 onClick={() => setYearFilter("2027")}
-                style={{
-                  padding: "7px 16px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  border: "none",
-                  cursor: "pointer",
-                  background: yearFilter === "2027" ? "var(--orange)" : "#F5ECE5",
-                  color: yearFilter === "2027" ? "#FFF" : "#4A362B",
-                }}
+                className={`tb-filter-btn ${yearFilter === "2027" ? "active-orange" : ""}`}
               >
                 NEET 2027
               </button>
@@ -462,64 +346,28 @@ export default function TargetBatchesPage() {
               <button
                 type="button"
                 onClick={() => setClassFilter("all")}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  border: "none",
-                  cursor: "pointer",
-                  background: classFilter === "all" ? "#1A1009" : "#F5ECE5",
-                  color: classFilter === "all" ? "#FFF" : "#4A362B",
-                }}
+                className={`tb-filter-btn ${classFilter === "all" ? "active-dark" : ""}`}
               >
                 All Courses
               </button>
               <button
                 type="button"
                 onClick={() => setClassFilter("11th")}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  border: "none",
-                  cursor: "pointer",
-                  background: classFilter === "11th" ? "#1A1009" : "#F5ECE5",
-                  color: classFilter === "11th" ? "#FFF" : "#4A362B",
-                }}
+                className={`tb-filter-btn ${classFilter === "11th" ? "active-dark" : ""}`}
               >
                 Class 11th
               </button>
               <button
                 type="button"
                 onClick={() => setClassFilter("12th")}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  border: "none",
-                  cursor: "pointer",
-                  background: classFilter === "12th" ? "#1A1009" : "#F5ECE5",
-                  color: classFilter === "12th" ? "#FFF" : "#4A362B",
-                }}
+                className={`tb-filter-btn ${classFilter === "12th" ? "active-dark" : ""}`}
               >
                 Class 12th
               </button>
               <button
                 type="button"
                 onClick={() => setClassFilter("dropper")}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  border: "none",
-                  cursor: "pointer",
-                  background: classFilter === "dropper" ? "#1A1009" : "#F5ECE5",
-                  color: classFilter === "dropper" ? "#FFF" : "#4A362B",
-                }}
+                className={`tb-filter-btn ${classFilter === "dropper" ? "active-dark" : ""}`}
               >
                 Dropper / Repeater
               </button>
@@ -541,20 +389,7 @@ export default function TargetBatchesPage() {
           }}
         >
           {filteredBatches.map((b) => (
-            <div
-              key={b.id}
-              style={{
-                background: "#FFF",
-                borderRadius: "18px",
-                border: "1px solid var(--border-light)",
-                boxShadow: "0 4px 16px rgba(28, 18, 12, 0.05)",
-                padding: "32px 30px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                position: "relative",
-              }}
-            >
+            <div key={b.id} className="tb-batch-card">
               <div>
                 {/* Top Badge Row */}
                 <div
@@ -597,36 +432,25 @@ export default function TargetBatchesPage() {
                 </div>
 
                 {/* Batch Title & Subtitle */}
-                <h3 style={{ fontFamily: "Outfit, sans-serif", fontSize: "26px", fontWeight: 900, color: "#140A03", marginBottom: "4px" }}>
+                <h3 className="tb-batch-title">
                   {b.title}
                 </h3>
-                <div style={{ fontSize: "13px", color: "#6E5B50", fontWeight: 600, marginBottom: "20px" }}>
+                <div className="tb-batch-sub">
                   {b.subtitle}
                 </div>
 
                 {/* Price Block */}
-                <div
-                  style={{
-                    background: "#FAF5EF",
-                    borderRadius: "12px",
-                    padding: "16px 20px",
-                    marginBottom: "24px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    border: "1px solid #EFE4D9",
-                  }}
-                >
+                <div className="tb-price-box">
                   <div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-                      <span style={{ fontFamily: "Outfit, sans-serif", fontSize: "32px", fontWeight: 900, color: "#140A03" }}>
+                      <span className="tb-price-main">
                         {b.price}
                       </span>
-                      <span style={{ fontSize: "14px", color: "#9E8B7F", textDecoration: "line-through" }}>
+                      <span className="tb-price-old">
                         {b.oldPrice}
                       </span>
                     </div>
-                    <div style={{ fontSize: "11px", color: "#6E5B50", marginTop: "2px" }}>{b.materialInfo}</div>
+                    <div className="tb-material-info">{b.materialInfo}</div>
                   </div>
 
                   <div style={{ textAlign: "right" }}>
@@ -655,7 +479,7 @@ export default function TargetBatchesPage() {
                 {/* Checklist */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "28px" }}>
                   {b.feats.map((f, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", fontSize: "13px", color: "#3B2B23", lineHeight: 1.45 }}>
+                    <div key={i} className="tb-feat-text" style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
                       <span
                         style={{
                           width: "18px",
@@ -675,7 +499,7 @@ export default function TargetBatchesPage() {
                         ✓
                       </span>
                       <div>
-                        <strong style={{ color: "#140A03" }}>{f.bold}: </strong>
+                        <strong>{f.bold}: </strong>
                         <span>{f.text}</span>
                       </div>
                     </div>
@@ -685,25 +509,15 @@ export default function TargetBatchesPage() {
 
               <div>
                 {/* Faculty & Schedule Footer */}
-                <div
-                  style={{
-                    paddingTop: "16px",
-                    borderTop: "1px solid #F3ECE5",
-                    marginBottom: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    fontSize: "12px",
-                  }}
-                >
+                <div className="tb-faculty-footer">
                   <div>
-                    <strong style={{ color: "#140A03", display: "block" }}>{b.facultyLabel}</strong>
-                    <span style={{ fontSize: "11px", color: "#6E5B50" }}>{b.facultySub}</span>
+                    <strong style={{ display: "block" }}>{b.facultyLabel}</strong>
+                    <span>{b.facultySub}</span>
                   </div>
 
                   <div style={{ textAlign: "right" }}>
                     <strong style={{ color: "var(--orange)", display: "block" }}>{b.startDate}</strong>
-                    <span style={{ fontSize: "11px", color: "#6E5B50" }}>{b.timing}</span>
+                    <span>{b.timing}</span>
                   </div>
                 </div>
 
@@ -719,15 +533,7 @@ export default function TargetBatchesPage() {
 
                   <button
                     type="button"
-                    style={{
-                      background: "#FAF5EF",
-                      border: "1px solid #E8DDD4",
-                      borderRadius: "8px",
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      color: "#3B2B23",
-                      cursor: "pointer",
-                    }}
+                    className="tb-btn-demo"
                     onClick={() => setActiveModal({ type: "demo", batchName: b.title })}
                   >
                     📞 Free Demo
@@ -752,28 +558,9 @@ export default function TargetBatchesPage() {
         </div>
 
         <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 24px" }}>
-          <div
-            style={{
-              background: "#FFF",
-              borderRadius: "16px",
-              border: "1px solid var(--border-light)",
-              boxShadow: "var(--shadow-sm)",
-              overflow: "hidden",
-            }}
-          >
+          <div className="tb-comparison-card">
             {/* Table Header */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1.2fr 1.5fr 1.5fr",
-                background: "#FAF5EF",
-                borderBottom: "1px solid var(--border-light)",
-                padding: "16px 24px",
-                fontWeight: 800,
-                fontSize: "13px",
-                color: "#140A03",
-              }}
-            >
+            <div className="tb-comp-head">
               <div>Prep Factor &amp; Delivery Architecture</div>
               <div style={{ color: "var(--orange)", display: "flex", alignItems: "center", gap: "6px" }}>
                 <span>🔥</span> Indraprastha NEET Batches
@@ -782,24 +569,16 @@ export default function TargetBatchesPage() {
             </div>
 
             {/* Table Rows */}
-            {comparisonRows.map((row, idx) => (
+            {comparisonRows.map((row) => (
               <div
                 key={row.factor}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1.2fr 1.5fr 1.5fr",
-                  padding: "20px 24px",
-                  borderBottom: idx === comparisonRows.length - 1 ? "none" : "1px solid #F3ECE5",
-                  fontSize: "13px",
-                  alignItems: "center",
-                  background: idx % 2 === 0 ? "#FFF" : "#FCF9F5",
-                }}
+                className="tb-comp-row"
               >
-                <div style={{ fontWeight: 700, color: "#140A03" }}>{row.factor}</div>
+                <div>{row.factor}</div>
                 <div style={{ color: "#16A34A", fontWeight: 700, paddingRight: "16px" }}>
                   ✓ {row.indraprastha}
                 </div>
-                <div style={{ color: "#7A675B", lineHeight: 1.4 }}>{row.traditional}</div>
+                <div style={{ lineHeight: 1.4 }}>{row.traditional}</div>
               </div>
             ))}
           </div>
@@ -823,15 +602,7 @@ export default function TargetBatchesPage() {
           onClick={() => setActiveModal(null)}
         >
           <div
-            style={{
-              background: "#FFF",
-              borderRadius: "16px",
-              padding: "36px",
-              maxWidth: "480px",
-              width: "100%",
-              boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
-              border: "1px solid var(--border-light)",
-            }}
+            className="tb-modal-box"
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
@@ -934,107 +705,7 @@ export default function TargetBatchesPage() {
       )}
 
       {/* ════════ FOOTER ════════ */}
-      <footer className="footer-section has-dark-texture" id="footer">
-        <div className="footer-container">
-          <div className="footer-top-grid">
-            {/* Col 1 */}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <Image
-                  src="/logo_app.jpeg"
-                  alt="Indraprastha Logo"
-                  width={34}
-                  height={34}
-                  style={{ borderRadius: "7px", objectFit: "cover" }}
-                />
-                <div>
-                  <span style={{ fontFamily: "Outfit, sans-serif", fontSize: "15px", fontWeight: "900", color: "#FFFFFF" }}>
-                    IndraprasthaNEET
-                  </span>
-                  <span style={{ fontSize: "9px", color: "var(--orange)", fontWeight: "800", display: "block", letterSpacing: "1px" }}>
-                    ACADEMY
-                  </span>
-                </div>
-              </div>
-
-              <p className="footer-bio-text">
-                Pioneering India&apos;s top NEET aspirants with rigorous cognitive analytics, strategy-led NCERT exemplar modules and AIR Top 100 Producing Faculty.
-              </p>
-
-              <span className="footer-badge-pill">🏆 AIR Top 100 Producing Faculty</span>
-            </div>
-
-            {/* Col 2 */}
-            <div>
-              <h4 className="footer-col-title">Quick Access</h4>
-              <ul className="footer-links-list">
-                <li><Link href="/">Home Overview</Link></li>
-                <li><Link href="/target-batches">Target Batches 2026/27</Link></li>
-                <li><a href="/#quiz">AI Rank Predictor</a></li>
-                <li><a href="/#methodology">Indraprastha Method</a></li>
-                <li><a href="/#app">Mobile App Showcase</a></li>
-                <li><a href="#footer">Help Desk &amp; FAQs</a></li>
-              </ul>
-            </div>
-
-            {/* Col 3 */}
-            <div>
-              <h4 className="footer-col-title">Helpline &amp; Campus</h4>
-              <div className="footer-contact-item">
-                <span>📞</span>
-                <div>
-                  <strong style={{ color: "#FFFFFF" }}>+91 77020 22682</strong>
-                  <div style={{ fontSize: "11px" }}>WhatsApp &amp; Phone Support</div>
-                </div>
-              </div>
-
-              <div className="footer-contact-item">
-                <span>✉️</span>
-                <div>
-                  <div style={{ color: "#FFFFFF" }}>support@indraprastha-neetacademy.com</div>
-                </div>
-              </div>
-
-              <div className="footer-contact-item">
-                <span>⏰</span>
-                <div>Mon - Sat: 08:00 AM - 08:00 PM IST</div>
-              </div>
-            </div>
-
-            {/* Col 4 */}
-            <div>
-              <h4 className="footer-col-title">Digital Study App</h4>
-              <div className="app-store-btns">
-                <a href="#" className="btn-app-store-badge">
-                  <span>▶</span>
-                  <div>
-                    <span className="store-badge-sub">GET IT ON</span>
-                    <span className="store-badge-title">Google Play</span>
-                  </div>
-                </a>
-
-                <a href="#" className="btn-app-store-badge">
-                  <span>🍎</span>
-                  <div>
-                    <span className="store-badge-sub">DOWNLOAD ON THE</span>
-                    <span className="store-badge-title">App Store</span>
-                  </div>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div className="footer-bottom-bar">
-            <div>© 2026 Indraprastha NEET Academy. All academic rights reserved.</div>
-            <div className="footer-legal-links">
-              <a href="#">Privacy Policy</a>
-              <a href="#">Terms of Admission</a>
-              <a href="#">Honor Code</a>
-              <a href="#">Grievance Redressal</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }

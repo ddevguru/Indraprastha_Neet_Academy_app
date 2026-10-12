@@ -63,6 +63,19 @@ class PracticeSavedState {
   Set<String> get incorrectIds =>
       incorrect.map((question) => question.id).toSet();
 
+  List<SavedPracticeQuestion> get combined {
+    final seen = <String>{};
+    final list = <SavedPracticeQuestion>[];
+    for (final q in [...incorrect, ...bookmarked]) {
+      if (seen.add(q.id)) {
+        list.add(q);
+      }
+    }
+    return list;
+  }
+
+  Set<String> get combinedIds => {...bookmarkedIds, ...incorrectIds};
+
   PracticeSavedState copyWith({
     List<SavedPracticeQuestion>? bookmarked,
     List<SavedPracticeQuestion>? incorrect,

@@ -297,6 +297,21 @@ function parseSimilarQuestionPayload(input) {
   if (!parsed || typeof parsed !== 'object') return null;
   const questionText = (parsed.question || '').toString().trim();
   if (!questionText) return null;
+
+  let explanationImages = [];
+  if (Array.isArray(parsed.explanation_images)) {
+    explanationImages = parsed.explanation_images
+      .map(img => (typeof img === 'string' ? img : (img?.image_url || img?.imageLink || img?.url || '')).toString().trim())
+      .filter(Boolean);
+  } else if (Array.isArray(parsed.explanation_images_list)) {
+    explanationImages = parsed.explanation_images_list
+      .map(img => (typeof img === 'string' ? img : (img?.image_url || img?.imageLink || img?.url || '')).toString().trim())
+      .filter(Boolean);
+  }
+
+  const questionImageLink = (parsed.question_image_link ?? parsed.questionImageLink ?? parsed.image_url ?? parsed.question_image ?? '').toString().trim();
+  const explanationImageLink = (parsed.explanation_image_link ?? parsed.explanationImageLink ?? parsed.explanation_image ?? '').toString().trim();
+
   return {
     question: questionText,
     option_a: (parsed.option_a ?? parsed.optionA ?? '').toString().trim(),
@@ -305,6 +320,9 @@ function parseSimilarQuestionPayload(input) {
     option_d: (parsed.option_d ?? parsed.optionD ?? '').toString().trim(),
     correct_option: (parsed.correct_option ?? parsed.correctOption ?? 'A').toString().trim().toUpperCase(),
     explanation: (parsed.explanation ?? '').toString().trim(),
+    question_image_link: questionImageLink,
+    explanation_image_link: explanationImageLink,
+    explanation_images: explanationImages,
   };
 }
 

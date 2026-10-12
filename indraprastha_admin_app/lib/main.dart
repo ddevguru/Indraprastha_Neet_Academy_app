@@ -2522,6 +2522,12 @@ class _PracticePageState extends State<PracticePage> {
   final _pqSimilarExplanation = TextEditingController();
   String _pqSimilarCorrect = 'A';
   bool _pqShowSimilarQuestion = false;
+  File? _pqSimilarQuestionImage;
+  String _pqSimilarQuestionImageLink = '';
+  File? _pqSimilarExplanationImage;
+  String _pqSimilarExplanationImageLink = '';
+  final List<File> _pqSimilarPendingExtraExplanationImages = [];
+  final List<String> _pqSimilarExistingExplanationImages = [];
 
   List<dynamic> _batches = const [];
   List<dynamic> _items = const [];
@@ -2589,6 +2595,12 @@ class _PracticePageState extends State<PracticePage> {
       _pqCorrect = 'A';
       _pqSimilarCorrect = 'A';
       _pqShowSimilarQuestion = false;
+      _pqSimilarQuestionImage = null;
+      _pqSimilarQuestionImageLink = '';
+      _pqSimilarExplanationImage = null;
+      _pqSimilarExplanationImageLink = '';
+      _pqSimilarPendingExtraExplanationImages.clear();
+      _pqSimilarExistingExplanationImages.clear();
     });
   }
 
@@ -2756,6 +2768,12 @@ class _PracticePageState extends State<PracticePage> {
     final qSimilarExplanation = TextEditingController();
     String qSimilarCorrect = 'A';
     bool qShowSimilarQuestion = false;
+    File? qSimilarQuestionImage;
+    String qSimilarQuestionImageLink = '';
+    File? qSimilarExplanationImage;
+    String qSimilarExplanationImageLink = '';
+    final List<File> qSimilarPendingExtraExplanationImages = [];
+    final List<String> qSimilarExistingExplanationImages = [];
 
     final sq = initialQuestion?['similar_question'];
     Map<String, dynamic>? sqMap;
@@ -2776,6 +2794,15 @@ class _PracticePageState extends State<PracticePage> {
       qSimilarCorrect = sqMap['correct_option']?.toString() ?? sqMap['correctOption']?.toString() ?? 'A';
       if (!const ['A', 'B', 'C', 'D'].contains(qSimilarCorrect)) qSimilarCorrect = 'A';
       qSimilarExplanation.text = sqMap['explanation']?.toString() ?? '';
+      qSimilarQuestionImageLink = sqMap['question_image_link']?.toString() ?? sqMap['image_url']?.toString() ?? '';
+      qSimilarExplanationImageLink = sqMap['explanation_image_link']?.toString() ?? '';
+      final rawExtra = sqMap['explanation_images'] ?? sqMap['explanation_images_list'];
+      if (rawExtra is List) {
+        for (final item in rawExtra) {
+          final s = (item is String ? item : (item is Map ? (item['image_url'] ?? item['imageLink'] ?? '') : '')).toString().trim();
+          if (s.isNotEmpty) qSimilarExistingExplanationImages.add(s);
+        }
+      }
       qShowSimilarQuestion = true;
     }
 
@@ -3000,6 +3027,137 @@ class _PracticePageState extends State<PracticePage> {
                                 maxLines: 4,
                                 decoration: const InputDecoration(labelText: 'Explanation for Similar Question'),
                               ),
+                              const SizedBox(height: 10),
+                              // Similar Question Image
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      qSimilarQuestionImage == null
+                                          ? (qSimilarQuestionImageLink.isEmpty
+                                              ? 'No similar question image'
+                                              : 'Similar question image uploaded')
+                                          : qSimilarQuestionImage!.path.split(Platform.pathSeparator).last,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                      if (result?.files.single.path == null) return;
+                                      setDialogState(() => qSimilarQuestionImage = File(result!.files.single.path!));
+                                    },
+                                    child: const Text('Pick Image'),
+                                  ),
+                                  if (qSimilarQuestionImage != null || qSimilarQuestionImageLink.isNotEmpty)
+                                    TextButton(
+                                      onPressed: () => setDialogState(() {
+                                        qSimilarQuestionImage = null;
+                                        qSimilarQuestionImageLink = '';
+                                      }),
+                                      child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              // Similar Question Explanation Image
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      qSimilarExplanationImage == null
+                                          ? (qSimilarExplanationImageLink.isEmpty
+                                              ? 'No similar explanation image'
+                                              : 'Similar explanation image uploaded')
+                                          : qSimilarExplanationImage!.path.split(Platform.pathSeparator).last,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                      if (result?.files.single.path == null) return;
+                                      setDialogState(() => qSimilarExplanationImage = File(result!.files.single.path!));
+                                    },
+                                    child: const Text('Pick Image'),
+                                  ),
+                                  if (qSimilarExplanationImage != null || qSimilarExplanationImageLink.isNotEmpty)
+                                    TextButton(
+                                      onPressed: () => setDialogState(() {
+                                        qSimilarExplanationImage = null;
+                                        qSimilarExplanationImageLink = '';
+                                      }),
+                                      child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              // Multiple Explanation Images for Similar Question
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      qSimilarPendingExtraExplanationImages.isEmpty && qSimilarExistingExplanationImages.isEmpty
+                                          ? 'No extra explanation images'
+                                          : '${qSimilarExistingExplanationImages.length} saved, ${qSimilarPendingExtraExplanationImages.length} ready to upload',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
+                                    label: const Text('Add Images'),
+                                    onPressed: () async {
+                                      final result = await FilePicker.platform.pickFiles(
+                                        type: FileType.image,
+                                        allowMultiple: true,
+                                      );
+                                      if (result == null) return;
+                                      setDialogState(() {
+                                        for (final f in result.files) {
+                                          if (f.path != null) {
+                                            qSimilarPendingExtraExplanationImages.add(File(f.path!));
+                                          }
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                              if (qSimilarExistingExplanationImages.isNotEmpty) ...[
+                                ...qSimilarExistingExplanationImages.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const Icon(Icons.image_outlined, size: 18),
+                                    title: Text('Saved Explanation Image #${idx + 1}', style: const TextStyle(fontSize: 12)),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                                      onPressed: () => setDialogState(() => qSimilarExistingExplanationImages.removeAt(idx)),
+                                    ),
+                                  );
+                                }),
+                              ],
+                              if (qSimilarPendingExtraExplanationImages.isNotEmpty) ...[
+                                ...qSimilarPendingExtraExplanationImages.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  final file = entry.value;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const Icon(Icons.add_photo_alternate_outlined, size: 18, color: Colors.indigo),
+                                    title: Text(file.path.split(Platform.pathSeparator).last, style: const TextStyle(fontSize: 12)),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
+                                      onPressed: () => setDialogState(() => qSimilarPendingExtraExplanationImages.removeAt(idx)),
+                                    ),
+                                  );
+                                }),
+                              ],
                             ],
                           ),
                         ),
@@ -3034,8 +3192,69 @@ class _PracticePageState extends State<PracticePage> {
                         var expImgLink = qExplanationImageLink;
                         final vidLink = qExplanationVideoLink.text.trim();
 
+                        final currentSet = _items.firstWhere(
+                          (x) => _asInt((x as Map)['id']) == setId,
+                          orElse: () => null,
+                        );
+                        final bId = currentSet != null ? _asInt(currentSet['batch_id'] ?? _batchId) : _batchId;
+                        final effectiveBatchId = bId ?? (_batches.isNotEmpty ? _asInt((_batches.first as Map)['id']) : null);
+                        final cls = currentSet != null ? currentSet['class_label']?.toString() ?? '' : _classLabel.text.trim();
+                        final sbj = currentSet != null ? currentSet['subject']?.toString() ?? '' : _subject.text.trim();
+                        final tpc = currentSet != null ? currentSet['topic']?.toString() ?? '' : _topic.text.trim();
+
                         Map<String, dynamic>? simData;
                         if (qSimilarQuestion.text.trim().isNotEmpty) {
+                          if (effectiveBatchId != null) {
+                            if (qSimilarQuestionImage != null) {
+                              if (!await _validateImageFile(dialogCtx, qSimilarQuestionImage!)) {
+                                throw Exception('Similar question image too large');
+                              }
+                              qSimilarQuestionImageLink = await widget.api.uploadQuestionImage(
+                                batchId: effectiveBatchId,
+                                classLabel: cls,
+                                subject: sbj,
+                                topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                file: qSimilarQuestionImage!,
+                                contentType: 'similar_question',
+                                contentId: setId,
+                              );
+                            }
+                            if (qSimilarExplanationImage != null) {
+                              if (!await _validateImageFile(dialogCtx, qSimilarExplanationImage!)) {
+                                throw Exception('Similar explanation image too large');
+                              }
+                              qSimilarExplanationImageLink = await widget.api.uploadQuestionImage(
+                                batchId: effectiveBatchId,
+                                classLabel: cls,
+                                subject: sbj,
+                                topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                file: qSimilarExplanationImage!,
+                                contentType: 'similar_explanation',
+                                contentId: setId,
+                              );
+                            }
+                            if (qSimilarPendingExtraExplanationImages.isNotEmpty) {
+                              for (final extraFile in qSimilarPendingExtraExplanationImages) {
+                                if (!await _validateImageFile(dialogCtx, extraFile)) {
+                                  throw Exception('Similar explanation image too large');
+                                }
+                                final extraLink = await widget.api.uploadQuestionImage(
+                                  batchId: effectiveBatchId,
+                                  classLabel: cls,
+                                  subject: sbj,
+                                  topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                  file: extraFile,
+                                  contentType: 'similar_explanation_extra',
+                                  contentId: setId,
+                                );
+                                if (extraLink.isNotEmpty) {
+                                  qSimilarExistingExplanationImages.add(extraLink);
+                                }
+                              }
+                              qSimilarPendingExtraExplanationImages.clear();
+                            }
+                          }
+
                           simData = {
                             'question': qSimilarQuestion.text.trim(),
                             'option_a': qSimilarOptionA.text.trim(),
@@ -3044,6 +3263,9 @@ class _PracticePageState extends State<PracticePage> {
                             'option_d': qSimilarOptionD.text.trim(),
                             'correct_option': qSimilarCorrect,
                             'explanation': qSimilarExplanation.text.trim(),
+                            if (qSimilarQuestionImageLink.isNotEmpty) 'question_image_link': qSimilarQuestionImageLink,
+                            if (qSimilarExplanationImageLink.isNotEmpty) 'explanation_image_link': qSimilarExplanationImageLink,
+                            if (qSimilarExistingExplanationImages.isNotEmpty) 'explanation_images': qSimilarExistingExplanationImages,
                           };
                         }
 
@@ -3998,6 +4220,137 @@ class _PracticePageState extends State<PracticePage> {
                                 labelText: 'Explanation for Similar Question (Optional)',
                               ),
                             ),
+                            const SizedBox(height: 10),
+                            // Similar Question Image
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _pqSimilarQuestionImage == null
+                                        ? (_pqSimilarQuestionImageLink.isEmpty
+                                            ? 'No similar question image'
+                                            : 'Similar question image uploaded')
+                                        : _pqSimilarQuestionImage!.path.split(Platform.pathSeparator).last,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                    if (result?.files.single.path == null) return;
+                                    setState(() => _pqSimilarQuestionImage = File(result!.files.single.path!));
+                                  },
+                                  child: const Text('Pick Image'),
+                                ),
+                                if (_pqSimilarQuestionImage != null || _pqSimilarQuestionImageLink.isNotEmpty)
+                                  TextButton(
+                                    onPressed: () => setState(() {
+                                      _pqSimilarQuestionImage = null;
+                                      _pqSimilarQuestionImageLink = '';
+                                    }),
+                                    child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            // Similar Question Explanation Image
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _pqSimilarExplanationImage == null
+                                        ? (_pqSimilarExplanationImageLink.isEmpty
+                                            ? 'No similar explanation image'
+                                            : 'Similar explanation image uploaded')
+                                        : _pqSimilarExplanationImage!.path.split(Platform.pathSeparator).last,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                    if (result?.files.single.path == null) return;
+                                    setState(() => _pqSimilarExplanationImage = File(result!.files.single.path!));
+                                  },
+                                  child: const Text('Pick Image'),
+                                ),
+                                if (_pqSimilarExplanationImage != null || _pqSimilarExplanationImageLink.isNotEmpty)
+                                  TextButton(
+                                    onPressed: () => setState(() {
+                                      _pqSimilarExplanationImage = null;
+                                      _pqSimilarExplanationImageLink = '';
+                                    }),
+                                    child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Multiple Explanation Images for Similar Question
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _pqSimilarPendingExtraExplanationImages.isEmpty && _pqSimilarExistingExplanationImages.isEmpty
+                                        ? 'No extra explanation images'
+                                        : '${_pqSimilarExistingExplanationImages.length} saved, ${_pqSimilarPendingExtraExplanationImages.length} ready to upload',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
+                                  label: const Text('Add Images'),
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform.pickFiles(
+                                      type: FileType.image,
+                                      allowMultiple: true,
+                                    );
+                                    if (result == null) return;
+                                    setState(() {
+                                      for (final f in result.files) {
+                                        if (f.path != null) {
+                                          _pqSimilarPendingExtraExplanationImages.add(File(f.path!));
+                                        }
+                                      }
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            if (_pqSimilarExistingExplanationImages.isNotEmpty) ...[
+                              ..._pqSimilarExistingExplanationImages.asMap().entries.map((entry) {
+                                final idx = entry.key;
+                                return ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.image_outlined, size: 18),
+                                  title: Text('Saved Explanation Image #${idx + 1}', style: const TextStyle(fontSize: 12)),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                                    onPressed: () => setState(() => _pqSimilarExistingExplanationImages.removeAt(idx)),
+                                  ),
+                                );
+                              }),
+                            ],
+                            if (_pqSimilarPendingExtraExplanationImages.isNotEmpty) ...[
+                              ..._pqSimilarPendingExtraExplanationImages.asMap().entries.map((entry) {
+                                final idx = entry.key;
+                                final file = entry.value;
+                                return ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.add_photo_alternate_outlined, size: 18, color: Colors.indigo),
+                                  title: Text(file.path.split(Platform.pathSeparator).last, style: const TextStyle(fontSize: 12)),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
+                                    onPressed: () => setState(() => _pqSimilarPendingExtraExplanationImages.removeAt(idx)),
+                                  ),
+                                );
+                              }),
+                            ],
                           ],
                         ),
                       ),
@@ -4019,8 +4372,69 @@ class _PracticePageState extends State<PracticePage> {
                                 var expLink = _pqExplanationImageLink;
                                 final videoLink = _pqExplanationVideoLink.text.trim();
 
+                                final currentSet = _items.firstWhere(
+                                  (x) => _asInt((x as Map)['id']) == _selectedSetId,
+                                  orElse: () => null,
+                                );
+                                final bId = currentSet != null ? _asInt(currentSet['batch_id'] ?? _batchId) : _batchId;
+                                final effectiveBatchId = bId ?? (_batches.isNotEmpty ? _asInt((_batches.first as Map)['id']) : null);
+                                final cls = currentSet != null ? currentSet['class_label']?.toString() ?? '' : _classLabel.text.trim();
+                                final sbj = currentSet != null ? currentSet['subject']?.toString() ?? '' : _subject.text.trim();
+                                final tpc = currentSet != null ? currentSet['topic']?.toString() ?? '' : _topic.text.trim();
+
                                 Map<String, dynamic>? similarQuestionData;
                                 if (_pqSimilarQuestion.text.trim().isNotEmpty) {
+                                  if (effectiveBatchId != null) {
+                                    if (_pqSimilarQuestionImage != null) {
+                                      if (!await _validateImageFile(context, _pqSimilarQuestionImage!)) {
+                                        throw Exception('Similar question image too large');
+                                      }
+                                      _pqSimilarQuestionImageLink = await widget.api.uploadQuestionImage(
+                                        batchId: effectiveBatchId,
+                                        classLabel: cls,
+                                        subject: sbj,
+                                        topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                        file: _pqSimilarQuestionImage!,
+                                        contentType: 'similar_question',
+                                        contentId: _selectedSetId,
+                                      );
+                                    }
+                                    if (_pqSimilarExplanationImage != null) {
+                                      if (!await _validateImageFile(context, _pqSimilarExplanationImage!)) {
+                                        throw Exception('Similar explanation image too large');
+                                      }
+                                      _pqSimilarExplanationImageLink = await widget.api.uploadQuestionImage(
+                                        batchId: effectiveBatchId,
+                                        classLabel: cls,
+                                        subject: sbj,
+                                        topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                        file: _pqSimilarExplanationImage!,
+                                        contentType: 'similar_explanation',
+                                        contentId: _selectedSetId,
+                                      );
+                                    }
+                                    if (_pqSimilarPendingExtraExplanationImages.isNotEmpty) {
+                                      for (final extraFile in _pqSimilarPendingExtraExplanationImages) {
+                                        if (!await _validateImageFile(context, extraFile)) {
+                                          throw Exception('Similar explanation extra image too large');
+                                        }
+                                        final extraLink = await widget.api.uploadQuestionImage(
+                                          batchId: effectiveBatchId,
+                                          classLabel: cls,
+                                          subject: sbj,
+                                          topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                          file: extraFile,
+                                          contentType: 'similar_explanation_extra',
+                                          contentId: _selectedSetId,
+                                        );
+                                        if (extraLink.isNotEmpty) {
+                                          _pqSimilarExistingExplanationImages.add(extraLink);
+                                        }
+                                      }
+                                      _pqSimilarPendingExtraExplanationImages.clear();
+                                    }
+                                  }
+
                                   similarQuestionData = {
                                     'question': _pqSimilarQuestion.text.trim(),
                                     'option_a': _pqSimilarOptionA.text.trim(),
@@ -4029,6 +4443,9 @@ class _PracticePageState extends State<PracticePage> {
                                     'option_d': _pqSimilarOptionD.text.trim(),
                                     'correct_option': _pqSimilarCorrect,
                                     'explanation': _pqSimilarExplanation.text.trim(),
+                                    if (_pqSimilarQuestionImageLink.isNotEmpty) 'question_image_link': _pqSimilarQuestionImageLink,
+                                    if (_pqSimilarExplanationImageLink.isNotEmpty) 'explanation_image_link': _pqSimilarExplanationImageLink,
+                                    if (_pqSimilarExistingExplanationImages.isNotEmpty) 'explanation_images': _pqSimilarExistingExplanationImages,
                                   };
                                 }
 
@@ -4367,6 +4784,12 @@ class _TestsPageState extends State<TestsPage> {
   final _testSimilarExplanation = TextEditingController();
   String _testSimilarCorrect = 'A';
   bool _testShowSimilarQuestion = false;
+  File? _testSimilarQuestionImage;
+  String _testSimilarQuestionImageLink = '';
+  File? _testSimilarExplanationImage;
+  String _testSimilarExplanationImageLink = '';
+  final List<File> _testSimilarPendingExtraExplanationImages = [];
+  final List<String> _testSimilarExistingExplanationImages = [];
 
   final List<File> _pendingExtraExplanationImages = [];
   List<dynamic> _savedExplanationImages = const [];
@@ -4443,6 +4866,12 @@ class _TestsPageState extends State<TestsPage> {
       _testCorrect = 'A';
       _testSimilarCorrect = 'A';
       _testShowSimilarQuestion = false;
+      _testSimilarQuestionImage = null;
+      _testSimilarQuestionImageLink = '';
+      _testSimilarExplanationImage = null;
+      _testSimilarExplanationImageLink = '';
+      _testSimilarPendingExtraExplanationImages.clear();
+      _testSimilarExistingExplanationImages.clear();
       _testQuestionImage = null;
       _testQuestionImageLink = '';
       _testExplanationImage = null;
@@ -4715,6 +5144,19 @@ class _TestsPageState extends State<TestsPage> {
                                               _testSimilarOptionD.text = simQ['option_d']?.toString() ?? '';
                                               _testSimilarCorrect = simQ['correct_option']?.toString() ?? 'A';
                                               _testSimilarExplanation.text = simQ['explanation']?.toString() ?? '';
+                                              _testSimilarQuestionImageLink = simQ['question_image_link']?.toString() ?? '';
+                                              _testSimilarExplanationImageLink = simQ['explanation_image_link']?.toString() ?? '';
+                                              _testSimilarQuestionImage = null;
+                                              _testSimilarExplanationImage = null;
+                                              _testSimilarPendingExtraExplanationImages.clear();
+                                              _testSimilarExistingExplanationImages.clear();
+                                              if (simQ['explanation_images'] is List) {
+                                                _testSimilarExistingExplanationImages.addAll(
+                                                  (simQ['explanation_images'] as List)
+                                                      .map((e) => e?.toString() ?? '')
+                                                      .where((s) => s.isNotEmpty),
+                                                );
+                                              }
                                               _testShowSimilarQuestion = true;
                                             } else {
                                               _testSimilarQuestion.clear();
@@ -4724,6 +5166,12 @@ class _TestsPageState extends State<TestsPage> {
                                               _testSimilarOptionD.clear();
                                               _testSimilarCorrect = 'A';
                                               _testSimilarExplanation.clear();
+                                              _testSimilarQuestionImageLink = '';
+                                              _testSimilarExplanationImageLink = '';
+                                              _testSimilarQuestionImage = null;
+                                              _testSimilarExplanationImage = null;
+                                              _testSimilarPendingExtraExplanationImages.clear();
+                                              _testSimilarExistingExplanationImages.clear();
                                               _testShowSimilarQuestion = false;
                                             }
                                           });
@@ -5276,6 +5724,137 @@ class _TestsPageState extends State<TestsPage> {
                                   labelText: 'Explanation for Similar Question (Optional)',
                                 ),
                               ),
+                              const SizedBox(height: 10),
+                              // Similar Question Image
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _testSimilarQuestionImage == null
+                                          ? (_testSimilarQuestionImageLink.isEmpty
+                                              ? 'No similar question image'
+                                              : 'Similar question image uploaded')
+                                          : _testSimilarQuestionImage!.path.split(Platform.pathSeparator).last,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                      if (result?.files.single.path == null) return;
+                                      setState(() => _testSimilarQuestionImage = File(result!.files.single.path!));
+                                    },
+                                    child: const Text('Pick Image'),
+                                  ),
+                                  if (_testSimilarQuestionImage != null || _testSimilarQuestionImageLink.isNotEmpty)
+                                    TextButton(
+                                      onPressed: () => setState(() {
+                                        _testSimilarQuestionImage = null;
+                                        _testSimilarQuestionImageLink = '';
+                                      }),
+                                      child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              // Similar Question Explanation Image
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _testSimilarExplanationImage == null
+                                          ? (_testSimilarExplanationImageLink.isEmpty
+                                              ? 'No similar explanation image'
+                                              : 'Similar explanation image uploaded')
+                                          : _testSimilarExplanationImage!.path.split(Platform.pathSeparator).last,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                      if (result?.files.single.path == null) return;
+                                      setState(() => _testSimilarExplanationImage = File(result!.files.single.path!));
+                                    },
+                                    child: const Text('Pick Image'),
+                                  ),
+                                  if (_testSimilarExplanationImage != null || _testSimilarExplanationImageLink.isNotEmpty)
+                                    TextButton(
+                                      onPressed: () => setState(() {
+                                        _testSimilarExplanationImage = null;
+                                        _testSimilarExplanationImageLink = '';
+                                      }),
+                                      child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              // Multiple Explanation Images for Similar Question
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _testSimilarPendingExtraExplanationImages.isEmpty && _testSimilarExistingExplanationImages.isEmpty
+                                          ? 'No extra explanation images'
+                                          : '${_testSimilarExistingExplanationImages.length} saved, ${_testSimilarPendingExtraExplanationImages.length} ready to upload',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
+                                    label: const Text('Add Images'),
+                                    onPressed: () async {
+                                      final result = await FilePicker.platform.pickFiles(
+                                        type: FileType.image,
+                                        allowMultiple: true,
+                                      );
+                                      if (result == null) return;
+                                      setState(() {
+                                        for (final f in result.files) {
+                                          if (f.path != null) {
+                                            _testSimilarPendingExtraExplanationImages.add(File(f.path!));
+                                          }
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                              if (_testSimilarExistingExplanationImages.isNotEmpty) ...[
+                                ..._testSimilarExistingExplanationImages.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const Icon(Icons.image_outlined, size: 18),
+                                    title: Text('Saved Explanation Image #${idx + 1}', style: const TextStyle(fontSize: 12)),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                                      onPressed: () => setState(() => _testSimilarExistingExplanationImages.removeAt(idx)),
+                                    ),
+                                  );
+                                }),
+                              ],
+                              if (_testSimilarPendingExtraExplanationImages.isNotEmpty) ...[
+                                ..._testSimilarPendingExtraExplanationImages.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  final file = entry.value;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const Icon(Icons.add_photo_alternate_outlined, size: 18, color: Colors.indigo),
+                                    title: Text(file.path.split(Platform.pathSeparator).last, style: const TextStyle(fontSize: 12)),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
+                                      onPressed: () => setState(() => _testSimilarPendingExtraExplanationImages.removeAt(idx)),
+                                    ),
+                                  );
+                                }),
+                              ],
                             ],
                           ),
                         ),
@@ -5297,8 +5876,69 @@ class _TestsPageState extends State<TestsPage> {
                                 var expLink = _testExplanationImageLink;
                                 final videoLink = _testExplanationVideoLink.text.trim();
 
+                                final currentTest = _items.firstWhere(
+                                  (x) => _asInt((x as Map)['id']) == _selectedTestId,
+                                  orElse: () => null,
+                                );
+                                final bId = currentTest != null ? _asInt(currentTest['batch_id'] ?? _batchId) : _batchId;
+                                final effectiveBatchId = bId ?? (_batches.isNotEmpty ? _asInt((_batches.first as Map)['id']) : null);
+                                final cls = currentTest != null ? currentTest['class_label']?.toString() ?? '' : _classLabel.text.trim();
+                                final sbj = currentTest != null ? currentTest['subject']?.toString() ?? '' : _subject.text.trim();
+                                final tpc = currentTest != null ? currentTest['topic']?.toString() ?? '' : _topic.text.trim();
+
                                 Map<String, dynamic>? similarQuestionData;
                                 if (_testSimilarQuestion.text.trim().isNotEmpty) {
+                                  if (effectiveBatchId != null) {
+                                    if (_testSimilarQuestionImage != null) {
+                                      if (!await _validateImageFile(context, _testSimilarQuestionImage!)) {
+                                        throw Exception('Similar question image too large');
+                                      }
+                                      _testSimilarQuestionImageLink = await widget.api.uploadQuestionImage(
+                                        batchId: effectiveBatchId,
+                                        classLabel: cls,
+                                        subject: sbj,
+                                        topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                        file: _testSimilarQuestionImage!,
+                                        contentType: 'similar_question',
+                                        contentId: _selectedTestId,
+                                      );
+                                    }
+                                    if (_testSimilarExplanationImage != null) {
+                                      if (!await _validateImageFile(context, _testSimilarExplanationImage!)) {
+                                        throw Exception('Similar explanation image too large');
+                                      }
+                                      _testSimilarExplanationImageLink = await widget.api.uploadQuestionImage(
+                                        batchId: effectiveBatchId,
+                                        classLabel: cls,
+                                        subject: sbj,
+                                        topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                        file: _testSimilarExplanationImage!,
+                                        contentType: 'similar_explanation',
+                                        contentId: _selectedTestId,
+                                      );
+                                    }
+                                    if (_testSimilarPendingExtraExplanationImages.isNotEmpty) {
+                                      for (final extraFile in _testSimilarPendingExtraExplanationImages) {
+                                        if (!await _validateImageFile(context, extraFile)) {
+                                          throw Exception('Similar explanation extra image too large');
+                                        }
+                                        final extraLink = await widget.api.uploadQuestionImage(
+                                          batchId: effectiveBatchId,
+                                          classLabel: cls,
+                                          subject: sbj,
+                                          topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                          file: extraFile,
+                                          contentType: 'similar_explanation_extra',
+                                          contentId: _selectedTestId,
+                                        );
+                                        if (extraLink.isNotEmpty) {
+                                          _testSimilarExistingExplanationImages.add(extraLink);
+                                        }
+                                      }
+                                      _testSimilarPendingExtraExplanationImages.clear();
+                                    }
+                                  }
+
                                   similarQuestionData = {
                                     'question': _testSimilarQuestion.text.trim(),
                                     'option_a': _testSimilarOptionA.text.trim(),
@@ -5307,6 +5947,9 @@ class _TestsPageState extends State<TestsPage> {
                                     'option_d': _testSimilarOptionD.text.trim(),
                                     'correct_option': _testSimilarCorrect,
                                     'explanation': _testSimilarExplanation.text.trim(),
+                                    if (_testSimilarQuestionImageLink.isNotEmpty) 'question_image_link': _testSimilarQuestionImageLink,
+                                    if (_testSimilarExplanationImageLink.isNotEmpty) 'explanation_image_link': _testSimilarExplanationImageLink,
+                                    if (_testSimilarExistingExplanationImages.isNotEmpty) 'explanation_images': _testSimilarExistingExplanationImages,
                                   };
                                 }
 

@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import '../../core/constants/api_constants.dart';
 import '../../core/providers/app_state.dart';
 import '../../theme/app_tokens.dart';
+import '../../widgets/app_widgets.dart';
+import '../../widgets/content_lock.dart';
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
   const LeaderboardScreen({super.key});
@@ -231,11 +233,13 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     final topThree = _leaderboard.take(3).toList();
-    final remainingList = _leaderboard.length > 3 ? _leaderboard.sublist(3) : <Map<String, dynamic>>[];
+    final remainingList =
+        _leaderboard.length > 3 ? _leaderboard.sublist(3) : <Map<String, dynamic>>[];
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Leaderboard', style: TextStyle(fontWeight: FontWeight.w700)),
         centerTitle: true,
@@ -247,75 +251,87 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildFilterSelector(),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : RefreshIndicator(
-                      onRefresh: _fetchLeaderboard,
-                      child: CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
-                        ),
-                        slivers: [
-                          if (topThree.length >= 3)
-                            SliverToBoxAdapter(
-                              child: _buildPodiumSection(topThree),
-                            ),
-                          SliverPadding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.sm,
-                            ),
-                            sliver: SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  final item = remainingList[index];
-                                  return _buildRankTile(item);
-                                },
-                                childCount: remainingList.length,
-                              ),
-                            ),
+      body: RefreshIndicator(
+        onRefresh: _fetchLeaderboard,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: mobileScrollPadding(context),
+          child: CenteredContent(
+            maxWidth: 960,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SectionHeader(
+                  title: 'Leaderboard',
+                  subtitle:
+                      'All India NEET Aspirant Rankings & Hall of Fame — compete, solve daily, and climb to AIR 1.',
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _buildFilterSelector(isDark, scheme),
+                const SizedBox(height: AppSpacing.lg),
+                if (_loading)
+                  const SkeletonLoader(cardCount: 5)
+                else if (_leaderboard.isEmpty)
+                  const EmptyStateWidget(
+                    title: 'No leaderboard data available',
+                    subtitle:
+                        'Rankings will appear once aspirants solve questions and take tests.',
+                    icon: Icons.emoji_events_outlined,
+                  )
+                else ...[
+                  if (topThree.length >= 3) ...[
+                    _buildPodiumSection(topThree, isDark, scheme),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+                  if (remainingList.isNotEmpty) ...[
+                    Text(
+                      'National Rankings',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
-                          const SliverToBoxAdapter(
-                            child: SizedBox(height: 80),
-                          ),
-                        ],
-                      ),
                     ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ...remainingList.map((item) => _buildRankTile(item, isDark, scheme)),
+                  ],
+                ],
+                const SizedBox(height: 90), // Reserved space for pinned bottom standing banner
+              ],
             ),
-          ],
+          ),
         ),
       ),
-      bottomSheet: _myRank != null ? _buildMyRankBanner(_myRank!) : null,
+      bottomSheet: _myRank != null ? _buildMyRankBanner(_myRank!, isDark, scheme) : null,
     );
   }
 
-  Widget _buildFilterSelector() {
+  Widget _buildFilterSelector(bool isDark, ColorScheme scheme) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        border: const Border(
-          bottom: BorderSide(color: Color(0x1F000000), width: 0.8),
-        ),
+        color: isDark ? const Color(0xFF171A22) : Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: scheme.outlineVariant),
+        boxShadow: AppShadows.soft,
       ),
       child: Row(
         children: [
-          _buildFilterChip('Overall', 'overall', Icons.emoji_events_rounded),
-          const SizedBox(width: AppSpacing.xs),
-          _buildFilterChip('This Week', 'weekly', Icons.calendar_view_week_rounded),
-          const SizedBox(width: AppSpacing.xs),
-          _buildFilterChip('Streaks', 'streak', Icons.local_fire_department_rounded),
+          _buildFilterChip('Overall', 'overall', Icons.emoji_events_rounded, isDark, scheme),
+          const SizedBox(width: 6),
+          _buildFilterChip('This Week', 'weekly', Icons.calendar_view_week_rounded, isDark, scheme),
+          const SizedBox(width: 6),
+          _buildFilterChip('Streaks', 'streak', Icons.local_fire_department_rounded, isDark, scheme),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, String value, IconData icon) {
+  Widget _buildFilterChip(
+    String label,
+    String value,
+    IconData icon,
+    bool isDark,
+    ColorScheme scheme,
+  ) {
     final isSelected = _selectedFilter == value;
     return Expanded(
       child: InkWell(
@@ -331,15 +347,19 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             gradient: isSelected ? AppGradients.primary : null,
-            color: isSelected ? null : AppColors.surfaceMuted,
+            color: isSelected
+                ? null
+                : (isDark
+                    ? scheme.surfaceContainerHighest.withValues(alpha: 0.5)
+                    : AppColors.surfaceMuted),
             borderRadius: BorderRadius.circular(AppRadii.md),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.25),
+                      color: AppColors.primary.withValues(alpha: 0.28),
                       blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    )
+                      offset: const Offset(0, 2),
+                    ),
                   ]
                 : null,
           ),
@@ -349,15 +369,23 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? Colors.white : AppColors.textSecondary,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.white70 : AppColors.textSecondary),
               ),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                  color: isSelected ? Colors.white : AppColors.textSecondary,
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                    color: isSelected
+                        ? Colors.white
+                        : (isDark ? Colors.white70 : AppColors.textSecondary),
+                  ),
                 ),
               ),
             ],
@@ -367,26 +395,39 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     );
   }
 
-  Widget _buildPodiumSection(List<Map<String, dynamic>> topThree) {
+  Widget _buildPodiumSection(
+    List<Map<String, dynamic>> topThree,
+    bool isDark,
+    ColorScheme scheme,
+  ) {
     final rank1 = topThree[0];
     final rank2 = topThree[1];
     final rank3 = topThree[2];
 
     return Container(
-      margin: const EdgeInsets.all(AppSpacing.md),
       padding: const EdgeInsets.only(top: 20, bottom: 16, left: 12, right: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.08),
-            AppColors.accentLight.withValues(alpha: 0.12),
-            AppColors.surfaceElevated,
-          ],
+          colors: isDark
+              ? [
+                  AppColors.primary.withValues(alpha: 0.16),
+                  const Color(0xFF1D212B),
+                  const Color(0xFF171A22),
+                ]
+              : [
+                  AppColors.primary.withValues(alpha: 0.08),
+                  AppColors.accentLight.withValues(alpha: 0.12),
+                  AppColors.surfaceElevated,
+                ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        border: Border.all(
+          color: isDark ? const Color(0xFF313744) : AppColors.primary.withValues(alpha: 0.2),
+          width: 1.2,
+        ),
+        boxShadow: AppShadows.soft,
       ),
       child: Column(
         children: [
@@ -394,28 +435,52 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.stars_rounded, color: AppColors.gold, size: 20),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 'NEET Champions Podium',
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 15.5,
                   fontWeight: FontWeight.w800,
-                  color: Theme.of(context).colorScheme.onSurface,
-                  letterSpacing: 0.3,
+                  color: scheme.onSurface,
+                  letterSpacing: 0.2,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               const Icon(Icons.stars_rounded, color: AppColors.gold, size: 20),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildPodiumPillar(rank2, 2, 110, const Color(0xFFC0C0C0), Icons.military_tech_rounded),
-              _buildPodiumPillar(rank1, 1, 145, const Color(0xFFFFD700), Icons.workspace_premium_rounded),
-              _buildPodiumPillar(rank3, 3, 95, const Color(0xFFCD7F32), Icons.military_tech_rounded),
+              _buildPodiumPillar(
+                rank2,
+                2,
+                112,
+                const Color(0xFFC0C0C0),
+                Icons.military_tech_rounded,
+                isDark,
+                scheme,
+              ),
+              _buildPodiumPillar(
+                rank1,
+                1,
+                150,
+                const Color(0xFFFFD700),
+                Icons.workspace_premium_rounded,
+                isDark,
+                scheme,
+              ),
+              _buildPodiumPillar(
+                rank3,
+                3,
+                96,
+                const Color(0xFFCD7F32),
+                Icons.military_tech_rounded,
+                isDark,
+                scheme,
+              ),
             ],
           ),
         ],
@@ -429,6 +494,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     double height,
     Color medalColor,
     IconData medalIcon,
+    bool isDark,
+    ColorScheme scheme,
   ) {
     final name = (item['name'] ?? 'Aspirant').toString();
     final points = (item['points'] ?? 0).toString();
@@ -446,20 +513,22 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               alignment: Alignment.center,
               children: [
                 Container(
-                  width: isRank1 ? 64 : 52,
-                  height: isRank1 ? 64 : 52,
+                  width: isRank1 ? 66 : 54,
+                  height: isRank1 ? 66 : 54,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: isRank1 ? AppGradients.primary : null,
-                    color: isRank1 ? null : medalColor.withValues(alpha: 0.2),
+                    color: isRank1
+                        ? null
+                        : medalColor.withValues(alpha: isDark ? 0.25 : 0.15),
                     border: Border.all(
                       color: medalColor,
                       width: isRank1 ? 3 : 2,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: medalColor.withValues(alpha: 0.35),
-                        blurRadius: isRank1 ? 12 : 6,
+                        color: medalColor.withValues(alpha: isDark ? 0.35 : 0.25),
+                        blurRadius: isRank1 ? 14 : 6,
                         spreadRadius: 1,
                       )
                     ],
@@ -478,13 +547,13 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 Positioned(
                   top: isRank1 ? -14 : -10,
                   child: Container(
-                    padding: const EdgeInsets.all(3),
+                    padding: const EdgeInsets.all(3.5),
                     decoration: BoxDecoration(
                       color: medalColor,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
+                          color: Colors.black.withValues(alpha: 0.25),
                           blurRadius: 4,
                         )
                       ],
@@ -507,6 +576,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               style: TextStyle(
                 fontSize: isRank1 ? 13 : 11.5,
                 fontWeight: isRank1 ? FontWeight.w800 : FontWeight.w700,
+                color: scheme.onSurface,
               ),
             ),
             Text(
@@ -523,7 +593,11 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 const Icon(Icons.local_fire_department_rounded, size: 12, color: AppColors.warning),
                 Text(
                   '${streak}d',
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.warning),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.warning,
+                  ),
                 ),
               ],
             ),
@@ -534,8 +608,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    medalColor.withValues(alpha: isRank1 ? 0.35 : 0.2),
-                    medalColor.withValues(alpha: 0.05),
+                    medalColor.withValues(alpha: isRank1 ? (isDark ? 0.35 : 0.25) : (isDark ? 0.22 : 0.14)),
+                    medalColor.withValues(alpha: 0.04),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -549,7 +623,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                   style: TextStyle(
                     fontSize: isRank1 ? 28 : 22,
                     fontWeight: FontWeight.w900,
-                    color: medalColor.withValues(alpha: 0.9),
+                    color: medalColor.withValues(alpha: 0.95),
                   ),
                 ),
               ),
@@ -560,37 +634,40 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     );
   }
 
-  Widget _buildRankTile(Map<String, dynamic> item) {
+  Widget _buildRankTile(
+    Map<String, dynamic> item,
+    bool isDark,
+    ColorScheme scheme,
+  ) {
     final rank = item['rank'] ?? 0;
     final name = (item['name'] ?? 'Aspirant').toString();
     final points = (item['points'] ?? 0).toString();
     final streak = (item['streak'] ?? 1).toString();
     final accuracy = (item['accuracy'] ?? 85).toString();
     final city = (item['city'] ?? '').toString();
+    final badge = (item['badge'] ?? '').toString();
     final isCurrentUser = item['isCurrentUser'] == true;
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
         color: isCurrentUser
-            ? AppColors.primary.withValues(alpha: 0.09)
+            ? AppColors.primary.withValues(alpha: isDark ? 0.18 : 0.08)
             : Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppRadii.md),
         border: Border.all(
-          color: isCurrentUser
-              ? AppColors.primary
-              : const Color(0x1F000000),
+          color: isCurrentUser ? AppColors.primary : scheme.outlineVariant,
           width: isCurrentUser ? 1.8 : 1,
         ),
         boxShadow: isCurrentUser
             ? [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.15),
+                  color: AppColors.primary.withValues(alpha: 0.18),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 )
               ]
-            : null,
+            : AppShadows.soft,
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
@@ -604,7 +681,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: isCurrentUser ? AppColors.primary : AppColors.textSecondary,
+                  color: isCurrentUser
+                      ? AppColors.primary
+                      : (isDark ? Colors.white60 : AppColors.textSecondary),
                 ),
               ),
             ),
@@ -612,12 +691,16 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               radius: 20,
               backgroundColor: isCurrentUser
                   ? AppColors.primary
-                  : AppColors.primary.withValues(alpha: 0.12),
+                  : (isDark
+                      ? AppColors.primary.withValues(alpha: 0.22)
+                      : AppColors.primarySoft),
               child: Text(
                 name.isNotEmpty ? name[0].toUpperCase() : 'A',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  color: isCurrentUser ? Colors.white : AppColors.primary,
+                  color: isCurrentUser
+                      ? Colors.white
+                      : (isDark ? AppColors.accentLight : AppColors.primary),
                   fontSize: 16,
                 ),
               ),
@@ -632,7 +715,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: isCurrentUser ? AppColors.primary : null,
+                  color: isCurrentUser ? AppColors.primary : scheme.onSurface,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -655,29 +738,78 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                   ),
                 ),
               ),
+            ] else if (badge.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF252A35)
+                      : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  badge,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white70 : AppColors.textSecondary,
+                  ),
+                ),
+              ),
             ],
           ],
         ),
         subtitle: Row(
           children: [
             if (city.isNotEmpty) ...[
-              Text(
-                city,
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.8)),
+              Flexible(
+                child: Text(
+                  city,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white60 : AppColors.textSecondary,
+                  ),
+                ),
               ),
-              const Text(' • ', style: TextStyle(fontSize: 10, color: Colors.grey)),
+              Text(
+                ' • ',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? Colors.white38 : Colors.grey,
+                ),
+              ),
             ],
             Text(
               '$accuracy% Acc',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.success),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.success,
+              ),
             ),
-            const Text(' • ', style: TextStyle(fontSize: 10, color: Colors.grey)),
+            Text(
+              ' • ',
+              style: TextStyle(
+                fontSize: 10,
+                color: isDark ? Colors.white38 : Colors.grey,
+              ),
+            ),
             Row(
               children: [
-                const Icon(Icons.local_fire_department_rounded, size: 12, color: AppColors.warning),
+                const Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 12,
+                  color: AppColors.warning,
+                ),
                 Text(
                   '${streak}d',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.warning),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.warning,
+                  ),
                 ),
               ],
             ),
@@ -695,12 +827,12 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 color: AppColors.primary,
               ),
             ),
-            const Text(
+            Text(
               'pts',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+                color: isDark ? Colors.white54 : AppColors.textSecondary,
               ),
             ),
           ],
@@ -709,7 +841,11 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     );
   }
 
-  Widget _buildMyRankBanner(Map<String, dynamic> myRank) {
+  Widget _buildMyRankBanner(
+    Map<String, dynamic> myRank,
+    bool isDark,
+    ColorScheme scheme,
+  ) {
     final rank = myRank['rank'] ?? 0;
     final name = (myRank['name'] ?? 'You').toString();
     final points = (myRank['points'] ?? 0).toString();
@@ -718,75 +854,94 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E222D),
+        color: isDark ? const Color(0xFF171A22) : AppColors.surface,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF272B34) : AppColors.border,
+            width: 1.2,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
             blurRadius: 16,
             offset: const Offset(0, -4),
           )
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              gradient: AppGradients.primary,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '#$rank',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: AppGradients.primary,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '#$rank',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your Standing ($name)',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    '🔥 $streak days streak • Top ${_calculatePercentile(rank)}% of $_totalParticipants aspirants',
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  'Your Standing ($name)',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                  '$points pts',
+                  style: TextStyle(
+                    color: isDark ? AppColors.accentLight : AppColors.primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
                   ),
                 ),
                 Text(
-                  '🔥 $streak days streak • Top ${_calculatePercentile(rank)}% of $_totalParticipants aspirants',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
+                  'Keep practicing!',
+                  style: TextStyle(
+                    color: isDark ? Colors.white60 : AppColors.textSecondary,
+                    fontSize: 10,
                   ),
                 ),
               ],
             ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '$points pts',
-                style: const TextStyle(
-                  color: AppColors.accentLight,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                ),
-              ),
-              const Text(
-                'Keep practicing!',
-                style: TextStyle(color: Colors.white60, fontSize: 10),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

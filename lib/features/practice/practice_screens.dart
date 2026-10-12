@@ -193,6 +193,12 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
             builder: (_) => const BookmarkedQuestionsScreen(),
           ),
         );
+      case 'Bookmarks & Incorrect':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const CombinedSavedQuestionsScreen(),
+          ),
+        );
       default:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$label — coming soon')),
@@ -211,6 +217,7 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
       ('Custom practice', Icons.tune_rounded),
       ('Incorrect questions', Icons.refresh_rounded),
       ('Bookmarked questions', Icons.bookmark_rounded),
+      ('Bookmarks & Incorrect', Icons.layers_rounded),
     ];
 
     int? countFor(String label) {
@@ -223,6 +230,10 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
           return savedPractice.bookmarked.isEmpty
               ? null
               : savedPractice.bookmarked.length;
+        case 'Bookmarks & Incorrect':
+          return savedPractice.combined.isEmpty
+              ? null
+              : savedPractice.combined.length;
         default:
           return null;
       }
@@ -2406,6 +2417,36 @@ class IncorrectQuestionsScreen extends ConsumerWidget {
   }
 }
 
+class CombinedSavedQuestionsScreen extends ConsumerWidget {
+  const CombinedSavedQuestionsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final saved = ref.watch(practiceSavedControllerProvider);
+    return _SavedQuestionsScreen(
+      title: 'Bookmarks & Incorrect',
+      emptyTitle: 'No saved revision questions yet',
+      emptySubtitle:
+          'Bookmarked and incorrect questions will be saved here together for revision.',
+      emptyIcon: Icons.layers_outlined,
+      questions: saved.combined,
+      onRemove: (id) {
+        if (saved.bookmarkedIds.contains(id)) {
+          ref.read(practiceSavedControllerProvider.notifier).removeBookmark(id);
+        }
+        if (saved.incorrectIds.contains(id)) {
+          ref.read(practiceSavedControllerProvider.notifier).removeIncorrect(id);
+        }
+      },
+      practiceTitle: 'Bookmarks & Mistakes Drill',
+      showClearAll: saved.combined.isNotEmpty,
+      onClearAll: () {
+        ref.read(practiceSavedControllerProvider.notifier).clearIncorrect();
+      },
+    );
+  }
+}
+
 class _SavedQuestionsScreen extends StatelessWidget {
   const _SavedQuestionsScreen({
     required this.title,
@@ -2580,12 +2621,13 @@ class CustomPracticeScreen extends ConsumerStatefulWidget {
   ConsumerState<CustomPracticeScreen> createState() => _CustomPracticeScreenState();
 }
 
+enum CustomFilterMode { none, bookmarked, wrong, both }
+
 class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
   String? _selectedSubject;
   String? _selectedTopic;
   int _questionCount = 10;
-  bool _filterBookmarked = false;
-  bool _filterWrong = false;
+  CustomFilterMode _filterMode = CustomFilterMode.none;
   bool _loading = false;
 
   @override
@@ -2652,12 +2694,16 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
 
       final savedPractice = ref.read(practiceSavedControllerProvider);
       var filteredQuestions = allQuestions;
-      if (_filterBookmarked) {
+      if (_filterMode == CustomFilterMode.both) {
+        final combinedIds = savedPractice.combinedIds;
+        filteredQuestions = filteredQuestions
+            .where((q) => combinedIds.contains(q['id']?.toString()))
+            .toList();
+      } else if (_filterMode == CustomFilterMode.bookmarked) {
         filteredQuestions = filteredQuestions
             .where((q) => savedPractice.bookmarkedIds.contains(q['id']?.toString()))
             .toList();
-      }
-      if (_filterWrong) {
+      } else if (_filterMode == CustomFilterMode.wrong) {
         filteredQuestions = filteredQuestions
             .where((q) => savedPractice.incorrectIds.contains(q['id']?.toString()))
             .toList();
@@ -2667,11 +2713,13 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _filterBookmarked && _filterWrong
+              _filterMode == CustomFilterMode.both
                   ? 'No bookmarked or incorrect questions found.'
-                  : _filterBookmarked
+                  : _filterMode == CustomFilterMode.bookmarked
                       ? 'No bookmarked questions found.'
-                      : 'No incorrect questions found.',
+                      : _filterMode == CustomFilterMode.wrong
+                          ? 'No incorrect questions found.'
+                          : 'No questions match the selected filters.',
             ),
           ),
         );
@@ -2684,6 +2732,9 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
         if (_selectedSubject != null && _selectedSubject!.isNotEmpty)
           _selectedSubject!,
         if (_selectedTopic != null && _selectedTopic!.isNotEmpty) _selectedTopic!,
+        if (_filterMode == CustomFilterMode.both) 'Bookmarks & Wrong',
+        if (_filterMode == CustomFilterMode.bookmarked) 'Bookmarked',
+        if (_filterMode == CustomFilterMode.wrong) 'Incorrect',
       ];
       final title = titleParts.isEmpty
           ? 'Custom practice'
@@ -2832,30 +2883,41 @@ class _CustomPracticeScreenState extends ConsumerState<CustomPracticeScreen> {
                     const SizedBox(height: AppSpacing.sm),
                     Wrap(
                       spacing: AppSpacing.md,
+                      runSpacing: AppSpacing.sm,
                       children: [
                         FilterChip(
                           label: const Text('Bookmarked'),
                           avatar: const Icon(Icons.bookmark_rounded, size: 18),
-                          selected: _filterBookmarked,
+                          selected: _filterMode == CustomFilterMode.bookmarked,
                           onSelected: (selected) {
                             setState(() {
-                              _filterBookmarked = selected;
-                              if (_filterBookmarked && _filterWrong) {
-                                _filterWrong = false;
-                              }
+                              _filterMode = selected
+                                  ? CustomFilterMode.bookmarked
+                                  : CustomFilterMode.none;
                             });
                           },
                         ),
                         FilterChip(
                           label: const Text('Wrong Answers'),
                           avatar: const Icon(Icons.close_rounded, size: 18),
-                          selected: _filterWrong,
+                          selected: _filterMode == CustomFilterMode.wrong,
                           onSelected: (selected) {
                             setState(() {
-                              _filterWrong = selected;
-                              if (_filterWrong && _filterBookmarked) {
-                                _filterBookmarked = false;
-                              }
+                              _filterMode = selected
+                                  ? CustomFilterMode.wrong
+                                  : CustomFilterMode.none;
+                            });
+                          },
+                        ),
+                        FilterChip(
+                          label: const Text('Bookmarked & Wrong'),
+                          avatar: const Icon(Icons.layers_rounded, size: 18),
+                          selected: _filterMode == CustomFilterMode.both,
+                          onSelected: (selected) {
+                            setState(() {
+                              _filterMode = selected
+                                  ? CustomFilterMode.both
+                                  : CustomFilterMode.none;
                             });
                           },
                         ),
