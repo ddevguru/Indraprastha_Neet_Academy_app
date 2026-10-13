@@ -319,7 +319,7 @@ class _EnhancedPracticeScreenState extends State<EnhancedPracticeScreen> {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
-                                        '$option) ${currentQuestion.options[index]}',
+                                        currentQuestion.options[index],
                                         style: const TextStyle(
                                           fontSize: 14,
                                         ),

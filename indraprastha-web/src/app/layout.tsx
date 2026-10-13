@@ -19,14 +19,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/logo_app.jpeg" type="image/jpeg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var saved = localStorage.getItem('indraprastha_theme') || 'dark';
+                  if (saved === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    document.documentElement.classList.add('dark-theme');
+                  } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    document.documentElement.classList.remove('dark-theme');
+                  }
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
       </head>
-      <body>{children}</body>
+      <body className="dark-theme">{children}</body>
     </html>
   );
 }

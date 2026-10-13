@@ -37,6 +37,10 @@ const questionMediaUpload = multer({
   { name: 'questionImage', maxCount: 1 },
   { name: 'explanationImage', maxCount: 1 },
   { name: 'extraExplanationImages', maxCount: 20 },
+  { name: 'optionAImage', maxCount: 1 },
+  { name: 'optionBImage', maxCount: 1 },
+  { name: 'optionCImage', maxCount: 1 },
+  { name: 'optionDImage', maxCount: 1 },
 ]);
 
 const UPLOAD_ROOT = path.join(os.tmpdir(), 'indra_uploads');
@@ -273,6 +277,7 @@ function mapChapterLinks(chapter) {
 }
 
 function mapQuestionImageLink(question) {
+  if (!question) return question;
   const fileId =
     question.question_image_drive_file_id || extractDriveFileId(question.question_image_link);
   const links = buildDrivePublicLinks(fileId);
@@ -281,6 +286,10 @@ function mapQuestionImageLink(question) {
     question_image_drive_file_id: fileId || '',
     question_image_link:
       links.imageLink || normalizeDriveLink(question.question_image_link, 'image'),
+    option_a_image_link: normalizeDriveLink(question.option_a_image_link || '', 'image'),
+    option_b_image_link: normalizeDriveLink(question.option_b_image_link || '', 'image'),
+    option_c_image_link: normalizeDriveLink(question.option_c_image_link || '', 'image'),
+    option_d_image_link: normalizeDriveLink(question.option_d_image_link || '', 'image'),
   };
 }
 
@@ -1373,7 +1382,7 @@ router.delete('/practice-sets/:id', adminAuth, async (req, res) => {
 
 router.get('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_video_link, similar_question
+    `SELECT id, practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_video_link, similar_question, option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link
      FROM practice_questions
      WHERE practice_set_id = $1
      ORDER BY id ASC`,
@@ -1449,7 +1458,8 @@ router.post('/practice-sets/:setId/questions/batch', adminAuth, async (req, res)
 
 router.post('/practice-sets/:setId/questions/with-media', adminAuth, questionMediaUpload, async (req, res) => {
   try {
-    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink = '', explanationImageLink = '', similarQuestion } =
+    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink = '', explanationImageLink = '',
+      optionAImageLink = '', optionBImageLink = '', optionCImageLink = '', optionDImageLink = '', similarQuestion } =
       req.body;
 
     if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
@@ -1484,8 +1494,8 @@ router.post('/practice-sets/:setId/questions/with-media', adminAuth, questionMed
 
     const result = await pool.query(
       `INSERT INTO practice_questions (
-        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question, option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
       [
         req.params.setId,
         question,
@@ -1502,6 +1512,10 @@ router.post('/practice-sets/:setId/questions/with-media', adminAuth, questionMed
         eFileId,
         '',
         parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
+        normalizeDriveLink(optionAImageLink || '', 'image'),
+        normalizeDriveLink(optionBImageLink || '', 'image'),
+        normalizeDriveLink(optionCImageLink || '', 'image'),
+        normalizeDriveLink(optionDImageLink || '', 'image'),
       ]
     );
 
@@ -1515,7 +1529,8 @@ router.post('/practice-sets/:setId/questions/with-media', adminAuth, questionMed
 // Single insert (keep existing for backward compatibility)
 router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
   try {
-    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, similarQuestion } =
+    const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink,
+      optionAImageLink = '', optionBImageLink = '', optionCImageLink = '', optionDImageLink = '', similarQuestion } =
       req.body;
 
     // Validation
@@ -1537,8 +1552,8 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO practice_questions (
-        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question, option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
       [
         req.params.setId,
         question,
@@ -1555,6 +1570,10 @@ router.post('/practice-sets/:setId/questions', adminAuth, async (req, res) => {
         extractDriveFileId(explanationImageLink || ''),
         '',
         parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
+        normalizeDriveLink(optionAImageLink || '', 'image'),
+        normalizeDriveLink(optionBImageLink || '', 'image'),
+        normalizeDriveLink(optionCImageLink || '', 'image'),
+        normalizeDriveLink(optionDImageLink || '', 'image'),
       ]
     );
 
@@ -1652,7 +1671,7 @@ router.post('/practice-questions/:id/explanation-video', adminAuth, practiceVide
 });
 
 router.put('/practice-questions/:id', adminAuth, async (req, res) => {
-  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, explanationVideoLink, practiceSetId, similarQuestion } =
+  const { question, optionA, optionB, optionC, optionD, correctOption, explanation, questionImageLink, explanationImageLink, explanationVideoLink, practiceSetId, similarQuestion, optionAImageLink, optionBImageLink, optionCImageLink, optionDImageLink } =
     req.body;
 
   const updateFields = [];
@@ -1714,6 +1733,26 @@ router.put('/practice-questions/:id', adminAuth, async (req, res) => {
     params.push(explanationVideoLink);
     params.push(extractDriveFileId(explanationVideoLink));
     paramIndex += 2;
+  }
+  if (optionAImageLink !== undefined && optionAImageLink !== null) {
+    updateFields.push(`option_a_image_link = $${paramIndex}`);
+    params.push(normalizeDriveLink(optionAImageLink, 'image'));
+    paramIndex++;
+  }
+  if (optionBImageLink !== undefined && optionBImageLink !== null) {
+    updateFields.push(`option_b_image_link = $${paramIndex}`);
+    params.push(normalizeDriveLink(optionBImageLink, 'image'));
+    paramIndex++;
+  }
+  if (optionCImageLink !== undefined && optionCImageLink !== null) {
+    updateFields.push(`option_c_image_link = $${paramIndex}`);
+    params.push(normalizeDriveLink(optionCImageLink, 'image'));
+    paramIndex++;
+  }
+  if (optionDImageLink !== undefined && optionDImageLink !== null) {
+    updateFields.push(`option_d_image_link = $${paramIndex}`);
+    params.push(normalizeDriveLink(optionDImageLink, 'image'));
+    paramIndex++;
   }
   if (practiceSetId !== undefined && practiceSetId !== null) {
     updateFields.push(`practice_set_id = $${paramIndex}`);
@@ -1893,7 +1932,12 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
       explanation,
       questionImageLink = '',
       explanationImageLink = '',
+      explanationVideoLink = '',
       similarQuestion,
+      optionAImageLink = '',
+      optionBImageLink = '',
+      optionCImageLink = '',
+      optionDImageLink = '',
     } = req.body;
 
     if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
@@ -1907,6 +1951,10 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
     const questionFile = files.questionImage?.[0] || null;
     const explanationFile = files.explanationImage?.[0] || null;
     const extraFiles = files.extraExplanationImages || [];
+    const optAFile = files.optionAImage?.[0] || null;
+    const optBFile = files.optionBImage?.[0] || null;
+    const optCFile = files.optionCImage?.[0] || null;
+    const optDFile = files.optionDImage?.[0] || null;
 
     let qLink = questionImageLink;
     let qFileId = extractDriveFileId(questionImageLink || '');
@@ -1914,6 +1962,10 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
     let eLink = explanationImageLink;
     let eFileId = extractDriveFileId(explanationImageLink || '');
     let eFolder = '';
+    let optALink = optionAImageLink;
+    let optBLink = optionBImageLink;
+    let optCLink = optionCImageLink;
+    let optDLink = optionDImageLink;
 
     const parsedSimilarQuestion = parseSimilarQuestionPayload(similarQuestion);
 
@@ -1922,8 +1974,31 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
       ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '',
       ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '',
       ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '',
-      ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
+      ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS option_a_image_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS option_b_image_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS option_c_image_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS option_d_image_link TEXT DEFAULT '';
     `).catch(() => {});
+
+    if (batchId) {
+      if (optAFile) {
+        const up = await uploadQuestionImageFast({ file: optAFile, batchId });
+        if (up) optALink = up;
+      }
+      if (optBFile) {
+        const up = await uploadQuestionImageFast({ file: optBFile, batchId });
+        if (up) optBLink = up;
+      }
+      if (optCFile) {
+        const up = await uploadQuestionImageFast({ file: optCFile, batchId });
+        if (up) optCLink = up;
+      }
+      if (optDFile) {
+        const up = await uploadQuestionImageFast({ file: optDFile, batchId });
+        if (up) optDLink = up;
+      }
+    }
 
     if (batchId && (questionFile || explanationFile || extraFiles.length)) {
       const [media, ...extraUploads] = await Promise.all([
@@ -1943,8 +2018,8 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
 
       const result = await pool.query(
         `INSERT INTO test_questions (
-          test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+          test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, explanation_video_link, explanation_video_drive_file_id, similar_question, option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
         [
           testId,
           subject || 'Biology',
@@ -1961,7 +2036,13 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
           normalizeDriveLink(eLink || '', 'image'),
           eFileId,
           eFolder,
+          explanationVideoLink || '',
+          extractDriveFileId(explanationVideoLink || ''),
           parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
+          normalizeDriveLink(optALink || '', 'image'),
+          normalizeDriveLink(optBLink || '', 'image'),
+          normalizeDriveLink(optCLink || '', 'image'),
+          normalizeDriveLink(optDLink || '', 'image'),
         ]
       );
       const explanationImages = await insertTestExplanationImages(
@@ -1977,8 +2058,8 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
 
     const result = await pool.query(
       `INSERT INTO test_questions (
-        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, explanation_video_link, explanation_video_drive_file_id, similar_question, option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
       [
         testId,
         subject || 'Biology',
@@ -1995,7 +2076,13 @@ router.post('/tests/:testId/questions/with-media', adminAuth, questionMediaUploa
         normalizeDriveLink(eLink || '', 'image'),
         eFileId,
         eFolder,
+        explanationVideoLink || '',
+        extractDriveFileId(explanationVideoLink || ''),
         parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
+        normalizeDriveLink(optALink || '', 'image'),
+        normalizeDriveLink(optBLink || '', 'image'),
+        normalizeDriveLink(optCLink || '', 'image'),
+        normalizeDriveLink(optDLink || '', 'image'),
       ]
     );
     return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
@@ -2018,7 +2105,12 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
       explanation,
       questionImageLink,
       explanationImageLink,
+      explanationVideoLink = '',
       similarQuestion,
+      optionAImageLink = '',
+      optionBImageLink = '',
+      optionCImageLink = '',
+      optionDImageLink = '',
     } = req.body;
 
     if (!question || !optionA || !optionB || !optionC || !optionD || !correctOption) {
@@ -2034,13 +2126,17 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
       ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '',
       ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '',
       ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '',
-      ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
+      ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS option_a_image_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS option_b_image_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS option_c_image_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS option_d_image_link TEXT DEFAULT '';
     `).catch(() => {});
 
     const result = await pool.query(
       `INSERT INTO test_questions (
-        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, similar_question
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        test_id, subject, question, option_a, option_b, option_c, option_d, correct_option, explanation, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id, explanation_video_link, explanation_video_drive_file_id, similar_question, option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
       [
         req.params.testId,
         subject || 'Biology',
@@ -2057,7 +2153,13 @@ router.post('/tests/:testId/questions', adminAuth, async (req, res) => {
         normalizeDriveLink(explanationImageLink || '', 'image'),
         extractDriveFileId(explanationImageLink || ''),
         '',
+        explanationVideoLink || '',
+        extractDriveFileId(explanationVideoLink || ''),
         parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
+        normalizeDriveLink(optionAImageLink || '', 'image'),
+        normalizeDriveLink(optionBImageLink || '', 'image'),
+        normalizeDriveLink(optionCImageLink || '', 'image'),
+        normalizeDriveLink(optionDImageLink || '', 'image'),
       ]
     );
     return res.json({ success: true, question: mapQuestionImageLink(result.rows[0]) });
@@ -2082,6 +2184,10 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
       explanationImageLink,
       explanationVideoLink,
       similarQuestion,
+      optionAImageLink,
+      optionBImageLink,
+      optionCImageLink,
+      optionDImageLink,
     } = req.body;
 
     // Self-healing: ensure all columns exist in test_questions table
@@ -2090,7 +2196,11 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
       ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '',
       ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '',
       ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '',
-      ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
+      ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS option_a_image_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS option_b_image_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS option_c_image_link TEXT DEFAULT '',
+      ADD COLUMN IF NOT EXISTS option_d_image_link TEXT DEFAULT '';
     `).catch(() => {});
 
     const updates = [];
@@ -2137,13 +2247,37 @@ router.put('/test-questions/:id', adminAuth, async (req, res) => {
         ],
       });
     }
-    if (explanationVideoLink !== undefined && explanationVideoLink !== null && explanationVideoLink !== '') {
+    if (optionAImageLink !== undefined && optionAImageLink !== null) {
+      updates.push({
+        sql: 'option_a_image_link = $INDEX',
+        values: [normalizeDriveLink(optionAImageLink, 'image')],
+      });
+    }
+    if (optionBImageLink !== undefined && optionBImageLink !== null) {
+      updates.push({
+        sql: 'option_b_image_link = $INDEX',
+        values: [normalizeDriveLink(optionBImageLink, 'image')],
+      });
+    }
+    if (optionCImageLink !== undefined && optionCImageLink !== null) {
+      updates.push({
+        sql: 'option_c_image_link = $INDEX',
+        values: [normalizeDriveLink(optionCImageLink, 'image')],
+      });
+    }
+    if (optionDImageLink !== undefined && optionDImageLink !== null) {
+      updates.push({
+        sql: 'option_d_image_link = $INDEX',
+        values: [normalizeDriveLink(optionDImageLink, 'image')],
+      });
+    }
+    if (explanationVideoLink !== undefined && explanationVideoLink !== null) {
       updates.push({
         optional: true,
         sql: 'explanation_video_link = $INDEX1, explanation_video_drive_file_id = $INDEX2',
         values: [
           explanationVideoLink,
-          extractDriveFileId(explanationVideoLink),
+          extractDriveFileId(explanationVideoLink || ''),
         ],
       });
     }
@@ -2313,19 +2447,30 @@ router.post('/tests/:testId/move-to-practice', adminAuth, async (req, res) => {
       const qRes = await pool.query('SELECT * FROM test_questions WHERE id = $1 AND test_id = $2', [qId, req.params.testId]);
       if (qRes.rows.length > 0) {
         const q = qRes.rows[0];
-        await pool.query(
+        const newPq = await pool.query(
           `INSERT INTO practice_questions (
             practice_set_id, question, option_a, option_b, option_c, option_d, correct_option, explanation,
             question_image_link, question_image_drive_file_id, question_image_drive_folder_id,
-            explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id,
+            explanation_video_link, explanation_video_drive_file_id, similar_question,
+            option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id`,
           [
             practiceSetId,
             q.question, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation,
             q.question_image_link, q.question_image_drive_file_id, q.question_image_drive_folder_id,
-            q.explanation_image_link, q.explanation_image_drive_file_id, q.explanation_image_drive_folder_id
+            q.explanation_image_link, q.explanation_image_drive_file_id, q.explanation_image_drive_folder_id,
+            q.explanation_video_link || '', q.explanation_video_drive_file_id || '', q.similar_question,
+            q.option_a_image_link || '', q.option_b_image_link || '', q.option_c_image_link || '', q.option_d_image_link || ''
           ]
         );
+        if (newPq.rows.length > 0) {
+          const newPqId = newPq.rows[0].id;
+          await pool.query(
+            'UPDATE explanation_images SET practice_question_id = $1, test_question_id = NULL WHERE test_question_id = $2',
+            [newPqId, qId]
+          ).catch(() => {});
+        }
         await pool.query('DELETE FROM test_questions WHERE id = $1', [qId]);
       }
     }

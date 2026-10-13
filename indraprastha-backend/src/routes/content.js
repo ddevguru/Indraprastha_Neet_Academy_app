@@ -176,6 +176,10 @@ function mapQuestionImageLink(question) {
     explanation_images_list: Array.isArray(explanationImagesList)
       ? explanationImagesList.map(mapExplanationImageEntry)
       : explanationImagesList,
+    option_a_image_link: normalizeDriveLink(question.option_a_image_link || '', 'image'),
+    option_b_image_link: normalizeDriveLink(question.option_b_image_link || '', 'image'),
+    option_c_image_link: normalizeDriveLink(question.option_c_image_link || '', 'image'),
+    option_d_image_link: normalizeDriveLink(question.option_d_image_link || '', 'image'),
   };
 }
 
@@ -454,6 +458,7 @@ router.get('/practice-sets/:setId/questions', userAuth, async (req, res) => {
         pq.explanation_image_link, pq.explanation_image_drive_file_id, pq.explanation_image_drive_folder_id,
         pq.explanation_video_link, pq.explanation_video_drive_file_id, pq.explanation_video_drive_folder_id,
         pq.similar_question,
+        pq.option_a_image_link, pq.option_b_image_link, pq.option_c_image_link, pq.option_d_image_link,
         (
           SELECT json_agg(
             json_build_object(
@@ -591,7 +596,9 @@ router.get('/tests/:testId/questions', userAuth, async (req, res) => {
         tq.correct_option, tq.explanation,
         tq.question_image_link, tq.question_image_drive_file_id, tq.question_image_drive_folder_id,
         tq.explanation_image_link, tq.explanation_image_drive_file_id, tq.explanation_image_drive_folder_id,
+        tq.explanation_video_link, tq.explanation_video_drive_file_id,
         tq.similar_question,
+        tq.option_a_image_link, tq.option_b_image_link, tq.option_c_image_link, tq.option_d_image_link,
         (
           SELECT json_agg(
             json_build_object(
@@ -806,7 +813,13 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
         tq.explanation_image_link,
         tq.explanation_image_drive_file_id,
         tq.explanation_image_drive_folder_id,
+        tq.explanation_video_link,
+        tq.explanation_video_drive_file_id,
         tq.similar_question,
+        tq.option_a_image_link,
+        tq.option_b_image_link,
+        tq.option_c_image_link,
+        tq.option_d_image_link,
         (
           SELECT json_agg(
             json_build_object(

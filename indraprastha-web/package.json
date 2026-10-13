@@ -4,11 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "backend": "node backend/server.js",
+    "backend:dev": "node --watch backend/server.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "firebase": "^13.0.0",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"

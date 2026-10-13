@@ -48,12 +48,9 @@
 
 /* ── METHODOLOGY NAVBAR ── */
 .pred-navbar {
-  background: var(--meth-card-bg);
-  border-bottom: 1px solid var(--meth-card-border);
-  position: sticky;
-  top: 0;
-  z-index: 99;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 99999 !important;
 }
 
 .pred-navbar-inner {

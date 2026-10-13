@@ -93,6 +93,64 @@ Future<bool> _validateImageFile(BuildContext context, File file) async {
   return false;
 }
 
+Widget _buildOptionImagePickerRow({
+  required String label,
+  required File? file,
+  required String imageLink,
+  required void Function(File?) onPick,
+  required VoidCallback onRemove,
+}) {
+  final hasImage = file != null || imageLink.isNotEmpty;
+  final displayName = file != null
+      ? file.path.split(Platform.pathSeparator).last
+      : (imageLink.isNotEmpty ? '$label image uploaded' : 'No $label image');
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      children: [
+        Icon(
+          hasImage ? Icons.image_rounded : Icons.image_outlined,
+          size: 16,
+          color: hasImage ? Colors.indigo : Colors.grey,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            displayName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color: hasImage ? null : Colors.grey.shade600,
+              fontWeight: hasImage ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+        ),
+        TextButton.icon(
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            visualDensity: VisualDensity.compact,
+          ),
+          icon: const Icon(Icons.add_photo_alternate_outlined, size: 15),
+          label: Text('Pick $label Image', style: const TextStyle(fontSize: 11)),
+          onPressed: () async {
+            final result = await FilePicker.platform.pickFiles(type: FileType.image);
+            if (result?.files.single.path == null) return;
+            onPick(File(result!.files.single.path!));
+          },
+        ),
+        if (hasImage)
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 16, color: Colors.red),
+            tooltip: 'Remove $label image',
+            visualDensity: VisualDensity.compact,
+            onPressed: onRemove,
+          ),
+      ],
+    ),
+  );
+}
+
 Widget _busyButtonChild(bool busy, String label) {
   if (!busy) return Text(label);
   return Row(
@@ -2513,6 +2571,14 @@ class _PracticePageState extends State<PracticePage> {
   String _pqImageLink = '';
   File? _pqExplanationImage;
   String _pqExplanationImageLink = '';
+  File? _pqOptionAImage;
+  String _pqOptionAImageLink = '';
+  File? _pqOptionBImage;
+  String _pqOptionBImageLink = '';
+  File? _pqOptionCImage;
+  String _pqOptionCImageLink = '';
+  File? _pqOptionDImage;
+  String _pqOptionDImageLink = '';
   // Similar Question for Practice MCQ
   final _pqSimilarQuestion = TextEditingController();
   final _pqSimilarOptionA = TextEditingController();
@@ -2592,6 +2658,14 @@ class _PracticePageState extends State<PracticePage> {
       _pqImageLink = '';
       _pqExplanationImage = null;
       _pqExplanationImageLink = '';
+      _pqOptionAImage = null;
+      _pqOptionAImageLink = '';
+      _pqOptionBImage = null;
+      _pqOptionBImageLink = '';
+      _pqOptionCImage = null;
+      _pqOptionCImageLink = '';
+      _pqOptionDImage = null;
+      _pqOptionDImageLink = '';
       _pqCorrect = 'A';
       _pqSimilarCorrect = 'A';
       _pqShowSimilarQuestion = false;
@@ -2731,6 +2805,105 @@ class _PracticePageState extends State<PracticePage> {
     );
   }
 
+  Future<void> _showManagePracticeSetsDialog() async {
+    if (_items.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.flash_on_rounded, color: Color(0xFFE85A1C)),
+                const SizedBox(width: 8),
+                Text('Manage Practice Sets (${_items.length})'),
+              ],
+            ),
+            content: SizedBox(
+              width: 600,
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _items.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final item = _items[index] as Map<String, dynamic>;
+                  final setId = _asInt(item['id'], label: 'setId');
+                  final title = item['title']?.toString() ?? 'Practice Set #$setId';
+                  final subj = item['subject']?.toString() ?? '';
+                  final topic = item['topic']?.toString() ?? '';
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE85A1C).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.flash_on_rounded, color: Color(0xFFE85A1C), size: 20),
+                    ),
+                    title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text([if (subj.isNotEmpty) subj, if (topic.isNotEmpty) topic].join(' • '), style: const TextStyle(fontSize: 12)),
+                    trailing: Wrap(
+                      spacing: 4,
+                      children: [
+                        IconButton(
+                          tooltip: 'Manage Questions',
+                          icon: const Icon(Icons.list_alt_outlined, size: 20),
+                          onPressed: () {
+                            Navigator.of(dialogCtx).pop();
+                            _openQuestionsForSet(setId);
+                          },
+                        ),
+                        IconButton(
+                          tooltip: 'Edit Practice Set',
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          onPressed: () {
+                            Navigator.of(dialogCtx).pop();
+                            _showEditPracticeDialog(item);
+                          },
+                        ),
+                        IconButton(
+                          tooltip: 'Delete Practice Set',
+                          icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFD92D20)),
+                          onPressed: () async {
+                            final ok = await _confirmDeleteDialog(
+                              context,
+                              title: 'Delete Practice?',
+                              body: 'This practice set will be removed permanently.',
+                            );
+                            if (!ok) return;
+                            try {
+                              await widget.api.deletePractice(setId);
+                              await _load();
+                              if (mounted) {
+                                setDialogState(() {});
+                                _showActionSnackBar(context, 'Practice deleted successfully');
+                              }
+                            } catch (e, st) {
+                              if (mounted) {
+                                await _handleTaskError(context, 'Delete practice', e, stackTrace: st);
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _showPracticeQuestionDialog(
     BuildContext hostContext, {
     required int setId,
@@ -2758,6 +2931,14 @@ class _PracticePageState extends State<PracticePage> {
     String qImageLink = initialQuestion?['question_image_link']?.toString() ?? '';
     File? qExplanationImage;
     String qExplanationImageLink = initialQuestion?['explanation_image_link']?.toString() ?? '';
+    File? qOptionAImage;
+    String qOptionAImageLink = initialQuestion?['option_a_image_link']?.toString() ?? '';
+    File? qOptionBImage;
+    String qOptionBImageLink = initialQuestion?['option_b_image_link']?.toString() ?? '';
+    File? qOptionCImage;
+    String qOptionCImageLink = initialQuestion?['option_c_image_link']?.toString() ?? '';
+    File? qOptionDImage;
+    String qOptionDImageLink = initialQuestion?['option_d_image_link']?.toString() ?? '';
 
     // Similar Question
     final qSimilarQuestion = TextEditingController();
@@ -2843,20 +3024,60 @@ class _PracticePageState extends State<PracticePage> {
                     controller: qOptionA,
                     decoration: const InputDecoration(labelText: 'Option A *'),
                   ),
+                  _buildOptionImagePickerRow(
+                    label: 'Option A',
+                    file: qOptionAImage,
+                    imageLink: qOptionAImageLink,
+                    onPick: (file) => setDialogState(() => qOptionAImage = file),
+                    onRemove: () => setDialogState(() {
+                      qOptionAImage = null;
+                      qOptionAImageLink = '';
+                    }),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: qOptionB,
                     decoration: const InputDecoration(labelText: 'Option B *'),
+                  ),
+                  _buildOptionImagePickerRow(
+                    label: 'Option B',
+                    file: qOptionBImage,
+                    imageLink: qOptionBImageLink,
+                    onPick: (file) => setDialogState(() => qOptionBImage = file),
+                    onRemove: () => setDialogState(() {
+                      qOptionBImage = null;
+                      qOptionBImageLink = '';
+                    }),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: qOptionC,
                     decoration: const InputDecoration(labelText: 'Option C *'),
                   ),
+                  _buildOptionImagePickerRow(
+                    label: 'Option C',
+                    file: qOptionCImage,
+                    imageLink: qOptionCImageLink,
+                    onPick: (file) => setDialogState(() => qOptionCImage = file),
+                    onRemove: () => setDialogState(() {
+                      qOptionCImage = null;
+                      qOptionCImageLink = '';
+                    }),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: qOptionD,
                     decoration: const InputDecoration(labelText: 'Option D *'),
+                  ),
+                  _buildOptionImagePickerRow(
+                    label: 'Option D',
+                    file: qOptionDImage,
+                    imageLink: qOptionDImageLink,
+                    onPick: (file) => setDialogState(() => qOptionDImage = file),
+                    onRemove: () => setDialogState(() {
+                      qOptionDImage = null;
+                      qOptionDImageLink = '';
+                    }),
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
@@ -3269,6 +3490,65 @@ class _PracticePageState extends State<PracticePage> {
                           };
                         }
 
+                        if (effectiveBatchId != null) {
+                          if (qOptionAImage != null) {
+                            if (!await _validateImageFile(dialogCtx, qOptionAImage!)) {
+                              throw Exception('Option A image too large');
+                            }
+                            qOptionAImageLink = await widget.api.uploadQuestionImage(
+                              batchId: effectiveBatchId,
+                              classLabel: cls,
+                              subject: sbj,
+                              topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                              file: qOptionAImage!,
+                              contentType: 'practice_option_a',
+                              contentId: setId,
+                            );
+                          }
+                          if (qOptionBImage != null) {
+                            if (!await _validateImageFile(dialogCtx, qOptionBImage!)) {
+                              throw Exception('Option B image too large');
+                            }
+                            qOptionBImageLink = await widget.api.uploadQuestionImage(
+                              batchId: effectiveBatchId,
+                              classLabel: cls,
+                              subject: sbj,
+                              topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                              file: qOptionBImage!,
+                              contentType: 'practice_option_b',
+                              contentId: setId,
+                            );
+                          }
+                          if (qOptionCImage != null) {
+                            if (!await _validateImageFile(dialogCtx, qOptionCImage!)) {
+                              throw Exception('Option C image too large');
+                            }
+                            qOptionCImageLink = await widget.api.uploadQuestionImage(
+                              batchId: effectiveBatchId,
+                              classLabel: cls,
+                              subject: sbj,
+                              topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                              file: qOptionCImage!,
+                              contentType: 'practice_option_c',
+                              contentId: setId,
+                            );
+                          }
+                          if (qOptionDImage != null) {
+                            if (!await _validateImageFile(dialogCtx, qOptionDImage!)) {
+                              throw Exception('Option D image too large');
+                            }
+                            qOptionDImageLink = await widget.api.uploadQuestionImage(
+                              batchId: effectiveBatchId,
+                              classLabel: cls,
+                              subject: sbj,
+                              topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                              file: qOptionDImage!,
+                              contentType: 'practice_option_d',
+                              contentId: setId,
+                            );
+                          }
+                        }
+
                         if (!isEdit) {
                           if (dialogCtx.mounted && qImage != null && !await _validateImageFile(dialogCtx, qImage!)) {
                             throw Exception('Question image too large');
@@ -3291,6 +3571,10 @@ class _PracticePageState extends State<PracticePage> {
                               questionImageLink: imgLink,
                               explanationImageLink: expImgLink,
                               explanationVideoLink: vidLink,
+                              optionAImageLink: qOptionAImageLink,
+                              optionBImageLink: qOptionBImageLink,
+                              optionCImageLink: qOptionCImageLink,
+                              optionDImageLink: qOptionDImageLink,
                               similarQuestion: simData,
                             );
                           } else {
@@ -3306,6 +3590,10 @@ class _PracticePageState extends State<PracticePage> {
                               questionImageLink: imgLink,
                               explanationImageLink: expImgLink,
                               explanationVideoLink: vidLink,
+                              optionAImageLink: qOptionAImageLink,
+                              optionBImageLink: qOptionBImageLink,
+                              optionCImageLink: qOptionCImageLink,
+                              optionDImageLink: qOptionDImageLink,
                               similarQuestion: simData,
                             );
                           }
@@ -3369,6 +3657,10 @@ class _PracticePageState extends State<PracticePage> {
                             questionImageLink: imgLink,
                             explanationImageLink: expImgLink,
                             explanationVideoLink: vidLink,
+                            optionAImageLink: qOptionAImageLink,
+                            optionBImageLink: qOptionBImageLink,
+                            optionCImageLink: qOptionCImageLink,
+                            optionDImageLink: qOptionDImageLink,
                             similarQuestion: simData,
                           );
                         }
@@ -3628,31 +3920,49 @@ class _PracticePageState extends State<PracticePage> {
                                             Builder(builder: (c) {
                                               final optKey = 'option_${opt.toLowerCase()}';
                                               final optText = question[optKey]?.toString() ?? '';
-                                              if (optText.isEmpty) return const SizedBox.shrink();
+                                              final optImg = question['option_${opt.toLowerCase()}_image_link']?.toString() ?? '';
+                                              if (optText.isEmpty && optImg.isEmpty) return const SizedBox.shrink();
                                               final isCorrect = correctOpt == opt;
                                               return Padding(
-                                                padding: const EdgeInsets.symmetric(vertical: 2),
-                                                child: Row(
+                                                padding: const EdgeInsets.symmetric(vertical: 3),
+                                                child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    Text(
-                                                      '($opt) ',
-                                                      style: TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 12,
-                                                        color: isCorrect ? Colors.green : Theme.of(context).colorScheme.onSurfaceVariant,
-                                                      ),
+                                                    Row(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          '($opt) ',
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 12,
+                                                            color: isCorrect ? Colors.green : Theme.of(context).colorScheme.onSurfaceVariant,
+                                                          ),
+                                                        ),
+                                                        Expanded(
+                                                          child: Text(
+                                                            optText,
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight: isCorrect ? FontWeight.w600 : FontWeight.normal,
+                                                              color: isCorrect ? Colors.green : null,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                    Expanded(
-                                                      child: Text(
-                                                        optText,
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight: isCorrect ? FontWeight.w600 : FontWeight.normal,
-                                                          color: isCorrect ? Colors.green : null,
+                                                    if (optImg.isNotEmpty) ...[
+                                                      const SizedBox(height: 4),
+                                                      ClipRRect(
+                                                        borderRadius: BorderRadius.circular(6),
+                                                        child: FastNetworkImage(
+                                                          url: optImg,
+                                                          height: 80,
+                                                          fit: BoxFit.contain,
+                                                          thumbWidth: 300,
                                                         ),
                                                       ),
-                                                    ),
+                                                    ],
                                                   ],
                                                 ),
                                               );
@@ -3939,6 +4249,13 @@ class _PracticePageState extends State<PracticePage> {
                         onPressed: _resetPracticeForm,
                         child: const Text('Cancel edit'),
                       ),
+                    FilledButton.tonalIcon(
+                      onPressed: _items.isEmpty
+                          ? null
+                          : () => _showManagePracticeSetsDialog(),
+                      icon: const Icon(Icons.list_alt_outlined, size: 18),
+                      label: const Text('Manage Practice Sets'),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -4007,18 +4324,58 @@ class _PracticePageState extends State<PracticePage> {
                 TextField(
                     controller: _pqOptionA,
                     decoration: const InputDecoration(labelText: 'Option A')),
+                _buildOptionImagePickerRow(
+                  label: 'Option A',
+                  file: _pqOptionAImage,
+                  imageLink: _pqOptionAImageLink,
+                  onPick: (file) => setState(() => _pqOptionAImage = file),
+                  onRemove: () => setState(() {
+                    _pqOptionAImage = null;
+                    _pqOptionAImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _pqOptionB,
                     decoration: const InputDecoration(labelText: 'Option B')),
+                _buildOptionImagePickerRow(
+                  label: 'Option B',
+                  file: _pqOptionBImage,
+                  imageLink: _pqOptionBImageLink,
+                  onPick: (file) => setState(() => _pqOptionBImage = file),
+                  onRemove: () => setState(() {
+                    _pqOptionBImage = null;
+                    _pqOptionBImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _pqOptionC,
                     decoration: const InputDecoration(labelText: 'Option C')),
+                _buildOptionImagePickerRow(
+                  label: 'Option C',
+                  file: _pqOptionCImage,
+                  imageLink: _pqOptionCImageLink,
+                  onPick: (file) => setState(() => _pqOptionCImage = file),
+                  onRemove: () => setState(() {
+                    _pqOptionCImage = null;
+                    _pqOptionCImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _pqOptionD,
                     decoration: const InputDecoration(labelText: 'Option D')),
+                _buildOptionImagePickerRow(
+                  label: 'Option D',
+                  file: _pqOptionDImage,
+                  imageLink: _pqOptionDImageLink,
+                  onPick: (file) => setState(() => _pqOptionDImage = file),
+                  onRemove: () => setState(() {
+                    _pqOptionDImage = null;
+                    _pqOptionDImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: const ['A', 'B', 'C', 'D'].contains(_pqCorrect) ? _pqCorrect : 'A',
@@ -4449,6 +4806,65 @@ class _PracticePageState extends State<PracticePage> {
                                   };
                                 }
 
+                                if (effectiveBatchId != null) {
+                                  if (_pqOptionAImage != null) {
+                                    if (!await _validateImageFile(context, _pqOptionAImage!)) {
+                                      throw Exception('Option A image too large');
+                                    }
+                                    _pqOptionAImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: effectiveBatchId,
+                                      classLabel: cls,
+                                      subject: sbj,
+                                      topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                      file: _pqOptionAImage!,
+                                      contentType: 'practice_option_a',
+                                      contentId: _selectedSetId,
+                                    );
+                                  }
+                                  if (_pqOptionBImage != null) {
+                                    if (!await _validateImageFile(context, _pqOptionBImage!)) {
+                                      throw Exception('Option B image too large');
+                                    }
+                                    _pqOptionBImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: effectiveBatchId,
+                                      classLabel: cls,
+                                      subject: sbj,
+                                      topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                      file: _pqOptionBImage!,
+                                      contentType: 'practice_option_b',
+                                      contentId: _selectedSetId,
+                                    );
+                                  }
+                                  if (_pqOptionCImage != null) {
+                                    if (!await _validateImageFile(context, _pqOptionCImage!)) {
+                                      throw Exception('Option C image too large');
+                                    }
+                                    _pqOptionCImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: effectiveBatchId,
+                                      classLabel: cls,
+                                      subject: sbj,
+                                      topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                      file: _pqOptionCImage!,
+                                      contentType: 'practice_option_c',
+                                      contentId: _selectedSetId,
+                                    );
+                                  }
+                                  if (_pqOptionDImage != null) {
+                                    if (!await _validateImageFile(context, _pqOptionDImage!)) {
+                                      throw Exception('Option D image too large');
+                                    }
+                                    _pqOptionDImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: effectiveBatchId,
+                                      classLabel: cls,
+                                      subject: sbj,
+                                      topic: tpc.isEmpty ? 'Practice Questions' : tpc,
+                                      file: _pqOptionDImage!,
+                                      contentType: 'practice_option_d',
+                                      contentId: _selectedSetId,
+                                    );
+                                  }
+                                }
+
                                 if (_editingPracticeQuestionId == null) {
                                   if (_pqImage != null &&
                                       !await _validateImageFile(context, _pqImage!)) {
@@ -4474,6 +4890,10 @@ class _PracticePageState extends State<PracticePage> {
                                       questionImageLink: imageLink,
                                       explanationImageLink: expLink,
                                       explanationVideoLink: videoLink,
+                                      optionAImageLink: _pqOptionAImageLink,
+                                      optionBImageLink: _pqOptionBImageLink,
+                                      optionCImageLink: _pqOptionCImageLink,
+                                      optionDImageLink: _pqOptionDImageLink,
                                       similarQuestion: similarQuestionData,
                                     );
                                   } else {
@@ -4489,6 +4909,10 @@ class _PracticePageState extends State<PracticePage> {
                                       questionImageLink: imageLink,
                                       explanationImageLink: expLink,
                                       explanationVideoLink: videoLink,
+                                      optionAImageLink: _pqOptionAImageLink,
+                                      optionBImageLink: _pqOptionBImageLink,
+                                      optionCImageLink: _pqOptionCImageLink,
+                                      optionDImageLink: _pqOptionDImageLink,
                                       similarQuestion: similarQuestionData,
                                     );
                                   }
@@ -4558,6 +4982,10 @@ class _PracticePageState extends State<PracticePage> {
                                     questionImageLink: imageLink,
                                     explanationImageLink: expLink,
                                     explanationVideoLink: videoLink,
+                                    optionAImageLink: _pqOptionAImageLink,
+                                    optionBImageLink: _pqOptionBImageLink,
+                                    optionCImageLink: _pqOptionCImageLink,
+                                    optionDImageLink: _pqOptionDImageLink,
                                     similarQuestion: similarQuestionData,
                                   );
                                 }
@@ -4597,9 +5025,15 @@ class _PracticePageState extends State<PracticePage> {
                         child: const Text('Cancel edit'),
                       ),
                     FilledButton.tonalIcon(
-                      onPressed: _selectedSetId == null
+                      onPressed: _items.isEmpty
                           ? null
-                          : () => _openQuestionsForSet(_selectedSetId!),
+                          : () {
+                              if (_selectedSetId != null) {
+                                _openQuestionsForSet(_selectedSetId!);
+                              } else {
+                                _showManagePracticeSetsDialog();
+                              }
+                            },
                       icon: const Icon(Icons.list_alt_outlined, size: 18),
                       label: const Text('Manage Questions for Set'),
                     ),
@@ -4775,6 +5209,14 @@ class _TestsPageState extends State<TestsPage> {
   String _testQuestionImageLink = '';
   File? _testExplanationImage;
   String _testExplanationImageLink = '';
+  File? _testOptionAImage;
+  String _testOptionAImageLink = '';
+  File? _testOptionBImage;
+  String _testOptionBImageLink = '';
+  File? _testOptionCImage;
+  String _testOptionCImageLink = '';
+  File? _testOptionDImage;
+  String _testOptionDImageLink = '';
   // Similar Question for Test MCQ
   final _testSimilarQuestion = TextEditingController();
   final _testSimilarOptionA = TextEditingController();
@@ -4876,17 +5318,1518 @@ class _TestsPageState extends State<TestsPage> {
       _testQuestionImageLink = '';
       _testExplanationImage = null;
       _testExplanationImageLink = '';
+      _testOptionAImage = null;
+      _testOptionAImageLink = '';
+      _testOptionBImage = null;
+      _testOptionBImageLink = '';
+      _testOptionCImage = null;
+      _testOptionCImageLink = '';
+      _testOptionDImage = null;
+      _testOptionDImageLink = '';
       _pendingExtraExplanationImages.clear();
       _savedExplanationImages = const [];
     });
   }
 
+  Future<void> _showEditTestDialog(Map<String, dynamic> item) async {
+    final testId = _asInt(item['id'], label: 'testId');
+    final titleCtrl = TextEditingController(text: item['title']?.toString() ?? '');
+    final classCtrl = TextEditingController(text: item['class_label']?.toString() ?? 'Class 11');
+    final subjectCtrl = TextEditingController(text: item['subject']?.toString() ?? 'Biology');
+    final topicCtrl = TextEditingController(text: item['topic']?.toString() ?? '');
+    final durationCtrl = TextEditingController(text: item['duration_minutes']?.toString() ?? '180');
+    final marksCtrl = TextEditingController(text: item['marks']?.toString() ?? '720');
+    final questionCountCtrl = TextEditingController(text: item['question_count']?.toString() ?? '180');
+    final scheduleCtrl = TextEditingController(text: item['schedule_label']?.toString() ?? 'Upcoming');
+    String categoryValue = item['category']?.toString() ?? 'Grand test';
+    if (!_testCategories.contains(categoryValue)) {
+      categoryValue = categoryValue.toLowerCase().contains('student') ? 'Subject test' : 'Grand test';
+    }
+    bool saving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.edit_outlined, color: Color(0xFFD92D20)),
+              SizedBox(width: 8),
+              Expanded(child: Text('Edit Test')),
+            ],
+          ),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: categoryValue,
+                    items: _testCategories
+                        .map((category) => DropdownMenuItem<String>(
+                              value: category,
+                              child: Text(category),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setDialogState(() => categoryValue = v ?? 'Grand test'),
+                    decoration: const InputDecoration(labelText: 'Test category'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(labelText: 'Test Title'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: classCtrl,
+                    decoration: const InputDecoration(labelText: 'Class'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: subjectCtrl,
+                    decoration: const InputDecoration(labelText: 'Subject'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: topicCtrl,
+                    decoration: const InputDecoration(labelText: 'Topic'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: durationCtrl,
+                    decoration: const InputDecoration(labelText: 'Duration (minutes)'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: marksCtrl,
+                    decoration: const InputDecoration(labelText: 'Total marks'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: questionCountCtrl,
+                    decoration: const InputDecoration(labelText: 'Question count'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: scheduleCtrl,
+                    decoration: const InputDecoration(labelText: 'Schedule label'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (titleCtrl.text.trim().isEmpty) {
+                        _showActionSnackBar(dialogCtx, 'Title cannot be empty', isError: true);
+                        return;
+                      }
+                      setDialogState(() => saving = true);
+                      try {
+                        await widget.api.updateTest(
+                          id: testId,
+                          classLabel: classCtrl.text.trim(),
+                          title: titleCtrl.text.trim(),
+                          subject: subjectCtrl.text.trim(),
+                          topic: topicCtrl.text.trim(),
+                          category: categoryValue,
+                          durationMinutes: int.tryParse(durationCtrl.text.trim()) ?? 180,
+                          marks: int.tryParse(marksCtrl.text.trim()) ?? 720,
+                          questionCount: int.tryParse(questionCountCtrl.text.trim()) ?? 180,
+                          scheduleLabel: scheduleCtrl.text.trim(),
+                        );
+                        if (dialogCtx.mounted) {
+                          Navigator.of(dialogCtx).pop();
+                        }
+                        await _load();
+                        if (mounted) {
+                          _showActionSnackBar(context, 'Test updated successfully');
+                        }
+                      } catch (e) {
+                        setDialogState(() => saving = false);
+                        if (dialogCtx.mounted) {
+                          _showActionSnackBar(dialogCtx, 'Update failed: ${_friendlyError(e)}', isError: true);
+                        }
+                      }
+                    },
+              child: _busyButtonChild(saving, 'Update Test'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showManageTestsDialog() async {
+    if (_items.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.fact_check_rounded, color: Color(0xFFD92D20)),
+                const SizedBox(width: 8),
+                Text('Manage Tests (${_items.length})'),
+              ],
+            ),
+            content: SizedBox(
+              width: 600,
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _items.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final item = _items[index] as Map<String, dynamic>;
+                  final testId = _asInt(item['id'], label: 'testId');
+                  final title = item['title']?.toString() ?? 'Test #$testId';
+                  final subj = item['subject']?.toString() ?? '';
+                  final topic = item['topic']?.toString() ?? '';
+                  final cat = item['category']?.toString() ?? '';
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD92D20).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.fact_check_rounded, color: Color(0xFFD92D20), size: 20),
+                    ),
+                    title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text([if (cat.isNotEmpty) cat, if (subj.isNotEmpty) subj, if (topic.isNotEmpty) topic].join(' • '), style: const TextStyle(fontSize: 12)),
+                    trailing: Wrap(
+                      spacing: 4,
+                      children: [
+                        IconButton(
+                          tooltip: 'Manage Questions',
+                          icon: const Icon(Icons.list_alt_outlined, size: 20),
+                          onPressed: () {
+                            Navigator.of(dialogCtx).pop();
+                            _openQuestionsForTest(testId);
+                          },
+                        ),
+                        IconButton(
+                          tooltip: 'Edit Test',
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          onPressed: () {
+                            Navigator.of(dialogCtx).pop();
+                            _showEditTestDialog(item);
+                          },
+                        ),
+                        IconButton(
+                          tooltip: 'Delete Test',
+                          icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFD92D20)),
+                          onPressed: () async {
+                            final ok = await _confirmDeleteDialog(
+                              context,
+                              title: 'Delete Test?',
+                              body: 'This test and its questions will be removed permanently.',
+                            );
+                            if (!ok) return;
+                            try {
+                              await widget.api.deleteTest(testId);
+                              await _load();
+                              if (mounted) {
+                                setDialogState(() {});
+                                _showActionSnackBar(context, 'Test deleted successfully');
+                              }
+                            } catch (_) {
+                              if (mounted) {
+                                _showActionSnackBar(context, 'Test delete failed', isError: true);
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showTestQuestionDialog(
+    BuildContext hostContext, {
+    required int testId,
+    Map<String, dynamic>? initialQuestion,
+    VoidCallback? onSaved,
+  }) async {
+    final isEdit = initialQuestion != null;
+    final questionId = isEdit ? _asInt(initialQuestion['id'], label: 'questionId') : null;
+
+    final qQuestion = TextEditingController(text: initialQuestion?['question']?.toString() ?? '');
+    final qOptionA = TextEditingController(text: initialQuestion?['option_a']?.toString() ?? '');
+    final qOptionB = TextEditingController(text: initialQuestion?['option_b']?.toString() ?? '');
+    final qOptionC = TextEditingController(text: initialQuestion?['option_c']?.toString() ?? '');
+    final qOptionD = TextEditingController(text: initialQuestion?['option_d']?.toString() ?? '');
+    final qExplanation = TextEditingController(text: initialQuestion?['explanation']?.toString() ?? '');
+    final qExplanationVideoLink = TextEditingController(
+      text: initialQuestion?['explanation_video_link']?.toString() ??
+          initialQuestion?['explanation_video_url']?.toString() ??
+          '',
+    );
+    String qCorrect = initialQuestion?['correct_option']?.toString() ?? 'A';
+    if (!const ['A', 'B', 'C', 'D'].contains(qCorrect)) qCorrect = 'A';
+
+    File? qImage;
+    String qImageLink = initialQuestion?['question_image_link']?.toString() ?? '';
+    File? qExplanationImage;
+    String qExplanationImageLink = initialQuestion?['explanation_image_link']?.toString() ?? '';
+    File? qOptionAImage;
+    String qOptionAImageLink = initialQuestion?['option_a_image_link']?.toString() ?? '';
+    File? qOptionBImage;
+    String qOptionBImageLink = initialQuestion?['option_b_image_link']?.toString() ?? '';
+    File? qOptionCImage;
+    String qOptionCImageLink = initialQuestion?['option_c_image_link']?.toString() ?? '';
+    File? qOptionDImage;
+    String qOptionDImageLink = initialQuestion?['option_d_image_link']?.toString() ?? '';
+
+    // Similar Question
+    final qSimilarQuestion = TextEditingController();
+    final qSimilarOptionA = TextEditingController();
+    final qSimilarOptionB = TextEditingController();
+    final qSimilarOptionC = TextEditingController();
+    final qSimilarOptionD = TextEditingController();
+    final qSimilarExplanation = TextEditingController();
+    String qSimilarCorrect = 'A';
+    bool qShowSimilarQuestion = false;
+    File? qSimilarQuestionImage;
+    String qSimilarQuestionImageLink = '';
+    File? qSimilarExplanationImage;
+    String qSimilarExplanationImageLink = '';
+    final List<File> qSimilarPendingExtraExplanationImages = [];
+    final List<String> qSimilarExistingExplanationImages = [];
+
+    final sq = initialQuestion?['similar_question'];
+    Map<String, dynamic>? sqMap;
+    if (sq is Map) {
+      sqMap = Map<String, dynamic>.from(sq);
+    } else if (sq is String && sq.trim().isNotEmpty) {
+      try {
+        final dec = jsonDecode(sq);
+        if (dec is Map) sqMap = Map<String, dynamic>.from(dec);
+      } catch (_) {}
+    }
+    if (sqMap != null && (sqMap['question']?.toString().trim().isNotEmpty ?? false)) {
+      qSimilarQuestion.text = sqMap['question']?.toString() ?? '';
+      qSimilarOptionA.text = sqMap['option_a']?.toString() ?? sqMap['optionA']?.toString() ?? '';
+      qSimilarOptionB.text = sqMap['option_b']?.toString() ?? sqMap['optionB']?.toString() ?? '';
+      qSimilarOptionC.text = sqMap['option_c']?.toString() ?? sqMap['optionC']?.toString() ?? '';
+      qSimilarOptionD.text = sqMap['option_d']?.toString() ?? sqMap['optionD']?.toString() ?? '';
+      qSimilarCorrect = sqMap['correct_option']?.toString() ?? sqMap['correctOption']?.toString() ?? 'A';
+      if (!const ['A', 'B', 'C', 'D'].contains(qSimilarCorrect)) qSimilarCorrect = 'A';
+      qSimilarExplanation.text = sqMap['explanation']?.toString() ?? '';
+      qSimilarQuestionImageLink = sqMap['question_image_link']?.toString() ?? sqMap['image_url']?.toString() ?? '';
+      qSimilarExplanationImageLink = sqMap['explanation_image_link']?.toString() ?? '';
+      final rawExtra = sqMap['explanation_images'] ?? sqMap['explanation_images_list'];
+      if (rawExtra is List) {
+        for (final item in rawExtra) {
+          final s = (item is String ? item : (item is Map ? (item['image_url'] ?? item['imageLink'] ?? '') : '')).toString().trim();
+          if (s.isNotEmpty) qSimilarExistingExplanationImages.add(s);
+        }
+      }
+      qShowSimilarQuestion = true;
+    }
+
+    bool saving = false;
+
+    await showDialog<void>(
+      context: hostContext,
+      barrierDismissible: false,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(isEdit ? Icons.edit_note_rounded : Icons.add_circle_outline, color: const Color(0xFFD92D20)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(isEdit ? 'Edit Test Question' : 'Add Test Question'),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: qQuestion,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Question *',
+                      hintText: 'Enter question text',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: qOptionA,
+                    decoration: const InputDecoration(labelText: 'Option A *'),
+                  ),
+                  _buildOptionImagePickerRow(
+                    label: 'Option A',
+                    file: qOptionAImage,
+                    imageLink: qOptionAImageLink,
+                    onPick: (file) => setDialogState(() => qOptionAImage = file),
+                    onRemove: () => setDialogState(() {
+                      qOptionAImage = null;
+                      qOptionAImageLink = '';
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: qOptionB,
+                    decoration: const InputDecoration(labelText: 'Option B *'),
+                  ),
+                  _buildOptionImagePickerRow(
+                    label: 'Option B',
+                    file: qOptionBImage,
+                    imageLink: qOptionBImageLink,
+                    onPick: (file) => setDialogState(() => qOptionBImage = file),
+                    onRemove: () => setDialogState(() {
+                      qOptionBImage = null;
+                      qOptionBImageLink = '';
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: qOptionC,
+                    decoration: const InputDecoration(labelText: 'Option C *'),
+                  ),
+                  _buildOptionImagePickerRow(
+                    label: 'Option C',
+                    file: qOptionCImage,
+                    imageLink: qOptionCImageLink,
+                    onPick: (file) => setDialogState(() => qOptionCImage = file),
+                    onRemove: () => setDialogState(() {
+                      qOptionCImage = null;
+                      qOptionCImageLink = '';
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: qOptionD,
+                    decoration: const InputDecoration(labelText: 'Option D *'),
+                  ),
+                  _buildOptionImagePickerRow(
+                    label: 'Option D',
+                    file: qOptionDImage,
+                    imageLink: qOptionDImageLink,
+                    onPick: (file) => setDialogState(() => qOptionDImage = file),
+                    onRemove: () => setDialogState(() {
+                      qOptionDImage = null;
+                      qOptionDImageLink = '';
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: qCorrect,
+                    items: const [
+                      DropdownMenuItem(value: 'A', child: Text('Correct Option: A')),
+                      DropdownMenuItem(value: 'B', child: Text('Correct Option: B')),
+                      DropdownMenuItem(value: 'C', child: Text('Correct Option: C')),
+                      DropdownMenuItem(value: 'D', child: Text('Correct Option: D')),
+                    ],
+                    onChanged: (v) => setDialogState(() => qCorrect = v ?? 'A'),
+                    decoration: const InputDecoration(labelText: 'Correct Option *'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: qExplanation,
+                    minLines: 2,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Explanation (optional)',
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: qExplanationVideoLink,
+                    decoration: const InputDecoration(
+                      labelText: 'Explanation Video Link (YouTube / Drive / MP4 URL)',
+                      hintText: 'e.g. https://www.youtube.com/watch?... or Google Drive link',
+                      prefixIcon: Icon(Icons.smart_display_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Question image
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          qImage == null
+                              ? (qImageLink.isEmpty ? 'No question image' : 'Question image uploaded')
+                              : qImage!.path.split(Platform.pathSeparator).last,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                          if (result?.files.single.path == null) return;
+                          setDialogState(() => qImage = File(result!.files.single.path!));
+                        },
+                        child: const Text('Pick Image'),
+                      ),
+                      if (qImage != null || qImageLink.isNotEmpty)
+                        TextButton(
+                          onPressed: () => setDialogState(() {
+                            qImage = null;
+                            qImageLink = '';
+                          }),
+                          child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Explanation image
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          qExplanationImage == null
+                              ? (qExplanationImageLink.isEmpty ? 'No explanation image' : 'Explanation image uploaded')
+                              : qExplanationImage!.path.split(Platform.pathSeparator).last,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                          if (result?.files.single.path == null) return;
+                          setDialogState(() => qExplanationImage = File(result!.files.single.path!));
+                        },
+                        child: const Text('Pick Image'),
+                      ),
+                      if (qExplanationImage != null || qExplanationImageLink.isNotEmpty)
+                        TextButton(
+                          onPressed: () => setDialogState(() {
+                            qExplanationImage = null;
+                            qExplanationImageLink = '';
+                          }),
+                          child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Similar Question Section
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx).cardColor,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: qSimilarQuestion.text.trim().isNotEmpty
+                            ? Colors.indigo.shade400
+                            : Theme.of(ctx).colorScheme.outlineVariant,
+                      ),
+                    ),
+                    child: ExpansionTile(
+                      initiallyExpanded: qShowSimilarQuestion,
+                      onExpansionChanged: (v) => setDialogState(() => qShowSimilarQuestion = v),
+                      leading: const Icon(Icons.help_center_outlined, color: Color(0xFF4F46E5)),
+                      title: Row(
+                        children: [
+                          const Text('Solve Similar Question', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(width: 8),
+                          if (qSimilarQuestion.text.trim().isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('Added', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                            )
+                          else
+                            Text('(Optional)', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: qSimilarQuestion,
+                                minLines: 2,
+                                maxLines: 4,
+                                decoration: const InputDecoration(
+                                  labelText: 'Similar Question text',
+                                  hintText: 'Enter parallel question on this concept',
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(controller: qSimilarOptionA, decoration: const InputDecoration(labelText: 'Similar Option A')),
+                              const SizedBox(height: 8),
+                              TextField(controller: qSimilarOptionB, decoration: const InputDecoration(labelText: 'Similar Option B')),
+                              const SizedBox(height: 8),
+                              TextField(controller: qSimilarOptionC, decoration: const InputDecoration(labelText: 'Similar Option C')),
+                              const SizedBox(height: 8),
+                              TextField(controller: qSimilarOptionD, decoration: const InputDecoration(labelText: 'Similar Option D')),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: qSimilarCorrect,
+                                items: const [
+                                  DropdownMenuItem(value: 'A', child: Text('Correct: A')),
+                                  DropdownMenuItem(value: 'B', child: Text('Correct: B')),
+                                  DropdownMenuItem(value: 'C', child: Text('Correct: C')),
+                                  DropdownMenuItem(value: 'D', child: Text('Correct: D')),
+                                ],
+                                onChanged: (v) => setDialogState(() => qSimilarCorrect = v ?? 'A'),
+                                decoration: const InputDecoration(labelText: 'Correct Option for Similar Question'),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: qSimilarExplanation,
+                                minLines: 2,
+                                maxLines: 4,
+                                decoration: const InputDecoration(labelText: 'Explanation for Similar Question'),
+                              ),
+                              const SizedBox(height: 10),
+                              // Similar Question Image
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      qSimilarQuestionImage == null
+                                          ? (qSimilarQuestionImageLink.isEmpty
+                                              ? 'No similar question image'
+                                              : 'Similar question image uploaded')
+                                          : qSimilarQuestionImage!.path.split(Platform.pathSeparator).last,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                      if (result?.files.single.path == null) return;
+                                      setDialogState(() => qSimilarQuestionImage = File(result!.files.single.path!));
+                                    },
+                                    child: const Text('Pick Image'),
+                                  ),
+                                  if (qSimilarQuestionImage != null || qSimilarQuestionImageLink.isNotEmpty)
+                                    TextButton(
+                                      onPressed: () => setDialogState(() {
+                                        qSimilarQuestionImage = null;
+                                        qSimilarQuestionImageLink = '';
+                                      }),
+                                      child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              // Similar Question Explanation Image
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      qSimilarExplanationImage == null
+                                          ? (qSimilarExplanationImageLink.isEmpty
+                                              ? 'No similar explanation image'
+                                              : 'Similar explanation image uploaded')
+                                          : qSimilarExplanationImage!.path.split(Platform.pathSeparator).last,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                      if (result?.files.single.path == null) return;
+                                      setDialogState(() => qSimilarExplanationImage = File(result!.files.single.path!));
+                                    },
+                                    child: const Text('Pick Image'),
+                                  ),
+                                  if (qSimilarExplanationImage != null || qSimilarExplanationImageLink.isNotEmpty)
+                                    TextButton(
+                                      onPressed: () => setDialogState(() {
+                                        qSimilarExplanationImage = null;
+                                        qSimilarExplanationImageLink = '';
+                                      }),
+                                      child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              // Multiple Explanation Images for Similar Question
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      qSimilarPendingExtraExplanationImages.isEmpty && qSimilarExistingExplanationImages.isEmpty
+                                          ? 'No extra explanation images'
+                                          : '${qSimilarExistingExplanationImages.length} saved, ${qSimilarPendingExtraExplanationImages.length} ready to upload',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
+                                    label: const Text('Add Images'),
+                                    onPressed: () async {
+                                      final result = await FilePicker.platform.pickFiles(
+                                        type: FileType.image,
+                                        allowMultiple: true,
+                                      );
+                                      if (result == null) return;
+                                      setDialogState(() {
+                                        for (final f in result.files) {
+                                          if (f.path != null) {
+                                            qSimilarPendingExtraExplanationImages.add(File(f.path!));
+                                          }
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                              if (qSimilarExistingExplanationImages.isNotEmpty) ...[
+                                ...qSimilarExistingExplanationImages.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const Icon(Icons.image_outlined, size: 18),
+                                    title: Text('Saved Explanation Image #${idx + 1}', style: const TextStyle(fontSize: 12)),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                                      onPressed: () => setDialogState(() => qSimilarExistingExplanationImages.removeAt(idx)),
+                                    ),
+                                  );
+                                }),
+                              ],
+                              if (qSimilarPendingExtraExplanationImages.isNotEmpty) ...[
+                                ...qSimilarPendingExtraExplanationImages.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  final file = entry.value;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const Icon(Icons.add_photo_alternate_outlined, size: 18, color: Colors.indigo),
+                                    title: Text(file.path.split(Platform.pathSeparator).last, style: const TextStyle(fontSize: 12)),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
+                                      onPressed: () => setDialogState(() => qSimilarPendingExtraExplanationImages.removeAt(idx)),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (qQuestion.text.trim().isEmpty ||
+                          qOptionA.text.trim().isEmpty ||
+                          qOptionB.text.trim().isEmpty ||
+                          qOptionC.text.trim().isEmpty ||
+                          qOptionD.text.trim().isEmpty) {
+                        _showActionSnackBar(dialogCtx, 'Please fill question and all options (A, B, C, D)', isError: true);
+                        return;
+                      }
+
+                      setDialogState(() => saving = true);
+                      try {
+                        var imgLink = qImageLink;
+                        var expImgLink = qExplanationImageLink;
+                        final vidLink = qExplanationVideoLink.text.trim();
+
+                        final currentTest = _items.firstWhere(
+                          (x) => _asInt((x as Map)['id']) == testId,
+                          orElse: () => null,
+                        );
+                        final bId = currentTest != null ? _asInt(currentTest['batch_id'] ?? _batchId) : _batchId;
+                        final effectiveBatchId = bId ?? (_batches.isNotEmpty ? _asInt((_batches.first as Map)['id']) : null);
+                        final cls = currentTest != null ? currentTest['class_label']?.toString() ?? '' : _classLabel.text.trim();
+                        final sbj = currentTest != null ? currentTest['subject']?.toString() ?? '' : _subject.text.trim();
+                        final tpc = currentTest != null ? currentTest['topic']?.toString() ?? '' : _topic.text.trim();
+
+                        Map<String, dynamic>? simData;
+                        if (qSimilarQuestion.text.trim().isNotEmpty) {
+                          if (effectiveBatchId != null) {
+                            if (qSimilarQuestionImage != null) {
+                              if (!await _validateImageFile(dialogCtx, qSimilarQuestionImage!)) {
+                                throw Exception('Similar question image too large');
+                              }
+                              qSimilarQuestionImageLink = await widget.api.uploadQuestionImage(
+                                batchId: effectiveBatchId,
+                                classLabel: cls,
+                                subject: sbj,
+                                topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                file: qSimilarQuestionImage!,
+                                contentType: 'similar_question',
+                                contentId: testId,
+                              );
+                            }
+                            if (qSimilarExplanationImage != null) {
+                              if (!await _validateImageFile(dialogCtx, qSimilarExplanationImage!)) {
+                                throw Exception('Similar explanation image too large');
+                              }
+                              qSimilarExplanationImageLink = await widget.api.uploadQuestionImage(
+                                batchId: effectiveBatchId,
+                                classLabel: cls,
+                                subject: sbj,
+                                topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                file: qSimilarExplanationImage!,
+                                contentType: 'similar_explanation',
+                                contentId: testId,
+                              );
+                            }
+                            if (qSimilarPendingExtraExplanationImages.isNotEmpty) {
+                              for (final extraFile in qSimilarPendingExtraExplanationImages) {
+                                if (!await _validateImageFile(dialogCtx, extraFile)) {
+                                  throw Exception('Similar explanation image too large');
+                                }
+                                final extraLink = await widget.api.uploadQuestionImage(
+                                  batchId: effectiveBatchId,
+                                  classLabel: cls,
+                                  subject: sbj,
+                                  topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                  file: extraFile,
+                                  contentType: 'similar_explanation_extra',
+                                  contentId: testId,
+                                );
+                                if (extraLink.isNotEmpty) {
+                                  qSimilarExistingExplanationImages.add(extraLink);
+                                }
+                              }
+                              qSimilarPendingExtraExplanationImages.clear();
+                            }
+                          }
+
+                          simData = {
+                            'question': qSimilarQuestion.text.trim(),
+                            'option_a': qSimilarOptionA.text.trim(),
+                            'option_b': qSimilarOptionB.text.trim(),
+                            'option_c': qSimilarOptionC.text.trim(),
+                            'option_d': qSimilarOptionD.text.trim(),
+                            'correct_option': qSimilarCorrect,
+                            'explanation': qSimilarExplanation.text.trim(),
+                            if (qSimilarQuestionImageLink.isNotEmpty) 'question_image_link': qSimilarQuestionImageLink,
+                            if (qSimilarExplanationImageLink.isNotEmpty) 'explanation_image_link': qSimilarExplanationImageLink,
+                            if (qSimilarExistingExplanationImages.isNotEmpty) 'explanation_images': qSimilarExistingExplanationImages,
+                          };
+                        }
+
+                        if (effectiveBatchId != null) {
+                          if (qOptionAImage != null) {
+                            if (!await _validateImageFile(dialogCtx, qOptionAImage!)) {
+                              throw Exception('Option A image too large');
+                            }
+                            qOptionAImageLink = await widget.api.uploadQuestionImage(
+                              batchId: effectiveBatchId,
+                              classLabel: cls,
+                              subject: sbj,
+                              topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                              file: qOptionAImage!,
+                              contentType: 'test_option_a',
+                              contentId: testId,
+                            );
+                          }
+                          if (qOptionBImage != null) {
+                            if (!await _validateImageFile(dialogCtx, qOptionBImage!)) {
+                              throw Exception('Option B image too large');
+                            }
+                            qOptionBImageLink = await widget.api.uploadQuestionImage(
+                              batchId: effectiveBatchId,
+                              classLabel: cls,
+                              subject: sbj,
+                              topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                              file: qOptionBImage!,
+                              contentType: 'test_option_b',
+                              contentId: testId,
+                            );
+                          }
+                          if (qOptionCImage != null) {
+                            if (!await _validateImageFile(dialogCtx, qOptionCImage!)) {
+                              throw Exception('Option C image too large');
+                            }
+                            qOptionCImageLink = await widget.api.uploadQuestionImage(
+                              batchId: effectiveBatchId,
+                              classLabel: cls,
+                              subject: sbj,
+                              topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                              file: qOptionCImage!,
+                              contentType: 'test_option_c',
+                              contentId: testId,
+                            );
+                          }
+                          if (qOptionDImage != null) {
+                            if (!await _validateImageFile(dialogCtx, qOptionDImage!)) {
+                              throw Exception('Option D image too large');
+                            }
+                            qOptionDImageLink = await widget.api.uploadQuestionImage(
+                              batchId: effectiveBatchId,
+                              classLabel: cls,
+                              subject: sbj,
+                              topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                              file: qOptionDImage!,
+                              contentType: 'test_option_d',
+                              contentId: testId,
+                            );
+                          }
+                        }
+
+                        if (!isEdit) {
+                          if (dialogCtx.mounted && qImage != null && !await _validateImageFile(dialogCtx, qImage!)) {
+                            throw Exception('Question image too large');
+                          }
+                          if (dialogCtx.mounted && qExplanationImage != null && !await _validateImageFile(dialogCtx, qExplanationImage!)) {
+                            throw Exception('Explanation image too large');
+                          }
+                          if (qImage != null || qExplanationImage != null) {
+                            await widget.api.addTestQuestionWithMedia(
+                              testId: testId,
+                              question: qQuestion.text.trim(),
+                              optionA: qOptionA.text.trim(),
+                              optionB: qOptionB.text.trim(),
+                              optionC: qOptionC.text.trim(),
+                              optionD: qOptionD.text.trim(),
+                              correctOption: qCorrect,
+                              explanation: qExplanation.text.trim(),
+                              subject: sbj,
+                              questionImage: qImage,
+                              explanationImage: qExplanationImage,
+                              questionImageLink: imgLink,
+                              explanationImageLink: expImgLink,
+                              explanationVideoLink: vidLink,
+                              optionAImageLink: qOptionAImageLink,
+                              optionBImageLink: qOptionBImageLink,
+                              optionCImageLink: qOptionCImageLink,
+                              optionDImageLink: qOptionDImageLink,
+                              similarQuestion: simData,
+                            );
+                          } else {
+                            await widget.api.addTestQuestion(
+                              testId: testId,
+                              question: qQuestion.text.trim(),
+                              optionA: qOptionA.text.trim(),
+                              optionB: qOptionB.text.trim(),
+                              optionC: qOptionC.text.trim(),
+                              optionD: qOptionD.text.trim(),
+                              correctOption: qCorrect,
+                              explanation: qExplanation.text.trim(),
+                              subject: sbj,
+                              questionImageLink: imgLink,
+                              explanationImageLink: expImgLink,
+                              explanationVideoLink: vidLink,
+                              optionAImageLink: qOptionAImageLink,
+                              optionBImageLink: qOptionBImageLink,
+                              optionCImageLink: qOptionCImageLink,
+                              optionDImageLink: qOptionDImageLink,
+                              similarQuestion: simData,
+                            );
+                          }
+                        } else {
+                          final currentTest = _items.firstWhere(
+                            (x) => _asInt((x as Map)['id']) == testId,
+                            orElse: () => null,
+                          );
+                          final bId = currentTest != null ? _asInt(currentTest['batch_id'] ?? _batchId) : _batchId;
+                          final cls = currentTest != null ? currentTest['class_label']?.toString() ?? '' : _classLabel.text.trim();
+                          final sbj = currentTest != null ? currentTest['subject']?.toString() ?? '' : _subject.text.trim();
+                          final tpc = currentTest != null ? currentTest['topic']?.toString() ?? '' : _topic.text.trim();
+
+                          if (bId != null) {
+                            final uploads = <Future<void>>[];
+                            if (qImage != null) {
+                              uploads.add(() async {
+                                if (!await _validateImageFile(dialogCtx, qImage!)) {
+                                  throw Exception('Question image too large');
+                                }
+                                imgLink = await widget.api.uploadQuestionImage(
+                                  batchId: bId,
+                                  classLabel: cls,
+                                  subject: sbj,
+                                  topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                  file: qImage!,
+                                  contentType: 'test',
+                                  contentId: testId,
+                                );
+                              }());
+                            }
+                            if (qExplanationImage != null) {
+                              uploads.add(() async {
+                                if (!await _validateImageFile(dialogCtx, qExplanationImage!)) {
+                                  throw Exception('Explanation image too large');
+                                }
+                                expImgLink = await widget.api.uploadQuestionImage(
+                                  batchId: bId,
+                                  classLabel: cls,
+                                  subject: sbj,
+                                  topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                  file: qExplanationImage!,
+                                  contentType: 'test_explanation',
+                                  contentId: testId,
+                                );
+                              }());
+                            }
+                            if (uploads.isNotEmpty) {
+                              await Future.wait(uploads);
+                            }
+                          }
+                          await widget.api.updateTestQuestion(
+                            id: questionId!,
+                            question: qQuestion.text.trim(),
+                            optionA: qOptionA.text.trim(),
+                            optionB: qOptionB.text.trim(),
+                            optionC: qOptionC.text.trim(),
+                            optionD: qOptionD.text.trim(),
+                            correctOption: qCorrect,
+                            explanation: qExplanation.text.trim(),
+                            subject: sbj,
+                            questionImageLink: imgLink,
+                            explanationImageLink: expImgLink,
+                            explanationVideoLink: vidLink,
+                            optionAImageLink: qOptionAImageLink,
+                            optionBImageLink: qOptionBImageLink,
+                            optionCImageLink: qOptionCImageLink,
+                            optionDImageLink: qOptionDImageLink,
+                            similarQuestion: simData,
+                          );
+                        }
+
+                        if (dialogCtx.mounted) {
+                          Navigator.of(dialogCtx).pop();
+                        }
+                        onSaved?.call();
+                        if (hostContext.mounted) {
+                          _showActionSnackBar(
+                            hostContext,
+                            isEdit ? 'Test question updated successfully' : 'Test question added successfully',
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => saving = false);
+                        if (dialogCtx.mounted) {
+                          _showActionSnackBar(dialogCtx, 'Save failed: ${_friendlyError(e)}', isError: true);
+                        }
+                      }
+                    },
+              child: _busyButtonChild(saving, isEdit ? 'Update Question' : 'Save Question'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _openQuestionsForTest(int testId) async {
     try {
       setState(() => _selectedTestId = testId);
-      final qs = await widget.api.testQuestions(testId);
+      List<dynamic> qs = await widget.api.testQuestions(testId);
       if (!mounted) return;
-      await _showTestQuestionsSheet(qs);
+
+      final testObj = _items.firstWhere(
+        (x) => _asInt((x as Map)['id']) == testId,
+        orElse: () => null,
+      );
+      final testTitle = testObj != null ? (testObj['title']?.toString() ?? '') : '';
+
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      final dialogWidth = (screenWidth > 900 ? 900.0 : (screenWidth * 0.95)).clamp(400.0, 950.0);
+      final dialogHeight = (MediaQuery.sizeOf(context).height * 0.88).clamp(450.0, 850.0);
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogCtx) => StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            Future<void> reloadQuestions() async {
+              try {
+                final updated = await widget.api.testQuestions(testId);
+                setDialogState(() => qs = updated);
+              } catch (_) {}
+            }
+
+            return Dialog(
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              child: SizedBox(
+                width: dialogWidth,
+                height: dialogHeight,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 14, 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.fact_check_rounded, color: Color(0xFFD92D20), size: 22),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        'Test Questions (${qs.length})',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (testTitle.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4, left: 30),
+                                    child: Text(
+                                      testTitle,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton.icon(
+                            onPressed: () {
+                              _showTestQuestionDialog(
+                                context,
+                                testId: testId,
+                                onSaved: reloadQuestions,
+                              );
+                            },
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add Question'),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            tooltip: 'Close',
+                            onPressed: () => Navigator.of(dialogCtx).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          if (qs.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              child: Center(
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.quiz_outlined, size: 48, color: Colors.grey.shade400),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'No questions added to this test yet.',
+                                      style: TextStyle(fontSize: 14),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    FilledButton.tonalIcon(
+                                      onPressed: () {
+                                        _showTestQuestionDialog(
+                                          context,
+                                          testId: testId,
+                                          onSaved: reloadQuestions,
+                                        );
+                                      },
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Add Question Now'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else
+                            ...qs.asMap().entries.map((entry) {
+                              final idx = entry.key;
+                              final question = entry.value as Map<String, dynamic>;
+                              final qId = _asInt(question['id'], label: 'questionId');
+                              final correctOpt = (question['correct_option'] ?? '').toString().toUpperCase();
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                elevation: 1,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFD92D20).withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              'Q${idx + 1}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                                color: Color(0xFFD92D20),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                                            ),
+                                            child: Text(
+                                              'Correct: Option $correctOpt',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.green,
+                                              ),
+                                            ),
+                                          ),
+                                          if (question['similar_question'] != null) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: Colors.indigo.withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: const Text(
+                                                'Similar Q Added',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.indigo,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        question['question']?.toString() ?? '',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            for (final opt in ['A', 'B', 'C', 'D']) ...[
+                                              Builder(builder: (c) {
+                                                final optKey = 'option_${opt.toLowerCase()}';
+                                                final optText = question[optKey]?.toString() ?? '';
+                                                final optImg = question['option_${opt.toLowerCase()}_image_link']?.toString() ?? '';
+                                                if (optText.isEmpty && optImg.isEmpty) return const SizedBox.shrink();
+                                                final isCorrect = correctOpt == opt;
+                                                return Padding(
+                                                  padding: const EdgeInsets.symmetric(vertical: 3),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Row(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            '($opt) ',
+                                                            style: TextStyle(
+                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: 12,
+                                                              color: isCorrect ? Colors.green : Theme.of(context).colorScheme.onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                          Expanded(
+                                                            child: Text(
+                                                              optText,
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                fontWeight: isCorrect ? FontWeight.w600 : FontWeight.normal,
+                                                                color: isCorrect ? Colors.green : null,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      if (optImg.isNotEmpty) ...[
+                                                        const SizedBox(height: 4),
+                                                        ClipRRect(
+                                                          borderRadius: BorderRadius.circular(6),
+                                                          child: FastNetworkImage(
+                                                            url: optImg,
+                                                            height: 80,
+                                                            fit: BoxFit.contain,
+                                                            thumbWidth: 300,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                );
+                                              }),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      if ((question['explanation']?.toString().trim().isNotEmpty ?? false)) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Explanation: ${question['explanation']}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontStyle: FontStyle.italic,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                      if ((question['explanation_video_link']?.toString().trim().isNotEmpty ?? false) ||
+                                          (question['explanation_video_url']?.toString().trim().isNotEmpty ?? false)) ...[
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.smart_display_outlined, size: 16, color: Colors.blue),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                'Video: ${(question['explanation_video_link'] ?? question['explanation_video_url']).toString()}',
+                                                style: const TextStyle(fontSize: 11, color: Colors.blue),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                      if (hasQuestionImage(question)) ...[
+                                        const SizedBox(height: 10),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: FastNetworkImage(
+                                            url: questionImageRawUrl(question),
+                                            height: 140,
+                                            width: double.infinity,
+                                            fit: BoxFit.contain,
+                                            thumbWidth: 600,
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 12),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 6,
+                                        children: [
+                                          FilledButton.tonalIcon(
+                                            onPressed: () {
+                                              _showTestQuestionDialog(
+                                                context,
+                                                testId: testId,
+                                                initialQuestion: question,
+                                                onSaved: reloadQuestions,
+                                              );
+                                            },
+                                            icon: const Icon(Icons.edit_outlined, size: 16),
+                                            label: const Text('Edit Question'),
+                                          ),
+                                          OutlinedButton.icon(
+                                            onPressed: () async {
+                                              List<dynamic> existingSets = [];
+                                              try {
+                                                final res = await widget.api.practiceSets();
+                                                existingSets = (res['practiceSets'] as List<dynamic>?) ?? [];
+                                              } catch (_) {}
+
+                                              if (!context.mounted) return;
+
+                                              final targetSetId = await showDialog<int?>(
+                                                context: context,
+                                                builder: (dialogContext) => AlertDialog(
+                                                  title: const Text('Move to Practice Set'),
+                                                  content: SizedBox(
+                                                    width: double.maxFinite,
+                                                    child: ListView(
+                                                      shrinkWrap: true,
+                                                      children: [
+                                                        ListTile(
+                                                          leading: const Icon(Icons.auto_awesome, color: Colors.deepPurple),
+                                                          title: const Text('Auto-match / Create New'),
+                                                          subtitle: const Text('Smartly matches existing set or creates a new one'),
+                                                          onTap: () => Navigator.of(dialogContext).pop(-1),
+                                                        ),
+                                                        const Divider(),
+                                                        if (existingSets.isNotEmpty)
+                                                          const Padding(
+                                                            padding: EdgeInsets.only(left: 16, top: 8, bottom: 4),
+                                                            child: Text('Select Existing Practice Set:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                                          ),
+                                                        ...existingSets.map((set) {
+                                                          final setMap = set as Map<String, dynamic>;
+                                                          final sId = _asInt(setMap['id']);
+                                                          final title = setMap['title']?.toString() ?? '';
+                                                          final topic = setMap['topic']?.toString() ?? '';
+                                                          final subj = setMap['subject']?.toString() ?? '';
+                                                          return ListTile(
+                                                            leading: const Icon(Icons.folder_open),
+                                                            title: Text(title.isNotEmpty ? title : topic),
+                                                            subtitle: Text([if (subj.isNotEmpty) subj, if (topic.isNotEmpty && topic != title) topic].join(' • ')),
+                                                            onTap: () => Navigator.of(dialogContext).pop(sId),
+                                                          );
+                                                        }),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(dialogContext).pop(null),
+                                                      child: const Text('Cancel'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+
+                                              if (targetSetId == null) return;
+
+                                              final actualTargetId = targetSetId == -1 ? null : targetSetId;
+                                              try {
+                                                await widget.api.moveTestQuestionsToPractice(
+                                                  testId,
+                                                  [qId],
+                                                  targetPracticeSetId: actualTargetId,
+                                                );
+                                                await reloadQuestions();
+                                                if (context.mounted) {
+                                                  _showActionSnackBar(context, 'Question moved to practice set');
+                                                }
+                                              } catch (e) {
+                                                if (context.mounted) {
+                                                  _showActionSnackBar(context, 'Move failed: $e', isError: true);
+                                                }
+                                              }
+                                            },
+                                            icon: const Icon(Icons.drive_file_move_outlined, size: 16),
+                                            label: const Text('Move to Practice'),
+                                          ),
+                                          OutlinedButton.icon(
+                                            onPressed: () async {
+                                              final confirm = await showDialog<bool>(
+                                                context: context,
+                                                builder: (dialogContext) => AlertDialog(
+                                                  title: const Text('Delete Question?'),
+                                                  content: const Text(
+                                                    'Is question delete ho jayega. Ye action undo nahi ho sakta.',
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(dialogContext).pop(false),
+                                                      child: const Text('Cancel'),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                                                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (confirm == true) {
+                                                try {
+                                                  await widget.api.deleteTestQuestion(qId);
+                                                  await reloadQuestions();
+                                                  if (mounted) {
+                                                    _showActionSnackBar(context, 'Question deleted successfully');
+                                                  }
+                                                } catch (e) {
+                                                  if (mounted) {
+                                                    _showActionSnackBar(context, 'Delete failed: $e', isError: true);
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                            label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      );
     } catch (e, st) {
       if (!mounted) return;
       await _handleTaskError(
@@ -4899,332 +6842,6 @@ class _TestsPageState extends State<TestsPage> {
     }
   }
 
-  Future<void> _showTestQuestionsSheet(List<dynamic> qs) async {
-    if (!mounted) return;
-    final List<int> selectedQuestionIds = [];
-    bool isMoving = false;
-
-    await showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setStateSheet) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Questions (${qs.length})', style: Theme.of(context).textTheme.titleLarge),
-                    if (selectedQuestionIds.isNotEmpty)
-                      ElevatedButton.icon(
-                        onPressed: isMoving
-                            ? null
-                            : () async {
-                                List<dynamic> existingSets = [];
-                                try {
-                                  final res = await widget.api.practiceSets();
-                                  existingSets = (res['practiceSets'] as List<dynamic>?) ?? [];
-                                } catch (_) {}
-
-                                if (!sheetContext.mounted) return;
-
-                                final targetId = await showDialog<int?>(
-                                  context: sheetContext,
-                                  builder: (dialogContext) => AlertDialog(
-                                    title: const Text('Move to Practice Set'),
-                                    content: SizedBox(
-                                      width: double.maxFinite,
-                                      child: ListView(
-                                        shrinkWrap: true,
-                                        children: [
-                                          ListTile(
-                                            leading: const Icon(Icons.auto_awesome, color: Colors.deepPurple),
-                                            title: const Text('Auto-match / Create New'),
-                                            subtitle: const Text('Smartly matches existing set or creates a new one'),
-                                            onTap: () => Navigator.of(dialogContext).pop(-1),
-                                          ),
-                                          const Divider(),
-                                          if (existingSets.isNotEmpty)
-                                            const Padding(
-                                              padding: EdgeInsets.only(left: 16, top: 8, bottom: 4),
-                                              child: Text('Select Existing Practice Set:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                            ),
-                                          ...existingSets.map((set) {
-                                            final setMap = set as Map<String, dynamic>;
-                                            final sId = _asInt(setMap['id']);
-                                            final title = setMap['title']?.toString() ?? '';
-                                            final topic = setMap['topic']?.toString() ?? '';
-                                            final subj = setMap['subject']?.toString() ?? '';
-                                            return ListTile(
-                                              leading: const Icon(Icons.folder_open),
-                                              title: Text(title.isNotEmpty ? title : topic),
-                                              subtitle: Text([if (subj.isNotEmpty) subj, if (topic.isNotEmpty && topic != title) topic].join(' • ')),
-                                              onTap: () => Navigator.of(dialogContext).pop(sId),
-                                            );
-                                          }),
-                                        ],
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.of(dialogContext).pop(null),
-                                        child: const Text('Cancel'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-
-                                if (targetId == null) return; // Cancelled
-
-                                final actualTargetId = targetId == -1 ? null : targetId;
-
-                                setStateSheet(() => isMoving = true);
-                                try {
-                                  await widget.api.moveTestQuestionsToPractice(
-                                    _selectedTestId!,
-                                    selectedQuestionIds,
-                                    targetPracticeSetId: actualTargetId,
-                                  );
-                                  if (sheetContext.mounted) {
-                                    Navigator.of(sheetContext).pop();
-                                  }
-                                  await _openQuestionsForTest(_selectedTestId!);
-                                  if (sheetContext.mounted) {
-                                    _showActionSnackBar(
-                                      sheetContext,
-                                      '${selectedQuestionIds.length} questions moved to practice set.',
-                                    );
-                                  }
-                                } catch (e, st) {
-                                  if (sheetContext.mounted) {
-                                    await _handleTaskError(
-                                      sheetContext,
-                                      'Move test questions to practice',
-                                      e,
-                                      stackTrace: st,
-                                    );
-                                  }
-                                } finally {
-                                  if (sheetContext.mounted) {
-                                    setStateSheet(() => isMoving = false);
-                                  }
-                                }
-                              },
-                        icon: isMoving
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.move_up),
-                        label: Text('Move ${selectedQuestionIds.length} to Practice'),
-                      ),
-                  ],
-                ),
-              ),
-              Flexible(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  shrinkWrap: true,
-                  children: [
-                    if (qs.isEmpty)
-                      const Text('No questions yet')
-                    else
-                      ...qs.map(
-                        (q) {
-                          final question = q as Map<String, dynamic>;
-                          final qId = _asInt(question['id'], label: 'questionId');
-                          final isSelected = selectedQuestionIds.contains(qId);
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            color: isSelected ? Colors.blue.withOpacity(0.1) : null,
-                            child: Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Checkbox(
-                                        value: isSelected,
-                                        onChanged: (val) {
-                                          setStateSheet(() {
-                                            if (val == true) {
-                                              selectedQuestionIds.add(qId);
-                                            } else {
-                                              selectedQuestionIds.remove(qId);
-                                            }
-                                          });
-                                        },
-                                      ),
-                                      Expanded(
-                                        child: Text(question['question']?.toString() ?? ''),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text('Correct: ${question['correct_option'] ?? '-'}'),
-                                  if (hasQuestionImage(question)) ...[
-                                    const SizedBox(height: 8),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: FastNetworkImage(
-                                        url: questionImageRawUrl(question),
-                                        height: 120,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                        thumbWidth: 600,
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
-                                    children: [
-                                      OutlinedButton.icon(
-                                        onPressed: () async {
-                                          final questionId = _asInt(question['id'],
-                                              label: 'questionId');
-                                          setState(() {
-                                            _editingQuestionId = questionId;
-                                            _testQuestion.text =
-                                                question['question']?.toString() ?? '';
-                                            _testOptionA.text =
-                                                question['option_a']?.toString() ?? '';
-                                            _testOptionB.text =
-                                                question['option_b']?.toString() ?? '';
-                                            _testOptionC.text =
-                                                question['option_c']?.toString() ?? '';
-                                            _testOptionD.text =
-                                                question['option_d']?.toString() ?? '';
-                                            _testCorrect = question['correct_option']
-                                                    ?.toString() ??
-                                                'A';
-                                            _testExplanation.text =
-                                                question['explanation']?.toString() ??
-                                                    '';
-                                            _testExplanationVideoLink.text =
-                                                question['explanation_video_link']?.toString() ??
-                                                    question['explanation_video_url']?.toString() ??
-                                                    '';
-                                            _testQuestionImageLink =
-                                                question['question_image_link']
-                                                        ?.toString() ??
-                                                    '';
-                                            _testExplanationImageLink =
-                                                question['explanation_image_link']
-                                                        ?.toString() ??
-                                                    '';
-                                            _testQuestionImage = null;
-                                            _testExplanationImage = null;
-                                            _pendingExtraExplanationImages.clear();
-                                            Map<String, dynamic>? simQ;
-                                            if (question['similar_question'] is Map) {
-                                              simQ = Map<String, dynamic>.from(question['similar_question'] as Map);
-                                            } else if (question['similar_question'] is String &&
-                                                (question['similar_question'] as String).isNotEmpty) {
-                                              try {
-                                                final decoded = jsonDecode(question['similar_question'] as String);
-                                                if (decoded is Map) {
-                                                  simQ = Map<String, dynamic>.from(decoded);
-                                                }
-                                              } catch (_) {}
-                                            }
-                                            if (simQ != null) {
-                                              _testSimilarQuestion.text = simQ['question']?.toString() ?? '';
-                                              _testSimilarOptionA.text = simQ['option_a']?.toString() ?? '';
-                                              _testSimilarOptionB.text = simQ['option_b']?.toString() ?? '';
-                                              _testSimilarOptionC.text = simQ['option_c']?.toString() ?? '';
-                                              _testSimilarOptionD.text = simQ['option_d']?.toString() ?? '';
-                                              _testSimilarCorrect = simQ['correct_option']?.toString() ?? 'A';
-                                              _testSimilarExplanation.text = simQ['explanation']?.toString() ?? '';
-                                              _testSimilarQuestionImageLink = simQ['question_image_link']?.toString() ?? '';
-                                              _testSimilarExplanationImageLink = simQ['explanation_image_link']?.toString() ?? '';
-                                              _testSimilarQuestionImage = null;
-                                              _testSimilarExplanationImage = null;
-                                              _testSimilarPendingExtraExplanationImages.clear();
-                                              _testSimilarExistingExplanationImages.clear();
-                                              if (simQ['explanation_images'] is List) {
-                                                _testSimilarExistingExplanationImages.addAll(
-                                                  (simQ['explanation_images'] as List)
-                                                      .map((e) => e?.toString() ?? '')
-                                                      .where((s) => s.isNotEmpty),
-                                                );
-                                              }
-                                              _testShowSimilarQuestion = true;
-                                            } else {
-                                              _testSimilarQuestion.clear();
-                                              _testSimilarOptionA.clear();
-                                              _testSimilarOptionB.clear();
-                                              _testSimilarOptionC.clear();
-                                              _testSimilarOptionD.clear();
-                                              _testSimilarCorrect = 'A';
-                                              _testSimilarExplanation.clear();
-                                              _testSimilarQuestionImageLink = '';
-                                              _testSimilarExplanationImageLink = '';
-                                              _testSimilarQuestionImage = null;
-                                              _testSimilarExplanationImage = null;
-                                              _testSimilarPendingExtraExplanationImages.clear();
-                                              _testSimilarExistingExplanationImages.clear();
-                                              _testShowSimilarQuestion = false;
-                                            }
-                                          });
-                                          await _loadTestExplanationImages(questionId);
-                                          if (sheetContext.mounted) {
-                                            Navigator.of(sheetContext).pop();
-                                          }
-                                        },
-                                        icon: const Icon(Icons.edit_outlined),
-                                        label: const Text('Edit'),
-                                      ),
-                                      OutlinedButton.icon(
-                                        onPressed: () async {
-                                          try {
-                                            await widget.api.deleteTestQuestion(
-                                              _asInt(question['id'],
-                                                  label: 'questionId'),
-                                            );
-                                            if (sheetContext.mounted) {
-                                              Navigator.of(sheetContext).pop();
-                                            }
-                                            await _openQuestionsForTest(
-                                                _selectedTestId!);
-                                          } catch (e, st) {
-                                            if (!mounted) return;
-                                            await _handleTaskError(
-                                              context,
-                                              'Delete test question',
-                                              e,
-                                              stackTrace: st,
-                                            );
-                                          }
-                                        },
-                                        icon: const Icon(Icons.delete_outline),
-                                        label: const Text('Delete'),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   void initState() {
@@ -5257,12 +6874,6 @@ class _TestsPageState extends State<TestsPage> {
     _testSimilarOptionD.dispose();
     _testSimilarExplanation.dispose();
     super.dispose();
-  }
-
-  void _scrollToForm() {
-    if (!_scroll.hasClients) return;
-    _scroll.animateTo(0,
-        duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
   }
 
   Future<void> _load() async {
@@ -5358,73 +6969,91 @@ class _TestsPageState extends State<TestsPage> {
                     decoration:
                         const InputDecoration(labelText: 'Schedule label')),
                 const SizedBox(height: 8),
-                FilledButton(
-                  onPressed: _batchId == null
-                      ? null
-                      : () async {
-                          try {
-                            if (_editingId == null) {
-                              await widget.api.addTest(
-                                batchId: _batchId!,
-                                classLabel: _classLabel.text.trim(),
-                                title: _title.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: _topic.text.trim(),
-                                category: _testCategory,
-                                durationMinutes:
-                                    int.tryParse(_duration.text.trim()) ?? 180,
-                                marks: int.tryParse(_marks.text.trim()) ?? 720,
-                                questionCount:
-                                    int.tryParse(_questionCount.text.trim()) ??
-                                        180,
-                                scheduleLabel: _schedule.text.trim(),
-                              );
-                              _resetTestForm();
-                              setState(
-                                  () => _status = 'Test added successfully');
-                              if (context.mounted) {
-                                _showActionSnackBar(
-                                    context, 'Test added successfully');
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton(
+                      onPressed: _batchId == null
+                          ? null
+                          : () async {
+                              try {
+                                if (_editingId == null) {
+                                  await widget.api.addTest(
+                                    batchId: _batchId!,
+                                    classLabel: _classLabel.text.trim(),
+                                    title: _title.text.trim(),
+                                    subject: _subject.text.trim(),
+                                    topic: _topic.text.trim(),
+                                    category: _testCategory,
+                                    durationMinutes:
+                                        int.tryParse(_duration.text.trim()) ?? 180,
+                                    marks: int.tryParse(_marks.text.trim()) ?? 720,
+                                    questionCount:
+                                        int.tryParse(_questionCount.text.trim()) ??
+                                            180,
+                                    scheduleLabel: _schedule.text.trim(),
+                                  );
+                                  _resetTestForm();
+                                  setState(
+                                      () => _status = 'Test added successfully');
+                                  if (context.mounted) {
+                                    _showActionSnackBar(
+                                        context, 'Test added successfully');
+                                  }
+                                } else {
+                                  await widget.api.updateTest(
+                                    id: _editingId!,
+                                    classLabel: _classLabel.text.trim(),
+                                    title: _title.text.trim(),
+                                    subject: _subject.text.trim(),
+                                    topic: _topic.text.trim(),
+                                    category: _testCategory,
+                                    durationMinutes:
+                                        int.tryParse(_duration.text.trim()) ?? 180,
+                                    marks: int.tryParse(_marks.text.trim()) ?? 720,
+                                    questionCount:
+                                        int.tryParse(_questionCount.text.trim()) ??
+                                            180,
+                                    scheduleLabel: _schedule.text.trim(),
+                                  );
+                                  _editingId = null;
+                                  setState(
+                                      () => _status = 'Test updated successfully');
+                                  if (context.mounted) {
+                                    _showActionSnackBar(
+                                        context, 'Test updated successfully');
+                                  }
+                                }
+                                await _load();
+                              } catch (e, st) {
+                                setState(() => _status = 'Test save failed: ${_friendlyError(e)}');
+                                if (context.mounted) {
+                                  await _handleTaskError(
+                                    context,
+                                    'Test save',
+                                    e,
+                                    stackTrace: st,
+                                    details: {'editingId': _editingId},
+                                  );
+                                }
                               }
-                            } else {
-                              await widget.api.updateTest(
-                                id: _editingId!,
-                                classLabel: _classLabel.text.trim(),
-                                title: _title.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: _topic.text.trim(),
-                                category: _testCategory,
-                                durationMinutes:
-                                    int.tryParse(_duration.text.trim()) ?? 180,
-                                marks: int.tryParse(_marks.text.trim()) ?? 720,
-                                questionCount:
-                                    int.tryParse(_questionCount.text.trim()) ??
-                                        180,
-                                scheduleLabel: _schedule.text.trim(),
-                              );
-                              _editingId = null;
-                              setState(
-                                  () => _status = 'Test updated successfully');
-                              if (context.mounted) {
-                                _showActionSnackBar(
-                                    context, 'Test updated successfully');
-                              }
-                            }
-                            await _load();
-                          } catch (e, st) {
-                            setState(() => _status = 'Test save failed: ${_friendlyError(e)}');
-                            if (context.mounted) {
-                              await _handleTaskError(
-                                context,
-                                'Test save',
-                                e,
-                                stackTrace: st,
-                                details: {'editingId': _editingId},
-                              );
-                            }
-                          }
-                        },
-                  child: Text(_editingId == null ? 'Add Test' : 'Update Test'),
+                            },
+                      child: Text(_editingId == null ? 'Add Test' : 'Update Test'),
+                    ),
+                    if (_editingId != null)
+                      OutlinedButton(
+                        onPressed: _resetTestForm,
+                        child: const Text('Cancel edit'),
+                      ),
+                    FilledButton.tonalIcon(
+                      onPressed: _items.isEmpty
+                          ? null
+                          : () => _showManageTestsDialog(),
+                      icon: const Icon(Icons.list_alt_outlined, size: 18),
+                      label: const Text('Manage Tests'),
+                    ),
+                  ],
                 ),
                 if (_status != null) ...[
                   const SizedBox(height: 8),
@@ -5432,6 +7061,32 @@ class _TestsPageState extends State<TestsPage> {
                 ],
                 const SizedBox(height: 10),
                 const Divider(),
+                if (_editingQuestionId != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit_outlined, size: 16, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Editing Question #$_editingQuestionId',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _resetTestQuestionForm,
+                          child: const Text('Cancel Edit'),
+                        ),
+                      ],
+                    ),
+                  ),
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text('Add questions to test',
@@ -5439,7 +7094,9 @@ class _TestsPageState extends State<TestsPage> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
-                  initialValue: _selectedTestId,
+                  value: _items.any((t) => _asInt(t['id']) == _selectedTestId)
+                      ? _selectedTestId
+                      : null,
                   items: _items
                       .map(
                         (t) => DropdownMenuItem<int>(
@@ -5462,18 +7119,58 @@ class _TestsPageState extends State<TestsPage> {
                 TextField(
                     controller: _testOptionA,
                     decoration: const InputDecoration(labelText: 'Option A')),
+                _buildOptionImagePickerRow(
+                  label: 'Option A',
+                  file: _testOptionAImage,
+                  imageLink: _testOptionAImageLink,
+                  onPick: (file) => setState(() => _testOptionAImage = file),
+                  onRemove: () => setState(() {
+                    _testOptionAImage = null;
+                    _testOptionAImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _testOptionB,
                     decoration: const InputDecoration(labelText: 'Option B')),
+                _buildOptionImagePickerRow(
+                  label: 'Option B',
+                  file: _testOptionBImage,
+                  imageLink: _testOptionBImageLink,
+                  onPick: (file) => setState(() => _testOptionBImage = file),
+                  onRemove: () => setState(() {
+                    _testOptionBImage = null;
+                    _testOptionBImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _testOptionC,
                     decoration: const InputDecoration(labelText: 'Option C')),
+                _buildOptionImagePickerRow(
+                  label: 'Option C',
+                  file: _testOptionCImage,
+                  imageLink: _testOptionCImageLink,
+                  onPick: (file) => setState(() => _testOptionCImage = file),
+                  onRemove: () => setState(() {
+                    _testOptionCImage = null;
+                    _testOptionCImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _testOptionD,
                     decoration: const InputDecoration(labelText: 'Option D')),
+                _buildOptionImagePickerRow(
+                  label: 'Option D',
+                  file: _testOptionDImage,
+                  imageLink: _testOptionDImageLink,
+                  onPick: (file) => setState(() => _testOptionDImage = file),
+                  onRemove: () => setState(() {
+                    _testOptionDImage = null;
+                    _testOptionDImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: _testCorrect,
@@ -5958,6 +7655,65 @@ class _TestsPageState extends State<TestsPage> {
                                 final hasMedia = _testQuestionImage != null ||
                                     _testExplanationImage != null ||
                                     _pendingExtraExplanationImages.isNotEmpty;
+                                if (effectiveBatchId != null) {
+                                  if (_testOptionAImage != null) {
+                                    if (!await _validateImageFile(context, _testOptionAImage!)) {
+                                      throw Exception('Option A image too large');
+                                    }
+                                    _testOptionAImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: effectiveBatchId,
+                                      classLabel: cls,
+                                      subject: sbj,
+                                      topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                      file: _testOptionAImage!,
+                                      contentType: 'test_option_a',
+                                      contentId: _selectedTestId,
+                                    );
+                                  }
+                                  if (_testOptionBImage != null) {
+                                    if (!await _validateImageFile(context, _testOptionBImage!)) {
+                                      throw Exception('Option B image too large');
+                                    }
+                                    _testOptionBImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: effectiveBatchId,
+                                      classLabel: cls,
+                                      subject: sbj,
+                                      topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                      file: _testOptionBImage!,
+                                      contentType: 'test_option_b',
+                                      contentId: _selectedTestId,
+                                    );
+                                  }
+                                  if (_testOptionCImage != null) {
+                                    if (!await _validateImageFile(context, _testOptionCImage!)) {
+                                      throw Exception('Option C image too large');
+                                    }
+                                    _testOptionCImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: effectiveBatchId,
+                                      classLabel: cls,
+                                      subject: sbj,
+                                      topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                      file: _testOptionCImage!,
+                                      contentType: 'test_option_c',
+                                      contentId: _selectedTestId,
+                                    );
+                                  }
+                                  if (_testOptionDImage != null) {
+                                    if (!await _validateImageFile(context, _testOptionDImage!)) {
+                                      throw Exception('Option D image too large');
+                                    }
+                                    _testOptionDImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: effectiveBatchId,
+                                      classLabel: cls,
+                                      subject: sbj,
+                                      topic: tpc.isEmpty ? 'Test Questions' : tpc,
+                                      file: _testOptionDImage!,
+                                      contentType: 'test_option_d',
+                                      contentId: _selectedTestId,
+                                    );
+                                  }
+                                }
+
                                 if (_editingQuestionId == null) {
                                   final filesToValidate = <File>[
                                     if (_testQuestionImage != null)
@@ -5996,6 +7752,10 @@ class _TestsPageState extends State<TestsPage> {
                                       questionImageLink: imageLink,
                                       explanationImageLink: expLink,
                                       explanationVideoLink: videoLink,
+                                      optionAImageLink: _testOptionAImageLink,
+                                      optionBImageLink: _testOptionBImageLink,
+                                      optionCImageLink: _testOptionCImageLink,
+                                      optionDImageLink: _testOptionDImageLink,
                                       similarQuestion: similarQuestionData,
                                     );
                                     _pendingExtraExplanationImages.clear();
@@ -6015,6 +7775,10 @@ class _TestsPageState extends State<TestsPage> {
                                       questionImageLink: imageLink,
                                       explanationImageLink: expLink,
                                       explanationVideoLink: videoLink,
+                                      optionAImageLink: _testOptionAImageLink,
+                                      optionBImageLink: _testOptionBImageLink,
+                                      optionCImageLink: _testOptionCImageLink,
+                                      optionDImageLink: _testOptionDImageLink,
                                       similarQuestion: similarQuestionData,
                                     );
                                   }
@@ -6081,6 +7845,10 @@ class _TestsPageState extends State<TestsPage> {
                                     questionImageLink: imageLink,
                                     explanationImageLink: expLink,
                                     explanationVideoLink: videoLink,
+                                    optionAImageLink: _testOptionAImageLink,
+                                    optionBImageLink: _testOptionBImageLink,
+                                    optionCImageLink: _testOptionCImageLink,
+                                    optionDImageLink: _testOptionDImageLink,
                                     similarQuestion: similarQuestionData,
                                   );
                                 }
@@ -6128,6 +7896,19 @@ class _TestsPageState extends State<TestsPage> {
                         onPressed: _resetTestQuestionForm,
                         child: const Text('Cancel edit'),
                       ),
+                    FilledButton.tonalIcon(
+                      onPressed: _items.isEmpty
+                          ? null
+                          : () {
+                              if (_selectedTestId != null) {
+                                _openQuestionsForTest(_selectedTestId!);
+                              } else {
+                                _showManageTestsDialog();
+                              }
+                            },
+                      icon: const Icon(Icons.list_alt_outlined, size: 18),
+                      label: const Text('Manage Questions for Test'),
+                    ),
                   ],
                 ),
               ],
@@ -6194,7 +7975,7 @@ class _TestsPageState extends State<TestsPage> {
                                         fontSize: 12,
                                         color: Color(0xFF757575))),
                                 const SizedBox(height: 2),
-                                const Text('Tap to view questions',
+                                const Text('Tap to view & manage questions',
                                     style: TextStyle(
                                         fontSize: 11,
                                         color: Color(0xFFD92D20))),
@@ -6202,52 +7983,17 @@ class _TestsPageState extends State<TestsPage> {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'View questions',
+                            tooltip: 'View & Manage questions',
                             icon: const Icon(Icons.list_alt_outlined, size: 20),
                             onPressed: () => _openQuestionsForTest(testId),
                           ),
                           IconButton(
-                              icon: const Icon(Icons.edit_outlined, size: 20),
-                              onPressed: () {
-                                setState(() {
-                                  _editingId = testId;
-                                  _selectedTestId = testId;
-                                  final categoryValue =
-                                      item['category']?.toString() ??
-                                          'Grand test';
-                                  _title.text = item['title']?.toString() ?? '';
-                                  _classLabel.text =
-                                      item['class_label']?.toString() ?? '';
-                                  _subject.text =
-                                      item['subject']?.toString() ?? '';
-                                  _topic.text = item['topic']?.toString() ?? '';
-                                  _testCategory =
-                                      _testCategories.contains(categoryValue)
-                                          ? categoryValue
-                                          : (categoryValue
-                                                  .toLowerCase()
-                                                  .contains('student')
-                                              ? 'Subject test'
-                                              : 'Grand test');
-                                  _duration.text =
-                                      item['duration_minutes']?.toString() ??
-                                          '180';
-                                  _marks.text =
-                                      item['marks']?.toString() ?? '720';
-                                  _questionCount.text =
-                                      item['question_count']?.toString() ??
-                                          '180';
-                                  _schedule.text =
-                                      item['schedule_label']?.toString() ??
-                                          'Upcoming';
-                                });
-                                _scrollToForm();
-                                if (context.mounted) {
-                                  _showActionSnackBar(context,
-                                      'Editing test — form upar scroll ho gaya');
-                                }
-                              }),
+                            tooltip: 'Edit Test',
+                            icon: const Icon(Icons.edit_outlined, size: 20),
+                            onPressed: () => _showEditTestDialog(item),
+                          ),
                           IconButton(
+                            tooltip: 'Delete Test',
                             icon: const Icon(Icons.delete_outline,
                                 size: 20, color: Color(0xFFD92D20)),
                             onPressed: () async {
@@ -9980,6 +11726,10 @@ class AdminApi {
     String explanationImageLink = '',
     String explanationVideoLink = '',
     Map<String, dynamic>? similarQuestion,
+    String optionAImageLink = '',
+    String optionBImageLink = '',
+    String optionCImageLink = '',
+    String optionDImageLink = '',
   }) async {
     final body = await _postMap('/admin/tests/$testId/questions', {
       'question': question,
@@ -9993,6 +11743,10 @@ class AdminApi {
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
       'explanationVideoLink': explanationVideoLink,
+      'optionAImageLink': optionAImageLink,
+      'optionBImageLink': optionBImageLink,
+      'optionCImageLink': optionCImageLink,
+      'optionDImageLink': optionDImageLink,
       if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
     final questionObj = body['question'];
@@ -10090,6 +11844,10 @@ class AdminApi {
     String explanationImageLink = '',
     String explanationVideoLink = '',
     Map<String, dynamic>? similarQuestion,
+    String optionAImageLink = '',
+    String optionBImageLink = '',
+    String optionCImageLink = '',
+    String optionDImageLink = '',
   }) async {
     final body = await _postQuestionWithMedia(
       path: '/admin/tests/$testId/questions/with-media',
@@ -10105,6 +11863,10 @@ class AdminApi {
         'questionImageLink': questionImageLink,
         'explanationImageLink': explanationImageLink,
         'explanationVideoLink': explanationVideoLink,
+        'optionAImageLink': optionAImageLink,
+        'optionBImageLink': optionBImageLink,
+        'optionCImageLink': optionCImageLink,
+        'optionDImageLink': optionDImageLink,
         if (similarQuestion != null) 'similarQuestion': jsonEncode(similarQuestion),
       },
       questionImage: questionImage,
@@ -10136,6 +11898,10 @@ class AdminApi {
     String explanationImageLink = '',
     String explanationVideoLink = '',
     Map<String, dynamic>? similarQuestion,
+    String optionAImageLink = '',
+    String optionBImageLink = '',
+    String optionCImageLink = '',
+    String optionDImageLink = '',
   }) async {
     await _put('/admin/test-questions/$id', {
       'question': question,
@@ -10150,6 +11916,10 @@ class AdminApi {
       'explanationImageLink': explanationImageLink,
       if (explanationVideoLink.trim().isNotEmpty)
         'explanationVideoLink': explanationVideoLink.trim(),
+      'optionAImageLink': optionAImageLink,
+      'optionBImageLink': optionBImageLink,
+      'optionCImageLink': optionCImageLink,
+      'optionDImageLink': optionDImageLink,
       if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
   }
@@ -10184,6 +11954,10 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    String optionAImageLink = '',
+    String optionBImageLink = '',
+    String optionCImageLink = '',
+    String optionDImageLink = '',
     Map<String, dynamic>? similarQuestion,
   }) async {
     await _postMap('/admin/practice-sets/$setId/questions', {
@@ -10197,6 +11971,10 @@ class AdminApi {
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
       'explanationVideoLink': explanationVideoLink,
+      'optionAImageLink': optionAImageLink,
+      'optionBImageLink': optionBImageLink,
+      'optionCImageLink': optionCImageLink,
+      'optionDImageLink': optionDImageLink,
       if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
   }
@@ -10215,6 +11993,10 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    String optionAImageLink = '',
+    String optionBImageLink = '',
+    String optionCImageLink = '',
+    String optionDImageLink = '',
     Map<String, dynamic>? similarQuestion,
   }) async {
     await _postQuestionWithMedia(
@@ -10230,6 +12012,10 @@ class AdminApi {
         'questionImageLink': questionImageLink,
         'explanationImageLink': explanationImageLink,
         'explanationVideoLink': explanationVideoLink,
+        'optionAImageLink': optionAImageLink,
+        'optionBImageLink': optionBImageLink,
+        'optionCImageLink': optionCImageLink,
+        'optionDImageLink': optionDImageLink,
         if (similarQuestion != null) 'similarQuestion': jsonEncode(similarQuestion),
       },
       questionImage: questionImage,
@@ -10249,6 +12035,10 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    String optionAImageLink = '',
+    String optionBImageLink = '',
+    String optionCImageLink = '',
+    String optionDImageLink = '',
     Map<String, dynamic>? similarQuestion,
   }) async {
     await _put('/admin/practice-questions/$id', {
@@ -10263,6 +12053,10 @@ class AdminApi {
       'explanationImageLink': explanationImageLink,
       if (explanationVideoLink.trim().isNotEmpty)
         'explanationVideoLink': explanationVideoLink.trim(),
+      'optionAImageLink': optionAImageLink,
+      'optionBImageLink': optionBImageLink,
+      'optionCImageLink': optionCImageLink,
+      'optionDImageLink': optionDImageLink,
       if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
   }

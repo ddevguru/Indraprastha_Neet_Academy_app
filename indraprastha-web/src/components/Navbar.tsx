@@ -5,18 +5,19 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 interface NavbarProps {
-  activePage?: "home" | "target-batches" | "ai-rank-predictor" | "methodology" | "legal";
+  activePage?: "home" | "target-batches" | "ai-rank-predictor" | "methodology" | "legal" | "login";
   currentTheme?: "light" | "dark";
   onThemeToggle?: (newTheme: "light" | "dark") => void;
 }
 
 export default function Navbar({ activePage, currentTheme, onThemeToggle }: NavbarProps) {
-  const [theme, setTheme] = useState<"light" | "dark">(currentTheme || "light");
+  const [theme, setTheme] = useState<"light" | "dark">(currentTheme || "dark");
+  const [isScrolled, setIsScrolled] = useState<boolean>(false);
 
   useEffect(() => {
-    // Default to light mode
+    // Default to dark mode across all pages
     const savedTheme = localStorage.getItem("indraprastha_theme") as "light" | "dark" | null;
-    const initialTheme = currentTheme || savedTheme || "light";
+    const initialTheme = currentTheme || savedTheme || "dark";
     setTheme(initialTheme);
     if (initialTheme === "dark") {
       document.body.classList.add("dark-theme");
@@ -26,6 +27,15 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
       document.documentElement.setAttribute("data-theme", "light");
     }
   }, [currentTheme]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 8);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const toggleTheme = () => {
     const nextTheme = theme === "light" ? "dark" : "light";
@@ -44,7 +54,11 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
   };
 
   return (
-    <nav className="pred-navbar" role="navigation" aria-label="Main Navigation">
+    <nav
+      className={`pred-navbar ${isScrolled ? "is-scrolled" : ""}`}
+      role="navigation"
+      aria-label="Main Navigation"
+    >
       <div className="pred-navbar-inner">
         {/* Brand Logo */}
         <Link href="/" className="navbar-brand" aria-label="Indraprastha NEET Academy Home">
@@ -123,9 +137,13 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
           <a href="tel:+917203055682" className="pred-phone-pill">
             📞 +91 72030 55682
           </a>
-          <a href="/target-batches#courses" className="btn-enroll-nav btn-orange-leather">
-            <span>Book Free Call →</span>
-          </a>
+          <Link
+            href="/login"
+            className={`btn-enroll-nav btn-orange-leather ${activePage === "login" ? "active-login" : ""}`}
+            id="nav-login-btn"
+          >
+            <span>Login →</span>
+          </Link>
         </div>
       </div>
     </nav>

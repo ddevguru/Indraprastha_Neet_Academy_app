@@ -92,13 +92,22 @@ body {
 ══════════════════════════════ */
 .pred-navbar,
 .navbar {
-  background: #FFFFFF;
-  border-bottom: 1px solid var(--border-light);
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  box-shadow: 0 1px 10px rgba(0,0,0,0.04);
-  transition: background-color 0.25s ease, border-color 0.25s ease;
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border-bottom: 1px solid var(--border-light) !important;
+  position: sticky !important;
+  top: 0 !important;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 99999 !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06) !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pred-navbar.is-scrolled,
+.navbar.is-scrolled {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
 }
 
 .top-announcement-bar {
@@ -296,53 +305,83 @@ body.dark-theme {
   color: #FBF6F1 !important;
 }
 
-/* Navbar in Dark Theme */
+/* ── NAVBAR IN DARK THEME (100% Solid Dark Opaque Background on Scroll) ── */
 body.dark-theme .pred-navbar,
-body.dark-theme .navbar {
+body.dark-theme .navbar,
+.dark-theme .pred-navbar,
+[data-theme="dark"] .pred-navbar {
   background: #18110B !important;
+  background-color: #18110B !important;
   border-bottom: 1px solid #2D2017 !important;
+  position: sticky !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  z-index: 99999 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
 }
 
-body.dark-theme .top-announcement-bar {
+body.dark-theme .pred-navbar.is-scrolled,
+body.dark-theme .navbar.is-scrolled,
+.dark-theme .pred-navbar.is-scrolled,
+[data-theme="dark"] .pred-navbar.is-scrolled {
   background: #140D07 !important;
-  border-bottom: 1px solid #2D2017 !important;
-  color: #E0D2C7 !important;
+  background-color: #140D07 !important;
+  border-bottom: 1px solid #38281E !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8) !important;
 }
 
-body.dark-theme .brand-title {
+body.dark-theme .pred-navbar .brand-title,
+.dark-theme .pred-navbar .brand-title,
+[data-theme="dark"] .pred-navbar .brand-title {
   color: #FBF6F1 !important;
 }
 
-body.dark-theme .pred-nav-link:not(.active-pill),
-body.dark-theme .navbar-nav a {
+body.dark-theme .pred-navbar .brand-sub,
+.dark-theme .pred-navbar .brand-sub,
+[data-theme="dark"] .pred-navbar .brand-sub {
+  color: var(--orange) !important;
+}
+
+body.dark-theme .pred-navbar .pred-nav-link:not(.active-pill),
+.dark-theme .pred-navbar .pred-nav-link:not(.active-pill),
+[data-theme="dark"] .pred-navbar .pred-nav-link:not(.active-pill) {
   color: #BBA99C !important;
 }
 
-body.dark-theme .pred-nav-link:not(.active-pill):hover,
-body.dark-theme .navbar-nav a:hover {
+body.dark-theme .pred-navbar .pred-nav-link:not(.active-pill):hover,
+.dark-theme .pred-navbar .pred-nav-link:not(.active-pill):hover,
+[data-theme="dark"] .pred-navbar .pred-nav-link:not(.active-pill):hover {
   color: #FF6B1A !important;
   background: rgba(229, 82, 0, 0.16) !important;
 }
 
-body.dark-theme .theme-toggle-btn {
+body.dark-theme .pred-navbar .theme-toggle-btn,
+.dark-theme .pred-navbar .theme-toggle-btn,
+[data-theme="dark"] .pred-navbar .theme-toggle-btn {
   background: #21160F !important;
   border-color: #2D2017 !important;
   color: #FBF6F1 !important;
 }
 
-body.dark-theme .theme-toggle-btn:hover {
+body.dark-theme .pred-navbar .theme-toggle-btn:hover,
+.dark-theme .pred-navbar .theme-toggle-btn:hover,
+[data-theme="dark"] .pred-navbar .theme-toggle-btn:hover {
   border-color: #FF6B1A !important;
 }
 
-body.dark-theme .pred-phone-pill,
-body.dark-theme .phone-badge {
+body.dark-theme .pred-navbar .pred-phone-pill,
+.dark-theme .pred-navbar .pred-phone-pill,
+[data-theme="dark"] .pred-navbar .pred-phone-pill {
   background: #21160F !important;
   border-color: #2D2017 !important;
   color: #FBF6F1 !important;
 }
 
-body.dark-theme .pred-phone-pill:hover,
-body.dark-theme .phone-badge:hover {
+body.dark-theme .pred-navbar .pred-phone-pill:hover,
+.dark-theme .pred-navbar .pred-phone-pill:hover,
+[data-theme="dark"] .pred-navbar .pred-phone-pill:hover {
   border-color: #FF6B1A !important;
   color: #FF6B1A !important;
 }
@@ -643,7 +682,6 @@ body.dark-theme select {
 
 /* Secondary Buttons */
 body.dark-theme .btn-secondary-hero,
-body.dark-theme .btn-batch-secondary,
 body.dark-theme button[style*="background: #FAF5EF"],
 body.dark-theme button[style*="background: \"#FAF5EF\""] {
   background: #21160F !important;
@@ -652,7 +690,6 @@ body.dark-theme button[style*="background: \"#FAF5EF\""] {
 }
 
 body.dark-theme .btn-secondary-hero:hover,
-body.dark-theme .btn-batch-secondary:hover,
 body.dark-theme button[style*="background: #FAF5EF"]:hover,
 body.dark-theme button[style*="background: \"#FAF5EF\""]:hover {
   background: #2D2017 !important;
@@ -1268,18 +1305,44 @@ body.dark-theme button[style*="background: \"#FAF5EF\""]:hover {
 }
 
 .btn-batch-secondary {
-  display: block;
-  text-align: center;
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 10px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #6E5B50;
+  background: #FAF5EF;
+  border: 1px solid #E8DDD4;
+  border-radius: 8px;
   text-decoration: none;
-  margin-top: 12px;
-  transition: color 0.15s ease;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
 }
 
 .btn-batch-secondary:hover {
+  background: #FFF0E6;
+  border-color: var(--orange);
   color: var(--orange);
+  transform: translateY(-1px);
+}
+
+body.dark-theme .btn-batch-secondary {
+  background: rgba(255, 107, 26, 0.08) !important;
+  border: 1px solid rgba(255, 107, 26, 0.28) !important;
+  color: #F1E2D4 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+}
+
+body.dark-theme .btn-batch-secondary:hover {
+  background: rgba(255, 107, 26, 0.16) !important;
+  border-color: #FF6B1A !important;
+  color: #FF8533 !important;
+  box-shadow: 0 4px 14px rgba(255, 107, 26, 0.25) !important;
+  transform: translateY(-1px);
 }
 
 /* ══════════════════════════════

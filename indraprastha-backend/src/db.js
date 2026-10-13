@@ -246,6 +246,10 @@ async function ensureDatabaseSchema() {
     ALTER TABLE pyqs
     ADD COLUMN IF NOT EXISTS question_image_drive_folder_id TEXT;
   `);
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS option_a_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS option_b_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS option_c_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS option_d_image_link TEXT DEFAULT '';`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS practice_sets (
@@ -326,6 +330,10 @@ async function ensureDatabaseSchema() {
     ALTER TABLE practice_questions
     ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
   `);
+  await pool.query(`ALTER TABLE practice_questions ADD COLUMN IF NOT EXISTS option_a_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE practice_questions ADD COLUMN IF NOT EXISTS option_b_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE practice_questions ADD COLUMN IF NOT EXISTS option_c_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE practice_questions ADD COLUMN IF NOT EXISTS option_d_image_link TEXT DEFAULT '';`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS tests (
@@ -428,6 +436,10 @@ async function ensureDatabaseSchema() {
     ALTER TABLE test_questions
     ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;
   `);
+  await pool.query(`ALTER TABLE test_questions ADD COLUMN IF NOT EXISTS option_a_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE test_questions ADD COLUMN IF NOT EXISTS option_b_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE test_questions ADD COLUMN IF NOT EXISTS option_c_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE test_questions ADD COLUMN IF NOT EXISTS option_d_image_link TEXT DEFAULT '';`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS test_attempts (

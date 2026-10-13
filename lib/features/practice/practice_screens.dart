@@ -1355,6 +1355,12 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                 readQuestionOption(qItem, 'C'),
                 readQuestionOption(qItem, 'D'),
               ];
+              final qOptionImages = [
+                readQuestionOptionImage(qItem, 'A'),
+                readQuestionOptionImage(qItem, 'B'),
+                readQuestionOptionImage(qItem, 'C'),
+                readQuestionOptionImage(qItem, 'D'),
+              ];
               final qCorrectOption = readCorrectOption(qItem);
               final qCorrectIndex =
                   ['A', 'B', 'C', 'D'].indexOf(qCorrectOption).clamp(0, 3);
@@ -1489,7 +1495,6 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                               final isDark = Theme.of(context).brightness == Brightness.dark;
                               final isCorrectOption = index == qCorrectIndex;
 
-                              final optionLabel = ['A', 'B', 'C', 'D'][index];
 
                               Color bg;
                               Color border;
@@ -1545,34 +1550,33 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              '$optionLabel)',
-                                              style: questionContentTextStyle(
-                                                context,
-                                                fontWeight: selected || revealState
-                                                    ? FontWeight.w700
-                                                    : FontWeight.w600,
-                                                color: textColor,
-                                                fontSize: 16,
-                                              ),
+                                        if (qOptions[index].isNotEmpty)
+                                          Text(
+                                            qOptions[index],
+                                            style: questionContentTextStyle(
+                                              context,
+                                              fontWeight: selected || revealState
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w400,
+                                              color: textColor,
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                qOptions[index],
-                                                style: questionContentTextStyle(
-                                                  context,
-                                                  fontWeight: selected || revealState
-                                                      ? FontWeight.w600
-                                                      : FontWeight.w400,
-                                                  color: textColor,
-                                                ),
-                                              ),
+                                          ),
+                                        if (qOptionImages[index].isNotEmpty) ...[
+                                          if (qOptions[index].isNotEmpty)
+                                            const SizedBox(height: 8),
+                                          ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(AppRadii.sm),
+                                            child: FastNetworkImage(
+                                              url: qOptionImages[index],
+                                              width: double.infinity,
+                                              height: 160,
+                                              fit: BoxFit.contain,
+                                              borderRadius:
+                                                  BorderRadius.circular(AppRadii.sm),
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),

@@ -187,7 +187,6 @@ Widget _buildQuestionImage(String rawUrl) {
   );
 }
 
-String _optionLabel(String key, String value) => formatOptionLabel(key, value);
 
 class TestsScreen extends ConsumerStatefulWidget {
   const TestsScreen({super.key});
@@ -1039,6 +1038,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                     final qItem = questions[idx];
                     final selectedOpt = _answers[idx];
                     final qOptions = readQuestionOptions(qItem);
+                    final qOptionImages = readQuestionOptionImages(qItem);
                     return SingleChildScrollView(
                       padding: const EdgeInsets.all(AppSpacing.lg),
                       child: CenteredContent(
@@ -1088,18 +1088,41 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                     ),
                                     child: Align(
                                       alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        _optionLabel(e.key, e.value),
-                                        style: questionContentTextStyle(
-                                          context,
-                                          fontWeight: selectedOpt == e.key
-                                              ? FontWeight.w700
-                                              : FontWeight.w500,
-                                          color: selectedOpt == e.key
-                                              ? AppColors.primaryDark
-                                              : Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (e.value.isNotEmpty)
+                                              Text(
+                                                e.value,
+                                                style: questionContentTextStyle(
+                                                  context,
+                                                  fontWeight: selectedOpt == e.key
+                                                      ? FontWeight.w700
+                                                      : FontWeight.w500,
+                                                  color: selectedOpt == e.key
+                                                      ? AppColors.primaryDark
+                                                      : Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurface,
+                                                ),
+                                              ),
+                                            if (qOptionImages[e.key] != null &&
+                                                qOptionImages[e.key]!.isNotEmpty) ...[
+                                              if (e.value.isNotEmpty) const SizedBox(height: 8),
+                                              ClipRRect(
+                                                borderRadius: BorderRadius.circular(AppRadii.sm),
+                                                child: FastNetworkImage(
+                                                  url: qOptionImages[e.key]!,
+                                                  width: double.infinity,
+                                                  height: 160,
+                                                  fit: BoxFit.contain,
+                                                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                       ),
                                     ),

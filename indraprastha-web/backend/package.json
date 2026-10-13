@@ -1,0 +1,30 @@
+{
+  "name": "indraprastha-web-backend",
+  "version": "1.0.0",
+  "description": "Express Node.js backend for Indraprastha NEET Academy Student Authentication (Login & Multi-Step Signup)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "express",
+    "node",
+    "auth",
+    "indraprastha",
+    "neet",
+    "jwt",
+    "bcryptjs"
+  ],
+  "author": "Indraprastha NEET Academy",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "firebase-admin": "^14.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.23.1"
+  }
+}

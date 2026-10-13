@@ -1,0 +1,43 @@
+[
+  {
+    "id": "student_1791838090392",
+    "role": "student",
+    "fullName": "Arjun Sharma",
+    "email": "arjun.sharma@neetstudent.in",
+    "phone": "9876543210",
+    "passwordHash": "$2a$10$F3816c1FDOgipMSIMuIX/uwK7gw.l9iR/aE/XvlNCYu/VarYgQdSG",
+    "studyYear": "Class 12th (NEET 2026)",
+    "isPhoneVerified": true,
+    "isGoogleUser": false,
+    "createdAt": "2026-10-12T20:48:10.392Z",
+    "updatedAt": "2026-10-12T20:48:10.392Z"
+  },
+  {
+    "id": "student_1791838100407_367",
+    "role": "student",
+    "fullName": "Priya Sharma",
+    "email": "priya.neet@gmail.com",
+    "phone": "9811223344",
+    "passwordHash": "$2a$10$.szKszceET2ccy3YXrRtQO2lVrP/AYmpKOIAwSXTsAwQu7jpsiW5q",
+    "studyYear": "Class 11th (NEET 2027)",
+    "isPhoneVerified": true,
+    "isGoogleUser": false,
+    "googleId": null,
+    "createdAt": "2026-10-12T20:48:20.407Z",
+    "updatedAt": "2026-10-12T20:48:20.407Z"
+  },
+  {
+    "id": "student_1791839603472_639",
+    "role": "student",
+    "fullName": "Kavita Patel",
+    "email": "kavita.neet@gmail.com",
+    "phone": "9833445566",
+    "passwordHash": null,
+    "studyYear": "Class 12th (NEET 2026)",
+    "isPhoneVerified": true,
+    "isGoogleUser": true,
+    "googleId": "google_uid_9988",
+    "createdAt": "2026-10-12T21:13:23.472Z",
+    "updatedAt": "2026-10-12T21:13:23.472Z"
+  }
+]

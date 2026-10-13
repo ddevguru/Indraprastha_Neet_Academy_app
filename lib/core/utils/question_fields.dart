@@ -31,6 +31,30 @@ Map<String, String> readQuestionOptions(Map<String, dynamic> question) {
   };
 }
 
+String readQuestionOptionImage(Map<String, dynamic> question, String letter) {
+  final key = letter.toUpperCase();
+  final lower = letter.toLowerCase();
+  for (final field in [
+    'option_${lower}_image_link',
+    'option_${lower}_image',
+    'option${key}ImageLink',
+    'option${key}Image',
+  ]) {
+    final value = question[field]?.toString().trim() ?? '';
+    if (value.isNotEmpty) return value;
+  }
+  return '';
+}
+
+Map<String, String> readQuestionOptionImages(Map<String, dynamic> question) {
+  return {
+    'A': readQuestionOptionImage(question, 'A'),
+    'B': readQuestionOptionImage(question, 'B'),
+    'C': readQuestionOptionImage(question, 'C'),
+    'D': readQuestionOptionImage(question, 'D'),
+  };
+}
+
 String readCorrectOption(Map<String, dynamic> question) {
   return (question['correct_option'] ?? question['correctOption'] ?? 'A')
       .toString()
@@ -39,8 +63,8 @@ String readCorrectOption(Map<String, dynamic> question) {
 
 String formatOptionLabel(String key, String value) {
   final text = value.trim();
-  if (text.isEmpty) return '$key) —';
-  return '$key) $text';
+  if (text.isEmpty) return '—';
+  return text;
 }
 
 TextStyle questionContentTextStyle(

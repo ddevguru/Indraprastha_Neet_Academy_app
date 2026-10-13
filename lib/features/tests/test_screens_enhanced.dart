@@ -246,7 +246,7 @@ class _EnhancedTestScreenState extends State<EnhancedTestScreen> {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
-                                        '$option) ${currentQuestion.options[index]}',
+                                        currentQuestion.options[index],
                                         style: const TextStyle(
                                           fontSize: 14,
                                         ),

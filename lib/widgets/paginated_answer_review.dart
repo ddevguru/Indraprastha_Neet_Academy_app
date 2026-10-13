@@ -74,7 +74,8 @@ class AnswerReviewEntry {
     this.explanationImagesList,
     this.explanationVideoUrl,
     this.subtitle,
-    this.optionPrefix = true,
+    this.optionPrefix = false,
+    this.optionImages,
     this.subject,
     this.topic,
     this.id,
@@ -85,6 +86,7 @@ class AnswerReviewEntry {
   final String questionText;
   final String? questionImageUrl;
   final List<String> options;
+  final List<String>? optionImages;
   final int correctIndex;
   final int? selectedIndex;
   final String? explanation;
@@ -112,6 +114,9 @@ class AnswerReviewEntry {
     final options = keys
         .map((k) => readQuestionOption(question, k))
         .toList();
+    final optionImages = keys
+        .map((k) => readQuestionOptionImage(question, k))
+        .toList();
     final correctIndex = keys.indexOf(correct).clamp(0, 3);
     final selectedIndex = selectedOption == null
         ? null
@@ -136,6 +141,8 @@ class AnswerReviewEntry {
           ? null
           : questionImageRawUrl(question),
       options: options,
+      optionImages: optionImages,
+      optionPrefix: false,
       correctIndex: correctIndex,
       selectedIndex: selectedIndex == null && selectedOption == null ? null : selectedIndex,
       explanation: question['explanation']?.toString(),
@@ -652,14 +659,30 @@ class _ReviewQuestionPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(AppRadii.md),
                       border: Border.all(color: style.border),
                     ),
-                    child: Text(
-                      '$prefix${entry.options[i]}',
-                      style: TextStyle(
-                        color: style.text,
-                        fontWeight: isCorrect || isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (entry.options[i].isNotEmpty)
+                          Text(
+                            '$prefix${entry.options[i]}',
+                            style: TextStyle(
+                              color: style.text,
+                              fontWeight: isCorrect || isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        if (entry.optionImages != null &&
+                            i < entry.optionImages!.length &&
+                            entry.optionImages![i].isNotEmpty) ...[
+                          if (entry.options[i].isNotEmpty)
+                            const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadii.sm),
+                            child: buildReviewImage(entry.optionImages![i]),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 );
@@ -668,7 +691,7 @@ class _ReviewQuestionPage extends StatelessWidget {
               Text(
                 entry.selectedIndex == null
                     ? 'Your answer: Not attempted'
-                    : 'Your answer: ${entry.optionPrefix && entry.selectedIndex! < _optionLetters.length ? _optionLetters[entry.selectedIndex!] : entry.options[entry.selectedIndex!]}  •  ${entry.isCorrect ? "Correct" : "Wrong"}',
+                    : 'Your answer: ${entry.optionPrefix && entry.selectedIndex! < _optionLetters.length ? _optionLetters[entry.selectedIndex!] : (entry.selectedIndex! < entry.options.length && entry.options[entry.selectedIndex!].isNotEmpty ? entry.options[entry.selectedIndex!] : "Selected")}  •  ${entry.isCorrect ? "Correct" : "Wrong"}',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   color: entry.selectedIndex == null
