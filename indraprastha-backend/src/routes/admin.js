@@ -1139,6 +1139,12 @@ router.post('/chapters/:chapterId/pyqs/with-media', adminAuth, questionMediaUplo
       yearLabel,
       questionImageLink = '',
       explanationImageLink = '',
+      explanationVideoLink = '',
+      optionAImageLink = '',
+      optionBImageLink = '',
+      optionCImageLink = '',
+      optionDImageLink = '',
+      similarQuestion,
     } = req.body;
 
     const chapterCheck = await pool.query(
@@ -1171,10 +1177,17 @@ router.post('/chapters/:chapterId/pyqs/with-media', adminAuth, questionMediaUplo
       }
     }
 
+    const parsedSimilarQuestion = parseSimilarQuestionPayload(similarQuestion);
+
     const result = await pool.query(
       `INSERT INTO pyqs (
-        chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label,
+        question_image_link, question_image_drive_file_id, question_image_drive_folder_id,
+        explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id,
+        explanation_video_link, explanation_video_drive_file_id,
+        option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link,
+        similar_question
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
       [
         chapterId,
         question,
@@ -1191,6 +1204,13 @@ router.post('/chapters/:chapterId/pyqs/with-media', adminAuth, questionMediaUplo
         normalizeDriveLink(eLink || '', 'image'),
         eFileId,
         '',
+        explanationVideoLink || '',
+        extractDriveFileId(explanationVideoLink || ''),
+        normalizeDriveLink(optionAImageLink || '', 'image'),
+        normalizeDriveLink(optionBImageLink || '', 'image'),
+        normalizeDriveLink(optionCImageLink || '', 'image'),
+        normalizeDriveLink(optionDImageLink || '', 'image'),
+        parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
       ]
     );
     return res.json({ success: true, pyq: mapQuestionImageLink(result.rows[0]) });
@@ -1201,60 +1221,89 @@ router.post('/chapters/:chapterId/pyqs/with-media', adminAuth, questionMediaUplo
 });
 
 router.post('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
-  const { chapterId } = req.params;
-  const {
-    question,
-    optionA,
-    optionB,
-    optionC,
-    optionD,
-    correctOption,
-    explanation,
-    yearLabel,
-    questionImageLink,
-    explanationImageLink,
-  } =
-    req.body;
-  const chapterCheck = await pool.query(
-    `SELECT id
-     FROM book_chapters
-     WHERE id = $1
-     LIMIT 1`,
-    [chapterId]
-  );
-  if (chapterCheck.rows.length === 0) {
-    return res.status(404).json({
-      error: 'Selected chapter does not exist. Refresh chapters and select again.',
-    });
-  }
-  const result = await pool.query(
-    `INSERT INTO pyqs (
-      chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link, question_image_drive_file_id, question_image_drive_folder_id, explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-    [
-      chapterId,
+  try {
+    const { chapterId } = req.params;
+    const {
       question,
       optionA,
       optionB,
       optionC,
       optionD,
       correctOption,
-      explanation || '',
-      yearLabel || 'NEET',
-      normalizeDriveLink(questionImageLink || '', 'image'),
-      extractDriveFileId(questionImageLink || ''),
-      '',
-      normalizeDriveLink(explanationImageLink || '', 'image'),
-      extractDriveFileId(explanationImageLink || ''),
-      '',
-    ]
-  );
-  res.json({ success: true, pyq: mapQuestionImageLink(result.rows[0]) });
+      explanation,
+      yearLabel,
+      questionImageLink,
+      explanationImageLink,
+      explanationVideoLink = '',
+      optionAImageLink = '',
+      optionBImageLink = '',
+      optionCImageLink = '',
+      optionDImageLink = '',
+      similarQuestion,
+    } = req.body;
+    const chapterCheck = await pool.query(
+      `SELECT id
+       FROM book_chapters
+       WHERE id = $1
+       LIMIT 1`,
+      [chapterId]
+    );
+    if (chapterCheck.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Selected chapter does not exist. Refresh chapters and select again.',
+      });
+    }
+
+    const parsedSimilarQuestion = parseSimilarQuestionPayload(similarQuestion);
+
+    const result = await pool.query(
+      `INSERT INTO pyqs (
+        chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label,
+        question_image_link, question_image_drive_file_id, question_image_drive_folder_id,
+        explanation_image_link, explanation_image_drive_file_id, explanation_image_drive_folder_id,
+        explanation_video_link, explanation_video_drive_file_id,
+        option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link,
+        similar_question
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
+      [
+        chapterId,
+        question,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        explanation || '',
+        yearLabel || 'NEET',
+        normalizeDriveLink(questionImageLink || '', 'image'),
+        extractDriveFileId(questionImageLink || ''),
+        '',
+        normalizeDriveLink(explanationImageLink || '', 'image'),
+        extractDriveFileId(explanationImageLink || ''),
+        '',
+        explanationVideoLink || '',
+        extractDriveFileId(explanationVideoLink || ''),
+        normalizeDriveLink(optionAImageLink || '', 'image'),
+        normalizeDriveLink(optionBImageLink || '', 'image'),
+        normalizeDriveLink(optionCImageLink || '', 'image'),
+        normalizeDriveLink(optionDImageLink || '', 'image'),
+        parsedSimilarQuestion ? JSON.stringify(parsedSimilarQuestion) : null,
+      ]
+    );
+    res.json({ success: true, pyq: mapQuestionImageLink(result.rows[0]) });
+  } catch (e) {
+    logAdminRouteError('/chapters/:chapterId/pyqs POST', e);
+    return res.status(500).json({ error: e.message || 'Failed to add PYQ' });
+  }
 });
 
 router.get('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label, question_image_link, question_image_drive_file_id, question_image_drive_folder_id
+    `SELECT id, chapter_id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label,
+            question_image_link, question_image_drive_file_id, question_image_drive_folder_id,
+            explanation_image_link, explanation_image_drive_file_id, explanation_video_link,
+            option_a_image_link, option_b_image_link, option_c_image_link, option_d_image_link,
+            similar_question
      FROM pyqs
      WHERE chapter_id = $1
      ORDER BY id DESC`,
@@ -1264,41 +1313,8 @@ router.get('/chapters/:chapterId/pyqs', adminAuth, async (req, res) => {
 });
 
 router.put('/pyqs/:id', adminAuth, async (req, res) => {
-  const {
-    question,
-    optionA,
-    optionB,
-    optionC,
-    optionD,
-    correctOption,
-    explanation,
-    yearLabel,
-    questionImageLink,
-    explanationImageLink,
-    explanationVideoLink,
-  } = req.body;
-  const result = await pool.query(
-    `UPDATE pyqs
-     SET question = COALESCE($2, question),
-         option_a = COALESCE($3, option_a),
-         option_b = COALESCE($4, option_b),
-         option_c = COALESCE($5, option_c),
-         option_d = COALESCE($6, option_d),
-         correct_option = COALESCE($7, correct_option),
-         explanation = COALESCE($8, explanation),
-         year_label = COALESCE($9, year_label),
-         question_image_link = COALESCE($10, question_image_link),
-         question_image_drive_file_id = COALESCE($11, question_image_drive_file_id),
-         question_image_drive_folder_id = COALESCE($12, question_image_drive_folder_id),
-         explanation_image_link = COALESCE($13, explanation_image_link),
-         explanation_image_drive_file_id = COALESCE($14, explanation_image_drive_file_id),
-         explanation_image_drive_folder_id = COALESCE($15, explanation_image_drive_folder_id),
-         explanation_video_link = COALESCE($16, explanation_video_link),
-         explanation_video_drive_file_id = COALESCE($17, explanation_video_drive_file_id)
-     WHERE id = $1
-     RETURNING *`,
-    [
-      req.params.id,
+  try {
+    const {
       question,
       optionA,
       optionB,
@@ -1307,21 +1323,132 @@ router.put('/pyqs/:id', adminAuth, async (req, res) => {
       correctOption,
       explanation,
       yearLabel,
-      questionImageLink == null ? null : normalizeDriveLink(questionImageLink, 'image'),
-      questionImageLink == null ? null : extractDriveFileId(questionImageLink),
-      null,
-      explanationImageLink == null ? null : normalizeDriveLink(explanationImageLink, 'image'),
-      explanationImageLink == null ? null : extractDriveFileId(explanationImageLink),
-      null,
-      explanationVideoLink == null ? null : explanationVideoLink,
-      explanationVideoLink == null ? null : extractDriveFileId(explanationVideoLink),
-    ]
-  );
-  return res.json({
-    success: true,
-    pyq: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
-  });
+      questionImageLink,
+      explanationImageLink,
+      explanationVideoLink,
+      optionAImageLink,
+      optionBImageLink,
+      optionCImageLink,
+      optionDImageLink,
+      similarQuestion,
+    } = req.body;
+
+    const updateFields = [];
+    const params = [req.params.id];
+    let paramIndex = 2;
+
+    if (question !== undefined) {
+      updateFields.push(`question = $${paramIndex}`);
+      params.push(question);
+      paramIndex++;
+    }
+    if (optionA !== undefined) {
+      updateFields.push(`option_a = $${paramIndex}`);
+      params.push(optionA);
+      paramIndex++;
+    }
+    if (optionB !== undefined) {
+      updateFields.push(`option_b = $${paramIndex}`);
+      params.push(optionB);
+      paramIndex++;
+    }
+    if (optionC !== undefined) {
+      updateFields.push(`option_c = $${paramIndex}`);
+      params.push(optionC);
+      paramIndex++;
+    }
+    if (optionD !== undefined) {
+      updateFields.push(`option_d = $${paramIndex}`);
+      params.push(optionD);
+      paramIndex++;
+    }
+    if (correctOption !== undefined) {
+      updateFields.push(`correct_option = $${paramIndex}`);
+      params.push(correctOption);
+      paramIndex++;
+    }
+    if (explanation !== undefined) {
+      updateFields.push(`explanation = $${paramIndex}`);
+      params.push(explanation);
+      paramIndex++;
+    }
+    if (yearLabel !== undefined) {
+      updateFields.push(`year_label = $${paramIndex}`);
+      params.push(yearLabel);
+      paramIndex++;
+    }
+    if (questionImageLink !== undefined) {
+      updateFields.push(`question_image_link = $${paramIndex}`);
+      params.push(questionImageLink ? normalizeDriveLink(questionImageLink, 'image') : '');
+      paramIndex++;
+      updateFields.push(`question_image_drive_file_id = $${paramIndex}`);
+      params.push(questionImageLink ? extractDriveFileId(questionImageLink) : '');
+      paramIndex++;
+    }
+    if (explanationImageLink !== undefined) {
+      updateFields.push(`explanation_image_link = $${paramIndex}`);
+      params.push(explanationImageLink ? normalizeDriveLink(explanationImageLink, 'image') : '');
+      paramIndex++;
+      updateFields.push(`explanation_image_drive_file_id = $${paramIndex}`);
+      params.push(explanationImageLink ? extractDriveFileId(explanationImageLink) : '');
+      paramIndex++;
+    }
+    if (explanationVideoLink !== undefined) {
+      updateFields.push(`explanation_video_link = $${paramIndex}`);
+      params.push(explanationVideoLink || '');
+      paramIndex++;
+      updateFields.push(`explanation_video_drive_file_id = $${paramIndex}`);
+      params.push(explanationVideoLink ? extractDriveFileId(explanationVideoLink) : '');
+      paramIndex++;
+    }
+    if (optionAImageLink !== undefined) {
+      updateFields.push(`option_a_image_link = $${paramIndex}`);
+      params.push(optionAImageLink ? normalizeDriveLink(optionAImageLink, 'image') : '');
+      paramIndex++;
+    }
+    if (optionBImageLink !== undefined) {
+      updateFields.push(`option_b_image_link = $${paramIndex}`);
+      params.push(optionBImageLink ? normalizeDriveLink(optionBImageLink, 'image') : '');
+      paramIndex++;
+    }
+    if (optionCImageLink !== undefined) {
+      updateFields.push(`option_c_image_link = $${paramIndex}`);
+      params.push(optionCImageLink ? normalizeDriveLink(optionCImageLink, 'image') : '');
+      paramIndex++;
+    }
+    if (optionDImageLink !== undefined) {
+      updateFields.push(`option_d_image_link = $${paramIndex}`);
+      params.push(optionDImageLink ? normalizeDriveLink(optionDImageLink, 'image') : '');
+      paramIndex++;
+    }
+    if (similarQuestion !== undefined) {
+      const parsedSimilar = parseSimilarQuestionPayload(similarQuestion);
+      updateFields.push(`similar_question = $${paramIndex}`);
+      params.push(parsedSimilar ? JSON.stringify(parsedSimilar) : null);
+      paramIndex++;
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+
+    const result = await pool.query(
+      `UPDATE pyqs
+       SET ${updateFields.join(', ')}
+       WHERE id = $1
+       RETURNING *`,
+      params
+    );
+    return res.json({
+      success: true,
+      pyq: result.rows[0] ? mapQuestionImageLink(result.rows[0]) : null,
+    });
+  } catch (e) {
+    logAdminRouteError('/pyqs/:id PUT', e);
+    return res.status(500).json({ error: e.message || 'Failed to update PYQ' });
+  }
 });
+
 
 router.delete('/pyqs/:id', adminAuth, async (req, res) => {
   await pool.query('DELETE FROM pyqs WHERE id = $1', [req.params.id]);

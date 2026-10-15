@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
@@ -14,6 +15,7 @@ import {
 import type { ConfirmationResult } from "firebase/auth";
 
 export default function LoginPage() {
+  const router = useRouter();
   // Main view: "login" or "signup"
   const [view, setView] = useState<"login" | "signup">("login");
 
@@ -75,7 +77,7 @@ export default function LoginPage() {
     return () => clearTimeout(timer);
   }, [loginOtpCountdown]);
 
-  const API_BASE = "http://localhost:5000/api/auth";
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5000/api/auth";
 
   // ─── LOGIN HANDLERS ───
   const handlePhonePasswordLogin = async (e: React.FormEvent) => {
@@ -118,6 +120,9 @@ export default function LoginPage() {
       }
       setLoginLoading(false);
       setLoginSuccess(true);
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 700);
     } catch {
       setLoginLoading(false);
       setLoginError("Server se connect nahi ho pa raha. Please check karein ki backend chal raha hai.");
@@ -133,6 +138,23 @@ export default function LoginPage() {
     }
     setLoginLoading(true);
     try {
+      // 1. Send Real SMS OTP via Firebase
+      try {
+        const verifier = initPhoneRecaptcha("recaptcha-container-login");
+        const confResult = await sendFirebasePhoneOtp(clean, verifier);
+        setConfirmationResult(confResult);
+        console.log("Firebase SMS OTP sent for login.");
+      } catch (fbErr: unknown) {
+        const error = fbErr as { code?: string; message?: string };
+        console.warn("Firebase Phone Auth error:", error.code, error.message);
+        if (error.code === "auth/operation-not-allowed") {
+          setLoginLoading(false);
+          setLoginError("Phone Authentication is disabled in Firebase Console. Please enable 'Phone' in Firebase Console > Authentication > Sign-in method.");
+          return;
+        }
+      }
+
+      // 2. Also notify backend
       const res = await fetch(`${API_BASE}/login/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,8 +168,6 @@ export default function LoginPage() {
       }
       setLoginOtpSent(true);
       setLoginOtpCountdown(60);
-      // In dev mode, auto-fill OTP from response
-      if (data.demoOtp) setLoginOtp(data.demoOtp);
     } catch {
       setLoginLoading(false);
       setLoginError("Server se connect nahi ho pa raha.");
@@ -164,11 +184,35 @@ export default function LoginPage() {
     }
     setLoginLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/login/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: clean, otp: loginOtp }),
-      });
+      let fbIdToken = "";
+      if (confirmationResult) {
+        try {
+          const { idToken } = await verifyFirebasePhoneOtp(confirmationResult, loginOtp);
+          fbIdToken = idToken;
+        } catch (confErr: unknown) {
+          const error = confErr as { code?: string; message?: string };
+          console.warn("Firebase Phone OTP verification failed:", error);
+          setLoginLoading(false);
+          setLoginError(error.message || "Invalid Firebase SMS OTP code. Please enter the correct code received on your phone.");
+          return;
+        }
+      }
+
+      let res;
+      if (fbIdToken) {
+        res = await fetch(`${API_BASE}/firebase/verify-phone-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken: fbIdToken }),
+        });
+      } else {
+        res = await fetch(`${API_BASE}/login/verify-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: clean, otp: loginOtp }),
+        });
+      }
+
       const data = await res.json();
       if (!res.ok || !data.success) {
         setLoginLoading(false);
@@ -181,6 +225,9 @@ export default function LoginPage() {
       }
       setLoginLoading(false);
       setLoginSuccess(true);
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 700);
     } catch {
       setLoginLoading(false);
       setLoginError("Server se connect nahi ho pa raha.");
@@ -212,6 +259,9 @@ export default function LoginPage() {
           if (data.user) localStorage.setItem("indraprastha_user", JSON.stringify(data.user));
         }
         setLoginSuccess(true);
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 700);
       } else if (data.isNewUser || flow === "signup") {
         // New student -> prefill Google details & advance to Step 2 (Phone OTP verification)
         setView("signup");
@@ -229,14 +279,20 @@ export default function LoginPage() {
       setLoginLoading(false);
       const error = err as { code?: string; message?: string };
       console.warn("Firebase Google popup error:", error.code, error.message);
-      // Show real error — do NOT show fake mock modal
       if (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
         // User closed the popup — silently ignore
         return;
       }
       if (error.code === "auth/popup-blocked") {
-        if (flow === "login") setLoginError("Google popup was blocked by your browser. Please allow popups for this site and try again.");
-        else setSignupError("Google popup was blocked by your browser. Please allow popups for this site and try again.");
+        const msg = "Google popup was blocked by your browser. Please allow popups for this site and try again.";
+        if (flow === "login") setLoginError(msg);
+        else setSignupError(msg);
+        return;
+      }
+      if (error.code === "auth/operation-not-allowed") {
+        const msg = "Google Sign-In is not enabled yet in your Firebase Console (Authentication > Sign-in method). Please enable Google provider in Firebase Console.";
+        if (flow === "login") setLoginError(msg);
+        else setSignupError(msg);
         return;
       }
       if (flow === "login") setLoginError("Google sign-in failed. Please try again or use phone number login.");
@@ -357,11 +413,17 @@ export default function LoginPage() {
         const confResult = await sendFirebasePhoneOtp(clean, verifier);
         setConfirmationResult(confResult);
         console.log("Firebase SMS OTP sent successfully.");
-      } catch (fbErr) {
-        console.warn("Firebase Phone Auth notice (using fallback dispatch):", fbErr);
+      } catch (fbErr: unknown) {
+        const error = fbErr as { code?: string; message?: string };
+        console.warn("Firebase Phone Auth error:", error.code, error.message);
+        if (error.code === "auth/operation-not-allowed") {
+          setSignupLoading(false);
+          setSignupError("Phone Authentication is disabled in Firebase Console. Please enable 'Phone' in Firebase Console > Authentication > Sign-in method.");
+          return;
+        }
       }
 
-      // 2. Also register with backend send-otp for duplicate checking & dev demo OTP
+      // 2. Also register with backend send-otp for duplicate checking
       const res = await fetch(`${API_BASE}/signup/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -372,9 +434,6 @@ export default function LoginPage() {
       if (!res.ok || !data.success) {
         setSignupError(data.error || "Failed to send OTP.");
         return;
-      }
-      if (data.demoOtp) {
-        setSignupOtp(data.demoOtp);
       }
       setSignupStep(3);
       setOtpCountdown(45);
@@ -448,6 +507,9 @@ export default function LoginPage() {
         if (data.user) localStorage.setItem("indraprastha_user", JSON.stringify(data.user));
       }
       setSignupStep(4);
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1500);
     } catch {
       setSignupLoading(false);
       setSignupStep(4);
@@ -573,6 +635,10 @@ export default function LoginPage() {
                 position: "relative",
               }}
             >
+              {/* Invisible Firebase Phone ReCAPTCHA containers */}
+              <div id="recaptcha-container"></div>
+              <div id="recaptcha-container-login"></div>
+
               {/* Top View Switcher (Sign In vs Create Account) */}
               <div
                 style={{
@@ -655,7 +721,7 @@ export default function LoginPage() {
                         Welcome back to Indraprastha NEET Academy! Loading your study modules and daily tests...
                       </p>
                       <Link
-                        href="/target-batches"
+                        href="/dashboard"
                         className="btn-enroll-nav btn-orange-leather"
                         style={{ width: "100%", justifyContent: "center" }}
                       >
@@ -1620,11 +1686,11 @@ export default function LoginPage() {
                       </div>
 
                       <Link
-                        href="/target-batches"
+                        href="/dashboard"
                         className="btn-enroll-nav btn-orange-leather"
                         style={{ width: "100%", justifyContent: "center" }}
                       >
-                        <span>Proceed to Study Material &amp; Batches →</span>
+                        <span>Proceed to Student Dashboard →</span>
                       </Link>
                     </div>
                   )}

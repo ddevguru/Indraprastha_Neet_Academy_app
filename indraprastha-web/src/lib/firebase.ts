@@ -11,12 +11,12 @@ import {
 
 // Official Firebase Web Configuration for Indraprastha NEET Academy
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyC-3-9it6uWk2d86ghPKnCtZ3dFQ12ERms",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "indraprastha-app.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "indraprastha-app",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "indraprastha-app.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "903265383444",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:903265383444:web:beec56e054566f7b7b2301",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyBha4ZEKcaQlUwhbUBNyzrTBC1VRIZIHW4",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "indraprastha-web.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "indraprastha-web",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "indraprastha-web.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "536433711964",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:536433711964:web:9eba07648f8e7707b37f99",
 };
 
 // Initialize Firebase App

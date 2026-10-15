@@ -1527,6 +1527,30 @@ class _BooksPageState extends State<BooksPage> {
   String _pyqImageLink = '';
   File? _pyqExplanationImage;
   String _pyqExplanationImageLink = '';
+  File? _pyqOptionAImage;
+  String _pyqOptionAImageLink = '';
+  File? _pyqOptionBImage;
+  String _pyqOptionBImageLink = '';
+  File? _pyqOptionCImage;
+  String _pyqOptionCImageLink = '';
+  File? _pyqOptionDImage;
+  String _pyqOptionDImageLink = '';
+  // Similar Question for PYQ
+  final _pyqSimilarQuestion = TextEditingController();
+  final _pyqSimilarOptionA = TextEditingController();
+  final _pyqSimilarOptionB = TextEditingController();
+  final _pyqSimilarOptionC = TextEditingController();
+  final _pyqSimilarOptionD = TextEditingController();
+  final _pyqSimilarExplanation = TextEditingController();
+  String _pyqSimilarCorrect = 'A';
+  bool _pyqShowSimilarQuestion = false;
+  File? _pyqSimilarQuestionImage;
+  String _pyqSimilarQuestionImageLink = '';
+  File? _pyqSimilarExplanationImage;
+  String _pyqSimilarExplanationImageLink = '';
+  final List<File> _pyqSimilarPendingExtraExplanationImages = [];
+  final List<String> _pyqSimilarExistingExplanationImages = [];
+  bool _savingPyq = false;
   String _bookCategory = 'NCERT books';
   int? _selectedBookId;
   int? _selectedChapterId;
@@ -1544,6 +1568,71 @@ class _BooksPageState extends State<BooksPage> {
     _chapterOverview.clear();
     _chapterHighlight.clear();
     _pdf = null;
+  }
+
+  void _resetPyqForm() {
+    _pyqQuestion.clear();
+    _pyqOptionA.clear();
+    _pyqOptionB.clear();
+    _pyqOptionC.clear();
+    _pyqOptionD.clear();
+    _pyqExplanation.clear();
+    _pyqExplanationVideoLink.clear();
+    _pyqSimilarQuestion.clear();
+    _pyqSimilarOptionA.clear();
+    _pyqSimilarOptionB.clear();
+    _pyqSimilarOptionC.clear();
+    _pyqSimilarOptionD.clear();
+    _pyqSimilarExplanation.clear();
+    setState(() {
+      _editingPyqId = null;
+      _pyqImage = null;
+      _pyqImageLink = '';
+      _pyqExplanationImage = null;
+      _pyqExplanationImageLink = '';
+      _pyqOptionAImage = null;
+      _pyqOptionAImageLink = '';
+      _pyqOptionBImage = null;
+      _pyqOptionBImageLink = '';
+      _pyqOptionCImage = null;
+      _pyqOptionCImageLink = '';
+      _pyqOptionDImage = null;
+      _pyqOptionDImageLink = '';
+      _pyqCorrect = 'A';
+      _pyqSimilarCorrect = 'A';
+      _pyqShowSimilarQuestion = false;
+      _pyqSimilarQuestionImage = null;
+      _pyqSimilarQuestionImageLink = '';
+      _pyqSimilarExplanationImage = null;
+      _pyqSimilarExplanationImageLink = '';
+      _pyqSimilarPendingExtraExplanationImages.clear();
+      _pyqSimilarExistingExplanationImages.clear();
+    });
+  }
+
+  @override
+  void dispose() {
+    _classLabel.dispose();
+    _subject.dispose();
+    _bookTitle.dispose();
+    _chapter.dispose();
+    _manualChapterTitle.dispose();
+    _chapterOverview.dispose();
+    _chapterHighlight.dispose();
+    _pyqQuestion.dispose();
+    _pyqOptionA.dispose();
+    _pyqOptionB.dispose();
+    _pyqOptionC.dispose();
+    _pyqOptionD.dispose();
+    _pyqExplanation.dispose();
+    _pyqExplanationVideoLink.dispose();
+    _pyqSimilarQuestion.dispose();
+    _pyqSimilarOptionA.dispose();
+    _pyqSimilarOptionB.dispose();
+    _pyqSimilarOptionC.dispose();
+    _pyqSimilarOptionD.dispose();
+    _pyqSimilarExplanation.dispose();
+    super.dispose();
   }
 
   @override
@@ -1946,21 +2035,61 @@ class _BooksPageState extends State<BooksPage> {
                 TextField(
                     controller: _pyqOptionA,
                     decoration: const InputDecoration(labelText: 'Option A')),
+                _buildOptionImagePickerRow(
+                  label: 'Option A',
+                  file: _pyqOptionAImage,
+                  imageLink: _pyqOptionAImageLink,
+                  onPick: (file) => setState(() => _pyqOptionAImage = file),
+                  onRemove: () => setState(() {
+                    _pyqOptionAImage = null;
+                    _pyqOptionAImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _pyqOptionB,
                     decoration: const InputDecoration(labelText: 'Option B')),
+                _buildOptionImagePickerRow(
+                  label: 'Option B',
+                  file: _pyqOptionBImage,
+                  imageLink: _pyqOptionBImageLink,
+                  onPick: (file) => setState(() => _pyqOptionBImage = file),
+                  onRemove: () => setState(() {
+                    _pyqOptionBImage = null;
+                    _pyqOptionBImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _pyqOptionC,
                     decoration: const InputDecoration(labelText: 'Option C')),
+                _buildOptionImagePickerRow(
+                  label: 'Option C',
+                  file: _pyqOptionCImage,
+                  imageLink: _pyqOptionCImageLink,
+                  onPick: (file) => setState(() => _pyqOptionCImage = file),
+                  onRemove: () => setState(() {
+                    _pyqOptionCImage = null;
+                    _pyqOptionCImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                     controller: _pyqOptionD,
                     decoration: const InputDecoration(labelText: 'Option D')),
+                _buildOptionImagePickerRow(
+                  label: 'Option D',
+                  file: _pyqOptionDImage,
+                  imageLink: _pyqOptionDImageLink,
+                  onPick: (file) => setState(() => _pyqOptionDImage = file),
+                  onRemove: () => setState(() {
+                    _pyqOptionDImage = null;
+                    _pyqOptionDImageLink = '';
+                  }),
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  initialValue: _pyqCorrect,
+                  value: const ['A', 'B', 'C', 'D'].contains(_pyqCorrect) ? _pyqCorrect : 'A',
                   items: const [
                     DropdownMenuItem(value: 'A', child: Text('Correct: A')),
                     DropdownMenuItem(value: 'B', child: Text('Correct: B')),
@@ -2017,6 +2146,14 @@ class _BooksPageState extends State<BooksPage> {
                       },
                       child: const Text('Question image'),
                     ),
+                    if (_pyqImage != null || _pyqImageLink.isNotEmpty)
+                      TextButton(
+                        onPressed: () => setState(() {
+                          _pyqImage = null;
+                          _pyqImageLink = '';
+                        }),
+                        child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -2053,123 +2190,492 @@ class _BooksPageState extends State<BooksPage> {
                           _pyqExplanationImage = null;
                           _pyqExplanationImageLink = '';
                         }),
-                        child: const Text('Remove'),
+                        child: const Text('Remove', style: TextStyle(color: Colors.red)),
                       ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                FilledButton.tonal(
-                  onPressed: _selectedChapterId == null
-                      ? null
-                      : () async {
-                          var imageLink = _pyqImageLink;
-                          var expLink = _pyqExplanationImageLink;
-                          final videoLink = _pyqExplanationVideoLink.text.trim();
-                          if (_editingPyqId != null) {
-                            if (_pyqImage != null && _batchId != null) {
-                              if (!await _validateImageFile(context, _pyqImage!)) {
-                                throw Exception('Question image too large');
-                              }
-                              imageLink = await widget.api.uploadQuestionImage(
-                                batchId: _batchId!,
-                                classLabel: _classLabel.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: _chapter.text.trim().isEmpty
-                                    ? 'PYQ'
-                                    : _chapter.text.trim(),
-                                file: _pyqImage!,
-                                contentType: 'pyq',
-                                contentId: _selectedChapterId,
-                              );
-                            }
-                            if (_pyqExplanationImage != null && _batchId != null) {
-                              if (!await _validateImageFile(
-                                  context, _pyqExplanationImage!)) {
-                                throw Exception('Explanation image too large');
-                              }
-                              expLink = await widget.api.uploadQuestionImage(
-                                batchId: _batchId!,
-                                classLabel: _classLabel.text.trim(),
-                                subject: _subject.text.trim(),
-                                topic: _chapter.text.trim().isEmpty
-                                    ? 'PYQ'
-                                    : _chapter.text.trim(),
-                                file: _pyqExplanationImage!,
-                                contentType: 'pyq_explanation',
-                                contentId: _selectedChapterId,
-                              );
-                            }
-                            await widget.api.updatePyq(
-                              id: _editingPyqId!,
-                              question: _pyqQuestion.text.trim(),
-                              optionA: _pyqOptionA.text.trim(),
-                              optionB: _pyqOptionB.text.trim(),
-                              optionC: _pyqOptionC.text.trim(),
-                              optionD: _pyqOptionD.text.trim(),
-                              correctOption: _pyqCorrect,
-                              explanation: _pyqExplanation.text.trim(),
-                              questionImageLink: imageLink,
-                              explanationImageLink: expLink,
-                              explanationVideoLink: videoLink,
-                            );
-                            setState(() => _editingPyqId = null);
-                          } else {
-                            if (_pyqImage != null &&
-                                !await _validateImageFile(context, _pyqImage!)) {
-                              throw Exception('Question image too large');
-                            }
-                            if (_pyqExplanationImage != null &&
-                                !await _validateImageFile(
-                                    context, _pyqExplanationImage!)) {
-                              throw Exception('Explanation image too large');
-                            }
-                            if (_pyqImage != null || _pyqExplanationImage != null) {
-                              await widget.api.addPyqWithMedia(
-                                chapterId: _selectedChapterId!,
-                                question: _pyqQuestion.text.trim(),
-                                optionA: _pyqOptionA.text.trim(),
-                                optionB: _pyqOptionB.text.trim(),
-                                optionC: _pyqOptionC.text.trim(),
-                                optionD: _pyqOptionD.text.trim(),
-                                correctOption: _pyqCorrect,
-                                explanation: _pyqExplanation.text.trim(),
-                                questionImage: _pyqImage,
-                                explanationImage: _pyqExplanationImage,
-                                questionImageLink: imageLink,
-                                explanationImageLink: expLink,
-                                explanationVideoLink: videoLink,
-                              );
-                            } else {
-                              await widget.api.addPyq(
-                                chapterId: _selectedChapterId!,
-                                question: _pyqQuestion.text.trim(),
-                                optionA: _pyqOptionA.text.trim(),
-                                optionB: _pyqOptionB.text.trim(),
-                                optionC: _pyqOptionC.text.trim(),
-                                optionD: _pyqOptionD.text.trim(),
-                                correctOption: _pyqCorrect,
-                                explanation: _pyqExplanation.text.trim(),
-                                questionImageLink: imageLink,
-                                explanationImageLink: expLink,
-                                explanationVideoLink: videoLink,
-                              );
-                            }
-                          }
-                          setState(() {
-                            _status = 'PYQ saved';
-                            _pyqImage = null;
-                            _pyqImageLink = imageLink;
-                            _pyqExplanationImage = null;
-                            _pyqExplanationImageLink = expLink;
-                            _pyqExplanationVideoLink.clear();
-                          });
-                          if (context.mounted) {
-                            _showActionSnackBar(
-                                context, 'PYQ saved successfully');
-                          }
-                        },
-                  child: Text(_editingPyqId == null ? 'Add PYQ' : 'Update PYQ'),
+                const SizedBox(height: 12),
+                // Similar Question Section
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _pyqSimilarQuestion.text.trim().isNotEmpty
+                          ? Colors.indigo.shade400
+                          : Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: ExpansionTile(
+                    initiallyExpanded: _pyqShowSimilarQuestion,
+                    onExpansionChanged: (val) => setState(() => _pyqShowSimilarQuestion = val),
+                    leading: const Icon(Icons.help_center_outlined, color: Color(0xFF4F46E5)),
+                    title: Row(
+                      children: [
+                        const Text(
+                          'Solve Similar Question',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        const SizedBox(width: 8),
+                        if (_pyqSimilarQuestion.text.trim().isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('Added', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                          )
+                        else
+                          Text('(Optional)', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                      ],
+                    ),
+                    subtitle: const Text(
+                      'Shown to student if they get this question wrong, or when solving all similar questions.',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              controller: _pyqSimilarQuestion,
+                              minLines: 2,
+                              maxLines: 4,
+                              decoration: const InputDecoration(
+                                labelText: 'Similar Question text',
+                                hintText: 'Enter a parallel question on this concept',
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pyqSimilarOptionA,
+                              decoration: const InputDecoration(labelText: 'Similar Option A'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pyqSimilarOptionB,
+                              decoration: const InputDecoration(labelText: 'Similar Option B'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pyqSimilarOptionC,
+                              decoration: const InputDecoration(labelText: 'Similar Option C'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pyqSimilarOptionD,
+                              decoration: const InputDecoration(labelText: 'Similar Option D'),
+                            ),
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              value: const ['A', 'B', 'C', 'D'].contains(_pyqSimilarCorrect) ? _pyqSimilarCorrect : 'A',
+                              items: const [
+                                DropdownMenuItem(value: 'A', child: Text('Correct: A')),
+                                DropdownMenuItem(value: 'B', child: Text('Correct: B')),
+                                DropdownMenuItem(value: 'C', child: Text('Correct: C')),
+                                DropdownMenuItem(value: 'D', child: Text('Correct: D')),
+                              ],
+                              onChanged: (v) => setState(() => _pyqSimilarCorrect = v ?? 'A'),
+                              decoration: const InputDecoration(labelText: 'Correct Option for Similar Question'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _pyqSimilarExplanation,
+                              minLines: 2,
+                              maxLines: 4,
+                              decoration: const InputDecoration(
+                                labelText: 'Explanation for Similar Question (Optional)',
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            // Similar Question Image
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _pyqSimilarQuestionImage == null
+                                        ? (_pyqSimilarQuestionImageLink.isEmpty
+                                            ? 'No similar question image'
+                                            : 'Similar question image uploaded')
+                                        : _pyqSimilarQuestionImage!.path.split(Platform.pathSeparator).last,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                    if (result?.files.single.path == null) return;
+                                    setState(() => _pyqSimilarQuestionImage = File(result!.files.single.path!));
+                                  },
+                                  child: const Text('Pick Image'),
+                                ),
+                                if (_pyqSimilarQuestionImage != null || _pyqSimilarQuestionImageLink.isNotEmpty)
+                                  TextButton(
+                                    onPressed: () => setState(() {
+                                      _pyqSimilarQuestionImage = null;
+                                      _pyqSimilarQuestionImageLink = '';
+                                    }),
+                                    child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            // Similar Question Explanation Image
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _pyqSimilarExplanationImage == null
+                                        ? (_pyqSimilarExplanationImageLink.isEmpty
+                                            ? 'No similar explanation image'
+                                            : 'Similar explanation image uploaded')
+                                        : _pyqSimilarExplanationImage!.path.split(Platform.pathSeparator).last,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+                                    if (result?.files.single.path == null) return;
+                                    setState(() => _pyqSimilarExplanationImage = File(result!.files.single.path!));
+                                  },
+                                  child: const Text('Pick Image'),
+                                ),
+                                if (_pyqSimilarExplanationImage != null || _pyqSimilarExplanationImageLink.isNotEmpty)
+                                  TextButton(
+                                    onPressed: () => setState(() {
+                                      _pyqSimilarExplanationImage = null;
+                                      _pyqSimilarExplanationImageLink = '';
+                                    }),
+                                    child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Multiple Explanation Images for Similar Question
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _pyqSimilarPendingExtraExplanationImages.isEmpty && _pyqSimilarExistingExplanationImages.isEmpty
+                                        ? 'No extra explanation images'
+                                        : '${_pyqSimilarExistingExplanationImages.length} saved, ${_pyqSimilarPendingExtraExplanationImages.length} ready to upload',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
+                                  label: const Text('Add Images'),
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform.pickFiles(
+                                      type: FileType.image,
+                                      allowMultiple: true,
+                                    );
+                                    if (result == null) return;
+                                    setState(() {
+                                      for (final f in result.files) {
+                                        if (f.path != null) {
+                                          _pyqSimilarPendingExtraExplanationImages.add(File(f.path!));
+                                        }
+                                      }
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                            if (_pyqSimilarExistingExplanationImages.isNotEmpty) ...[
+                              ..._pyqSimilarExistingExplanationImages.asMap().entries.map((entry) {
+                                final idx = entry.key;
+                                return ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.image_outlined, size: 18),
+                                  title: Text('Saved Explanation Image #${idx + 1}', style: const TextStyle(fontSize: 12)),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                                    onPressed: () => setState(() => _pyqSimilarExistingExplanationImages.removeAt(idx)),
+                                  ),
+                                );
+                              }),
+                            ],
+                            if (_pyqSimilarPendingExtraExplanationImages.isNotEmpty) ...[
+                              ..._pyqSimilarPendingExtraExplanationImages.asMap().entries.map((entry) {
+                                final idx = entry.key;
+                                final file = entry.value;
+                                return ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.add_photo_alternate_outlined, size: 18, color: Colors.indigo),
+                                  title: Text(file.path.split(Platform.pathSeparator).last, style: const TextStyle(fontSize: 12)),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
+                                    onPressed: () => setState(() => _pyqSimilarPendingExtraExplanationImages.removeAt(idx)),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: _selectedChapterId == null || _savingPyq
+                          ? null
+                          : () async {
+                              setState(() => _savingPyq = true);
+                              try {
+                                var imageLink = _pyqImageLink;
+                                var expLink = _pyqExplanationImageLink;
+                                final videoLink = _pyqExplanationVideoLink.text.trim();
+
+                                if (_batchId != null) {
+                                  if (_pyqImage != null) {
+                                    if (!await _validateImageFile(context, _pyqImage!)) {
+                                      throw Exception('Question image too large');
+                                    }
+                                    imageLink = await widget.api.uploadQuestionImage(
+                                      batchId: _batchId!,
+                                      classLabel: _classLabel.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                                      file: _pyqImage!,
+                                      contentType: 'pyq',
+                                      contentId: _selectedChapterId,
+                                    );
+                                  }
+                                  if (_pyqExplanationImage != null) {
+                                    if (!await _validateImageFile(context, _pyqExplanationImage!)) {
+                                      throw Exception('Explanation image too large');
+                                    }
+                                    expLink = await widget.api.uploadQuestionImage(
+                                      batchId: _batchId!,
+                                      classLabel: _classLabel.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                                      file: _pyqExplanationImage!,
+                                      contentType: 'pyq_explanation',
+                                      contentId: _selectedChapterId,
+                                    );
+                                  }
+                                  if (_pyqOptionAImage != null) {
+                                    if (!await _validateImageFile(context, _pyqOptionAImage!)) {
+                                      throw Exception('Option A image too large');
+                                    }
+                                    _pyqOptionAImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: _batchId!,
+                                      classLabel: _classLabel.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                                      file: _pyqOptionAImage!,
+                                      contentType: 'pyq_option_a',
+                                      contentId: _selectedChapterId,
+                                    );
+                                  }
+                                  if (_pyqOptionBImage != null) {
+                                    if (!await _validateImageFile(context, _pyqOptionBImage!)) {
+                                      throw Exception('Option B image too large');
+                                    }
+                                    _pyqOptionBImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: _batchId!,
+                                      classLabel: _classLabel.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                                      file: _pyqOptionBImage!,
+                                      contentType: 'pyq_option_b',
+                                      contentId: _selectedChapterId,
+                                    );
+                                  }
+                                  if (_pyqOptionCImage != null) {
+                                    if (!await _validateImageFile(context, _pyqOptionCImage!)) {
+                                      throw Exception('Option C image too large');
+                                    }
+                                    _pyqOptionCImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: _batchId!,
+                                      classLabel: _classLabel.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                                      file: _pyqOptionCImage!,
+                                      contentType: 'pyq_option_c',
+                                      contentId: _selectedChapterId,
+                                    );
+                                  }
+                                  if (_pyqOptionDImage != null) {
+                                    if (!await _validateImageFile(context, _pyqOptionDImage!)) {
+                                      throw Exception('Option D image too large');
+                                    }
+                                    _pyqOptionDImageLink = await widget.api.uploadQuestionImage(
+                                      batchId: _batchId!,
+                                      classLabel: _classLabel.text.trim(),
+                                      subject: _subject.text.trim(),
+                                      topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                                      file: _pyqOptionDImage!,
+                                      contentType: 'pyq_option_d',
+                                      contentId: _selectedChapterId,
+                                    );
+                                  }
+
+                                  if (_pyqSimilarQuestion.text.trim().isNotEmpty) {
+                                    if (_pyqSimilarQuestionImage != null) {
+                                      if (!await _validateImageFile(context, _pyqSimilarQuestionImage!)) {
+                                        throw Exception('Similar question image too large');
+                                      }
+                                      _pyqSimilarQuestionImageLink = await widget.api.uploadQuestionImage(
+                                        batchId: _batchId!,
+                                        classLabel: _classLabel.text.trim(),
+                                        subject: _subject.text.trim(),
+                                        topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                                        file: _pyqSimilarQuestionImage!,
+                                        contentType: 'pyq_similar_question',
+                                        contentId: _selectedChapterId,
+                                      );
+                                    }
+                                    if (_pyqSimilarExplanationImage != null) {
+                                      if (!await _validateImageFile(context, _pyqSimilarExplanationImage!)) {
+                                        throw Exception('Similar explanation image too large');
+                                      }
+                                      _pyqSimilarExplanationImageLink = await widget.api.uploadQuestionImage(
+                                        batchId: _batchId!,
+                                        classLabel: _classLabel.text.trim(),
+                                        subject: _subject.text.trim(),
+                                        topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                                        file: _pyqSimilarExplanationImage!,
+                                        contentType: 'pyq_similar_explanation',
+                                        contentId: _selectedChapterId,
+                                      );
+                                    }
+                                    if (_pyqSimilarPendingExtraExplanationImages.isNotEmpty) {
+                                      for (final extraFile in _pyqSimilarPendingExtraExplanationImages) {
+                                        if (!await _validateImageFile(context, extraFile)) {
+                                          throw Exception('Similar explanation extra image too large');
+                                        }
+                                        final extraLink = await widget.api.uploadQuestionImage(
+                                          batchId: _batchId!,
+                                          classLabel: _classLabel.text.trim(),
+                                          subject: _subject.text.trim(),
+                                          topic: _chapter.text.trim().isEmpty ? 'PYQ' : _chapter.text.trim(),
+                                          file: extraFile,
+                                          contentType: 'pyq_similar_explanation_extra',
+                                          contentId: _selectedChapterId,
+                                        );
+                                        if (extraLink.isNotEmpty) {
+                                          _pyqSimilarExistingExplanationImages.add(extraLink);
+                                        }
+                                      }
+                                      _pyqSimilarPendingExtraExplanationImages.clear();
+                                    }
+                                  }
+                                }
+
+                                Map<String, dynamic>? similarQuestionData;
+                                if (_pyqSimilarQuestion.text.trim().isNotEmpty) {
+                                  similarQuestionData = {
+                                    'question': _pyqSimilarQuestion.text.trim(),
+                                    'option_a': _pyqSimilarOptionA.text.trim(),
+                                    'option_b': _pyqSimilarOptionB.text.trim(),
+                                    'option_c': _pyqSimilarOptionC.text.trim(),
+                                    'option_d': _pyqSimilarOptionD.text.trim(),
+                                    'correct_option': _pyqSimilarCorrect,
+                                    'explanation': _pyqSimilarExplanation.text.trim(),
+                                    if (_pyqSimilarQuestionImageLink.isNotEmpty)
+                                      'question_image_link': _pyqSimilarQuestionImageLink,
+                                    if (_pyqSimilarExplanationImageLink.isNotEmpty)
+                                      'explanation_image_link': _pyqSimilarExplanationImageLink,
+                                    if (_pyqSimilarExistingExplanationImages.isNotEmpty)
+                                      'explanation_images': _pyqSimilarExistingExplanationImages,
+                                  };
+                                }
+
+                                if (_editingPyqId != null) {
+                                  await widget.api.updatePyq(
+                                    id: _editingPyqId!,
+                                    question: _pyqQuestion.text.trim(),
+                                    optionA: _pyqOptionA.text.trim(),
+                                    optionB: _pyqOptionB.text.trim(),
+                                    optionC: _pyqOptionC.text.trim(),
+                                    optionD: _pyqOptionD.text.trim(),
+                                    correctOption: _pyqCorrect,
+                                    explanation: _pyqExplanation.text.trim(),
+                                    questionImageLink: imageLink,
+                                    explanationImageLink: expLink,
+                                    explanationVideoLink: videoLink,
+                                    optionAImageLink: _pyqOptionAImageLink,
+                                    optionBImageLink: _pyqOptionBImageLink,
+                                    optionCImageLink: _pyqOptionCImageLink,
+                                    optionDImageLink: _pyqOptionDImageLink,
+                                    similarQuestion: similarQuestionData,
+                                  );
+                                } else {
+                                  await widget.api.addPyq(
+                                    chapterId: _selectedChapterId!,
+                                    question: _pyqQuestion.text.trim(),
+                                    optionA: _pyqOptionA.text.trim(),
+                                    optionB: _pyqOptionB.text.trim(),
+                                    optionC: _pyqOptionC.text.trim(),
+                                    optionD: _pyqOptionD.text.trim(),
+                                    correctOption: _pyqCorrect,
+                                    explanation: _pyqExplanation.text.trim(),
+                                    questionImageLink: imageLink,
+                                    explanationImageLink: expLink,
+                                    explanationVideoLink: videoLink,
+                                    optionAImageLink: _pyqOptionAImageLink,
+                                    optionBImageLink: _pyqOptionBImageLink,
+                                    optionCImageLink: _pyqOptionCImageLink,
+                                    optionDImageLink: _pyqOptionDImageLink,
+                                    similarQuestion: similarQuestionData,
+                                  );
+                                }
+
+                                _resetPyqForm();
+                                if (!mounted) return;
+                                if (context.mounted) {
+                                  _showActionSnackBar(
+                                      context, 'PYQ saved successfully');
+                                }
+                              } catch (e, st) {
+                                if (!context.mounted) return;
+                                await _handleTaskError(
+                                  context,
+                                  'PYQ save',
+                                  e,
+                                  stackTrace: st,
+                                  details: {
+                                    'chapterId': _selectedChapterId,
+                                    'editingPyqId': _editingPyqId,
+                                  },
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _savingPyq = false);
+                                }
+                              }
+                            },
+                      child: _busyButtonChild(
+                        _savingPyq,
+                        _editingPyqId == null ? 'Add PYQ' : 'Update PYQ',
+                      ),
+                    ),
+                    if (_editingPyqId != null)
+                      OutlinedButton(
+                        onPressed: _resetPyqForm,
+                        child: const Text('Cancel edit'),
+                      ),
+                  ],
+                ),
+
                 const SizedBox(height: 8),
                 FilledButton.tonal(
                   onPressed: _selectedChapterId == null
@@ -2222,6 +2728,36 @@ class _BooksPageState extends State<BooksPage> {
                                                   ),
                                                 ),
                                               ],
+                                              for (final opt in ['a', 'b', 'c', 'd']) ...[
+                                                if ((q['option_${opt}_image_link']?.toString().isNotEmpty ?? false)) ...[
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Text('Option ${opt.toUpperCase()} Image: ', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                      ClipRRect(
+                                                        borderRadius: BorderRadius.circular(4),
+                                                        child: FastNetworkImage(
+                                                          url: q['option_${opt}_image_link'].toString(),
+                                                          height: 40,
+                                                          fit: BoxFit.contain,
+                                                          thumbWidth: 100,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ],
+                                              if (q['similar_question'] != null) ...[
+                                                const SizedBox(height: 4),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.indigo.withValues(alpha: 0.12),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: const Text('Has Similar Question', style: TextStyle(color: Colors.indigo, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ],
                                               const SizedBox(height: 8),
                                               Wrap(
                                                 spacing: 6,
@@ -2270,6 +2806,84 @@ class _BooksPageState extends State<BooksPage> {
                                                                     ?.toString() ??
                                                                 '';
                                                         _pyqImage = null;
+                                                        _pyqExplanationImageLink =
+                                                            q['explanation_image_link']
+                                                                    ?.toString() ??
+                                                                '';
+                                                        _pyqExplanationImage = null;
+                                                        _pyqOptionAImageLink =
+                                                            q['option_a_image_link']
+                                                                    ?.toString() ??
+                                                                '';
+                                                        _pyqOptionAImage = null;
+                                                        _pyqOptionBImageLink =
+                                                            q['option_b_image_link']
+                                                                    ?.toString() ??
+                                                                '';
+                                                        _pyqOptionBImage = null;
+                                                        _pyqOptionCImageLink =
+                                                            q['option_c_image_link']
+                                                                    ?.toString() ??
+                                                                '';
+                                                        _pyqOptionCImage = null;
+                                                        _pyqOptionDImageLink =
+                                                            q['option_d_image_link']
+                                                                    ?.toString() ??
+                                                                '';
+                                                        _pyqOptionDImage = null;
+
+                                                        dynamic sim = q['similar_question'];
+                                                        if (sim is String && sim.isNotEmpty) {
+                                                          try {
+                                                            sim = jsonDecode(sim);
+                                                          } catch (_) {}
+                                                        }
+                                                        if (sim is Map) {
+                                                          _pyqSimilarQuestion.text =
+                                                              sim['question']?.toString() ?? '';
+                                                          _pyqSimilarOptionA.text =
+                                                              sim['option_a']?.toString() ?? '';
+                                                          _pyqSimilarOptionB.text =
+                                                              sim['option_b']?.toString() ?? '';
+                                                          _pyqSimilarOptionC.text =
+                                                              sim['option_c']?.toString() ?? '';
+                                                          _pyqSimilarOptionD.text =
+                                                              sim['option_d']?.toString() ?? '';
+                                                          _pyqSimilarCorrect =
+                                                              sim['correct_option']?.toString() ?? 'A';
+                                                          _pyqSimilarExplanation.text =
+                                                              sim['explanation']?.toString() ?? '';
+                                                          _pyqSimilarQuestionImageLink =
+                                                              sim['question_image_link']?.toString() ?? '';
+                                                          _pyqSimilarExplanationImageLink =
+                                                              sim['explanation_image_link']?.toString() ?? '';
+                                                          _pyqSimilarExistingExplanationImages.clear();
+                                                          final extraImgs = sim['explanation_images'] ?? sim['explanation_images_list'];
+                                                          if (extraImgs is List) {
+                                                            for (final x in extraImgs) {
+                                                              if (x != null && x.toString().isNotEmpty) {
+                                                                _pyqSimilarExistingExplanationImages.add(x.toString());
+                                                              }
+                                                            }
+                                                          }
+                                                          _pyqShowSimilarQuestion =
+                                                              _pyqSimilarQuestion.text.trim().isNotEmpty;
+                                                        } else {
+                                                          _pyqSimilarQuestion.clear();
+                                                          _pyqSimilarOptionA.clear();
+                                                          _pyqSimilarOptionB.clear();
+                                                          _pyqSimilarOptionC.clear();
+                                                          _pyqSimilarOptionD.clear();
+                                                          _pyqSimilarExplanation.clear();
+                                                          _pyqSimilarCorrect = 'A';
+                                                          _pyqSimilarQuestionImageLink = '';
+                                                          _pyqSimilarExplanationImageLink = '';
+                                                          _pyqSimilarExistingExplanationImages.clear();
+                                                          _pyqShowSimilarQuestion = false;
+                                                        }
+                                                        _pyqSimilarQuestionImage = null;
+                                                        _pyqSimilarExplanationImage = null;
+                                                        _pyqSimilarPendingExtraExplanationImages.clear();
                                                       });
                                                       Navigator.of(context)
                                                           .pop();
@@ -12079,8 +12693,13 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    String optionAImageLink = '',
+    String optionBImageLink = '',
+    String optionCImageLink = '',
+    String optionDImageLink = '',
+    Map<String, dynamic>? similarQuestion,
   }) async {
-    await _post('/admin/chapters/$chapterId/pyqs', {
+    await _postMap('/admin/chapters/$chapterId/pyqs', {
       'question': question,
       'optionA': optionA,
       'optionB': optionB,
@@ -12092,6 +12711,11 @@ class AdminApi {
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
       'explanationVideoLink': explanationVideoLink,
+      'optionAImageLink': optionAImageLink,
+      'optionBImageLink': optionBImageLink,
+      'optionCImageLink': optionCImageLink,
+      'optionDImageLink': optionDImageLink,
+      if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
   }
 
@@ -12109,6 +12733,11 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    String optionAImageLink = '',
+    String optionBImageLink = '',
+    String optionCImageLink = '',
+    String optionDImageLink = '',
+    Map<String, dynamic>? similarQuestion,
   }) async {
     await _postQuestionWithMedia(
       path: '/admin/chapters/$chapterId/pyqs/with-media',
@@ -12124,6 +12753,11 @@ class AdminApi {
         'questionImageLink': questionImageLink,
         'explanationImageLink': explanationImageLink,
         'explanationVideoLink': explanationVideoLink,
+        'optionAImageLink': optionAImageLink,
+        'optionBImageLink': optionBImageLink,
+        'optionCImageLink': optionCImageLink,
+        'optionDImageLink': optionDImageLink,
+        if (similarQuestion != null) 'similarQuestion': jsonEncode(similarQuestion),
       },
       questionImage: questionImage,
       explanationImage: explanationImage,
@@ -12145,6 +12779,11 @@ class AdminApi {
     String questionImageLink = '',
     String explanationImageLink = '',
     String explanationVideoLink = '',
+    String optionAImageLink = '',
+    String optionBImageLink = '',
+    String optionCImageLink = '',
+    String optionDImageLink = '',
+    Map<String, dynamic>? similarQuestion,
   }) async {
     await _put('/admin/pyqs/$id', {
       'question': question,
@@ -12157,7 +12796,13 @@ class AdminApi {
       'yearLabel': 'NEET',
       'questionImageLink': questionImageLink,
       'explanationImageLink': explanationImageLink,
-      'explanationVideoLink': explanationVideoLink,
+      if (explanationVideoLink.trim().isNotEmpty)
+        'explanationVideoLink': explanationVideoLink.trim(),
+      'optionAImageLink': optionAImageLink,
+      'optionBImageLink': optionBImageLink,
+      'optionCImageLink': optionCImageLink,
+      'optionDImageLink': optionDImageLink,
+      if (similarQuestion != null) 'similarQuestion': similarQuestion,
     });
   }
 

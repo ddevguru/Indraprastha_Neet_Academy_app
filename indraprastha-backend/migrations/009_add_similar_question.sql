@@ -11,3 +11,6 @@ ALTER TABLE test_questions
 ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '',
 ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '',
 ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '';
+
+ALTER TABLE pyqs
+ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;

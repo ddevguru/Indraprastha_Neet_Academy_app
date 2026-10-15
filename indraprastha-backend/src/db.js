@@ -250,6 +250,7 @@ async function ensureDatabaseSchema() {
   await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS option_b_image_link TEXT DEFAULT '';`);
   await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS option_c_image_link TEXT DEFAULT '';`);
   await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS option_d_image_link TEXT DEFAULT '';`);
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS practice_sets (

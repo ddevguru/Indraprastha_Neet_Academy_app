@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -20,6 +21,7 @@ import '../../theme/app_tokens.dart';
 import '../../widgets/app_widgets.dart';
 import '../../widgets/content_lock.dart';
 import '../../widgets/paginated_answer_review.dart';
+import '../../widgets/ai_similar_questions_dialog.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../core/utils/drive_image_url.dart';
 import '../../core/utils/question_fields.dart';
@@ -854,6 +856,8 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                       textColor = Theme.of(context).colorScheme.onSurface;
                     }
 
+                    final optImg = readQuestionOptionImage(q, e.key);
+
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: InkWell(
@@ -866,9 +870,27 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                             borderRadius: BorderRadius.circular(AppRadii.md),
                             border: Border.all(color: border),
                           ),
-                          child: Text(
-                            _optionLabel(e.key, e.value),
-                            style: questionContentTextStyle(context, color: textColor),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _optionLabel(e.key, e.value),
+                                style: questionContentTextStyle(context, color: textColor),
+                              ),
+                              if (optImg.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                                  child: FastNetworkImage(
+                                    url: optImg,
+                                    width: double.infinity,
+                                    height: 160,
+                                    fit: BoxFit.contain,
+                                    borderRadius: BorderRadius.circular(AppRadii.sm),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),
@@ -893,72 +915,139 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                         final hasExpImg = expImgUrl.isNotEmpty;
                         final hasExpList = expImagesList.isNotEmpty;
 
-                        return Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F7FF),
-                            borderRadius: BorderRadius.circular(AppRadii.lg),
-                            border: Border.all(
-                              color: isDark ? const Color(0xFF334155) : const Color(0xFFBAE6FD),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                        final rawSim = q['similar_question'] ?? q['similarQuestion'];
+                        Map<String, dynamic>? simQMap;
+                        if (rawSim is Map) {
+                          simQMap = Map<String, dynamic>.from(rawSim);
+                        } else if (rawSim is String && rawSim.trim().isNotEmpty) {
+                          try {
+                            final d = jsonDecode(rawSim);
+                            if (d is Map) simQMap = Map<String, dynamic>.from(d);
+                          } catch (_) {}
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F7FF),
+                                borderRadius: BorderRadius.circular(AppRadii.lg),
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFBAE6FD),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
-                                    Icons.lightbulb_rounded,
-                                    color: isDark ? const Color(0xFFF59E0B) : const Color(0xFF0284C7),
-                                    size: 20,
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.lightbulb_rounded,
+                                        color: isDark ? const Color(0xFFF59E0B) : const Color(0xFF0284C7),
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Explanation',
+                                        style: questionContentTextStyle(
+                                          context,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Explanation',
-                                    style: questionContentTextStyle(
-                                      context,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  if (hasExpText)
+                                    Text(
+                                      expText,
+                                      style: questionContentTextStyle(
+                                        context,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w400,
+                                      ),
                                     ),
-                                  ),
+                                  if (hasExpImg) ...[
+                                    if (hasExpText) const SizedBox(height: AppSpacing.sm),
+                                    _buildQuestionImage(expImgUrl),
+                                  ],
+                                  if (hasExpList) ...[
+                                    for (final imgData in expImagesList) ...[
+                                      const SizedBox(height: AppSpacing.sm),
+                                      _buildQuestionImage(explanationImageRawUrl(imgData)),
+                                    ],
+                                  ],
+                                  if (!hasExpText && !hasExpImg && !hasExpList)
+                                    Text(
+                                      'No explanation available for this question.',
+                                      style: questionContentTextStyle(
+                                        context,
+                                        fontSize: 14,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.6),
+                                      ),
+                                    ),
                                 ],
                               ),
-                              const SizedBox(height: AppSpacing.sm),
-                              if (hasExpText)
-                                Text(
-                                  expText,
-                                  style: questionContentTextStyle(
-                                    context,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w400,
+                            ),
+                            if (simQMap != null) ...[
+                              const SizedBox(height: AppSpacing.md),
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    showSingleSimilarQuestionSheet(
+                                      context,
+                                      similarQuestion: simQMap,
+                                      questionTitle: 'PYQ ${_index + 1} - Similar Question',
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(AppRadii.lg),
+                                  child: Ink(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(AppRadii.lg),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Solve Similar Question',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              if (hasExpImg) ...[
-                                if (hasExpText) const SizedBox(height: AppSpacing.sm),
-                                _buildQuestionImage(expImgUrl),
-                              ],
-                              if (hasExpList) ...[
-                                for (final imgData in expImagesList) ...[
-                                  const SizedBox(height: AppSpacing.sm),
-                                  _buildQuestionImage(explanationImageRawUrl(imgData)),
-                                ],
-                              ],
-                              if (!hasExpText && !hasExpImg && !hasExpList)
-                                Text(
-                                  'No explanation available for this question.',
-                                  style: questionContentTextStyle(
-                                    context,
-                                    fontSize: 14,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.6),
-                                  ),
-                                ),
+                              ),
                             ],
-                          ),
+                          ],
                         );
                       },
                     ),

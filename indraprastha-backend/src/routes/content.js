@@ -407,7 +407,11 @@ router.get('/chapters/:chapterId', userAuth, async (req, res) => {
 
 router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
   const pyqs = await pool.query(
-    `SELECT p.id, p.question, p.option_a, p.option_b, p.option_c, p.option_d, p.correct_option, p.explanation, p.year_label, p.question_image_link, p.question_image_drive_file_id, p.question_image_drive_folder_id
+    `SELECT p.id, p.chapter_id, p.question, p.option_a, p.option_b, p.option_c, p.option_d, p.correct_option, p.explanation, p.year_label,
+            p.question_image_link, p.question_image_drive_file_id, p.question_image_drive_folder_id,
+            p.explanation_image_link, p.explanation_image_drive_file_id, p.explanation_video_link, p.explanation_video_drive_file_id,
+            p.option_a_image_link, p.option_b_image_link, p.option_c_image_link, p.option_d_image_link,
+            p.similar_question
      FROM pyqs p
      WHERE p.chapter_id = $1
      ORDER BY p.id ASC`,

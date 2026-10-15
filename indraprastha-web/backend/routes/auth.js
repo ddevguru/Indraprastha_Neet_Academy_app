@@ -37,8 +37,33 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Lookup student in PostgreSQL
-    const user = await findUserByPhone(cleanPhone);
+    // 1. Direct Live GCP Production Auth
+    try {
+      const prodRes = await fetch('https://api.indraprasthaneetacademy.com/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone, password }),
+      });
+      const prodData = await prodRes.json();
+      if (prodRes.ok && (prodData.success || prodData.token)) {
+        console.log(`[Live GCP Auth] Student ${cleanPhone} authenticated directly on production.`);
+        return res.json({
+          success: true,
+          message: 'Student login successful!',
+          token: prodData.token,
+          user: prodData.user || { phone: cleanPhone, full_name: 'Deepak Mishra' },
+        });
+      }
+      if (prodData.error) {
+        return res.status(prodRes.status || 400).json({ success: false, error: prodData.error });
+      }
+    } catch (prodErr) {
+      console.warn('[Live GCP Auth] Live server request failed, attempting local fallback:', prodErr.message);
+    }
+
+    // Lookup student in Local PostgreSQL fallback
+    let user = await findUserByPhone(cleanPhone);
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -62,7 +87,26 @@ router.post('/login', async (req, res) => {
     }
 
     // Compare Bcrypt Password Hash
-    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+    let passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+    // If local password does not match, double-check live production server
+    if (!passwordMatch && !process.env.DATABASE_URL) {
+      try {
+        const prodRes = await fetch('https://api.indraprasthaneetacademy.com/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: cleanPhone, password }),
+        });
+        const prodData = await prodRes.json();
+        if (prodRes.ok && prodData.success) {
+          console.log(`[Production Auth Bridge] Student ${cleanPhone} authenticated via live production server.`);
+          return res.json(prodData);
+        }
+      } catch (prodErr) {
+        console.warn('[Production Auth Bridge] Fallback check failed:', prodErr.message);
+      }
+    }
+
     if (!passwordMatch) {
       return res.status(401).json({
         success: false,
@@ -267,9 +311,25 @@ router.post('/firebase/verify-phone-token', async (req, res) => {
     const existingUser = await findUserByPhone(phone);
     const isNewUser = !existingUser;
 
+    if (existingUser) {
+      if (existingUser.is_blocked) {
+        return res.status(403).json({ success: false, error: 'Your account has been blocked by the admin.' });
+      }
+      const { token } = await issueUserSession(existingUser);
+      const { password_hash: _, ...sanitizedUser } = existingUser;
+      return res.json({
+        success: true,
+        isNewUser: false,
+        phone,
+        token,
+        user: sanitizedUser,
+        message: 'Phone OTP verified, student logged in successfully!',
+      });
+    }
+
     return res.json({
       success: true,
-      isNewUser,
+      isNewUser: true,
       phone,
       message: 'Firebase Phone OTP successfully verified!',
     });
