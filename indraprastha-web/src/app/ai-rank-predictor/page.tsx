@@ -329,7 +329,7 @@ export default function AiRankPredictorPage() {
         <div className="pred-ticker-inner">
           <div className="ticker-left">
             <span className="ticker-badge-orange">NTA Normalization v4.2 Engine</span>
-            <span>|</span>
+            <span className="ticker-sep">|</span>
             <span>NEET 2024/2025 AIR vs College Database</span>
           </div>
           <div className="ticker-badge-green">

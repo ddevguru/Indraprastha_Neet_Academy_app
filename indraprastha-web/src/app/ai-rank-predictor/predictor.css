@@ -69,7 +69,39 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .pred-ticker-bar {
+    padding: 6px 12px;
+  }
+  .pred-ticker-inner {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
+  }
+  .ticker-left {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: center;
+  }
+  .ticker-left .ticker-sep {
+    display: none;
+  }
+  .ticker-badge-orange {
+    font-size: 9.5px;
+    padding: 2px 6px;
+  }
+  .ticker-badge-green {
+    justify-content: center;
+    font-size: 10.5px;
+    text-align: center;
+  }
 }
 
 .ticker-left {

@@ -208,12 +208,11 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
           </a>
 
           {isLoggedIn ? (
-            <div className="auth-btns-desktop" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="nav-auth-wrapper" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <Link
                 href="/dashboard"
-                className="btn-enroll-nav btn-orange-leather"
+                className="btn-enroll-nav btn-orange-leather nav-login-btn"
                 id="nav-dashboard-btn"
-                style={{ padding: "8px 14px", fontSize: "12px" }}
               >
                 <span>Dashboard 🩺</span>
               </Link>
@@ -224,7 +223,7 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
                   localStorage.removeItem("indraprastha_user");
                   window.location.href = "/login";
                 }}
-                className="btn-signout-nav"
+                className="btn-signout-nav auth-btns-desktop"
                 style={{
                   padding: "7px 12px",
                   borderRadius: "20px",
@@ -245,7 +244,7 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
           ) : (
             <Link
               href="/login"
-              className={`btn-enroll-nav btn-orange-leather auth-btns-desktop ${activePage === "login" ? "active-login" : ""}`}
+              className={`btn-enroll-nav btn-orange-leather nav-login-btn ${activePage === "login" ? "active-login" : ""}`}
               id="nav-login-btn"
             >
               <span>Login →</span>

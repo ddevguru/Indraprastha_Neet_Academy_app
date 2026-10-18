@@ -212,37 +212,21 @@ export default function TargetBatchesPage() {
   return (
     <>
       {/* ════════ TOP ANNOUNCEMENT BAR ════════ */}
-      <div
-        className="top-announcement-bar"
-        style={{
-          fontSize: "12px",
-          padding: "8px 24px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span
-            style={{
-              background: "var(--orange)",
-              color: "#FFF",
-              fontWeight: 900,
-              fontSize: "10px",
-              padding: "2px 8px",
-              borderRadius: "4px",
-              letterSpacing: "0.5px",
-            }}
-          >
-            🔥 PROGRAM ANNOUNCEMENT
-          </span>
-          <strong>Batches strictly mapped to recent NMC syllabus rationalization guidelines</strong>
-        </div>
+      <div className="top-announcement-bar">
+        <div className="announcement-inner">
+          <div className="announcement-left">
+            <span className="announcement-badge">
+              🔥 PROGRAM ANNOUNCEMENT
+            </span>
+            <span className="announcement-main-text">
+              <strong>Batches strictly mapped to recent NMC syllabus rationalization guidelines</strong>
+            </span>
+          </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "16px", fontWeight: 700 }}>
-          <span style={{ color: "#16A34A" }}>✓ 100% NCERT Line-by-Line Pedagogy</span>
-          <span style={{ color: "var(--orange)" }}>🎓 Scholarship Window Closes in 48h</span>
+          <div className="announcement-right">
+            <span className="announcement-tag-green">✓ 100% NCERT Line-by-Line Pedagogy</span>
+            <span className="announcement-tag-orange">🎓 Scholarship Window Closes in 48h</span>
+          </div>
         </div>
       </div>
 
