@@ -69,7 +69,7 @@ services:
 
       # ─── API BASE URL (Points to the Website Backend Service on Render) ───
       - key: NEXT_PUBLIC_API_BASE
-        value: https://indraprastha-web-backend.onrender.com/api/auth
+        value: https://indraprastha-web-backend-668r.onrender.com/api/auth
 
       # ─── FIREBASE CLIENT CONFIGURATION ───
       - key: NEXT_PUBLIC_FIREBASE_API_KEY
