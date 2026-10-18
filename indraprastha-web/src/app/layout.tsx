@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import DisableInspect from "@/components/DisableInspect";
 
 export const metadata: Metadata = {
   title: "Indraprastha NEET Academy – Crack NEET 2026/2027 with NCERT Line-by-Line",
@@ -39,12 +40,39 @@ export default function RootLayout({
                     document.documentElement.classList.remove('dark-theme');
                   }
                 } catch(e) {}
+
+                // Immediate protection before React mounts
+                try {
+                  document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
+                  document.addEventListener('keydown', function(e) {
+                    var k = (e.key || '').toLowerCase();
+                    if (e.key === 'F12' || e.keyCode === 123 || e.key === 'PrintScreen' || e.keyCode === 44 ||
+                        ((e.ctrlKey || e.metaKey) && (k === 'u' || k === 's' || k === 'p')) ||
+                        ((e.ctrlKey || e.metaKey) && e.shiftKey && (k === 'i' || k === 'j' || k === 'c' || k === 'k' || k === 's')) ||
+                        ((e.ctrlKey || e.metaKey) && e.altKey && (k === 'i' || k === 'j' || k === 'c' || k === 'u'))) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (e.key === 'PrintScreen' || e.keyCode === 44) {
+                        try { if (navigator.clipboard) navigator.clipboard.writeText(''); } catch(err) {}
+                      }
+                      return false;
+                    }
+                  });
+                  document.addEventListener('keyup', function(e) {
+                    if (e.key === 'PrintScreen' || e.keyCode === 44) {
+                      try { if (navigator.clipboard) navigator.clipboard.writeText(''); } catch(err) {}
+                    }
+                  });
+                } catch(e) {}
               })();
             `,
           }}
         />
       </head>
-      <body className="dark-theme">{children}</body>
+      <body className="dark-theme">
+        <DisableInspect />
+        {children}
+      </body>
     </html>
   );
 }

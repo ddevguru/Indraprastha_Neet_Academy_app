@@ -1720,3 +1720,60 @@
   padding: 3px 8px;
   border-radius: 4px;
 }
+
+/* ══════════════════════════════
+   AI RANK PREDICTOR RESPONSIVE STYLES
+══════════════════════════════ */
+@media (max-width: 1024px) {
+  .pred-engine-grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+    padding: 0 16px 36px !important;
+  }
+  .pred-hero-top-row {
+    flex-direction: column !important;
+    gap: 18px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .pred-main-title {
+    font-size: 28px !important;
+  }
+  .pred-card {
+    padding: 18px 16px !important;
+  }
+  .pred-dropdown-row {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .pred-ranks-dual-card {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .pred-tabs-nav {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 6px;
+    scrollbar-width: none;
+  }
+  .pred-tabs-nav::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .pred-main-title {
+    font-size: 24px !important;
+  }
+  .pred-accuracy-card {
+    width: 100% !important;
+  }
+  .pred-category-pills {
+    gap: 6px !important;
+  }
+  .category-pill-btn {
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+  }
+}

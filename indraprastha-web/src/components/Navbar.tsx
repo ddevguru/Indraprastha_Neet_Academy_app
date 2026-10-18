@@ -14,6 +14,7 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
   const [theme, setTheme] = useState<"light" | "dark">(currentTheme || "dark");
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -44,6 +45,18 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Lock scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
   const toggleTheme = () => {
     const nextTheme = theme === "light" ? "dark" : "light";
     setTheme(nextTheme);
@@ -60,6 +73,8 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
     }
   };
 
+  const closeMobile = () => setIsMobileMenuOpen(false);
+
   return (
     <nav
       className={`pred-navbar ${isScrolled ? "is-scrolled" : ""}`}
@@ -68,7 +83,7 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
     >
       <div className="pred-navbar-inner">
         {/* Brand Logo */}
-        <Link href="/" className="navbar-brand" aria-label="Indraprastha NEET Academy Home">
+        <Link href="/" className="navbar-brand" aria-label="Indraprastha NEET Academy Home" onClick={closeMobile}>
           <Image
             src="/logo_app.jpeg"
             alt="Indraprastha NEET Logo"
@@ -83,7 +98,7 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
           </div>
         </Link>
 
-        {/* Navigation Links - Dynamically updates if logged in */}
+        {/* Navigation Links (Desktop) */}
         {isLoggedIn ? (
           <ul className="pred-nav-links">
             <li>
@@ -116,6 +131,11 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
                 className={`pred-nav-link ${activePage === "methodology" ? "active-pill" : ""}`}
               >
                 🔬 Methodology
+              </Link>
+            </li>
+            <li>
+              <Link href="/#mentorship" className="pred-nav-link">
+                👨‍⚕️ Mentorship
               </Link>
             </li>
           </ul>
@@ -154,14 +174,14 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
               </Link>
             </li>
             <li>
-              <Link href="/#app" className="pred-nav-link">
-                Mobile App
+              <Link href="/#mentorship" className="pred-nav-link">
+                Dr. Mentorship
               </Link>
             </li>
             <li>
-              <a href="tel:+917203055682" className="pred-nav-link">
-                Talk to Support
-              </a>
+              <Link href="/#app" className="pred-nav-link">
+                Mobile App
+              </Link>
             </li>
           </ul>
         )}
@@ -178,11 +198,13 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
               {theme === "light" ? "☀️ / 🌙" : "🌙 / ☀️"}
             </span>
           </button>
+
           <a href="tel:+917203055682" className="pred-phone-pill">
             📞 +91 72030 55682
           </a>
+
           {isLoggedIn ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="auth-btns-desktop" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <Link
                 href="/dashboard"
                 className="btn-enroll-nav btn-orange-leather"
@@ -198,6 +220,7 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
                   localStorage.removeItem("indraprastha_user");
                   window.location.href = "/login";
                 }}
+                className="btn-signout-nav"
                 style={{
                   padding: "7px 12px",
                   borderRadius: "20px",
@@ -218,12 +241,180 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
           ) : (
             <Link
               href="/login"
-              className={`btn-enroll-nav btn-orange-leather ${activePage === "login" ? "active-login" : ""}`}
+              className={`btn-enroll-nav btn-orange-leather auth-btns-desktop ${activePage === "login" ? "active-login" : ""}`}
               id="nav-login-btn"
             >
               <span>Login →</span>
             </Link>
           )}
+
+          {/* Mobile Hamburger Toggle Button */}
+          <button
+            type="button"
+            className={`mobile-menu-toggle ${isMobileMenuOpen ? "is-active" : ""}`}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle mobile menu"
+            aria-expanded={isMobileMenuOpen}
+          >
+            <span className="hamburger-bar bar-1"></span>
+            <span className="hamburger-bar bar-2"></span>
+            <span className="hamburger-bar bar-3"></span>
+          </button>
+        </div>
+      </div>
+
+      {/* ════════ MOBILE FULL DRAWER MENU ════════ */}
+      <div
+        className={`mobile-nav-overlay ${isMobileMenuOpen ? "active" : ""}`}
+        onClick={closeMobile}
+      />
+      <div className={`mobile-nav-drawer ${isMobileMenuOpen ? "active" : ""}`}>
+        <div className="mobile-nav-header">
+          <div className="mobile-drawer-brand">
+            <Image
+              src="/logo_app.jpeg"
+              alt="Indraprastha Logo"
+              width={34}
+              height={34}
+              style={{ borderRadius: "8px", objectFit: "cover" }}
+            />
+            <div>
+              <span className="brand-title" style={{ fontSize: "14px" }}>IndraprasthaNEET</span>
+              <span className="brand-sub" style={{ fontSize: "9px" }}>ACADEMY</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mobile-drawer-close"
+            onClick={closeMobile}
+            aria-label="Close menu"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mobile-nav-body">
+          <ul className="mobile-links-list">
+            <li>
+              <Link
+                href="/"
+                className={`mobile-nav-link ${activePage === "home" ? "active" : ""}`}
+                onClick={closeMobile}
+              >
+                <span>🏠 Home Overview</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/target-batches"
+                className={`mobile-nav-link ${activePage === "target-batches" ? "active" : ""}`}
+                onClick={closeMobile}
+              >
+                <span>🎯 Target Batches 2026/27</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/ai-rank-predictor"
+                className={`mobile-nav-link ${activePage === "ai-rank-predictor" ? "active" : ""}`}
+                onClick={closeMobile}
+              >
+                <span>⚡ AI Rank Predictor</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/methodology"
+                className={`mobile-nav-link ${activePage === "methodology" ? "active" : ""}`}
+                onClick={closeMobile}
+              >
+                <span>🔬 The Indraprastha Method</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/#mentorship"
+                className="mobile-nav-link"
+                onClick={closeMobile}
+              >
+                <span>👨‍⚕️ Dr Rahul Mentorship</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/#app"
+                className="mobile-nav-link"
+                onClick={closeMobile}
+              >
+                <span>📱 Mobile Android App</span>
+              </Link>
+            </li>
+            {isLoggedIn && (
+              <li>
+                <Link
+                  href="/dashboard"
+                  className="mobile-nav-link highlight"
+                  onClick={closeMobile}
+                >
+                  <span>📊 Student Study Dashboard</span>
+                </Link>
+              </li>
+            )}
+          </ul>
+
+          <div className="mobile-drawer-footer">
+            <div className="mobile-phone-cta">
+              <a href="tel:+917203055682" className="mobile-phone-link">
+                <span>📞 +91 72030 55682</span>
+                <span className="mobile-phone-hint">24/7 Academic Helpline</span>
+              </a>
+            </div>
+
+            <div className="mobile-auth-row">
+              {isLoggedIn ? (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="btn-primary-hero btn-orange-leather"
+                    style={{ flex: 1, textAlign: "center", padding: "12px" }}
+                    onClick={closeMobile}
+                  >
+                    <span>Dashboard 🩺</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.removeItem("indraprastha_token");
+                      localStorage.removeItem("indraprastha_user");
+                      closeMobile();
+                      window.location.href = "/login";
+                    }}
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: "10px",
+                      border: "1px solid rgba(239, 68, 68, 0.4)",
+                      backgroundColor: "rgba(239, 68, 68, 0.12)",
+                      color: "#EF4444",
+                      fontSize: "13px",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href="/login"
+                  className="btn-primary-hero btn-orange-leather"
+                  style={{ width: "100%", textAlign: "center", padding: "12px", justifyContent: "center" }}
+                  onClick={closeMobile}
+                >
+                  <span>Student Sign In / Register →</span>
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </nav>

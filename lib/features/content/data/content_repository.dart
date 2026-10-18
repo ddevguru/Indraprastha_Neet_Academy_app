@@ -98,8 +98,24 @@ class ContentRepository {
     return _mapsFromListKey(data, 'chapters');
   }
 
-  Future<List<Map<String, dynamic>>> fetchPyqs(int chapterId) async {
-    final data = await _get('/content/chapters/$chapterId/pyqs', bypassCache: true);
+  Future<List<Map<String, dynamic>>> fetchPyqChapters({
+    String? subject,
+    String? topic,
+  }) async {
+    final data = await _get(
+      _scopedPath('/content/pyq-chapters', subject: subject, topic: topic),
+    );
+    return _mapsFromListKey(data, 'chapters');
+  }
+
+  Future<List<Map<String, dynamic>>> fetchPyqs(
+    int chapterId, {
+    bool bypassCache = false,
+  }) async {
+    final data = await _get(
+      '/content/chapters/$chapterId/pyqs',
+      bypassCache: bypassCache,
+    );
     return _mapsFromListKey(data, 'pyqs');
   }
 

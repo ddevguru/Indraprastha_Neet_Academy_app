@@ -1,54 +1,85 @@
+# ==============================================================================
+# Render Blueprint for Indraprastha NEET Academy Website
+# Frontend: Next.js Web App (indraprastha-web)
+# Backend: Express Auth & Student API (indraprastha-web/backend)
+# Database: External GCP Cloud SQL / PostgreSQL (No separate Render DB created)
+# ==============================================================================
+
 services:
+  # ----------------------------------------------------------------------------
+  # 1. WEBSITE BACKEND SERVICE (Express Node.js API)
+  # ----------------------------------------------------------------------------
   - type: web
-    name: indraprastha-backend
+    name: indraprastha-web-backend
     runtime: node
-    rootDir: indraprastha-backend
+    rootDir: indraprastha-web/backend
     plan: free
     buildCommand: npm install
     startCommand: npm start
-    healthCheckPath: /health
+    healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 10000
+
+      # ─── EXTERNAL GCP POSTGRESQL DATABASE ───
+      # Connects directly to existing GCP Cloud SQL database (indraprastha_db)
       - key: DATABASE_URL
-        fromDatabase:
-          name: indraprastha-db
-          property: connectionString
+        sync: false
       - key: DB_HOST
-        fromDatabase:
-          name: indraprastha-db
-          property: host
+        sync: false
       - key: DB_PORT
-        fromDatabase:
-          name: indraprastha-db
-          property: port
+        value: "5432"
       - key: DB_NAME
-        fromDatabase:
-          name: indraprastha-db
-          property: database
+        value: "indraprastha_db"
       - key: DB_USER
-        fromDatabase:
-          name: indraprastha-db
-          property: user
+        sync: false
       - key: DB_PASSWORD
-        fromDatabase:
-          name: indraprastha-db
-          property: password
-      - key: JWT_SECRET
-        generateValue: true
-      - key: ADMIN_USERNAME
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: CORS_ORIGINS
-        sync: false
-      - key: GDRIVE_CLIENT_EMAIL
-        sync: false
-      - key: GDRIVE_PRIVATE_KEY
-        sync: false
-      - key: GDRIVE_FOLDER_ID
         sync: false
 
-databases:
-  - name: indraprastha-db
+      # ─── AUTHENTICATION & SECURITY ───
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: DEMO_OTP_ENABLED
+        value: "false"
+
+      # ─── FIREBASE ADMIN AUTH (Google & Phone OTP) ───
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+
+  # ----------------------------------------------------------------------------
+  # 2. WEBSITE FRONTEND SERVICE (Next.js Application)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: indraprastha-web
+    runtime: node
+    rootDir: indraprastha-web
     plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # ─── API BASE URL (Points to the Website Backend Service on Render) ───
+      - key: NEXT_PUBLIC_API_BASE
+        value: https://indraprastha-web-backend.onrender.com/api/auth
+
+      # ─── FIREBASE CLIENT CONFIGURATION ───
+      - key: NEXT_PUBLIC_FIREBASE_API_KEY
+        value: AIzaSyBha4ZEKcaQlUwhbUBNyzrTBC1VRIZIHW4
+      - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+        value: indraprastha-web.firebaseapp.com
+      - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        value: indraprastha-web
+      - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+        value: indraprastha-web.firebasestorage.app
+      - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+        value: "536433711964"
+      - key: NEXT_PUBLIC_FIREBASE_APP_ID
+        value: 1:536433711964:web:9eba07648f8e7707b37f99

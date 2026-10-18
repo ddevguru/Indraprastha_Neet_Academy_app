@@ -598,20 +598,52 @@ Return ONLY valid JSON matching the schema.`;
     let rawList = null;
     let usedModel = 'chatgpt-42-gpt5';
 
-    const rapidApiKey = this._getRapidApiKey();
-    if (rapidApiKey) {
-      try {
-        console.log(`[AI_SIMILAR_QUESTIONS] Generating ${requestedCount} questions via RapidAPI ChatGPT-42 GPT-5...`);
-        rawList = await this.callRapidAPIGeneration(prompts, requestedCount);
-        usedModel = 'chatgpt-42-gpt5';
-      } catch (rapidErr) {
-        console.warn('[AI_SIMILAR_QUESTIONS_RAPIDAPI_WARNING] RapidAPI call failed, attempting OpenAI fallback:', rapidErr.message);
+    try {
+      const rapidApiKey = this._getRapidApiKey();
+      if (rapidApiKey) {
+        try {
+          console.log(`[AI_SIMILAR_QUESTIONS] Generating ${requestedCount} questions via RapidAPI ChatGPT-42 GPT-5...`);
+          rawList = await this.callRapidAPIGeneration(prompts, requestedCount);
+          usedModel = 'chatgpt-42-gpt5';
+        } catch (rapidErr) {
+          console.warn('[AI_SIMILAR_QUESTIONS_RAPIDAPI_WARNING] RapidAPI call failed, attempting OpenAI fallback:', rapidErr.message);
+          rawList = await this.callOpenAIGeneration(prompts, requestedCount);
+          usedModel = process.env.OPENAI_MODEL || this.defaultModel;
+        }
+      } else {
         rawList = await this.callOpenAIGeneration(prompts, requestedCount);
         usedModel = process.env.OPENAI_MODEL || this.defaultModel;
       }
-    } else {
-      rawList = await this.callOpenAIGeneration(prompts, requestedCount);
-      usedModel = process.env.OPENAI_MODEL || this.defaultModel;
+    } catch (aiErr) {
+      console.warn('[AI_SIMILAR_QUESTIONS] AI generation failed, falling back to NEET Question Engine:', aiErr.message);
+      try {
+        const engineRes = neetQuestionEngine.generateConceptQuestions({
+          subject: sourceContext.subject,
+          topic: sourceContext.chapter || sourceContext.topic,
+          concept: sourceContext.concept,
+          questionText: sourceContext.questionText,
+          count: requestedCount,
+        });
+        if (engineRes && engineRes.questions && engineRes.questions.length > 0) {
+          rawList = engineRes.questions.map((q) => ({
+            question: q.question_text || q.question,
+            option_a: q.option_a,
+            option_b: q.option_b,
+            option_c: q.option_c,
+            option_d: q.option_d,
+            correct_option: q.correct_option,
+            explanation: q.explanation,
+            subject: engineRes.subject || sourceContext.subject,
+            chapter: engineRes.topic || sourceContext.chapter,
+            concept: engineRes.concept || sourceContext.concept,
+          }));
+          usedModel = 'neet-question-engine';
+        } else {
+          throw aiErr;
+        }
+      } catch (fallbackErr) {
+        throw aiErr;
+      }
     }
 
     // 5. Strictly validate, deduplicate, and normalize questions

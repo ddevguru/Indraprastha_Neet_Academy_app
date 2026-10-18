@@ -226,9 +226,9 @@ export default function StudentDashboardPage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <button
-              onClick={() => setShowProfileModal(true)}
-              title="Click to view full profile details"
+            <Link
+              href="/profile"
+              title="Click to view full student profile"
               style={{
                 width: "60px",
                 height: "60px",
@@ -239,8 +239,9 @@ export default function StudentDashboardPage() {
                 alignItems: "center",
                 justifyContent: "center",
                 boxShadow: "0 4px 14px rgba(229, 82, 0, 0.25)",
-                border: "none",
+                textDecoration: "none",
                 cursor: "pointer",
+                transition: "transform 0.15s ease",
               }}
             >
               <Image
@@ -250,26 +251,24 @@ export default function StudentDashboardPage() {
                 height={54}
                 style={{ borderRadius: "50%", objectFit: "cover" }}
               />
-            </button>
+            </Link>
 
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "4px" }}>
-                <h1
-                  onClick={() => setShowProfileModal(true)}
+                <Link
+                  href="/profile"
                   style={{
                     fontSize: "clamp(20px, 3vw, 26px)",
                     fontWeight: 900,
                     color: "var(--text-main)",
                     margin: 0,
+                    textDecoration: "none",
                     cursor: "pointer",
-                    textDecoration: "underline",
-                    textDecorationColor: "rgba(229, 82, 0, 0.3)",
-                    textUnderlineOffset: "4px",
                   }}
-                  title="Click to view Profile &amp; Subscription Details"
+                  title="Click to view Profile &amp; Account Details"
                 >
                   Namaste, {displayName}! 🩺
-                </h1>
+                </Link>
                 <span
                   style={{
                     backgroundColor: hasActiveSub ? "rgba(16, 185, 129, 0.12)" : "rgba(229, 82, 0, 0.12)",
@@ -307,8 +306,8 @@ export default function StudentDashboardPage() {
 
           {/* Quick Action Buttons */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-            <button
-              onClick={() => setShowProfileModal(true)}
+            <Link
+              href="/profile"
               style={{
                 padding: "9px 16px",
                 backgroundColor: "rgba(229, 82, 0, 0.08)",
@@ -317,15 +316,15 @@ export default function StudentDashboardPage() {
                 borderRadius: "10px",
                 fontSize: "13px",
                 fontWeight: 700,
-                cursor: "pointer",
+                textDecoration: "none",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
               }}
             >
               <span>👤</span>
-              <span>View Profile Details</span>
-            </button>
+              <span>View Profile Details →</span>
+            </Link>
             <Link
               href="/daily-mcqs"
               style={{
@@ -428,7 +427,7 @@ export default function StudentDashboardPage() {
           {/* ════════ LEFT COLUMN: STREAKS & LEARNING STATS ════════ */}
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
             
-            {/* 1. WEEKLY STREAK WIDGET (Exact replica of Flutter WeeklyStreakWidget) */}
+            {/* 1. WEEKLY STREAK WIDGET (Clickable Preview -> Full /streaks page) */}
             <div
               style={{
                 backgroundColor: "var(--cream-card, #FFFFFF)",
@@ -458,7 +457,7 @@ export default function StudentDashboardPage() {
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <h3 style={{ fontSize: "16px", fontWeight: 800, color: "var(--text-main)", margin: 0 }}>
-                        Weekly Streak
+                        Weekly Streak Preview
                       </h3>
                       <span
                         style={{
@@ -478,6 +477,21 @@ export default function StudentDashboardPage() {
                     </p>
                   </div>
                 </div>
+
+                <Link
+                  href="/streaks"
+                  style={{
+                    fontSize: "12px",
+                    color: "#E55200",
+                    fontWeight: 800,
+                    textDecoration: "none",
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    backgroundColor: "rgba(229, 82, 0, 0.08)",
+                  }}
+                >
+                  View Details →
+                </Link>
               </div>
 
               {/* 7-Day Pills (Mon to Sun - matching Flutter 7 days pills row) */}
@@ -541,6 +555,28 @@ export default function StudentDashboardPage() {
                 <span>🛡️</span>
                 <span>Streak Protected! Solve today's MCQs to keep your revision cycle active.</span>
               </div>
+
+              <Link
+                href="/streaks"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  marginTop: "12px",
+                  padding: "10px",
+                  borderRadius: "10px",
+                  backgroundColor: "rgba(229, 82, 0, 0.08)",
+                  border: "1px solid rgba(229, 82, 0, 0.2)",
+                  color: "#E55200",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  textDecoration: "none",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>📅 View Full Streak Calendar &amp; Activity History →</span>
+              </Link>
             </div>
 
             {/* 2. LEARNING STATS & TEST DIAGNOSTICS */}
@@ -776,18 +812,34 @@ export default function StudentDashboardPage() {
                     </p>
                   </div>
                 </div>
-                <span
-                  style={{
-                    backgroundColor: "rgba(229, 82, 0, 0.12)",
-                    color: "#E55200",
-                    padding: "3px 10px",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    fontWeight: 800,
-                  }}
-                >
-                  Your Rank: #{myRank}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span
+                    style={{
+                      backgroundColor: "rgba(229, 82, 0, 0.12)",
+                      color: "#E55200",
+                      padding: "3px 10px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                    }}
+                  >
+                    Your Rank: #{myRank}
+                  </span>
+                  <Link
+                    href="/leaderboard"
+                    style={{
+                      fontSize: "12px",
+                      color: "#E55200",
+                      fontWeight: 800,
+                      textDecoration: "none",
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      backgroundColor: "rgba(229, 82, 0, 0.08)",
+                    }}
+                  >
+                    Full List →
+                  </Link>
+                </div>
               </div>
 
               {/* Topper Podium Row */}
@@ -861,6 +913,29 @@ export default function StudentDashboardPage() {
                   </span>
                 </div>
               </div>
+
+              {/* Full Leaderboard Button */}
+              <Link
+                href="/leaderboard"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  marginTop: "14px",
+                  padding: "11px",
+                  borderRadius: "10px",
+                  backgroundColor: "#E55200",
+                  color: "#FFFFFF",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  textDecoration: "none",
+                  boxShadow: "0 3px 10px rgba(229, 82, 0, 0.25)",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>🏆 View Full All-India Leaderboard &amp; Ranks →</span>
+              </Link>
             </div>
 
           </div>

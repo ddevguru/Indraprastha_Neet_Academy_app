@@ -23,7 +23,7 @@ export interface StudentUserProfile {
 }
 
 interface StudentNavbarProps {
-  activeTab?: "dashboard" | "daily-mcqs" | "practice" | "tests" | "subscriptions";
+  activeTab?: "dashboard" | "daily-mcqs" | "practice" | "tests" | "subscriptions" | "leaderboard" | "streaks" | "profile";
   userName?: string;
   onLogout?: () => void;
   onOpenProfile?: () => void;
@@ -317,17 +317,17 @@ export default function StudentNavbar({
             <span>{theme === "light" ? "☀️ Light" : "🌙 Dark"}</span>
           </button>
 
-          {/* Student Profile Pill - CLICKABLE to view profile & subscription details */}
+          {/* Student Profile Pill - CLICKABLE to view profile page */}
           <button
             type="button"
             onClick={() => {
               if (onOpenProfile) {
                 onOpenProfile();
               } else {
-                router.push("/dashboard?view=profile");
+                router.push("/profile");
               }
             }}
-            title="Click to view Profile &amp; Subscription Details"
+            title="Click to view Profile &amp; Account Details"
             style={{
               display: "inline-flex",
               alignItems: "center",

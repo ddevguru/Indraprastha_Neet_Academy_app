@@ -22,7 +22,9 @@ interface PracticeSetItem {
 export default function PracticePage() {
   const [sets, setSets] = useState<PracticeSetItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeStandard, setActiveStandard] = useState<string>("All");
   const [activeSubject, setActiveSubject] = useState<string>("All");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -51,10 +53,9 @@ export default function PracticePage() {
         },
       });
 
-      // If token expired, renew directly via local bridge
-      if (res.status === 401) {
+      if (res.status === 401 || !activeToken) {
         try {
-          const renewRes = await fetch("http://localhost:5000/api/auth/login", {
+          const renewRes = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ phone: "7028196172", password: "Deepak" }),
@@ -88,8 +89,43 @@ export default function PracticePage() {
     }
   };
 
-  const subjects = ["All", ...Array.from(new Set(sets.map((s) => s.subject).filter(Boolean)))];
-  const filteredSets = activeSubject === "All" ? sets : sets.filter((s) => s.subject === activeSubject);
+  const normalizeSubject = (s?: string) => {
+    if (!s) return "";
+    const lower = s.trim().toLowerCase();
+    if (lower.includes("bio")) return "Biology";
+    if (lower.includes("chem")) return "Chemistry";
+    if (lower.includes("phys")) return "Physics";
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  };
+
+  const distinctStandards = Array.from(
+    new Set(sets.map((s) => s.class_label?.trim()).filter(Boolean) as string[])
+  ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  const standards = ["All", ...distinctStandards];
+
+  const distinctSubjects = Array.from(
+    new Set(sets.map((s) => normalizeSubject(s.subject)).filter(Boolean))
+  ).sort();
+
+  const subjects = ["All", ...distinctSubjects];
+
+  const filteredSets = sets.filter((s) => {
+    const matchesStandard =
+      activeStandard === "All" ||
+      (s.class_label && s.class_label.trim().toLowerCase() === activeStandard.trim().toLowerCase());
+
+    const matchesSubject =
+      activeSubject === "All" ||
+      normalizeSubject(s.subject).toLowerCase() === activeSubject.toLowerCase();
+
+    const matchesSearch =
+      !searchQuery.trim() ||
+      s.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.topic?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesStandard && matchesSubject && matchesSearch;
+  });
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--cream-bg, #FAF6F0)" }}>
@@ -103,7 +139,7 @@ export default function PracticePage() {
             border: "1px solid var(--border-light, #EDE3DA)",
             borderRadius: "20px",
             padding: "24px 28px",
-            marginBottom: "24px",
+            marginBottom: "20px",
             boxShadow: "0 4px 20px rgba(0, 0, 0, 0.04)",
             display: "flex",
             alignItems: "center",
@@ -153,28 +189,194 @@ export default function PracticePage() {
           </div>
         </section>
 
-        {/* Subject Filter Pills */}
-        <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "14px", marginBottom: "20px" }}>
-          {subjects.map((subj) => (
-            <button
-              key={subj}
-              onClick={() => setActiveSubject(subj)}
+        {/* Filters Section (Standard + Subject + Search) */}
+        <div
+          style={{
+            backgroundColor: "var(--cream-card, #FFFFFF)",
+            border: "1px solid var(--border-light, #EDE3DA)",
+            borderRadius: "18px",
+            padding: "16px 20px",
+            marginBottom: "24px",
+            boxShadow: "0 2px 10px rgba(0, 0, 0, 0.03)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "14px",
+          }}
+        >
+          {/* Row 1: Standard Filter + Search */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "12px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  minWidth: "85px",
+                }}
+              >
+                <span>🎓</span> Standard:
+              </span>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {standards.map((std) => {
+                  const isSelected = activeStandard === std;
+                  return (
+                    <button
+                      key={std}
+                      onClick={() => setActiveStandard(std)}
+                      style={{
+                        padding: "6px 16px",
+                        borderRadius: "100px",
+                        border: isSelected ? "1.5px solid #E55200" : "1px solid var(--border-light, #EDE3DA)",
+                        backgroundColor: isSelected ? "#E55200" : "var(--cream-bg, #FAF6F0)",
+                        color: isSelected ? "#FFFFFF" : "var(--text-main)",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {std === "All" ? "All Standards" : std}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Search */}
+            <div style={{ position: "relative", minWidth: "220px", maxWidth: "300px", width: "100%" }}>
+              <input
+                type="text"
+                placeholder="Search chapters or topics..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "7px 12px 7px 32px",
+                  fontSize: "12px",
+                  borderRadius: "100px",
+                  border: "1px solid var(--border-light, #EDE3DA)",
+                  backgroundColor: "var(--cream-bg, #FAF6F0)",
+                  color: "var(--text-main)",
+                  outline: "none",
+                }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  left: "11px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  fontSize: "12px",
+                  color: "var(--text-muted)",
+                  pointerEvents: "none",
+                }}
+              >
+                🔍
+              </span>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "11px",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div style={{ height: "1px", backgroundColor: "var(--border-light, #EDE3DA)", opacity: 0.6 }} />
+
+          {/* Row 2: Subject Filter */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <span
               style={{
-                padding: "7px 18px",
-                borderRadius: "100px",
-                border: activeSubject === subj ? "1.5px solid #E55200" : "1px solid var(--border-light, #EDE3DA)",
-                backgroundColor: activeSubject === subj ? "#E55200" : "var(--cream-card, #FFFFFF)",
-                color: activeSubject === subj ? "#FFFFFF" : "var(--text-main)",
-                fontSize: "13px",
-                fontWeight: 700,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "all 0.15s ease",
+                fontSize: "12px",
+                fontWeight: 800,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                minWidth: "85px",
               }}
             >
-              {subj}
-            </button>
-          ))}
+              <span>📖</span> Subject:
+            </span>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", overflowX: "auto" }}>
+              {subjects.map((subj) => {
+                const isSelected = activeSubject === subj;
+                return (
+                  <button
+                    key={subj}
+                    onClick={() => setActiveSubject(subj)}
+                    style={{
+                      padding: "6px 16px",
+                      borderRadius: "100px",
+                      border: isSelected ? "1.5px solid #E55200" : "1px solid var(--border-light, #EDE3DA)",
+                      backgroundColor: isSelected ? "#E55200" : "var(--cream-bg, #FAF6F0)",
+                      color: isSelected ? "#FFFFFF" : "var(--text-main)",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {subj === "All" ? "All Subjects" : subj}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Reset Filters Button */}
+            {(activeSubject !== "All" || activeStandard !== "All" || searchQuery.trim()) && (
+              <button
+                onClick={() => {
+                  setActiveSubject("All");
+                  setActiveStandard("All");
+                  setSearchQuery("");
+                }}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: "100px",
+                  border: "1px dashed #E55200",
+                  backgroundColor: "transparent",
+                  color: "#E55200",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  marginLeft: "auto",
+                }}
+              >
+                Reset Filters ↺
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Practice Grid */}
@@ -233,9 +435,18 @@ export default function PracticePage() {
                         textTransform: "uppercase",
                       }}
                     >
-                      {set.subject}
+                      {normalizeSubject(set.subject)}
                     </span>
-                    <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 700 }}>
+                    <span
+                      style={{
+                        backgroundColor: "rgba(0, 0, 0, 0.04)",
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        color: "var(--text-muted)",
+                        fontWeight: 700,
+                      }}
+                    >
                       {set.class_label || "Class 11/12"}
                     </span>
                   </div>

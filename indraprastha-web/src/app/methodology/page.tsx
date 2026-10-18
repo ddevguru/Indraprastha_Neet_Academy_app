@@ -469,6 +469,34 @@ export default function MethodologyPage() {
           </p>
         </div>
 
+        {/* Personalised Mentorship Spotlight by Dr. Rahul Kumar in Methodology */}
+        <div style={{ maxWidth: "1280px", margin: "0 auto 40px", padding: "0 20px" }}>
+          <div className="mentorship-banner-card" style={{ padding: "18px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ background: "rgba(229, 82, 0, 0.12)", color: "var(--orange)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 800 }}>
+                  👨‍⚕️ CHIEF MENTOR SPOTLIGHT
+                </span>
+                <span style={{ fontSize: "14px", fontWeight: 800, color: "var(--text-main)" }}>
+                  Personalised Mentorship by Dr Rahul Kumar
+                </span>
+              </div>
+              <a href="tel:+917203055682" style={{ fontSize: "12px", fontWeight: 800, color: "var(--orange)", textDecoration: "none" }}>
+                📞 Book Free Mentorship Session: +91 72030 55682 ↗
+              </a>
+            </div>
+            <div className="mentorship-banner-image-wrapper">
+              <Image
+                src="/dr_rahul_mentorship.png"
+                alt="Personalised Mentorship by Dr Rahul Kumar"
+                width={1200}
+                height={450}
+                className="mentorship-banner-img"
+              />
+            </div>
+          </div>
+        </div>
+
         <div className="faculty-grid">
           {/* Faculty 1 */}
           <div className="faculty-card">

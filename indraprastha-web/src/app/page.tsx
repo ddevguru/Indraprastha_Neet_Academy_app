@@ -250,6 +250,92 @@ export default function Page() {
         </div>
       </section>
 
+      {/* ════════ PERSONALISED MENTORSHIP BY DR RAHUL KUMAR ════════ */}
+      <section className="mentorship-section has-texture" id="mentorship">
+        <div className="mentorship-container">
+          <div className="section-header-row" style={{ marginBottom: "28px" }}>
+            <div>
+              <span className="section-label">👨‍⚕️ FOUNDER &amp; CHIEF ACADEMIC MENTOR</span>
+              <h2 className="section-title">Personalised Mentorship by Dr Rahul Kumar</h2>
+              <p className="section-subtitle">
+                Bridging the vital gap between textbook memorization and exam-day rank. Every Indraprastha aspirant receives doctor-led 1-on-1 strategic guidance, tailored revision timelines, and psychological mindset coaching.
+              </p>
+            </div>
+            <a href="tel:+917203055682" className="engine-tag" style={{ textDecoration: "none" }}>
+              📞 Call Mentorship Desk: +91 72030 55682
+            </a>
+          </div>
+
+          {/* Featured Dr. Rahul Mentorship Banner Showcase */}
+          <div className="mentorship-banner-card">
+            <div className="mentorship-banner-image-wrapper">
+              <Image
+                src="/dr_rahul_mentorship.png"
+                alt="Personalised Mentorship by Dr Rahul Kumar – Indraprastha NEET Academy"
+                width={1200}
+                height={450}
+                priority
+                className="mentorship-banner-img"
+              />
+            </div>
+
+            {/* Value Highlights Grid Below Banner */}
+            <div className="mentorship-features-grid">
+              <div className="mentorship-feat-card">
+                <div className="feat-card-icon-box">🎯</div>
+                <div>
+                  <h4 className="feat-card-title">Understand Exam Pattern</h4>
+                  <p className="feat-card-desc">
+                    Deconstruct the exact NTA &amp; NMC question patterns. Learn how assertion-reason, statement-based, and multi-concept questions are designed.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mentorship-feat-card">
+                <div className="feat-card-icon-box">📈</div>
+                <div>
+                  <h4 className="feat-card-title">Plan Your Revision</h4>
+                  <p className="feat-card-desc">
+                    Get an individualized, scientifically-structured 90-day &amp; 180-day active recall plan that stops forgetting cycles before exam day.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mentorship-feat-card">
+                <div className="feat-card-icon-box">📖</div>
+                <div>
+                  <h4 className="feat-card-title">Focus on Weaker Areas</h4>
+                  <p className="feat-card-desc">
+                    Identify your negative marking leaks through AI diagnostics and rectify them with 1-on-1 doctor doubt consultations and targeted drills.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Dr. Rahul Quote & CTA Row */}
+            <div className="mentorship-bottom-cta">
+              <div className="mentor-quote-box">
+                <p className="mentor-quote-text">
+                  &ldquo;Cracking NEET is not about studying 16 hours haphazardly; it is about precision, eliminating careless negative marks, and calm execution under timed pressure.&rdquo;
+                </p>
+                <div className="mentor-sign-text">
+                  <strong>— Dr Rahul Kumar</strong> · Founder &amp; Academic Director
+                </div>
+              </div>
+
+              <div className="mentor-actions-group">
+                <a href="tel:+917203055682" className="btn-primary-hero btn-orange-leather">
+                  <span>Book Free 1-on-1 Mentorship Call 📞</span>
+                </a>
+                <a href="/target-batches" className="btn-secondary-hero">
+                  Explore Batches with Mentorship →
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ════════ TARGET BATCHES SECTION ════════ */}
       <section className="batches-section has-texture" id="courses">
         <div className="section-header-row">

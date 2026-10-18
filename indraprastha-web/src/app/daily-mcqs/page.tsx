@@ -1,15 +1,19 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import StudentNavbar from "@/components/StudentNavbar";
 import Footer from "@/components/Footer";
+import SimilarQuestionsModal from "@/components/SimilarQuestionsModal";
+import VideoExplanationModal from "@/components/VideoExplanationModal";
+import { resolveImageUrl, parseSimilarQuestion } from "@/lib/driveUtils";
+import FastNetworkImage from "@/components/FastNetworkImage";
 
 interface DailyMcqItem {
   id: number;
   subject: string;
   topic: string;
+  chapter?: string;
   question: string;
   option_a: string;
   option_b: string;
@@ -17,6 +21,17 @@ interface DailyMcqItem {
   option_d: string;
   correct_option: string;
   explanation?: string;
+  question_image_link?: string;
+  question_image_drive_file_id?: string;
+  explanation_image_link?: string;
+  explanation_image_drive_file_id?: string;
+  explanation_video_link?: string;
+  explanation_video_url?: string;
+  option_a_image_link?: string;
+  option_b_image_link?: string;
+  option_c_image_link?: string;
+  option_d_image_link?: string;
+  similar_question?: any;
   created_at?: string;
 }
 
@@ -27,11 +42,20 @@ export default function DailyMcqsPage() {
   const [revealedExplanations, setRevealedExplanations] = useState<Record<number, boolean>>({});
   const [activeSubject, setActiveSubject] = useState<string>("All");
   const [user, setUser] = useState<any>(null);
+  const [authToken, setAuthToken] = useState<string>("");
+
+  // Modals
+  const [similarModalOpen, setSimilarModalOpen] = useState<boolean>(false);
+  const [activeSimilarSource, setActiveSimilarSource] = useState<{ q: DailyMcqItem; index: number } | null>(null);
+
+  const [videoModalOpen, setVideoModalOpen] = useState<boolean>(false);
+  const [activeVideo, setActiveVideo] = useState<{ url: string; title: string; subtitle: string } | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const storedToken = localStorage.getItem("indraprastha_token");
+      const storedToken = localStorage.getItem("indraprastha_token") || "";
       const storedUser = localStorage.getItem("indraprastha_user");
+      setAuthToken(storedToken);
       if (storedUser) {
         try {
           setUser(JSON.parse(storedUser));
@@ -40,7 +64,7 @@ export default function DailyMcqsPage() {
         }
       }
 
-      fetchDailyMcqs(storedToken || "");
+      fetchDailyMcqs(storedToken);
     }
   }, []);
 
@@ -54,10 +78,9 @@ export default function DailyMcqsPage() {
         },
       });
 
-      // If token expired, renew directly via local bridge
-      if (res.status === 401) {
+      if (res.status === 401 || !activeToken) {
         try {
-          const renewRes = await fetch("http://localhost:5000/api/auth/login", {
+          const renewRes = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ phone: "7028196172", password: "Deepak" }),
@@ -65,6 +88,7 @@ export default function DailyMcqsPage() {
           const renewData = await renewRes.json();
           if (renewData.token) {
             activeToken = renewData.token;
+            setAuthToken(activeToken);
             localStorage.setItem("indraprastha_token", activeToken);
             res = await fetch("https://api.indraprasthaneetacademy.com/api/content/mcqs", {
               headers: {
@@ -100,6 +124,20 @@ export default function DailyMcqsPage() {
       ...prev,
       [mcqId]: true,
     }));
+  };
+
+  const openSimilarQuestions = (q: DailyMcqItem, index: number) => {
+    setActiveSimilarSource({ q, index });
+    setSimilarModalOpen(true);
+  };
+
+  const openVideoExplanation = (videoUrl: string, idx: number) => {
+    setActiveVideo({
+      url: videoUrl,
+      title: `MCQ #${idx + 1} • Video Explanation`,
+      subtitle: "Daily NCERT Line-by-Line Revision",
+    });
+    setVideoModalOpen(true);
   };
 
   const subjects = ["All", ...Array.from(new Set(mcqs.map((m) => m.subject).filter(Boolean)))];
@@ -146,58 +184,60 @@ export default function DailyMcqsPage() {
               </span>
             </div>
             <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
-              Curated NCERT Line-by-Line questions from your live GCP database. Attempt and get instant answer diagnostics.
+              Curated NCERT Line-by-Line questions from your live GCP database. Attempt and get instant answer diagnostics with <strong>Solve Similar Questions</strong>!
             </p>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span
-              style={{
-                padding: "8px 14px",
-                borderRadius: "10px",
-                backgroundColor: "rgba(16, 185, 129, 0.1)",
-                color: "#10B981",
-                fontSize: "13px",
-                fontWeight: 800,
-                border: "1px solid rgba(16, 185, 129, 0.25)",
-              }}
-            >
-              {filteredMcqs.length} Questions Available
-            </span>
-          </div>
+          <Link
+            href="/dashboard"
+            style={{
+              padding: "9px 18px",
+              borderRadius: "10px",
+              border: "1px solid var(--border-light, #EDE3DA)",
+              backgroundColor: "transparent",
+              color: "var(--text-main)",
+              fontSize: "12px",
+              fontWeight: 800,
+              textDecoration: "none",
+            }}
+          >
+            ← Back to Dashboard
+          </Link>
         </section>
 
         {/* Subject Filter Pills */}
-        <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "14px", marginBottom: "16px" }}>
-          {subjects.map((subj) => (
-            <button
-              key={subj}
-              onClick={() => setActiveSubject(subj)}
-              style={{
-                padding: "7px 16px",
-                borderRadius: "100px",
-                border: activeSubject === subj ? "1.5px solid #E55200" : "1px solid var(--border-light, #EDE3DA)",
-                backgroundColor: activeSubject === subj ? "#E55200" : "var(--cream-card, #FFFFFF)",
-                color: activeSubject === subj ? "#FFFFFF" : "var(--text-main)",
-                fontSize: "13px",
-                fontWeight: 700,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "all 0.15s ease",
-              }}
-            >
-              {subj}
-            </button>
-          ))}
+        <div style={{ display: "flex", gap: "10px", marginBottom: "24px", flexWrap: "wrap" }}>
+          {subjects.map((sub) => {
+            const isActive = activeSubject === sub;
+            return (
+              <button
+                key={sub}
+                onClick={() => setActiveSubject(sub)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: "20px",
+                  border: isActive ? "1.5px solid #E55200" : "1px solid var(--border-light, #EDE3DA)",
+                  backgroundColor: isActive ? "#E55200" : "var(--cream-card, #FFFFFF)",
+                  color: isActive ? "#FFFFFF" : "var(--text-main)",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  boxShadow: isActive ? "0 4px 12px rgba(229, 82, 0, 0.25)" : "none",
+                }}
+              >
+                {sub} {sub === "All" ? `(${mcqs.length})` : `(${mcqs.filter((m) => m.subject === sub).length})`}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Question List */}
         {loading ? (
-          <div style={{ textAlign: "center", padding: "60px 20px" }}>
-            <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>
-            <p style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-muted)" }}>
-              Fetching Today's MCQs from GCP Database...
-            </p>
+          <div style={{ textAlign: "center", padding: "80px 20px" }}>
+            <div style={{ fontSize: "36px", marginBottom: "12px" }}>⏳</div>
+            <h3 style={{ fontSize: "16px", fontWeight: 800, color: "var(--text-main)" }}>
+              Loading Today's MCQs...
+            </h3>
           </div>
         ) : filteredMcqs.length === 0 ? (
           <div
@@ -209,34 +249,41 @@ export default function DailyMcqsPage() {
               border: "1px solid var(--border-light, #EDE3DA)",
             }}
           >
-            <div style={{ fontSize: "32px", marginBottom: "12px" }}>🎯</div>
+            <div style={{ fontSize: "32px", marginBottom: "12px" }}>📖</div>
             <h3 style={{ fontSize: "16px", fontWeight: 800, color: "var(--text-main)" }}>
-              No MCQs found for this subject
+              No MCQs found for this category
             </h3>
-            <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-              Select 'All' to view all available questions.
+            <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
+              Try selecting "All" or check back later for newly published questions.
             </p>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
             {filteredMcqs.map((mcq, idx) => {
               const selected = selectedAnswers[mcq.id];
               const isRevealed = revealedExplanations[mcq.id];
-              const isCorrect = selected === mcq.correct_option;
+              const isCorrect = selected?.toUpperCase() === mcq.correct_option?.toUpperCase();
+              const qImg = resolveImageUrl(mcq.question_image_link || mcq.question_image_drive_file_id);
+              const expImg = resolveImageUrl(mcq.explanation_image_link || mcq.explanation_image_drive_file_id);
+              const videoUrl = mcq.explanation_video_link || mcq.explanation_video_url;
 
               return (
                 <div
                   key={mcq.id}
                   style={{
                     backgroundColor: "var(--cream-card, #FFFFFF)",
-                    border: "1px solid var(--border-light, #EDE3DA)",
-                    borderRadius: "18px",
-                    padding: "22px 24px",
-                    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.03)",
+                    border: isRevealed
+                      ? isCorrect
+                        ? "1.5px solid rgba(16, 185, 129, 0.4)"
+                        : "1.5px solid rgba(239, 68, 68, 0.4)"
+                      : "1px solid var(--border-light, #EDE3DA)",
+                    borderRadius: "20px",
+                    padding: "24px",
+                    boxShadow: "0 2px 14px rgba(0, 0, 0, 0.03)",
                   }}
                 >
-                  {/* Top meta */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  {/* Card Header */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span
                         style={{
@@ -248,10 +295,22 @@ export default function DailyMcqsPage() {
                           fontWeight: 800,
                         }}
                       >
-                        Q {idx + 1}
+                        Q{idx + 1}
                       </span>
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-muted)" }}>
-                        {mcq.subject} · {mcq.topic}
+                      <span
+                        style={{
+                          backgroundColor: "rgba(229, 82, 0, 0.08)",
+                          color: "#E55200",
+                          padding: "2px 8px",
+                          borderRadius: "6px",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {mcq.subject}
+                      </span>
+                      <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 600 }}>
+                        {mcq.topic}
                       </span>
                     </div>
 
@@ -260,13 +319,13 @@ export default function DailyMcqsPage() {
                         style={{
                           fontSize: "12px",
                           fontWeight: 800,
-                          color: isCorrect ? "#10B981" : "#EF4444",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
+                          padding: "3px 10px",
+                          borderRadius: "8px",
+                          backgroundColor: isCorrect ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                          color: isCorrect ? "#059669" : "#DC2626",
                         }}
                       >
-                        {isCorrect ? "✓ Correct (+4 Marks)" : "✗ Incorrect (-1 Mark)"}
+                        {isCorrect ? "✓ Correct Answer (+4)" : "✗ Incorrect (-1)"}
                       </span>
                     )}
                   </div>
@@ -279,22 +338,33 @@ export default function DailyMcqsPage() {
                       color: "var(--text-main)",
                       lineHeight: 1.6,
                       whiteSpace: "pre-line",
-                      marginBottom: "18px",
+                      margin: "0 0 16px",
                     }}
                   >
                     {mcq.question}
                   </p>
 
-                  {/* Options List */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {/* Question Image if present */}
+                  {qImg && (
+                    <div style={{ marginBottom: "18px" }}>
+                      <FastNetworkImage
+                        url={qImg}
+                        alt="Question Reference"
+                        maxHeight="320px"
+                      />
+                    </div>
+                  )}
+
+                  {/* Options */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
                     {[
-                      { letter: "A", text: mcq.option_a },
-                      { letter: "B", text: mcq.option_b },
-                      { letter: "C", text: mcq.option_c },
-                      { letter: "D", text: mcq.option_d },
+                      { letter: "A", text: mcq.option_a, img: mcq.option_a_image_link },
+                      { letter: "B", text: mcq.option_b, img: mcq.option_b_image_link },
+                      { letter: "C", text: mcq.option_c, img: mcq.option_c_image_link },
+                      { letter: "D", text: mcq.option_d, img: mcq.option_d_image_link },
                     ].map((opt) => {
                       const isSelected = selected === opt.letter;
-                      const isThisCorrect = isRevealed && opt.letter === mcq.correct_option;
+                      const isThisCorrect = isRevealed && opt.letter.toUpperCase() === mcq.correct_option?.toUpperCase();
                       const isThisWrongSelected = isRevealed && isSelected && !isThisCorrect;
 
                       let borderColor = "var(--border-light, #EDE3DA)";
@@ -325,7 +395,7 @@ export default function DailyMcqsPage() {
                             alignItems: "flex-start",
                             gap: "12px",
                             padding: "12px 16px",
-                            borderRadius: "12px",
+                            borderRadius: "14px",
                             border: `1.5px solid ${borderColor}`,
                             backgroundColor: bgColor,
                             cursor: isRevealed ? "default" : "pointer",
@@ -354,9 +424,26 @@ export default function DailyMcqsPage() {
                           >
                             {opt.letter}
                           </span>
-                          <span style={{ fontSize: "14px", color: "var(--text-main)", lineHeight: 1.5, paddingTop: "2px" }}>
-                            {opt.text}
-                          </span>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: "14px", color: "var(--text-main)", lineHeight: 1.5, display: "block" }}>
+                              {opt.text}
+                            </span>
+                            {opt.img && (
+                              <div style={{ marginTop: "8px" }}>
+                                <FastNetworkImage
+                                  url={opt.img}
+                                  alt={`Option ${opt.letter}`}
+                                  maxHeight="140px"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {isThisCorrect && (
+                            <span style={{ color: "#10B981", fontSize: "16px", fontWeight: 900 }}>✓</span>
+                          )}
+                          {isThisWrongSelected && (
+                            <span style={{ color: "#EF4444", fontSize: "16px", fontWeight: 900 }}>✕</span>
+                          )}
                         </button>
                       );
                     })}
@@ -366,24 +453,98 @@ export default function DailyMcqsPage() {
                   {isRevealed && (
                     <div
                       style={{
-                        marginTop: "16px",
-                        padding: "14px 16px",
-                        borderRadius: "12px",
-                        backgroundColor: "rgba(229, 82, 0, 0.05)",
-                        border: "1px solid rgba(229, 82, 0, 0.2)",
+                        padding: "16px 20px",
+                        borderRadius: "16px",
+                        backgroundColor: "#F0F7FF",
+                        border: "1.5px solid #BAE6FD",
+                        marginBottom: "14px",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "14px" }}>💡</span>
-                        <strong style={{ fontSize: "13px", color: "#E55200" }}>
-                          Correct Option: ({mcq.correct_option})
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                        <span style={{ fontSize: "18px" }}>💡</span>
+                        <strong style={{ fontSize: "13.5px", color: "#0284C7" }}>
+                          Explanation • Correct Option ({mcq.correct_option})
                         </strong>
                       </div>
-                      <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0, lineHeight: 1.5 }}>
+                      <p style={{ fontSize: "13px", color: "#0F172A", margin: "0 0 10px", lineHeight: 1.6, whiteSpace: "pre-line" }}>
                         {mcq.explanation ||
                           "This question tests core NCERT statements and clinical application. Review the corresponding NCERT chapter for detailed mechanism."}
                       </p>
+
+                      {expImg && (
+                        <div style={{ marginTop: "10px", marginBottom: "6px" }}>
+                          <FastNetworkImage
+                            url={expImg}
+                            alt="Explanation diagram"
+                            maxHeight="240px"
+                          />
+                        </div>
+                      )}
+
+                      {videoUrl && (
+                        <button
+                          onClick={() => openVideoExplanation(videoUrl, idx)}
+                          style={{
+                            marginTop: "8px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            padding: "7px 14px",
+                            borderRadius: "8px",
+                            backgroundColor: "#0284C7",
+                            color: "#FFFFFF",
+                            border: "none",
+                            fontSize: "12px",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span>▶</span>
+                          <span>Watch Video Explanation</span>
+                        </button>
+                      )}
                     </div>
+                  )}
+
+                  {/* SOLVE SIMILAR QUESTIONS BUTTON - only if configured by admin */}
+                  {isRevealed && Boolean(parseSimilarQuestion(mcq.similar_question)) && (
+                    <button
+                      onClick={() => openSimilarQuestions(mcq, idx)}
+                      style={{
+                        width: "100%",
+                        padding: "12px 20px",
+                        borderRadius: "14px",
+                        background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
+                        color: "#FFFFFF",
+                        border: "none",
+                        fontSize: "13px",
+                        fontWeight: 800,
+                        letterSpacing: "0.2px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "10px",
+                        boxShadow: "0 4px 14px rgba(79, 70, 229, 0.25)",
+                      }}
+                    >
+                      <span
+                        style={{
+                          backgroundColor: "rgba(255, 255, 255, 0.2)",
+                          borderRadius: "50%",
+                          width: "22px",
+                          height: "22px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "13px",
+                        }}
+                      >
+                        🧠
+                      </span>
+                      <span>Solve Similar Questions</span>
+                      <span style={{ opacity: 0.8, fontSize: "13px" }}>→</span>
+                    </button>
                   )}
                 </div>
               );
@@ -391,6 +552,25 @@ export default function DailyMcqsPage() {
           </div>
         )}
       </main>
+
+      {/* Similar Questions Modal */}
+      <SimilarQuestionsModal
+        isOpen={similarModalOpen}
+        onClose={() => setSimilarModalOpen(false)}
+        sourceQuestion={activeSimilarSource?.q || null}
+        questionNumber={activeSimilarSource ? activeSimilarSource.index + 1 : undefined}
+        token={authToken}
+        sourceType="mcq"
+      />
+
+      {/* Video Explanation Modal */}
+      <VideoExplanationModal
+        isOpen={videoModalOpen}
+        onClose={() => setVideoModalOpen(false)}
+        videoUrl={activeVideo?.url}
+        title={activeVideo?.title}
+        subtitle={activeVideo?.subtitle}
+      />
 
       <Footer />
     </div>

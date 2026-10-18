@@ -329,6 +329,35 @@ router.get('/course', userAuth, async (req, res) => {
   res.json({ success: true, course: result.rows[0] || null });
 });
 
+router.get('/pyq-chapters', userAuth, async (req, res) => {
+  try {
+    const subject = req.query.subject?.toString() || '';
+    const topic = req.query.topic?.toString() || '';
+    const chapters = await pool.query(
+      `SELECT ch.id AS chapter_id,
+              'ch_' || ch.id AS id,
+              ch.title,
+              COALESCE(NULLIF(bk.topic, ''), ch.title) AS topic,
+              bk.subject,
+              bk.class_label,
+              (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS question_count,
+              true AS is_book_chapter,
+              bk.id AS book_id,
+              ch.id AS order_index
+       FROM book_chapters ch
+       JOIN books bk ON bk.id = ch.book_id
+       WHERE ($1 = '' OR bk.subject = $1)
+         AND ($2 = '' OR bk.topic = $2)
+       ORDER BY bk.class_label ASC, bk.subject ASC, ch.id ASC`,
+      [subject, topic]
+    );
+    res.json({ success: true, chapters: chapters.rows });
+  } catch (error) {
+    console.error('Failed to fetch pyq chapters:', error);
+    res.status(500).json({ error: 'Failed to fetch pyq chapters' });
+  }
+});
+
 router.get('/books', userAuth, async (req, res) => {
   const subject = req.query.subject?.toString() || '';
   const topic = req.query.topic?.toString() || '';

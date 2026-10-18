@@ -617,11 +617,12 @@ export default function LoginPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: "30px",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
+              gap: "24px",
               alignItems: "stretch",
               maxWidth: "980px",
               margin: "0 auto",
+              width: "100%",
             }}
           >
             {/* ── LEFT COLUMN: AUTH CARD ── */}

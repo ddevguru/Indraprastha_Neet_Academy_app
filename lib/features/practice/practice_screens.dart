@@ -144,6 +144,8 @@ class _PracticeHomeScreenState extends ConsumerState<PracticeHomeScreen> {
     setState(() {
       _practiceFuture = ref.read(contentRepositoryProvider).fetchPracticeSets();
     });
+    // Warm up the PYQ cache in background so clicking 'PYQs' is instantaneous
+    unawaited(ref.read(contentRepositoryProvider).fetchPyqChapters().catchError((_) => <Map<String, dynamic>>[]));
   }
 
   void _onCategoryTap(
@@ -2036,27 +2038,54 @@ class _TopicWiseMcqsScreenState extends ConsumerState<TopicWiseMcqsScreen> {
   Future<List<Map<String, dynamic>>> _loadCombinedSets() async {
     final repo = ref.read(contentRepositoryProvider);
     if (widget.isPyqCategory) {
+      // 1. Fast path: Fetch all PYQ-linked chapters in one single aggregated API call
+      try {
+        final chapters = await repo.fetchPyqChapters();
+        if (chapters.isNotEmpty) {
+          return chapters.map((ch) => <String, dynamic>{
+            'id': ch['id']?.toString() ?? 'ch_${ch['chapter_id']}',
+            'chapter_id': ch['chapter_id'] ?? ch['id'],
+            'title': ch['title']?.toString() ?? 'Chapter',
+            'topic': ch['topic']?.toString() ?? ch['title']?.toString() ?? '',
+            'subject': ch['subject']?.toString() ?? '',
+            'class_label': ch['class_label']?.toString() ?? '',
+            'question_count': _parseInt(ch['question_count'] ?? ch['linked_pyq_count']),
+            'is_book_chapter': true,
+            'book_id': ch['book_id'],
+            'order_index': _parseInt(ch['order_index'] ?? ch['chapter_id'] ?? ch['id']),
+          }).toList();
+        }
+      } catch (_) {}
+
+      // 2. Fallback path: Parallel fetch across books instead of sequential waterfall
       final pyqSets = <Map<String, dynamic>>[];
       try {
         final books = await repo.fetchBooks();
-        for (final book in books) {
-          final bookId = int.tryParse(book['id']?.toString() ?? '');
-          if (bookId == null) continue;
-          final chapters = await repo.fetchChapters(bookId);
-          for (final ch in chapters) {
-            pyqSets.add({
-              'id': 'ch_${ch['id']}',
-              'chapter_id': ch['id'],
-              'title': ch['title']?.toString() ?? 'Chapter',
-              'topic': book['topic']?.toString() ?? ch['title']?.toString() ?? '',
-              'subject': book['subject']?.toString() ?? '',
-              'class_label': book['class_label']?.toString() ?? '',
-              'question_count': _parseInt(ch['linked_pyq_count']),
-              'is_book_chapter': true,
-              'book_id': bookId,
-              'order_index': _parseInt(ch['order_index'] ?? ch['id']),
-            });
-          }
+        final chapterResults = await Future.wait(
+          books.map((book) async {
+            final bookId = int.tryParse(book['id']?.toString() ?? '');
+            if (bookId == null) return <Map<String, dynamic>>[];
+            try {
+              final chapters = await repo.fetchChapters(bookId);
+              return chapters.map((ch) => <String, dynamic>{
+                'id': 'ch_${ch['id']}',
+                'chapter_id': ch['id'],
+                'title': ch['title']?.toString() ?? 'Chapter',
+                'topic': book['topic']?.toString() ?? ch['title']?.toString() ?? '',
+                'subject': book['subject']?.toString() ?? '',
+                'class_label': book['class_label']?.toString() ?? '',
+                'question_count': _parseInt(ch['linked_pyq_count']),
+                'is_book_chapter': true,
+                'book_id': bookId,
+                'order_index': _parseInt(ch['order_index'] ?? ch['id']),
+              }).toList();
+            } catch (_) {
+              return <Map<String, dynamic>>[];
+            }
+          }),
+        );
+        for (final list in chapterResults) {
+          pyqSets.addAll(list);
         }
       } catch (_) {}
       return pyqSets;

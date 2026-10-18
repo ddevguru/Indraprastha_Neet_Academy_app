@@ -43,7 +43,7 @@ android {
         applicationId = "com.indraprastha.neetacademy"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 13
+        versionCode = 14
         versionName = flutter.versionName
         manifestPlaceholders["appLabel"] = "Indraprastha Neet Academy"
     }

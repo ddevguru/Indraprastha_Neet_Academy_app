@@ -283,9 +283,9 @@ export default function TargetBatchesPage() {
           </div>
 
           {/* Main Title & Subtitle */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "40px", alignItems: "flex-end" }}>
+          <div className="tb-hero-grid">
             <div>
-              <h1 className="hero-title" style={{ fontSize: "48px", marginBottom: "14px" }}>
+              <h1 className="hero-title" style={{ fontSize: "clamp(28px, 4.5vw, 48px)", marginBottom: "14px" }}>
                 NEET 2026 &amp; 2027{" "}
                 <span style={{ color: "var(--orange)", fontStyle: "italic" }}>Target Batches</span>
               </h1>
@@ -378,16 +378,35 @@ export default function TargetBatchesPage() {
 
       {/* ════════ 4 BATCH CARDS GRID (2x2) ════════ */}
       <section className="batches-section has-texture" style={{ paddingTop: "20px", paddingBottom: "80px" }}>
-        <div
-          style={{
-            maxWidth: "1280px",
-            margin: "0 auto",
-            padding: "0 24px",
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "32px",
-          }}
-        >
+        {/* Featured Dr. Rahul Mentorship Banner in Target Batches */}
+        <div style={{ maxWidth: "1280px", margin: "0 auto 32px", padding: "0 24px" }}>
+          <div className="mentorship-banner-card" style={{ padding: "18px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ background: "rgba(229, 82, 0, 0.12)", color: "var(--orange)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 800 }}>
+                  👨‍⚕️ INCLUDED IN ALL BATCHES
+                </span>
+                <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-main)" }}>
+                  Personalised Mentorship by Dr Rahul Kumar
+                </span>
+              </div>
+              <a href="tel:+917203055682" style={{ fontSize: "12px", fontWeight: 800, color: "var(--orange)", textDecoration: "none" }}>
+                📞 Book Free Counseling Call: +91 72030 55682 ↗
+              </a>
+            </div>
+            <div className="mentorship-banner-image-wrapper">
+              <Image
+                src="/dr_rahul_mentorship.png"
+                alt="Personalised Mentorship by Dr Rahul Kumar"
+                width={1200}
+                height={450}
+                className="mentorship-banner-img"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="tb-batches-grid-container">
           {filteredBatches.map((b) => (
             <div key={b.id} className="tb-batch-card">
               <div>
