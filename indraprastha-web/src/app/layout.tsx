@@ -20,9 +20,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="dark">
+    <html lang="en" data-theme="dark" style={{ colorScheme: "dark", backgroundColor: "#0F0905" }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="dark" />
+        <meta name="theme-color" content="#0F0905" />
         <link rel="icon" href="/logo_app.jpeg" type="image/jpeg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -31,13 +33,23 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  var saved = localStorage.getItem('indraprastha_theme') || 'dark';
-                  if (saved === 'dark') {
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                    document.documentElement.classList.add('dark-theme');
-                  } else {
+                  var saved = localStorage.getItem('indraprastha_theme');
+                  if (saved === 'light') {
                     document.documentElement.setAttribute('data-theme', 'light');
                     document.documentElement.classList.remove('dark-theme');
+                    document.documentElement.classList.add('light-theme');
+                    if (document.body) {
+                      document.body.classList.remove('dark-theme');
+                      document.body.classList.add('light-theme');
+                    }
+                  } else {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    document.documentElement.classList.add('dark-theme');
+                    document.documentElement.classList.remove('light-theme');
+                    if (document.body) {
+                      document.body.classList.add('dark-theme');
+                      document.body.classList.remove('light-theme');
+                    }
                   }
                 } catch(e) {}
 

@@ -139,13 +139,15 @@ export default function AiRankPredictorPage() {
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("indraprastha_theme") as "light" | "dark" | null;
-    const initialTheme = savedTheme || "dark";
+    const initialTheme = savedTheme === "light" ? "light" : "dark";
     setTheme(initialTheme);
     if (initialTheme === "dark") {
       document.body.classList.add("dark-theme");
+      document.body.classList.remove("light-theme");
       document.documentElement.setAttribute("data-theme", "dark");
     } else {
       document.body.classList.remove("dark-theme");
+      document.body.classList.add("light-theme");
       document.documentElement.setAttribute("data-theme", "light");
     }
   }, []);

@@ -11,7 +11,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<StudentUserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   // Performance stats
   const [testsCompleted, setTestsCompleted] = useState<number>(18);
@@ -23,7 +23,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const storedTheme = (localStorage.getItem("indraprastha_theme") as "light" | "dark") || "light";
+      const storedTheme = (localStorage.getItem("indraprastha_theme") === "light" ? "light" : "dark");
       setTheme(storedTheme);
 
       const storedUser = localStorage.getItem("indraprastha_user");
@@ -102,9 +102,11 @@ export default function ProfilePage() {
     localStorage.setItem("indraprastha_theme", nextTheme);
     if (nextTheme === "dark") {
       document.body.classList.add("dark-theme");
+      document.body.classList.remove("light-theme");
       document.documentElement.setAttribute("data-theme", "dark");
     } else {
       document.body.classList.remove("dark-theme");
+      document.body.classList.add("light-theme");
       document.documentElement.setAttribute("data-theme", "light");
     }
   };

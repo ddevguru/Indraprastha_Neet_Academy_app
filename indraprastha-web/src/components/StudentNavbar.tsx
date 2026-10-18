@@ -38,20 +38,22 @@ export default function StudentNavbar({
   onOpenSubscriptions,
 }: StudentNavbarProps) {
   const router = useRouter();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [profile, setProfile] = useState<StudentUserProfile | null>(null);
 
   useEffect(() => {
-    // Read saved theme
+    // Read saved theme, default to dark
     const savedTheme = localStorage.getItem("indraprastha_theme") as "light" | "dark" | null;
-    const initialTheme = savedTheme || "light";
+    const initialTheme = savedTheme === "light" ? "light" : "dark";
     setTheme(initialTheme);
     if (initialTheme === "dark") {
       document.body.classList.add("dark-theme");
+      document.body.classList.remove("light-theme");
       document.documentElement.setAttribute("data-theme", "dark");
     } else {
       document.body.classList.remove("dark-theme");
+      document.body.classList.add("light-theme");
       document.documentElement.setAttribute("data-theme", "light");
     }
 
@@ -82,9 +84,11 @@ export default function StudentNavbar({
     localStorage.setItem("indraprastha_theme", nextTheme);
     if (nextTheme === "dark") {
       document.body.classList.add("dark-theme");
+      document.body.classList.remove("light-theme");
       document.documentElement.setAttribute("data-theme", "dark");
     } else {
       document.body.classList.remove("dark-theme");
+      document.body.classList.add("light-theme");
       document.documentElement.setAttribute("data-theme", "light");
     }
   };

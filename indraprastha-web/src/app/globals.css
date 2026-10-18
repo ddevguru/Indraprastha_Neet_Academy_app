@@ -10,27 +10,30 @@
   --orange: #E55200;
   --orange-hover: #D04800;
   --orange-light: #FF6B00;
-  --orange-bg: #FFF5F0;
-  --dark-leather: #120B06;
-  --dark-card: #18110B;
-  --cream-bg: #FAF6F0;
-  --cream-card: #FFFFFF;
-  --text-main: #1C120C;
-  --text-muted: #6E5B50;
-  --border-light: #EDE3DA;
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
-  --shadow-md: 0 8px 24px rgba(0,0,0,0.06);
-  --shadow-lg: 0 16px 40px rgba(0,0,0,0.09);
+  --orange-bg: rgba(229, 82, 0, 0.16);
+  --dark-leather: #0C0704;
+  --dark-card: #140E08;
+  --cream-bg: #0F0905;
+  --cream-card: #18110B;
+  --text-main: #FBF6F1;
+  --text-muted: #BBA99C;
+  --border-light: #2D2017;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.4);
+  --shadow-lg: 0 16px 40px rgba(0,0,0,0.6);
   --shadow-orange: 0 4px 18px rgba(229,82,0,0.35);
 }
 
 html {
   scroll-behavior: smooth;
+  color-scheme: dark;
+  background-color: #0F0905;
 }
 
 body {
   font-family: 'Inter', sans-serif;
   color: var(--text-main);
+  background-color: #0F0905;
   background-color: var(--cream-bg);
   overflow-x: hidden;
   -webkit-user-select: none;
@@ -314,9 +317,25 @@ img {
 }
 
 /* ══════════════════════════════
-   GLOBAL DARK THEME SYSTEM
-   (Matching Methodology Screenshot)
-══════════════════════════════ */
+/* Explicit Light Theme (when student manually toggles to light mode) */
+body.light-theme,
+[data-theme="light"],
+[data-theme="light"] body {
+  --orange-bg: #FFF5F0;
+  --dark-leather: #120B06;
+  --dark-card: #18110B;
+  --cream-bg: #FAF6F0;
+  --cream-card: #FFFFFF;
+  --text-main: #1C120C;
+  --text-muted: #6E5B50;
+  --border-light: #EDE3DA;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.06);
+  --shadow-lg: 0 16px 40px rgba(0,0,0,0.09);
+  background-color: #FAF6F0 !important;
+  color: #1C120C !important;
+}
+
 body.dark-theme {
   --cream-bg: #0F0905;
   --cream-card: #18110B;

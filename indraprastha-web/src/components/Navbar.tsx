@@ -25,13 +25,15 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
   useEffect(() => {
     // Default to dark mode across all pages
     const savedTheme = localStorage.getItem("indraprastha_theme") as "light" | "dark" | null;
-    const initialTheme = currentTheme || savedTheme || "dark";
+    const initialTheme = currentTheme || (savedTheme === "light" ? "light" : "dark");
     setTheme(initialTheme);
     if (initialTheme === "dark") {
       document.body.classList.add("dark-theme");
+      document.body.classList.remove("light-theme");
       document.documentElement.setAttribute("data-theme", "dark");
     } else {
       document.body.classList.remove("dark-theme");
+      document.body.classList.add("light-theme");
       document.documentElement.setAttribute("data-theme", "light");
     }
   }, [currentTheme]);
@@ -63,9 +65,11 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
     localStorage.setItem("indraprastha_theme", nextTheme);
     if (nextTheme === "dark") {
       document.body.classList.add("dark-theme");
+      document.body.classList.remove("light-theme");
       document.documentElement.setAttribute("data-theme", "dark");
     } else {
       document.body.classList.remove("dark-theme");
+      document.body.classList.add("light-theme");
       document.documentElement.setAttribute("data-theme", "light");
     }
     if (onThemeToggle) {
