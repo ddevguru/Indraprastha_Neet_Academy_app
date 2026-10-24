@@ -395,7 +395,7 @@ export default function StudentDashboardPage() {
                 </span>
               </div>
               <p style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.9)", margin: 0 }}>
-                15 High-Yield NCERT Questions · Direct from live GCP database · Instant answer breakdown
+                24-Hour Active Test Window · Direct from live GCP database · Instant answer breakdown & archive review
               </p>
             </div>
           </div>

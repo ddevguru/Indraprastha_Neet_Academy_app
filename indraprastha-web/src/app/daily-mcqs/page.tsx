@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import StudentNavbar from "@/components/StudentNavbar";
 import Footer from "@/components/Footer";
 import SimilarQuestionsModal from "@/components/SimilarQuestionsModal";
@@ -33,7 +33,11 @@ interface DailyMcqItem {
   option_d_image_link?: string;
   similar_question?: any;
   created_at?: string;
+  is_active?: boolean;
 }
+
+// 24-Hour (in ms) active testing window
+const WINDOW_24_HOURS_MS = 24 * 60 * 60 * 1000;
 
 export default function DailyMcqsPage() {
   const [mcqs, setMcqs] = useState<DailyMcqItem[]>([]);
@@ -41,8 +45,10 @@ export default function DailyMcqsPage() {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
   const [revealedExplanations, setRevealedExplanations] = useState<Record<number, boolean>>({});
   const [activeSubject, setActiveSubject] = useState<string>("All");
+  const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
   const [user, setUser] = useState<any>(null);
   const [authToken, setAuthToken] = useState<string>("");
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
   // Modals
   const [similarModalOpen, setSimilarModalOpen] = useState<boolean>(false);
@@ -51,17 +57,42 @@ export default function DailyMcqsPage() {
   const [videoModalOpen, setVideoModalOpen] = useState<boolean>(false);
   const [activeVideo, setActiveVideo] = useState<{ url: string; title: string; subtitle: string } | null>(null);
 
+  // Live timer tick every second for accurate 24-hour countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedToken = localStorage.getItem("indraprastha_token") || "";
       const storedUser = localStorage.getItem("indraprastha_user");
       setAuthToken(storedToken);
+
       if (storedUser) {
         try {
           setUser(JSON.parse(storedUser));
         } catch {
           // ignore
         }
+      }
+
+      // Restore saved user answers from localStorage
+      try {
+        const savedAnswers = localStorage.getItem("indraprastha_daily_mcq_answers");
+        if (savedAnswers) {
+          const parsed = JSON.parse(savedAnswers);
+          setSelectedAnswers(parsed);
+          const revealed: Record<number, boolean> = {};
+          Object.keys(parsed).forEach((k) => {
+            revealed[Number(k)] = true;
+          });
+          setRevealedExplanations(revealed);
+        }
+      } catch {
+        // ignore
       }
 
       fetchDailyMcqs(storedToken);
@@ -106,6 +137,12 @@ export default function DailyMcqsPage() {
         const data = await res.json();
         if (data.mcqs && Array.isArray(data.mcqs)) {
           setMcqs(data.mcqs);
+
+          // If there are no active questions in today's 24h window, check if we should auto-switch or guide to archive
+          const hasActive = data.mcqs.some((m: DailyMcqItem) => isItemWithin24Hours(m.created_at));
+          if (!hasActive) {
+            // Keep on active tab initially so user sees the 24h expiration status message, but allow easy toggle
+          }
         }
       }
     } catch (e) {
@@ -115,15 +152,91 @@ export default function DailyMcqsPage() {
     }
   };
 
+  /**
+   * Helper: Check if an MCQ was created within the last 24 hours
+   */
+  const isItemWithin24Hours = (createdAtStr?: string): boolean => {
+    if (!createdAtStr) return false;
+    const createdMs = new Date(createdAtStr).getTime();
+    if (isNaN(createdMs)) return false;
+    const diff = currentTime - createdMs;
+    return diff >= 0 && diff < WINDOW_24_HOURS_MS;
+  };
+
+  /**
+   * Helper: Get remaining time formatted as hh:mm:ss for an active item
+   */
+  const getRemainingTimeFormatted = (createdAtStr?: string) => {
+    if (!createdAtStr) return "00:00:00";
+    const createdMs = new Date(createdAtStr).getTime();
+    if (isNaN(createdMs)) return "00:00:00";
+    const expiresMs = createdMs + WINDOW_24_HOURS_MS;
+    const diffMs = Math.max(0, expiresMs - currentTime);
+
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+    return `${hours.toString().padStart(2, "0")}h ${minutes
+      .toString()
+      .padStart(2, "0")}m ${seconds.toString().padStart(2, "0")}s`;
+  };
+
+  /**
+   * Helper: Format publish date for archive review
+   */
+  const formatPublishedDate = (createdAtStr?: string) => {
+    if (!createdAtStr) return "Past question";
+    const d = new Date(createdAtStr);
+    if (isNaN(d.getTime())) return "Past question";
+    return d.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Segregate MCQs into Active (within 24 hours) vs Archived (older than 24 hours)
+  const { activeMcqs, archivedMcqs } = useMemo(() => {
+    const active: DailyMcqItem[] = [];
+    const archived: DailyMcqItem[] = [];
+
+    mcqs.forEach((item) => {
+      if (isItemWithin24Hours(item.created_at)) {
+        active.push(item);
+      } else {
+        archived.push(item);
+      }
+    });
+
+    return { activeMcqs: active, archivedMcqs: archived };
+  }, [mcqs, currentTime]);
+
+  const displayedList = activeTab === "active" ? activeMcqs : archivedMcqs;
+
+  // Filter subjects based on current displayed list
+  const subjects = ["All", ...Array.from(new Set(displayedList.map((m) => m.subject).filter(Boolean)))];
+  const filteredMcqs =
+    activeSubject === "All" ? displayedList : displayedList.filter((m) => m.subject === activeSubject);
+
   const handleSelectOption = (mcqId: number, optionLetter: string) => {
-    setSelectedAnswers((prev) => ({
-      ...prev,
+    const updated = {
+      ...selectedAnswers,
       [mcqId]: optionLetter,
-    }));
+    };
+    setSelectedAnswers(updated);
     setRevealedExplanations((prev) => ({
       ...prev,
       [mcqId]: true,
     }));
+
+    try {
+      localStorage.setItem("indraprastha_daily_mcq_answers", JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
   };
 
   const openSimilarQuestions = (q: DailyMcqItem, index: number) => {
@@ -140,11 +253,15 @@ export default function DailyMcqsPage() {
     setVideoModalOpen(true);
   };
 
-  const subjects = ["All", ...Array.from(new Set(mcqs.map((m) => m.subject).filter(Boolean)))];
-  const filteredMcqs = activeSubject === "All" ? mcqs : mcqs.filter((m) => m.subject === activeSubject);
-
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--cream-bg, #FAF6F0)" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: "var(--cream-bg, #FAF6F0)",
+      }}
+    >
       <StudentNavbar activeTab="daily-mcqs" userName={user?.full_name} />
 
       <main style={{ flex: 1, padding: "28px 20px 80px", maxWidth: "980px", width: "100%", margin: "0 auto" }}>
@@ -155,7 +272,7 @@ export default function DailyMcqsPage() {
             border: "1px solid var(--border-light, #EDE3DA)",
             borderRadius: "20px",
             padding: "24px 28px",
-            marginBottom: "24px",
+            marginBottom: "20px",
             boxShadow: "0 4px 20px rgba(0, 0, 0, 0.04)",
             display: "flex",
             alignItems: "center",
@@ -165,26 +282,30 @@ export default function DailyMcqsPage() {
           }}
         >
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-              <span style={{ fontSize: "24px" }}>📝</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "26px" }}>📝</span>
               <h1 style={{ fontSize: "22px", fontWeight: 900, color: "var(--text-main)", margin: 0 }}>
-                Today's Daily MCQs
+                Daily MCQs Practice
               </h1>
               <span
                 style={{
                   backgroundColor: "rgba(229, 82, 0, 0.12)",
                   color: "#E55200",
-                  padding: "2px 8px",
-                  borderRadius: "6px",
+                  padding: "3px 10px",
+                  borderRadius: "8px",
                   fontSize: "11px",
                   fontWeight: 800,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
                 }}
               >
-                LIVE NTA REVISION
+                <span>⏱️</span>
+                <span>24-HOUR DAILY WINDOW</span>
               </span>
             </div>
-            <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
-              Curated NCERT Line-by-Line questions from your live GCP database. Attempt and get instant answer diagnostics with <strong>Solve Similar Questions</strong>!
+            <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0, lineHeight: 1.5 }}>
+              Just like on the mobile app, Daily MCQs stay active for exactly <strong>24 hours</strong> for live testing and scoring. After 24 hours, they expire and move to the archive where past questions remain available for solution review.
             </p>
           </div>
 
@@ -199,45 +320,265 @@ export default function DailyMcqsPage() {
               fontSize: "12px",
               fontWeight: 800,
               textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
             }}
           >
             ← Back to Dashboard
           </Link>
         </section>
 
-        {/* Subject Filter Pills */}
-        <div style={{ display: "flex", gap: "10px", marginBottom: "24px", flexWrap: "wrap" }}>
-          {subjects.map((sub) => {
-            const isActive = activeSubject === sub;
-            return (
-              <button
-                key={sub}
-                onClick={() => setActiveSubject(sub)}
-                style={{
-                  padding: "8px 18px",
-                  borderRadius: "20px",
-                  border: isActive ? "1.5px solid #E55200" : "1px solid var(--border-light, #EDE3DA)",
-                  backgroundColor: isActive ? "#E55200" : "var(--cream-card, #FFFFFF)",
-                  color: isActive ? "#FFFFFF" : "var(--text-main)",
-                  fontSize: "13px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  boxShadow: isActive ? "0 4px 12px rgba(229, 82, 0, 0.25)" : "none",
-                }}
-              >
-                {sub} {sub === "All" ? `(${mcqs.length})` : `(${mcqs.filter((m) => m.subject === sub).length})`}
-              </button>
-            );
-          })}
+        {/* ── ACTIVE (24h) vs ARCHIVED (EXPIRED) TABS ── */}
+        <div
+          style={{
+            display: "flex",
+            gap: "12px",
+            marginBottom: "20px",
+            backgroundColor: "rgba(237, 227, 218, 0.4)",
+            padding: "6px",
+            borderRadius: "16px",
+            border: "1px solid var(--border-light, #EDE3DA)",
+          }}
+        >
+          <button
+            onClick={() => {
+              setActiveTab("active");
+              setActiveSubject("All");
+            }}
+            style={{
+              flex: 1,
+              padding: "12px 18px",
+              borderRadius: "12px",
+              border: "none",
+              backgroundColor: activeTab === "active" ? "#E55200" : "transparent",
+              color: activeTab === "active" ? "#FFFFFF" : "var(--text-main)",
+              fontSize: "13.5px",
+              fontWeight: 800,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              boxShadow: activeTab === "active" ? "0 4px 14px rgba(229, 82, 0, 0.28)" : "none",
+            }}
+          >
+            <span>⚡ Today's Live MCQs</span>
+            <span
+              style={{
+                backgroundColor: activeTab === "active" ? "rgba(255, 255, 255, 0.25)" : "rgba(0, 0, 0, 0.08)",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                fontSize: "11px",
+              }}
+            >
+              {activeMcqs.length} Live
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("archived");
+              setActiveSubject("All");
+            }}
+            style={{
+              flex: 1,
+              padding: "12px 18px",
+              borderRadius: "12px",
+              border: "none",
+              backgroundColor: activeTab === "archived" ? "#0B1B3D" : "transparent",
+              color: activeTab === "archived" ? "#FFFFFF" : "var(--text-main)",
+              fontSize: "13.5px",
+              fontWeight: 800,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              boxShadow: activeTab === "archived" ? "0 4px 14px rgba(11, 27, 61, 0.25)" : "none",
+            }}
+          >
+            <span>📚 Archived MCQs (Past Questions)</span>
+            <span
+              style={{
+                backgroundColor: activeTab === "archived" ? "rgba(255, 255, 255, 0.25)" : "rgba(0, 0, 0, 0.08)",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                fontSize: "11px",
+              }}
+            >
+              {archivedMcqs.length} Closed
+            </span>
+          </button>
         </div>
 
+        {/* Tab Description Card */}
+        {activeTab === "active" ? (
+          <div
+            style={{
+              backgroundColor: "rgba(229, 82, 0, 0.06)",
+              border: "1px solid rgba(229, 82, 0, 0.2)",
+              borderRadius: "14px",
+              padding: "12px 18px",
+              marginBottom: "20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "18px" }}>🟢</span>
+              <div>
+                <strong style={{ fontSize: "13px", color: "#E55200", display: "block" }}>
+                  Active Attempting Window Open (24 Hours)
+                </strong>
+                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  Solve questions to earn points (+4 / -1). Questions remain open for 24 hours from publication time.
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              backgroundColor: "rgba(11, 27, 61, 0.05)",
+              border: "1px solid rgba(11, 27, 61, 0.18)",
+              borderRadius: "14px",
+              padding: "12px 18px",
+              marginBottom: "20px",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <span style={{ fontSize: "20px" }}>🔒</span>
+            <div>
+              <strong style={{ fontSize: "13px", color: "#0B1B3D", display: "block" }}>
+                Test Closed — Sirf Solution Aur Revision Dekh Sakte Ho
+              </strong>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                These daily MCQs have completed their 24-hour test window. Students can no longer submit answers for score, but you can review the questions, options, answer key, and detailed faculty explanations.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Subject Filter Pills */}
+        {subjects.length > 1 && (
+          <div style={{ display: "flex", gap: "8px", marginBottom: "22px", flexWrap: "wrap" }}>
+            {subjects.map((sub) => {
+              const isActive = activeSubject === sub;
+              const count = sub === "All" ? displayedList.length : displayedList.filter((m) => m.subject === sub).length;
+              return (
+                <button
+                  key={sub}
+                  onClick={() => setActiveSubject(sub)}
+                  style={{
+                    padding: "7px 16px",
+                    borderRadius: "18px",
+                    border: isActive
+                      ? activeTab === "active"
+                        ? "1.5px solid #E55200"
+                        : "1.5px solid #0B1B3D"
+                      : "1px solid var(--border-light, #EDE3DA)",
+                    backgroundColor: isActive
+                      ? activeTab === "active"
+                        ? "#E55200"
+                        : "#0B1B3D"
+                      : "var(--cream-card, #FFFFFF)",
+                    color: isActive ? "#FFFFFF" : "var(--text-main)",
+                    fontSize: "12.5px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {sub} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Content Loading State */}
         {loading ? (
           <div style={{ textAlign: "center", padding: "80px 20px" }}>
             <div style={{ fontSize: "36px", marginBottom: "12px" }}>⏳</div>
             <h3 style={{ fontSize: "16px", fontWeight: 800, color: "var(--text-main)" }}>
-              Loading Today's MCQs...
+              Loading Daily MCQs...
             </h3>
+          </div>
+        ) : activeTab === "active" && activeMcqs.length === 0 ? (
+          /* EMPTY STATE FOR ACTIVE 24H WINDOW */
+          <div
+            style={{
+              textAlign: "center",
+              padding: "60px 24px",
+              backgroundColor: "var(--cream-card, #FFFFFF)",
+              borderRadius: "20px",
+              border: "1px solid var(--border-light, #EDE3DA)",
+              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.03)",
+            }}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(229, 82, 0, 0.1)",
+                color: "#E55200",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "28px",
+                marginBottom: "16px",
+              }}
+            >
+              ⏰
+            </div>
+            <h2 style={{ fontSize: "18px", fontWeight: 900, color: "var(--text-main)", margin: "0 0 8px" }}>
+              No Active Daily MCQs Right Now
+            </h2>
+            <p
+              style={{
+                fontSize: "13.5px",
+                color: "var(--text-muted)",
+                maxWidth: "520px",
+                margin: "0 auto 24px",
+                lineHeight: 1.6,
+              }}
+            >
+              Indraprastha Daily MCQs are published daily by the faculty and remain available to attempt for exactly <strong>24 hours</strong>. Past daily questions have concluded and can be accessed anytime in the archive below.
+            </p>
+            <div style={{ display: "flex", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+              <button
+                onClick={() => {
+                  setActiveTab("archived");
+                  setActiveSubject("All");
+                }}
+                style={{
+                  padding: "12px 24px",
+                  borderRadius: "12px",
+                  backgroundColor: "#0B1B3D",
+                  color: "#FFFFFF",
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 12px rgba(11, 27, 61, 0.2)",
+                }}
+              >
+                <span>📚 Browse Archived MCQs ({archivedMcqs.length} Available)</span>
+                <span>→</span>
+              </button>
+            </div>
           </div>
         ) : filteredMcqs.length === 0 ? (
           <div
@@ -251,17 +592,19 @@ export default function DailyMcqsPage() {
           >
             <div style={{ fontSize: "32px", marginBottom: "12px" }}>📖</div>
             <h3 style={{ fontSize: "16px", fontWeight: 800, color: "var(--text-main)" }}>
-              No MCQs found for this category
+              No questions found under {activeSubject}
             </h3>
             <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
-              Try selecting "All" or check back later for newly published questions.
+              Try selecting another subject or view "All" to see available questions.
             </p>
           </div>
         ) : (
+          /* MCQ CARDS LIST */
           <div style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
             {filteredMcqs.map((mcq, idx) => {
+              const isItemActive = isItemWithin24Hours(mcq.created_at);
               const selected = selectedAnswers[mcq.id];
-              const isRevealed = revealedExplanations[mcq.id];
+              const isRevealed = revealedExplanations[mcq.id] || !isItemActive;
               const isCorrect = selected?.toUpperCase() === mcq.correct_option?.toUpperCase();
               const qImg = resolveImageUrl(mcq.question_image_link || mcq.question_image_drive_file_id);
               const expImg = resolveImageUrl(mcq.explanation_image_link || mcq.explanation_image_drive_file_id);
@@ -272,24 +615,36 @@ export default function DailyMcqsPage() {
                   key={mcq.id}
                   style={{
                     backgroundColor: "var(--cream-card, #FFFFFF)",
-                    border: isRevealed
-                      ? isCorrect
-                        ? "1.5px solid rgba(16, 185, 129, 0.4)"
-                        : "1.5px solid rgba(239, 68, 68, 0.4)"
-                      : "1px solid var(--border-light, #EDE3DA)",
+                    border: isItemActive
+                      ? isRevealed && selected
+                        ? isCorrect
+                          ? "1.5px solid rgba(16, 185, 129, 0.5)"
+                          : "1.5px solid rgba(239, 68, 68, 0.5)"
+                        : "1px solid var(--border-light, #EDE3DA)"
+                      : "1px solid var(--border-light, #E2D9CE)",
                     borderRadius: "20px",
                     padding: "24px",
                     boxShadow: "0 2px 14px rgba(0, 0, 0, 0.03)",
+                    position: "relative",
                   }}
                 >
-                  {/* Card Header */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  {/* Card Top Header */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: "14px",
+                      flexWrap: "wrap",
+                      gap: "10px",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       <span
                         style={{
-                          backgroundColor: "#E55200",
+                          backgroundColor: isItemActive ? "#E55200" : "#0B1B3D",
                           color: "#FFFFFF",
-                          padding: "2px 8px",
+                          padding: "3px 9px",
                           borderRadius: "6px",
                           fontSize: "11px",
                           fontWeight: 800,
@@ -299,9 +654,9 @@ export default function DailyMcqsPage() {
                       </span>
                       <span
                         style={{
-                          backgroundColor: "rgba(229, 82, 0, 0.08)",
-                          color: "#E55200",
-                          padding: "2px 8px",
+                          backgroundColor: isItemActive ? "rgba(229, 82, 0, 0.08)" : "rgba(11, 27, 61, 0.08)",
+                          color: isItemActive ? "#E55200" : "#0B1B3D",
+                          padding: "3px 9px",
                           borderRadius: "6px",
                           fontSize: "11px",
                           fontWeight: 700,
@@ -314,21 +669,79 @@ export default function DailyMcqsPage() {
                       </span>
                     </div>
 
-                    {isRevealed && (
-                      <span
+                    {/* Window Status Badge */}
+                    {isItemActive ? (
+                      <div
                         style={{
-                          fontSize: "12px",
-                          fontWeight: 800,
-                          padding: "3px 10px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "4px 10px",
                           borderRadius: "8px",
-                          backgroundColor: isCorrect ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
-                          color: isCorrect ? "#059669" : "#DC2626",
+                          backgroundColor: "rgba(16, 185, 129, 0.12)",
+                          color: "#059669",
+                          fontSize: "11.5px",
+                          fontWeight: 800,
                         }}
                       >
-                        {isCorrect ? "✓ Correct Answer (+4)" : "✗ Incorrect (-1)"}
-                      </span>
+                        <span>⏳</span>
+                        <span>Ends in: {getRemainingTimeFormatted(mcq.created_at)}</span>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "4px 10px",
+                          borderRadius: "8px",
+                          backgroundColor: "rgba(107, 114, 128, 0.12)",
+                          color: "#4B5563",
+                          fontSize: "11px",
+                          fontWeight: 800,
+                        }}
+                      >
+                        <span>🔒</span>
+                        <span>Test Closed (24h Expired)</span>
+                      </div>
                     )}
                   </div>
+
+                  {/* For Archived: Notice that testing window closed */}
+                  {!isItemActive && (
+                    <div
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: "10px",
+                        backgroundColor: "#F8FAFC",
+                        border: "1px dashed #CBD5E1",
+                        marginBottom: "14px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "6px",
+                        fontSize: "11.5px",
+                        color: "#64748B",
+                      }}
+                    >
+                      <span>
+                        ⏰ Published: {formatPublishedDate(mcq.created_at)} · <strong>View & Review only (Cannot attempt)</strong>
+                      </span>
+                      <span
+                        style={{
+                          backgroundColor: "#E2E8F0",
+                          color: "#334155",
+                          padding: "1px 6px",
+                          borderRadius: "4px",
+                          fontSize: "10px",
+                          fontWeight: 800,
+                        }}
+                      >
+                        ARCHIVE
+                      </span>
+                    </div>
+                  )}
 
                   {/* Question Text */}
                   <p
@@ -347,11 +760,7 @@ export default function DailyMcqsPage() {
                   {/* Question Image if present */}
                   {qImg && (
                     <div style={{ marginBottom: "18px" }}>
-                      <FastNetworkImage
-                        url={qImg}
-                        alt="Question Reference"
-                        maxHeight="320px"
-                      />
+                      <FastNetworkImage url={qImg} alt="Question Reference" maxHeight="320px" />
                     </div>
                   )}
 
@@ -364,32 +773,52 @@ export default function DailyMcqsPage() {
                       { letter: "D", text: mcq.option_d, img: mcq.option_d_image_link },
                     ].map((opt) => {
                       const isSelected = selected === opt.letter;
-                      const isThisCorrect = isRevealed && opt.letter.toUpperCase() === mcq.correct_option?.toUpperCase();
-                      const isThisWrongSelected = isRevealed && isSelected && !isThisCorrect;
+                      const isThisCorrect = opt.letter.toUpperCase() === mcq.correct_option?.toUpperCase();
 
                       let borderColor = "var(--border-light, #EDE3DA)";
                       let bgColor = "transparent";
                       let letterColor = "var(--text-muted)";
+                      let showCheck = false;
+                      let showCross = false;
 
-                      if (isThisCorrect) {
-                        borderColor = "#10B981";
-                        bgColor = "rgba(16, 185, 129, 0.08)";
-                        letterColor = "#10B981";
-                      } else if (isThisWrongSelected) {
-                        borderColor = "#EF4444";
-                        bgColor = "rgba(239, 68, 68, 0.08)";
-                        letterColor = "#EF4444";
-                      } else if (isSelected) {
-                        borderColor = "#E55200";
-                        bgColor = "rgba(229, 82, 0, 0.06)";
-                        letterColor = "#E55200";
+                      if (isItemActive) {
+                        // In Active 24h Window: User can attempt
+                        if (isRevealed) {
+                          if (isThisCorrect) {
+                            borderColor = "#10B981";
+                            bgColor = "rgba(16, 185, 129, 0.08)";
+                            letterColor = "#10B981";
+                            showCheck = true;
+                          } else if (isSelected && !isThisCorrect) {
+                            borderColor = "#EF4444";
+                            bgColor = "rgba(239, 68, 68, 0.08)";
+                            letterColor = "#EF4444";
+                            showCross = true;
+                          }
+                        } else if (isSelected) {
+                          borderColor = "#E55200";
+                          bgColor = "rgba(229, 82, 0, 0.06)";
+                          letterColor = "#E55200";
+                        }
+                      } else {
+                        // In Archived / Expired: Test is closed, user cannot attempt, correct option is highlighted for review
+                        if (isThisCorrect) {
+                          borderColor = "#10B981";
+                          bgColor = "rgba(16, 185, 129, 0.08)";
+                          letterColor = "#10B981";
+                          showCheck = true;
+                        }
                       }
 
                       return (
                         <button
                           key={opt.letter}
-                          disabled={Boolean(isRevealed)}
-                          onClick={() => handleSelectOption(mcq.id, opt.letter)}
+                          disabled={!isItemActive || Boolean(isRevealed)}
+                          onClick={() => {
+                            if (isItemActive && !isRevealed) {
+                              handleSelectOption(mcq.id, opt.letter);
+                            }
+                          }}
                           style={{
                             display: "flex",
                             alignItems: "flex-start",
@@ -398,9 +827,10 @@ export default function DailyMcqsPage() {
                             borderRadius: "14px",
                             border: `1.5px solid ${borderColor}`,
                             backgroundColor: bgColor,
-                            cursor: isRevealed ? "default" : "pointer",
+                            cursor: isItemActive && !isRevealed ? "pointer" : "default",
                             textAlign: "left",
                             transition: "all 0.15s ease",
+                            opacity: !isItemActive && !isThisCorrect ? 0.78 : 1,
                           }}
                         >
                           <span
@@ -413,41 +843,68 @@ export default function DailyMcqsPage() {
                               justifyContent: "center",
                               fontSize: "13px",
                               fontWeight: 900,
-                              backgroundColor: isThisCorrect
+                              backgroundColor: showCheck
                                 ? "#10B981"
-                                : isThisWrongSelected
+                                : showCross
                                 ? "#EF4444"
                                 : "rgba(229, 82, 0, 0.08)",
-                              color: isThisCorrect || isThisWrongSelected ? "#FFFFFF" : letterColor,
+                              color: showCheck || showCross ? "#FFFFFF" : letterColor,
                               flexShrink: 0,
                             }}
                           >
                             {opt.letter}
                           </span>
                           <div style={{ flex: 1 }}>
-                            <span style={{ fontSize: "14px", color: "var(--text-main)", lineHeight: 1.5, display: "block" }}>
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                color: "var(--text-main)",
+                                lineHeight: 1.5,
+                                display: "block",
+                                fontWeight: showCheck ? 700 : 500,
+                              }}
+                            >
                               {opt.text}
                             </span>
                             {opt.img && (
                               <div style={{ marginTop: "8px" }}>
-                                <FastNetworkImage
-                                  url={opt.img}
-                                  alt={`Option ${opt.letter}`}
-                                  maxHeight="140px"
-                                />
+                                <FastNetworkImage url={opt.img} alt={`Option ${opt.letter}`} maxHeight="140px" />
                               </div>
                             )}
                           </div>
-                          {isThisCorrect && (
-                            <span style={{ color: "#10B981", fontSize: "16px", fontWeight: 900 }}>✓</span>
+                          {showCheck && (
+                            <span style={{ color: "#10B981", fontSize: "15px", fontWeight: 900, whiteSpace: "nowrap" }}>
+                              ✓ Correct
+                            </span>
                           )}
-                          {isThisWrongSelected && (
-                            <span style={{ color: "#EF4444", fontSize: "16px", fontWeight: 900 }}>✕</span>
+                          {showCross && (
+                            <span style={{ color: "#EF4444", fontSize: "15px", fontWeight: 900, whiteSpace: "nowrap" }}>
+                              ✕ Your Choice
+                            </span>
                           )}
                         </button>
                       );
                     })}
                   </div>
+
+                  {/* Result pill for Active questions when answered */}
+                  {isItemActive && isRevealed && (
+                    <div style={{ marginBottom: "14px" }}>
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          padding: "4px 12px",
+                          borderRadius: "8px",
+                          backgroundColor: isCorrect ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                          color: isCorrect ? "#059669" : "#DC2626",
+                          display: "inline-block",
+                        }}
+                      >
+                        {isCorrect ? "✓ Correct Answer (+4 marks)" : "✗ Incorrect Attempt (-1 mark)"}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Explanation Section */}
                   {isRevealed && (
@@ -466,18 +923,22 @@ export default function DailyMcqsPage() {
                           Explanation • Correct Option ({mcq.correct_option})
                         </strong>
                       </div>
-                      <p style={{ fontSize: "13px", color: "#0F172A", margin: "0 0 10px", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                      <p
+                        style={{
+                          fontSize: "13px",
+                          color: "#0F172A",
+                          margin: "0 0 10px",
+                          lineHeight: 1.6,
+                          whiteSpace: "pre-line",
+                        }}
+                      >
                         {mcq.explanation ||
                           "This question tests core NCERT statements and clinical application. Review the corresponding NCERT chapter for detailed mechanism."}
                       </p>
 
                       {expImg && (
                         <div style={{ marginTop: "10px", marginBottom: "6px" }}>
-                          <FastNetworkImage
-                            url={expImg}
-                            alt="Explanation diagram"
-                            maxHeight="240px"
-                          />
+                          <FastNetworkImage url={expImg} alt="Explanation diagram" maxHeight="240px" />
                         </div>
                       )}
 
@@ -506,7 +967,7 @@ export default function DailyMcqsPage() {
                     </div>
                   )}
 
-                  {/* SOLVE SIMILAR QUESTIONS BUTTON - only if configured by admin */}
+                  {/* SOLVE SIMILAR QUESTIONS BUTTON */}
                   {isRevealed && Boolean(parseSimilarQuestion(mcq.similar_question)) && (
                     <button
                       onClick={() => openSimilarQuestions(mcq, idx)}
