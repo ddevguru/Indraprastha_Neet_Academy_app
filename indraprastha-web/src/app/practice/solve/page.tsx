@@ -85,6 +85,33 @@ function PracticeSolveComponent() {
   }, [currentIndex, questions]);
 
   const loadPracticeQuestions = async (id: string, token: string) => {
+    if (id === "custom") {
+      if (typeof window !== "undefined") {
+        const stored = sessionStorage.getItem("indraprastha_custom_practice");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            setPracticeInfo(
+              parsed.practiceSet || {
+                id: "custom",
+                title: parsed.title || "Custom PYQs & Practice Drill",
+                subject: parsed.subject || "Mixed",
+                topic: parsed.topic || "Custom Drill",
+                question_count: parsed.questions?.length || 10,
+              }
+            );
+            if (parsed.questions && Array.isArray(parsed.questions)) {
+              setQuestions(parsed.questions);
+            }
+            setLoading(false);
+            return;
+          } catch (e) {
+            console.error("Failed to parse custom practice from storage", e);
+          }
+        }
+      }
+    }
+
     let activeToken = token;
     try {
       let res = await fetch(`https://api.indraprasthaneetacademy.com/api/content/practice-sets/${id}/questions`, {
@@ -99,7 +126,7 @@ function PracticeSolveComponent() {
           const renew = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: "7028196172", password: "Deepak" }),
+            body: JSON.stringify({ phone: "7703033682", password: "Deepak" }),
           });
           const d = await renew.json();
           if (d.token) {
@@ -250,7 +277,7 @@ function PracticeSolveComponent() {
               </span>
             </div>
             <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>
-              {practiceInfo?.subject || "Biology, Physics & Chemistry"} · {questions.length} Questions · NTA Concept Mastery
+              {practiceInfo?.subject || "Biology, Physics & Chemistry"} · {questions.length} Questions · NCERT Concept Mastery
             </p>
           </div>
 
@@ -444,7 +471,7 @@ function PracticeSolveComponent() {
 
                   let borderColor = "var(--border-light, #EDE3DA)";
                   let bgColor = "transparent";
-                  let letterColor = "var(--text-muted)";
+                  let letterColor = "var(--text-main)";
 
                   if (isThisCorrect) {
                     borderColor = "#10B981";
@@ -726,7 +753,7 @@ function PracticeSolveComponent() {
               )}
             </div>
 
-            {/* Right: Sticky CBT Question Palette with 5 NTA States */}
+            {/* Right: Sticky CBT Question Palette with 5 Exam States */}
             <CbtQuestionPalette
               questions={questions}
               currentIndex={currentIndex}

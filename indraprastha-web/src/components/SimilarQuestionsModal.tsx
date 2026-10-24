@@ -91,14 +91,15 @@ export default function SimilarQuestionsModal({
     >
       <div
         style={{
-          backgroundColor: "#FFFFFF",
+          backgroundColor: "var(--cream-card, #18110B)",
           borderRadius: "24px",
           width: "100%",
           maxWidth: "760px",
           maxHeight: "90vh",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+          border: "1px solid var(--border-light, #2D2017)",
           overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -107,11 +108,11 @@ export default function SimilarQuestionsModal({
         <div
           style={{
             padding: "18px 24px",
-            borderBottom: "1px solid #EDE3DA",
+            borderBottom: "1px solid var(--border-light, #2D2017)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background: "#FAF6F0",
+            background: "var(--cream-bg, #0F0905)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -133,13 +134,13 @@ export default function SimilarQuestionsModal({
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: "#0F172A" }}>
+                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: "var(--text-main, #FBF6F1)" }}>
                   Solve Similar Question
                 </h3>
                 <span
                   style={{
-                    backgroundColor: "rgba(79, 70, 229, 0.12)",
-                    color: "#4F46E5",
+                    backgroundColor: "rgba(79, 70, 229, 0.15)",
+                    color: "#818CF8",
                     padding: "2px 8px",
                     borderRadius: "6px",
                     fontSize: "11px",
@@ -149,7 +150,7 @@ export default function SimilarQuestionsModal({
                   CURATED BY TEACHER
                 </span>
               </div>
-              <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#475569", fontWeight: 600 }}>
+              <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--text-muted, #BBA99C)", fontWeight: 600 }}>
                 {questionNumber ? `Question #${questionNumber} · ` : ""}
                 {sourceQuestion.subject || "Practice"} {sourceQuestion.topic || sourceQuestion.chapter ? `• ${sourceQuestion.topic || sourceQuestion.chapter}` : ""}
               </p>
@@ -159,9 +160,9 @@ export default function SimilarQuestionsModal({
           <button
             onClick={onClose}
             style={{
-              background: "#F1F5F9",
-              border: "none",
-              color: "#64748B",
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid var(--border-light, #2D2017)",
+              color: "var(--text-muted, #BBA99C)",
               width: "34px",
               height: "34px",
               borderRadius: "50%",
@@ -183,10 +184,10 @@ export default function SimilarQuestionsModal({
           {!adminSimilar ? (
             <div style={{ textAlign: "center", padding: "50px 20px" }}>
               <div style={{ fontSize: "36px", marginBottom: "12px" }}>📖</div>
-              <h4 style={{ fontSize: "16px", fontWeight: 800, color: "#1E293B", margin: "0 0 6px" }}>
+              <h4 style={{ fontSize: "16px", fontWeight: 800, color: "var(--text-main, #FBF6F1)", margin: "0 0 6px" }}>
                 No similar question available for this question yet.
               </h4>
-              <p style={{ fontSize: "13px", color: "#64748B", margin: "0 0 16px" }}>
+              <p style={{ fontSize: "13px", color: "var(--text-muted, #BBA99C)", margin: "0 0 16px" }}>
                 Your teacher has not linked a parallel question for this specific item yet.
               </p>
               <button
@@ -210,8 +211,8 @@ export default function SimilarQuestionsModal({
               {/* Question Box */}
               <div
                 style={{
-                  backgroundColor: "#F8FAFC",
-                  border: "1.5px solid #E2E8F0",
+                  backgroundColor: "rgba(79, 70, 229, 0.08)",
+                  border: "1.5px solid rgba(79, 70, 229, 0.28)",
                   borderRadius: "16px",
                   padding: "20px",
                 }}
@@ -229,7 +230,7 @@ export default function SimilarQuestionsModal({
                   >
                     Similar Question
                   </span>
-                  <span style={{ fontSize: "11px", color: "#64748B", fontWeight: 600 }}>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted, #BBA99C)", fontWeight: 600 }}>
                     Solve to master this concept
                   </span>
                 </div>
@@ -238,7 +239,7 @@ export default function SimilarQuestionsModal({
                   style={{
                     fontSize: "15px",
                     fontWeight: 700,
-                    color: "#0F172A",
+                    color: "var(--text-main, #FBF6F1)",
                     lineHeight: 1.6,
                     margin: 0,
                     whiteSpace: "pre-line",
@@ -268,26 +269,26 @@ export default function SimilarQuestionsModal({
                     const isThisCorrect = isSubmitted && opt.letter === correctOpt;
                     const isWrongSelected = isSubmitted && isSelected && !isThisCorrect;
 
-                    let border = "1.5px solid #E2E8F0";
-                    let bg = "#FFFFFF";
-                    let badgeBg = "rgba(79, 70, 229, 0.08)";
-                    let badgeColor = "#4F46E5";
+                    let border = "1.5px solid var(--border-light, #2D2017)";
+                    let bg = "var(--cream-bg, rgba(255, 255, 255, 0.02))";
+                    let badgeBg = "rgba(79, 70, 229, 0.12)";
+                    let badgeColor = "#818CF8";
 
                     if (isSubmitted) {
                       if (isThisCorrect) {
                         border = "2px solid #10B981";
-                        bg = "rgba(16, 185, 129, 0.08)";
+                        bg = "rgba(16, 185, 129, 0.12)";
                         badgeBg = "#10B981";
                         badgeColor = "#FFFFFF";
                       } else if (isWrongSelected) {
                         border = "2px solid #EF4444";
-                        bg = "rgba(239, 68, 68, 0.08)";
+                        bg = "rgba(239, 68, 68, 0.12)";
                         badgeBg = "#EF4444";
                         badgeColor = "#FFFFFF";
                       }
                     } else if (isSelected) {
                       border = "2px solid #4F46E5";
-                      bg = "rgba(79, 70, 229, 0.06)";
+                      bg = "rgba(79, 70, 229, 0.12)";
                       badgeBg = "#4F46E5";
                       badgeColor = "#FFFFFF";
                     }
@@ -331,7 +332,7 @@ export default function SimilarQuestionsModal({
                         <span
                           style={{
                             fontSize: "14px",
-                            color: "#1E293B",
+                            color: "var(--text-main, #FBF6F1)",
                             fontWeight: isSelected ? 700 : 500,
                             lineHeight: 1.5,
                             paddingTop: "3px",
@@ -358,7 +359,7 @@ export default function SimilarQuestionsModal({
                   style={{
                     padding: "14px 18px",
                     borderRadius: "14px",
-                    backgroundColor: isCorrect ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                    backgroundColor: isCorrect ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
                     border: `1.5px solid ${isCorrect ? "#10B981" : "#EF4444"}`,
                     display: "flex",
                     alignItems: "center",
@@ -372,12 +373,12 @@ export default function SimilarQuestionsModal({
                         margin: 0,
                         fontSize: "14px",
                         fontWeight: 900,
-                        color: isCorrect ? "#047857" : "#B91C1C",
+                        color: isCorrect ? "#10B981" : "#EF4444",
                       }}
                     >
                       {isCorrect ? "Correct Answer! Great work! 🎉" : `Incorrect. The correct answer is Option (${correctOpt}).`}
                     </h5>
-                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#475569" }}>
+                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--text-muted, #BBA99C)" }}>
                       {isCorrect
                         ? "You've successfully solved this parallel NCERT concept."
                         : "Review the explanation below to clear your concept."}
@@ -390,15 +391,15 @@ export default function SimilarQuestionsModal({
               {isSubmitted && (
                 <div
                   style={{
-                    backgroundColor: "#F0FDF4",
-                    border: "1px solid #BBF7D0",
+                    backgroundColor: "rgba(16, 185, 129, 0.08)",
+                    border: "1.5px solid rgba(16, 185, 129, 0.28)",
                     borderRadius: "16px",
                     padding: "18px 20px",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                     <span style={{ fontSize: "16px" }}>💡</span>
-                    <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 800, color: "#15803D" }}>
+                    <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 800, color: "#10B981" }}>
                       Explanation & Solution
                     </h4>
                   </div>
@@ -407,7 +408,7 @@ export default function SimilarQuestionsModal({
                     style={{
                       margin: 0,
                       fontSize: "13.5px",
-                      color: "#166534",
+                      color: "var(--text-main, #FBF6F1)",
                       lineHeight: 1.6,
                       whiteSpace: "pre-line",
                     }}
@@ -430,11 +431,11 @@ export default function SimilarQuestionsModal({
         <div
           style={{
             padding: "16px 24px",
-            borderTop: "1px solid #EDE3DA",
+            borderTop: "1px solid var(--border-light, #2D2017)",
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
-            backgroundColor: "#FAF6F0",
+            backgroundColor: "var(--cream-bg, #0F0905)",
             gap: "12px",
           }}
         >

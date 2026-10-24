@@ -3402,14 +3402,14 @@ router.post('/notifications/send', adminAuth, async (req, res) => {
   try {
     const { title, body, imageUrl, targetType = 'all', userIds = [] } = req.body;
     if (!title || !body) {
-      return res.status(400).json({ error: 'title aur body required hain' });
+      return res.status(400).json({ error: 'Title and body are required' });
     }
 
     let sentCount = 0;
 
     if (targetType === 'specific') {
       if (!Array.isArray(userIds) || userIds.length === 0) {
-        return res.status(400).json({ error: 'Specific target ke liye userIds chahiye' });
+        return res.status(400).json({ error: 'Specific target requires userIds array' });
       }
       const data = {};
       if (imageUrl) data.imageUrl = imageUrl;

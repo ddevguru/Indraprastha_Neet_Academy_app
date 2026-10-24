@@ -1,0 +1,492 @@
+[
+  {
+    "id": 155,
+    "title": "Full Syallbus Test Biology",
+    "subject": "Biology"
+  },
+  {
+    "id": 154,
+    "title": "Neet 180 Assertion Reason Biology Test",
+    "subject": "Biology"
+  },
+  {
+    "id": 153,
+    "title": "180 Diagram Question Biology",
+    "subject": "Biology"
+  },
+  {
+    "id": 152,
+    "title": "Practice Paper Physical Chemistry",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 150,
+    "title": "Practice Paper Inorganic Chemistry",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 149,
+    "title": "Practice Paper Organic Chemistry",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 148,
+    "title": "Complete Test Chemistry",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 147,
+    "title": "3 Hours Paper Chemistry",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 146,
+    "title": "Complete Test Physics",
+    "subject": "physics"
+  },
+  {
+    "id": 145,
+    "title": "3 Hours Paper Physics",
+    "subject": "Physics"
+  },
+  {
+    "id": 144,
+    "title": "180 Question Physics",
+    "subject": "physics"
+  },
+  {
+    "id": 143,
+    "title": "Full Syllabus Physics",
+    "subject": "Physics"
+  },
+  {
+    "id": 142,
+    "title": "Practice Paper Physics",
+    "subject": "Physics"
+  },
+  {
+    "id": 140,
+    "title": "Semiconductor",
+    "subject": "Physics"
+  },
+  {
+    "id": 139,
+    "title": "Modern Physics",
+    "subject": "Physics"
+  },
+  {
+    "id": 138,
+    "title": "Wave Optics",
+    "subject": "Physics"
+  },
+  {
+    "id": 137,
+    "title": "Ray Optics",
+    "subject": "Physics"
+  },
+  {
+    "id": 136,
+    "title": "EM Waves",
+    "subject": "Physics"
+  },
+  {
+    "id": 135,
+    "title": "Alternating Current",
+    "subject": "Physics"
+  },
+  {
+    "id": 134,
+    "title": "Electromagnetic induction",
+    "subject": "Physics"
+  },
+  {
+    "id": 133,
+    "title": "Magnetic Effect Of Current & Magnetism",
+    "subject": "Physics"
+  },
+  {
+    "id": 132,
+    "title": "Capacitance & Capacitor",
+    "subject": "Physics"
+  },
+  {
+    "id": 131,
+    "title": "Current Electricity & Heating Effects of Current",
+    "subject": "Physics"
+  },
+  {
+    "id": 129,
+    "title": "Electrostatics",
+    "subject": "Physics"
+  },
+  {
+    "id": 128,
+    "title": "Wave Motion",
+    "subject": "Physics"
+  },
+  {
+    "id": 127,
+    "title": "Oscillations",
+    "subject": "Physics"
+  },
+  {
+    "id": 126,
+    "title": "Thermal Physics",
+    "subject": "Physics"
+  },
+  {
+    "id": 125,
+    "title": "Fluid Mechanics",
+    "subject": "Physics"
+  },
+  {
+    "id": 124,
+    "title": "Gravitation",
+    "subject": "Physics"
+  },
+  {
+    "id": 123,
+    "title": "Rotational Motion",
+    "subject": "Physics"
+  },
+  {
+    "id": 122,
+    "title": "Collisions & Centre Of Mass",
+    "subject": "Physics"
+  },
+  {
+    "id": 121,
+    "title": "Circular Motion",
+    "subject": "Physics"
+  },
+  {
+    "id": 120,
+    "title": "Work,Power & Energy",
+    "subject": "Physics"
+  },
+  {
+    "id": 119,
+    "title": "Law Of Motion & Friction",
+    "subject": "Physics"
+  },
+  {
+    "id": 118,
+    "title": "Kinematics",
+    "subject": "Physics"
+  },
+  {
+    "id": 117,
+    "title": "Units & Dimensions",
+    "subject": "Physics"
+  },
+  {
+    "id": 116,
+    "title": "Vectors",
+    "subject": "Physics"
+  },
+  {
+    "id": 115,
+    "title": "Basic Mathematics",
+    "subject": "Physics"
+  },
+  {
+    "id": 114,
+    "title": "Aromatic Compounds",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 113,
+    "title": "Carboxylic Acid",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 112,
+    "title": "Aldehyde & Ketone",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 111,
+    "title": "Alcohol & Ether",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 110,
+    "title": "Hydrocarbons",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 109,
+    "title": "GOC",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 108,
+    "title": "Isomerism",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 107,
+    "title": "IUPAC",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 106,
+    "title": "Coordination Compounds",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 105,
+    "title": "d & f Block",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 104,
+    "title": "P-Block Elements",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 103,
+    "title": "Chemical Bonding",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 102,
+    "title": "Periodic Table & Periodic Properties",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 101,
+    "title": "Electrochemistry",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 100,
+    "title": "Chemical Kinetics",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 99,
+    "title": "Solution & Concentration Terms",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 98,
+    "title": "Thermodynamics",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 97,
+    "title": "Redox Reaction",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 96,
+    "title": "Ionic Equilibrium",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 95,
+    "title": "Chemical Equilibrium",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 94,
+    "title": "Atomic structure",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 93,
+    "title": "Mole Concept",
+    "subject": "Chemistry"
+  },
+  {
+    "id": 92,
+    "title": "Biodiversity & its Conservation",
+    "subject": "Biology"
+  },
+  {
+    "id": 91,
+    "title": "Ecosystem",
+    "subject": "Biology"
+  },
+  {
+    "id": 90,
+    "title": "Organism & Population",
+    "subject": "Biology"
+  },
+  {
+    "id": 89,
+    "title": "Microbes in Human Welfare",
+    "subject": "Biology"
+  },
+  {
+    "id": 88,
+    "title": "Biotechnology & its Application",
+    "subject": "Biology"
+  },
+  {
+    "id": 87,
+    "title": "Biotechnology-Principle & Processes",
+    "subject": "Biology"
+  },
+  {
+    "id": 86,
+    "title": "Human Health & Disease",
+    "subject": "Biology"
+  },
+  {
+    "id": 85,
+    "title": "Evolution",
+    "subject": "Biology"
+  },
+  {
+    "id": 84,
+    "title": "Molecular Basis of Inheritance",
+    "subject": "Biology"
+  },
+  {
+    "id": 83,
+    "title": "Principles of Inheritance & Variation",
+    "subject": "Biology"
+  },
+  {
+    "id": 82,
+    "title": "Human Reproduction & Reproductive Health",
+    "subject": "Biology"
+  },
+  {
+    "id": 81,
+    "title": "Sexsual Reproduction in Flowering Plants",
+    "subject": "Biology"
+  },
+  {
+    "id": 80,
+    "title": "Reproduction in organisms",
+    "subject": "Biology"
+  },
+  {
+    "id": 79,
+    "title": "Endocrine Glands",
+    "subject": "Biology"
+  },
+  {
+    "id": 78,
+    "title": "Neural Control & Coordination",
+    "subject": "Biology"
+  },
+  {
+    "id": 77,
+    "title": "Locomotion & Movement",
+    "subject": "Biology"
+  },
+  {
+    "id": 76,
+    "title": "Excretory Products & Their Elimination",
+    "subject": "Biology"
+  },
+  {
+    "id": 75,
+    "title": "Body Fluids & Circulation",
+    "subject": "Biology"
+  },
+  {
+    "id": 74,
+    "title": "Breathing & Exchange of Gases",
+    "subject": "Biology"
+  },
+  {
+    "id": 73,
+    "title": "Respiration in Plants",
+    "subject": "Biology"
+  },
+  {
+    "id": 72,
+    "title": "Photosynthesis in Flowering Plants",
+    "subject": "Biology"
+  },
+  {
+    "id": 71,
+    "title": "Mineral Nutrition",
+    "subject": "Biology"
+  },
+  {
+    "id": 70,
+    "title": "Anatomy of Flowering Plants",
+    "subject": "Biology"
+  },
+  {
+    "id": 69,
+    "title": "Morphology of Flowering Plants",
+    "subject": "Biology"
+  },
+  {
+    "id": 68,
+    "title": "Biomolecules",
+    "subject": "Biology"
+  },
+  {
+    "id": 67,
+    "title": "Cell Cycle & Cell Division",
+    "subject": "Biology"
+  },
+  {
+    "id": 66,
+    "title": "Cell-The Unit of life",
+    "subject": "Biology"
+  },
+  {
+    "id": 65,
+    "title": "Structural Organisation in Animals",
+    "subject": "Biology"
+  },
+  {
+    "id": 62,
+    "title": "Animal Kingdom",
+    "subject": "Biology"
+  },
+  {
+    "id": 61,
+    "title": "Plant Kingdom",
+    "subject": "Biology"
+  },
+  {
+    "id": 60,
+    "title": "Biological Classification",
+    "subject": "Biology"
+  },
+  {
+    "id": 59,
+    "title": "The Living World",
+    "subject": "Biology"
+  },
+  {
+    "id": 45,
+    "title": "Neet 2020 Paper",
+    "subject": "Full Syallbus"
+  },
+  {
+    "id": 44,
+    "title": "Neet 2021 Paper",
+    "subject": "Full Syallbus"
+  },
+  {
+    "id": 43,
+    "title": "Neet 2022 Paper",
+    "subject": "Full Syallbus"
+  },
+  {
+    "id": 42,
+    "title": "Neet 2023 Paper",
+    "subject": "Full Syallbus"
+  },
+  {
+    "id": 31,
+    "title": "Neet 2024 Paper",
+    "subject": "Neet 2024 Paper"
+  },
+  {
+    "id": 30,
+    "title": "Neet 2025 Paper",
+    "subject": "Full Syallabus"
+  }
+]

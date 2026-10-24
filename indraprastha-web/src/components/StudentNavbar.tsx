@@ -40,6 +40,7 @@ export default function StudentNavbar({
   const router = useRouter();
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [profile, setProfile] = useState<StudentUserProfile | null>(null);
 
   useEffect(() => {
@@ -78,6 +79,29 @@ export default function StudentNavbar({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Lock scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isMobileMenuOpen) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobileMenuOpen]);
+
   const toggleTheme = () => {
     const nextTheme = theme === "light" ? "dark" : "light";
     setTheme(nextTheme);
@@ -91,6 +115,14 @@ export default function StudentNavbar({
       document.body.classList.add("light-theme");
       document.documentElement.setAttribute("data-theme", "light");
     }
+  };
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen((prev) => !prev);
+  };
+
+  const closeMobile = () => {
+    setIsMobileMenuOpen(false);
   };
 
   const handleSignOut = () => {
@@ -132,14 +164,12 @@ export default function StudentNavbar({
           alignItems: "center",
           justifyContent: "space-between",
           gap: "12px",
-          flexWrap: "nowrap",
-          whiteSpace: "nowrap",
-          overflowX: "auto",
         }}
       >
         {/* ── Brand Logo & Portal Tag ── */}
         <Link
           href="/dashboard"
+          onClick={closeMobile}
           style={{
             display: "flex",
             alignItems: "center",
@@ -182,12 +212,10 @@ export default function StudentNavbar({
           </div>
         </Link>
 
-        {/* ── All Student Navigation Items In A Single Line (No AI Predictor, No Methodology) ── */}
+        {/* ── Desktop Navigation Items (Hidden on Mobile <= 992px) ── */}
         <div
+          className="student-desktop-nav"
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
             backgroundColor: "rgba(229, 82, 0, 0.04)",
             padding: "3px 4px",
             borderRadius: "10px",
@@ -296,7 +324,7 @@ export default function StudentNavbar({
           </Link>
         </div>
 
-        {/* ── Right Actions: Theme Toggle, User Profile (Clickable modal), Sign Out ── */}
+        {/* ── Right Actions: Theme Toggle, User Profile, Sign Out, Mobile Hamburger ── */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
           {/* Theme Toggle Button */}
           <button
@@ -318,10 +346,11 @@ export default function StudentNavbar({
               gap: "4px",
             }}
           >
-            <span>{theme === "light" ? "☀️ Light" : "🌙 Dark"}</span>
+            <span>{theme === "light" ? "☀️" : "🌙"}</span>
+            <span className="student-desktop-pill-text">{theme === "light" ? " Light" : " Dark"}</span>
           </button>
 
-          {/* Student Profile Pill - CLICKABLE to view profile page */}
+          {/* Student Profile Pill - Clickable to open profile */}
           <button
             type="button"
             onClick={() => {
@@ -331,7 +360,7 @@ export default function StudentNavbar({
                 router.push("/profile");
               }
             }}
-            title="Click to view Profile &amp; Account Details"
+            title="Click to view Profile & Account Details"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -361,7 +390,7 @@ export default function StudentNavbar({
             >
               {firstName.charAt(0).toUpperCase()}
             </div>
-            <div style={{ lineHeight: 1.1 }}>
+            <div className="student-desktop-pill-text" style={{ lineHeight: 1.1 }}>
               <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--text-main)" }}>
                 {firstName}
               </div>
@@ -371,11 +400,12 @@ export default function StudentNavbar({
             </div>
           </button>
 
-          {/* Logout Button */}
+          {/* Desktop Sign Out Button */}
           <button
             type="button"
             onClick={handleSignOut}
             title="Sign Out of Academy"
+            className="student-desktop-signout"
             style={{
               padding: "6px 10px",
               borderRadius: "8px",
@@ -385,7 +415,6 @@ export default function StudentNavbar({
               fontSize: "11px",
               fontWeight: 800,
               cursor: "pointer",
-              display: "inline-flex",
               alignItems: "center",
               gap: "4px",
             }}
@@ -393,6 +422,240 @@ export default function StudentNavbar({
             <span>🚪</span>
             <span>Sign Out</span>
           </button>
+
+          {/* ── Mobile Hamburger Toggle Button (Mobile Only) ── */}
+          <button
+            type="button"
+            className={`mobile-menu-toggle ${isMobileMenuOpen ? "is-active" : ""}`}
+            onClick={toggleMobileMenu}
+            aria-label="Toggle navigation menu"
+            aria-expanded={isMobileMenuOpen}
+          >
+            <span className="hamburger-bar bar-1"></span>
+            <span className="hamburger-bar bar-2"></span>
+            <span className="hamburger-bar bar-3"></span>
+          </button>
+        </div>
+      </div>
+
+      {/* ════════ MOBILE FULL DRAWER MENU ════════ */}
+      <div
+        className={`mobile-nav-overlay ${isMobileMenuOpen ? "active" : ""}`}
+        onClick={closeMobile}
+      />
+      <div className={`mobile-nav-drawer ${isMobileMenuOpen ? "active" : ""}`}>
+        {/* Drawer Header */}
+        <div className="mobile-nav-header">
+          <div className="mobile-drawer-brand">
+            <Image
+              src="/logo_app.jpeg"
+              alt="Indraprastha Logo"
+              width={34}
+              height={34}
+              style={{ borderRadius: "8px", objectFit: "cover" }}
+            />
+            <div>
+              <span className="brand-title" style={{ fontSize: "14px" }}>IndraprasthaNEET</span>
+              <span className="brand-sub" style={{ fontSize: "9px" }}>STUDENT PORTAL</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mobile-drawer-close"
+            onClick={closeMobile}
+            aria-label="Close menu"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Drawer Body */}
+        <div className="mobile-nav-body" style={{ overflowY: "auto" }}>
+          <div>
+            {/* Student Profile Card in Drawer */}
+            <div
+              style={{
+                padding: "12px 14px",
+                borderRadius: "12px",
+                backgroundColor: "rgba(229, 82, 0, 0.06)",
+                border: "1px solid rgba(229, 82, 0, 0.2)",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                style={{
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #FF6B00, #E55200)",
+                  color: "#FFFFFF",
+                  fontSize: "18px",
+                  fontWeight: 900,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                {firstName.charAt(0).toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--text-main)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {displayName}
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--orange)", fontWeight: 700 }}>
+                  {profile?.subscription_plan || "Starter Plan"} • {profile?.target_exam_year || "NEET 2026/27"}
+                </div>
+              </div>
+            </div>
+
+            {/* Student Navigation Links */}
+            <ul className="mobile-links-list">
+              <li>
+                <Link
+                  href="/dashboard"
+                  className={`mobile-nav-link ${activeTab === "dashboard" ? "active" : ""}`}
+                  onClick={closeMobile}
+                >
+                  <span>📊</span>
+                  <span>Student Dashboard</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/daily-mcqs"
+                  className={`mobile-nav-link ${activeTab === "daily-mcqs" ? "active" : ""}`}
+                  onClick={closeMobile}
+                >
+                  <span>📝</span>
+                  <span>Daily Practice MCQs</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/practice"
+                  className={`mobile-nav-link ${activeTab === "practice" ? "active" : ""}`}
+                  onClick={closeMobile}
+                >
+                  <span>📚</span>
+                  <span>Topic-Wise Practice &amp; PYQs</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/tests"
+                  className={`mobile-nav-link ${activeTab === "tests" ? "active" : ""}`}
+                  onClick={closeMobile}
+                >
+                  <span>🎯</span>
+                  <span>Test Series &amp; CBT Mocks</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/subscriptions"
+                  className={`mobile-nav-link ${activeTab === "subscriptions" ? "active" : ""}`}
+                  onClick={closeMobile}
+                >
+                  <span>👑</span>
+                  <span>Membership &amp; Plans</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/streaks"
+                  className={`mobile-nav-link ${activeTab === "streaks" ? "active" : ""}`}
+                  onClick={closeMobile}
+                >
+                  <span>🔥</span>
+                  <span>Study Streaks &amp; Badges</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/leaderboard"
+                  className={`mobile-nav-link ${activeTab === "leaderboard" ? "active" : ""}`}
+                  onClick={closeMobile}
+                >
+                  <span>🏆</span>
+                  <span>All-India Leaderboard</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/profile"
+                  className={`mobile-nav-link ${activeTab === "profile" ? "active" : ""}`}
+                  onClick={() => {
+                    closeMobile();
+                    if (onOpenProfile) onOpenProfile();
+                  }}
+                >
+                  <span>👤</span>
+                  <span>My Profile &amp; Account</span>
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Drawer Footer with Helpline & Actions */}
+          <div className="mobile-drawer-footer">
+            <a href="tel:+917703033682" className="mobile-phone-link">
+              <span>📞 +91 77030 33682</span>
+              <span className="mobile-phone-hint">24/7 Academic Helpline</span>
+            </a>
+
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border-light, #EDE3DA)",
+                  background: "var(--cream-bg, #FAF6F0)",
+                  color: "var(--text-main)",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                }}
+              >
+                <span>{theme === "light" ? "🌙 Dark" : "☀️ Light"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  closeMobile();
+                  handleSignOut();
+                }}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(239, 68, 68, 0.4)",
+                  backgroundColor: "rgba(239, 68, 68, 0.12)",
+                  color: "#EF4444",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                }}
+              >
+                <span>🚪 Sign Out</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </nav>

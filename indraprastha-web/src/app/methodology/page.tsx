@@ -55,7 +55,7 @@ export default function MethodologyPage() {
           </div>
           <div className="meth-stat-card">
             <div className="meth-stat-val">15+ Yrs</div>
-            <div className="meth-stat-label">NTA PYQ Repository Indexed</div>
+            <div className="meth-stat-label">NEET PYQ Repository Indexed</div>
           </div>
           <div className="meth-stat-card">
             <div className="meth-stat-val">&lt;7 Mins</div>
@@ -214,13 +214,13 @@ export default function MethodologyPage() {
             </div>
             <h3 className="pillar-title">15+ Years Chapter-Wise PYQ Mastery</h3>
             <p className="pillar-desc">
-              Solving random past papers without structure wastes hundreds of hours. We dissect 15+ years into precise micro-topics, uncovering NTA question-framing patterns and recurring numerical shortcuts.
+              Solving random past papers without structure wastes hundreds of hours. We dissect 15+ years into precise micro-topics, uncovering NEET question-framing patterns and recurring numerical shortcuts.
             </p>
 
             <ul className="pillar-bullets">
               <li className="pillar-bullet-item">
                 <span className="bullet-check-icon">✔</span>
-                <span>NTA Frequency Heatmap: identify recurring high-yield questions with high exam probability.</span>
+                <span>Exam Frequency Heatmap: identify recurring high-yield questions with high exam probability.</span>
               </li>
               <li className="pillar-bullet-item">
                 <span className="bullet-check-icon">✔</span>
@@ -276,7 +276,7 @@ export default function MethodologyPage() {
               <span style={{ fontSize: "12px", fontWeight: "800", color: "var(--meth-text-main)" }}>
                 Student Velocity Tracker (Roll: #NEET-8874)
               </span>
-              <span className="mockup-badge-orange">SPEED INDEX: 42 SEC/MCQ (NTA ELITE)</span>
+              <span className="mockup-badge-orange">SPEED INDEX: 42 SEC/MCQ (NEET ELITE)</span>
             </div>
 
             <div className="velocity-stat-row">
@@ -376,7 +376,7 @@ export default function MethodologyPage() {
 
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <a
-                href="https://wa.me/917203055682"
+                href="https://wa.me/917703033682"
                 target="_blank"
                 rel="noreferrer"
                 style={{
@@ -395,11 +395,11 @@ export default function MethodologyPage() {
                 <span>💬 WhatsApp Doubt Desk</span>
               </a>
               <a
-                href="tel:+917203055682"
+                href="tel:+917703033682"
                 className="pred-phone-pill"
                 style={{ fontSize: "12px" }}
               >
-                📞 +91 72030 55682
+                📞 +91 77030 33682
               </a>
             </div>
           </div>
@@ -452,7 +452,7 @@ export default function MethodologyPage() {
             </div>
             <h4 className="habit-title">Weekly Speed & Accuracy Audit</h4>
             <p className="habit-desc">
-              3-hour full-syllabus CBT exam in exact NTA simulation interface. Identify rank trajectory and time-management leaks before the real test.
+              3-hour full-syllabus CBT exam in exact NEET simulation interface. Identify rank trajectory and time-management leaks before the real test.
             </p>
             <Link href="/target-batches" className="habit-footer-link">
               <span>📊 Sunday All-India Mock Test →</span>
@@ -483,8 +483,8 @@ export default function MethodologyPage() {
                   Personalised Mentorship by Dr Rahul Kumar
                 </span>
               </div>
-              <a href="tel:+917203055682" style={{ fontSize: "12px", fontWeight: 800, color: "var(--orange)", textDecoration: "none" }}>
-                📞 Book Free Mentorship Session: +91 72030 55682 ↗
+              <a href="tel:+917703033682" style={{ fontSize: "12px", fontWeight: 800, color: "var(--orange)", textDecoration: "none" }}>
+                📞 Book Free Mentorship Session: +91 77030 33682 ↗
               </a>
             </div>
             <div className="mentorship-banner-image-wrapper">
@@ -575,8 +575,8 @@ export default function MethodologyPage() {
             <Link href="/ai-rank-predictor" className="btn-schedule-audit">
               <span>⚡ Schedule Free AI Audit</span>
             </Link>
-            <a href="tel:+917203055682" className="callout-phone-text">
-              📞 Talk to Academic Dean: +91 72030 55682
+            <a href="tel:+917703033682" className="callout-phone-text">
+              📞 Talk to Academic Dean: +91 77030 33682
             </a>
           </div>
         </div>

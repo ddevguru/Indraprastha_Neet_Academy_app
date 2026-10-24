@@ -72,7 +72,7 @@ export default function TestsPage() {
           const renewRes = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: "7028196172", password: "Deepak" }),
+            body: JSON.stringify({ phone: "7703033682", password: "Deepak" }),
           });
           const renewData = await renewRes.json();
           if (renewData.token) {
@@ -337,7 +337,7 @@ export default function TestsPage() {
                   fontWeight: 800,
                 }}
               >
-                EXACT NTA CBT PATTERN
+                EXACT NEET CBT PATTERN
               </span>
             </div>
             <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
@@ -455,7 +455,7 @@ export default function TestsPage() {
                           fontSize: "10px",
                           padding: "1px 6px",
                           borderRadius: "10px",
-                          backgroundColor: isSelected ? "rgba(255, 255, 255, 0.25)" : "rgba(0, 0, 0, 0.06)",
+                          backgroundColor: isSelected ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.08)",
                           color: isSelected ? "#FFFFFF" : "var(--text-muted)",
                           fontWeight: 800,
                         }}
@@ -683,7 +683,7 @@ export default function TestsPage() {
                   </span>
                 </div>
                 <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
-                  Subject aur topic choose karo, question count aur time set karo, aur random questions se instant test banao.
+                  Select your subject and topic, set your target question count and duration, and instantly generate a personalized CBT mock test.
                 </p>
               </div>
 
@@ -915,7 +915,7 @@ export default function TestsPage() {
                   {customSubject === "All" ? "Full Syllabus" : customSubject} · {customQuestionCount} Questions · {customDuration} Minutes · {customQuestionCount * 4} Marks
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
-                  Marking scheme: +4 for correct answer, -1 for wrong answer (Exact NTA NEET CBT pattern)
+                  Marking scheme: +4 for correct answer, -1 for wrong answer (Exact NEET CBT pattern)
                 </div>
               </div>
 
@@ -1017,7 +1017,8 @@ export default function TestsPage() {
                       {normalizeClass(test.class_label) && (
                         <span
                           style={{
-                            backgroundColor: "rgba(0, 0, 0, 0.04)",
+                            backgroundColor: "rgba(255, 255, 255, 0.08)",
+                            border: "1px solid var(--border-light, #EDE3DA)",
                             color: "var(--text-muted)",
                             padding: "3px 8px",
                             borderRadius: "6px",

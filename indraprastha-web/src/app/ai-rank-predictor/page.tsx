@@ -114,7 +114,7 @@ const collegesList: CollegeData[] = [
 const faqs = [
   {
     q: "How does the 2024 NEET normalization paper controversy affect 2026/2027 rank predictions?",
-    a: "The 2024 NEET exam witnessed unprecedented score inflation at the 650–700 plateau where each single mark shifted ~1,200 All-India positions. Our AI Rank Engine incorporates NTA's post-audit percentile calibrations and models conservative seat allocation shifts for 2026/2027 aspirants, factoring in potential syllabus rationalization and stricter paper parity.",
+    a: "The 2024 NEET exam witnessed unprecedented score inflation at the 650–700 plateau where each single mark shifted ~1,200 All-India positions. Our AI Rank Engine incorporates audited national percentile calibrations and models conservative seat allocation shifts for 2026/2027 aspirants, factoring in potential syllabus rationalization and stricter paper parity.",
   },
   {
     q: "What is the difference between All India Quota (AIQ) 15% and State Quota 85%?",
@@ -328,7 +328,7 @@ export default function AiRankPredictorPage() {
       <div className="pred-ticker-bar">
         <div className="pred-ticker-inner">
           <div className="ticker-left">
-            <span className="ticker-badge-orange">NTA Normalization v4.2 Engine</span>
+            <span className="ticker-badge-orange">NEET Normalization v4.2 Engine</span>
             <span className="ticker-sep">|</span>
             <span>NEET 2024/2025 AIR vs College Database</span>
           </div>
@@ -357,7 +357,7 @@ export default function AiRankPredictorPage() {
               NEET 2026/2027 <span className="pred-title-highlight">AI Rank</span> Predictor
             </h1>
             <p className="pred-subtitle">
-              Benchmarked against 24.3 Lakh candidate score distributions, recent NTA shift normalizations, 15% AIQ counseling rounds, and 85% State Quota closing cutoffs.
+              Benchmarked against 24.3 Lakh candidate score distributions, recent shift normalizations, 15% AIQ counseling rounds, and 85% State Quota closing cutoffs.
             </p>
           </div>
 
@@ -504,7 +504,7 @@ export default function AiRankPredictorPage() {
             <span>⚡ Calculate My Rank</span>
           </button>
           <div className="pred-calc-subtext">
-            Instant processing with NTA 2024 percentile calibrations.
+            Instant processing with NEET percentile calibrations.
           </div>
         </div>
 
@@ -534,7 +534,7 @@ export default function AiRankPredictorPage() {
                 Calculating Projected AIR & Percentile...
               </div>
               <div style={{ fontSize: "12px", color: "var(--pred-text-muted)" }}>
-                Calibrating score against 24.3L NTA candidates & shift normalizations
+                Calibrating score against 24.3L NEET candidates & shift normalizations
               </div>
             </div>
           ) : !hasCalculated || !stats ? (
@@ -545,7 +545,7 @@ export default function AiRankPredictorPage() {
                 Select your expected NEET score on the slider (100–720) and reservation category on the left, then click <strong>&quot;Calculate My Rank&quot;</strong> to reveal your All-India Rank, Percentile, and GMC admission probabilities.
               </p>
               <div className="placeholder-feature-tags">
-                <span className="placeholder-tag">🎯 24.3 Lakh NTA Dataset</span>
+                <span className="placeholder-tag">🎯 24.3 Lakh Candidate Dataset</span>
                 <span className="placeholder-tag">📊 Real-Time Percentile Model</span>
                 <span className="placeholder-tag">🏛️ MCC Quota & Seat Matrix</span>
               </div>
@@ -632,7 +632,7 @@ export default function AiRankPredictorPage() {
                 </div>
 
                 <div className="pred-mini-card">
-                  <div className="mini-card-icon">🩺</div>
+                  <div className="mini-card-icon">🏥</div>
                   <div>
                     <div className="mini-card-title">MBBS (Core)</div>
                     <div className="mini-card-sub">High Specialization Fit</div>
@@ -740,7 +740,7 @@ export default function AiRankPredictorPage() {
 
           <div className="table-footer-row">
             <div>
-              * Cutoffs based on MCC 2024 Round 1 & Round 2 counselling closing seats. Subject to seat matrix & NTA percentile shifts.
+              * Cutoffs based on MCC 2024 Round 1 & Round 2 counselling closing seats. Subject to seat matrix & percentile shifts.
             </div>
             <a href="#counseling" className="table-footer-link">
               Read NEET 2025 AIQ 15% Analysis PDF 📥
@@ -756,7 +756,7 @@ export default function AiRankPredictorPage() {
           <div className="graph-header-row">
             <div>
               <span className="pred-tagline-capsule" style={{ marginBottom: "6px" }}>
-                NTA DATA ENGINE 2024 VS 2026 PROJECTED
+                NEET DATA ENGINE 2024 VS 2026 PROJECTED
               </span>
               <h3 className="pred-card-title">NEET Score vs AIR Distribution Curve</h3>
             </div>
@@ -887,7 +887,7 @@ export default function AiRankPredictorPage() {
             <div className="graph-insight-box">
               <div className="insight-title">🏛️ Indraprastha Test Edge</div>
               <div className="insight-desc">
-                Our mock engines replicate NTA score-to-percentile distribution, saving your rank in rigorous mock-to-reality College Allocation Sessions.
+                Our mock engines replicate NEET score-to-percentile distribution, saving your rank in rigorous mock-to-reality College Allocation Sessions.
               </div>
             </div>
           </div>
@@ -961,9 +961,9 @@ export default function AiRankPredictorPage() {
             <div className="counsel-phone-action-row">
               <div>
                 <div className="counsel-phone-label">24/7 HELPLINE / ADMISSION COUNSEL</div>
-                <div className="counsel-phone-number">+91 72030 55682</div>
+                <div className="counsel-phone-number">+91 77030 33682</div>
               </div>
-              <a href="tel:+917203055682" className="btn-call-counsel">
+              <a href="tel:+917703033682" className="btn-call-counsel">
                 <span>Call Now 📞</span>
               </a>
             </div>
@@ -1106,8 +1106,8 @@ export default function AiRankPredictorPage() {
             <span>Most verified MBBS Admission Database! 2024 & 2025 counselling dataset integrated live.</span>
           </div>
           <div className="prefooter-right">
-            <a href="tel:+917203055682" style={{ color: "#FFFFFF", textDecoration: "none", fontSize: "12px", fontWeight: "700" }}>
-              📞 +91 72030 55682
+            <a href="tel:+917703033682" style={{ color: "#FFFFFF", textDecoration: "none", fontSize: "12px", fontWeight: "700" }}>
+              📞 +91 77030 33682
             </a>
             <a href="#counseling" className="btn-enroll-nav btn-orange-leather" style={{ padding: "6px 14px", fontSize: "11.5px" }}>
               <span>Book Free Call →</span>

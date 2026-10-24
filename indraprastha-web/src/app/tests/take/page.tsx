@@ -138,7 +138,7 @@ function TestPlayerComponent() {
           const renew = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: "7028196172", password: "Deepak" }),
+            body: JSON.stringify({ phone: "7703033682", password: "Deepak" }),
           });
           const d = await renew.json();
           if (d.token) {
@@ -314,11 +314,11 @@ function TestPlayerComponent() {
                   fontWeight: 800,
                 }}
               >
-                {submitted ? "TEST SUBMITTED" : "LIVE NTA CBT"}
+                {submitted ? "TEST SUBMITTED" : "LIVE NEET CBT"}
               </span>
             </div>
             <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>
-              {testInfo?.subject || "Physics, Chemistry & Biology"} · {questions.length} Questions · NTA NEET Marking Scheme (+4 / -1)
+              {testInfo?.subject || "Physics, Chemistry & Biology"} · {questions.length} Questions · Official NEET Marking Scheme (+4 / -1)
             </p>
           </div>
 
@@ -427,7 +427,7 @@ function TestPlayerComponent() {
             {/* Scorecard Strip */}
             <div
               style={{
-                backgroundColor: "#FFFFFF",
+                backgroundColor: "var(--cream-card, #18110B)",
                 border: "1.5px solid var(--border-light, #EDE3DA)",
                 borderRadius: "20px",
                 padding: "26px",
@@ -546,8 +546,8 @@ function TestPlayerComponent() {
                 style={{
                   padding: "6px 14px",
                   borderRadius: "20px",
-                  border: reviewFilter === "all" ? "1.5px solid #4F46E5" : "1px solid #EDE3DA",
-                  backgroundColor: reviewFilter === "all" ? "#4F46E5" : "#FFFFFF",
+                  border: reviewFilter === "all" ? "1.5px solid #4F46E5" : "1px solid var(--border-light, #EDE3DA)",
+                  backgroundColor: reviewFilter === "all" ? "#4F46E5" : "var(--cream-card, #18110B)",
                   color: reviewFilter === "all" ? "#FFFFFF" : "var(--text-main)",
                   fontSize: "12px",
                   fontWeight: 800,
@@ -562,8 +562,8 @@ function TestPlayerComponent() {
                 style={{
                   padding: "6px 14px",
                   borderRadius: "20px",
-                  border: reviewFilter === "wrong" ? "1.5px solid #EF4444" : "1px solid #EDE3DA",
-                  backgroundColor: reviewFilter === "wrong" ? "#EF4444" : "#FFFFFF",
+                  border: reviewFilter === "wrong" ? "1.5px solid #EF4444" : "1px solid var(--border-light, #EDE3DA)",
+                  backgroundColor: reviewFilter === "wrong" ? "#EF4444" : "var(--cream-card, #18110B)",
                   color: reviewFilter === "wrong" ? "#FFFFFF" : "#EF4444",
                   fontSize: "12px",
                   fontWeight: 800,
@@ -581,9 +581,9 @@ function TestPlayerComponent() {
                 style={{
                   padding: "6px 14px",
                   borderRadius: "20px",
-                  border: reviewFilter === "correct" ? "1.5px solid #10B981" : "1px solid #EDE3DA",
-                  backgroundColor: reviewFilter === "correct" ? "#10B981" : "#FFFFFF",
-                  color: reviewFilter === "correct" ? "#FFFFFF" : "#047857",
+                  border: reviewFilter === "correct" ? "1.5px solid #10B981" : "1px solid var(--border-light, #EDE3DA)",
+                  backgroundColor: reviewFilter === "correct" ? "#10B981" : "var(--cream-card, #18110B)",
+                  color: reviewFilter === "correct" ? "#FFFFFF" : "#10B981",
                   fontSize: "12px",
                   fontWeight: 800,
                   cursor: "pointer",
@@ -597,9 +597,9 @@ function TestPlayerComponent() {
                 style={{
                   padding: "6px 14px",
                   borderRadius: "20px",
-                  border: reviewFilter === "unattempted" ? "1.5px solid #64748B" : "1px solid #EDE3DA",
-                  backgroundColor: reviewFilter === "unattempted" ? "#64748B" : "#FFFFFF",
-                  color: reviewFilter === "unattempted" ? "#FFFFFF" : "#64748B",
+                  border: reviewFilter === "unattempted" ? "1.5px solid #64748B" : "1px solid var(--border-light, #EDE3DA)",
+                  backgroundColor: reviewFilter === "unattempted" ? "#64748B" : "var(--cream-card, #18110B)",
+                  color: reviewFilter === "unattempted" ? "#FFFFFF" : "var(--text-muted)",
                   fontSize: "12px",
                   fontWeight: 800,
                   cursor: "pointer",
@@ -622,7 +622,7 @@ function TestPlayerComponent() {
                 const expImg = resolveImageUrl(q.explanation_image_link || q.explanation_image_drive_file_id);
                 const videoUrl = q.explanation_video_link || q.explanation_video_url;
 
-                let cardBorder = "1px solid #EDE3DA";
+                let cardBorder = "1px solid var(--border-light, #EDE3DA)";
                 if (isWrong) cardBorder = "1.5px solid rgba(239, 68, 68, 0.4)";
                 if (isCorrect) cardBorder = "1.5px solid rgba(16, 185, 129, 0.4)";
 
@@ -630,7 +630,7 @@ function TestPlayerComponent() {
                   <div
                     key={q.id}
                     style={{
-                      backgroundColor: "#FFFFFF",
+                      backgroundColor: "var(--cream-card, #18110B)",
                       border: cardBorder,
                       borderRadius: "20px",
                       padding: "24px",
@@ -742,14 +742,14 @@ function TestPlayerComponent() {
                         const isWrongSelected = isUserSelected && !isThisCorrect;
 
                         let border = "1px solid var(--border-light, #EDE3DA)";
-                        let bg = "#FFFFFF";
+                        let bg = "transparent";
 
                         if (isThisCorrect) {
                           border = "2px solid #10B981";
-                          bg = "rgba(16, 185, 129, 0.08)";
+                          bg = "rgba(16, 185, 129, 0.12)";
                         } else if (isWrongSelected) {
                           border = "2px solid #EF4444";
-                          bg = "rgba(239, 68, 68, 0.08)";
+                          bg = "rgba(239, 68, 68, 0.12)";
                         }
 
                         return (
@@ -820,8 +820,8 @@ function TestPlayerComponent() {
                       style={{
                         padding: "16px 20px",
                         borderRadius: "16px",
-                        backgroundColor: "#F0F7FF",
-                        border: "1.5px solid #BAE6FD",
+                        backgroundColor: "rgba(2, 132, 199, 0.08)",
+                        border: "1.5px solid rgba(2, 132, 199, 0.28)",
                         marginBottom: "14px",
                       }}
                     >
@@ -832,7 +832,7 @@ function TestPlayerComponent() {
                         </h4>
                       </div>
 
-                      <p style={{ fontSize: "13.5px", color: "#0F172A", margin: "0 0 10px", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                      <p style={{ fontSize: "13.5px", color: "var(--text-main)", margin: "0 0 10px", lineHeight: 1.6, whiteSpace: "pre-line" }}>
                         {q.explanation || "Detailed concept logic aligns with NCERT line-by-line statements."}
                       </p>
 
@@ -1020,7 +1020,7 @@ function TestPlayerComponent() {
                           fontSize: "13px",
                           fontWeight: 900,
                           backgroundColor: isSelected ? "#E55200" : "rgba(229, 82, 0, 0.08)",
-                          color: isSelected ? "#FFFFFF" : "var(--text-muted)",
+                          color: isSelected ? "#FFFFFF" : "var(--text-main)",
                           flexShrink: 0,
                         }}
                       >
@@ -1168,13 +1168,13 @@ function TestPlayerComponent() {
         >
           <div
             style={{
-              backgroundColor: "#FFFFFF",
+              backgroundColor: "var(--cream-card, #18110B)",
               borderRadius: "20px",
               width: "100%",
               maxWidth: "480px",
               padding: "26px",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)",
-              border: "1px solid #EDE3DA",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+              border: "1px solid var(--border-light, #2D2017)",
               textAlign: "center",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -1194,7 +1194,7 @@ function TestPlayerComponent() {
                 style={{
                   padding: "10px 18px",
                   borderRadius: "10px",
-                  border: "1px solid #EDE3DA",
+                  border: "1px solid var(--border-light, #2D2017)",
                   backgroundColor: "transparent",
                   color: "var(--text-muted)",
                   fontWeight: 700,

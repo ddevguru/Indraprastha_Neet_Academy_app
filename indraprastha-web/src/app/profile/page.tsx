@@ -122,7 +122,7 @@ export default function ProfilePage() {
   const targetYear = user?.target_exam_year || "NEET 2026/2027";
   const batchName = user?.batch_name || "Target Neet 2027 - Class 12th Going";
   const courseCategory = user?.course_category || "State Boards / CBSE";
-  const phone = user?.phone || "7028196172";
+  const phone = user?.phone || "7703033682";
   const email = user?.email || "deepak.mishra@student.indraprastha.com";
   const planName = user?.subscription_plan || "Starter Plan";
   const hasActiveSub = user?.has_active_subscription || user?.subscription_status === "active";
@@ -368,7 +368,7 @@ export default function ProfilePage() {
               <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "18px" }}>
                 {[
                   "Unlimited NCERT Line-by-Line Question Bank",
-                  "Official NTA CBT Mock Test Engine & Solutions",
+                  "Official NEET CBT Mock Test Engine & Solutions",
                   "Solve Similar Questions AI Engine",
                   "Video Explanations from Top NEET Mentors",
                   "All-India Percentile & Leaderboard Tracking",
@@ -532,7 +532,7 @@ export default function ProfilePage() {
                     <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Faculty &amp; Academic Inquiries</span>
                   </div>
                   <a
-                    href="tel:+917203055682"
+                    href="tel:+917703033682"
                     style={{
                       padding: "6px 12px",
                       borderRadius: "8px",

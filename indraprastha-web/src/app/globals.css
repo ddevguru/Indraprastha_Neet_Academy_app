@@ -2529,7 +2529,10 @@ body.dark-theme .mobile-phone-hint {
 }
 
 @media (max-width: 992px) {
-  .pred-nav-links {
+  .pred-nav-links,
+  .student-desktop-nav,
+  .student-desktop-pill-text,
+  .student-desktop-signout {
     display: none !important;
   }
   .mobile-menu-toggle {
@@ -3050,5 +3053,11 @@ body.dark-theme .tb-modal-box h3 {
 }
 body.dark-theme .tb-modal-box label {
   color: #BBA99C !important;
+}
+body.dark-theme .tb-modal-box input,
+body.dark-theme .tb-modal-box select {
+  background: #0F0905 !important;
+  border-color: #2D2017 !important;
+  color: #FBF6F1 !important;
 }
 

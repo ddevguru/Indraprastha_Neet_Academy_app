@@ -203,8 +203,8 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
             </span>
           </button>
 
-          <a href="tel:+917203055682" className="pred-phone-pill">
-            📞 +91 72030 55682
+          <a href="tel:+917703033682" className="pred-phone-pill">
+            📞 +91 77030 33682
           </a>
 
           {isLoggedIn ? (
@@ -214,7 +214,7 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
                 className="btn-enroll-nav btn-orange-leather nav-login-btn"
                 id="nav-dashboard-btn"
               >
-                <span>Dashboard 🩺</span>
+                <span>Dashboard</span>
               </Link>
               <button
                 type="button"
@@ -367,8 +367,8 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
 
           <div className="mobile-drawer-footer">
             <div className="mobile-phone-cta">
-              <a href="tel:+917203055682" className="mobile-phone-link">
-                <span>📞 +91 72030 55682</span>
+              <a href="tel:+917703033682" className="mobile-phone-link">
+                <span>📞 +91 77030 33682</span>
                 <span className="mobile-phone-hint">24/7 Academic Helpline</span>
               </a>
             </div>
@@ -382,7 +382,7 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
                     style={{ flex: 1, textAlign: "center", padding: "12px" }}
                     onClick={closeMobile}
                   >
-                    <span>Dashboard 🩺</span>
+                    <span>Dashboard</span>
                   </Link>
                   <button
                     type="button"

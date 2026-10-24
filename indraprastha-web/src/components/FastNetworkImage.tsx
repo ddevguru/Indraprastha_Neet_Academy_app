@@ -70,8 +70,8 @@ export default function FastNetworkImage({
         maxWidth: "100%",
         borderRadius: "12px",
         overflow: "hidden",
-        backgroundColor: "#F8FAFC",
-        border: "1px solid #E2E8F0",
+        backgroundColor: "rgba(255, 255, 255, 0.04)",
+        border: "1px solid var(--border-light, rgba(255, 255, 255, 0.1))",
         ...style,
       }}
       className={className}
@@ -84,8 +84,8 @@ export default function FastNetworkImage({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: "#F1F5F9",
-            color: "#94A3B8",
+            backgroundColor: "rgba(0, 0, 0, 0.25)",
+            color: "var(--text-muted)",
             fontSize: "12px",
             fontWeight: 700,
             minHeight: "120px",

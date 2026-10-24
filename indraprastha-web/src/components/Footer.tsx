@@ -55,8 +55,8 @@ export default function Footer() {
             <div className="footer-contact-item">
               <span>📞</span>
               <div>
-                <a href="tel:+917203055682" style={{ color: "#FFFFFF", textDecoration: "none", fontWeight: 700 }}>
-                  +91 72030 55682
+                <a href="tel:+917703033682" style={{ color: "#FFFFFF", textDecoration: "none", fontWeight: 700 }}>
+                  +91 77030 33682
                 </a>
                 <div style={{ fontSize: "11px", color: "#8C786B" }}>WhatsApp &amp; Phone Support</div>
               </div>
@@ -85,7 +85,7 @@ export default function Footer() {
           <div>
             <h4 className="footer-col-title">Digital Study App</h4>
             <p style={{ fontSize: "12px", color: "#A38E82", marginBottom: "14px", lineHeight: 1.5 }}>
-              Solve 10,000+ NCERT MCQs, take simulated NTA mock tests, and track your AIR live.
+              Solve 10,000+ NCERT MCQs, take simulated NEET mock tests, and track your AIR live.
             </p>
             <div className="app-store-btns">
               <a href="#app" className="btn-app-store-badge">

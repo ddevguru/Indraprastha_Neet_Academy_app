@@ -45,7 +45,7 @@ export default function DisclaimerPage() {
           <section className="doc-section">
             <h2 className="doc-section-title">2. No Examination Result Guarantee</h2>
             <p className="doc-p">
-              While our pedagogic methods, NCERT line-by-line analyses, and simulated tests are designed with maximum alignment to official NTA NEET patterns, enrollment in any batch or program does not guarantee selection, specific scores, or government medical college seats. Individual outcomes depend entirely on candidate dedication, regular practice, and actual examination day performance.
+              While our pedagogic methods, NCERT line-by-line analyses, and simulated tests are designed with maximum alignment to official NEET examination patterns, enrollment in any batch or program does not guarantee selection, specific scores, or government medical college seats. Individual outcomes depend entirely on candidate dedication, regular practice, and actual examination day performance.
             </p>
           </section>
 
@@ -53,7 +53,7 @@ export default function DisclaimerPage() {
           <section className="doc-section">
             <h2 className="doc-section-title">3. AI Rank Predictor &amp; Score Estimations</h2>
             <p className="doc-p">
-              Our AI Rank Predictor generates percentile and rank estimates based on historical statistical trends, previous years&apos; cutoffs, and normalized difficulty heuristics. These estimations are strictly for indicative guidance and planning purposes and do not represent official National Testing Agency (NTA) scorecards or counselling allotments.
+              Our AI Rank Predictor generates percentile and rank estimates based on historical statistical trends, previous years&apos; cutoffs, and normalized difficulty heuristics. These estimations are strictly for indicative guidance and planning purposes and do not represent official examination scorecards or counselling allotments.
             </p>
           </section>
 
@@ -61,7 +61,7 @@ export default function DisclaimerPage() {
           <section className="doc-section">
             <h2 className="doc-section-title">4. Third-Party Links &amp; Examination Notices</h2>
             <p className="doc-p">
-              References to external examination bodies (such as NTA, NMC, MCC) and external informational links are provided for student convenience. Indraprastha NEET Academy does not claim official affiliation with the National Testing Agency or government regulatory bodies unless explicitly stated.
+              References to external examination bodies (such as NMC, MCC) and external informational links are provided for student convenience. Indraprastha NEET Academy does not claim official affiliation with national examination bodies or government regulatory authorities unless explicitly stated.
             </p>
           </section>
 

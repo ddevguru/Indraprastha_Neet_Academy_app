@@ -114,7 +114,7 @@ export default function DailyMcqsPage() {
           const renewRes = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: "7028196172", password: "Deepak" }),
+            body: JSON.stringify({ phone: "7703033682", password: "Deepak" }),
           });
           const renewData = await renewRes.json();
           if (renewData.token) {
@@ -335,7 +335,7 @@ export default function DailyMcqsPage() {
             display: "flex",
             gap: "12px",
             marginBottom: "20px",
-            backgroundColor: "rgba(237, 227, 218, 0.4)",
+            backgroundColor: "rgba(255, 255, 255, 0.04)",
             padding: "6px",
             borderRadius: "16px",
             border: "1px solid var(--border-light, #EDE3DA)",
@@ -367,7 +367,7 @@ export default function DailyMcqsPage() {
             <span>⚡ Today's Live MCQs</span>
             <span
               style={{
-                backgroundColor: activeTab === "active" ? "rgba(255, 255, 255, 0.25)" : "rgba(0, 0, 0, 0.08)",
+                backgroundColor: activeTab === "active" ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.08)",
                 padding: "2px 8px",
                 borderRadius: "12px",
                 fontSize: "11px",
@@ -387,7 +387,7 @@ export default function DailyMcqsPage() {
               padding: "12px 18px",
               borderRadius: "12px",
               border: "none",
-              backgroundColor: activeTab === "archived" ? "#0B1B3D" : "transparent",
+              backgroundColor: activeTab === "archived" ? "#4F46E5" : "transparent",
               color: activeTab === "archived" ? "#FFFFFF" : "var(--text-main)",
               fontSize: "13.5px",
               fontWeight: 800,
@@ -397,13 +397,13 @@ export default function DailyMcqsPage() {
               alignItems: "center",
               justifyContent: "center",
               gap: "8px",
-              boxShadow: activeTab === "archived" ? "0 4px 14px rgba(11, 27, 61, 0.25)" : "none",
+              boxShadow: activeTab === "archived" ? "0 4px 14px rgba(79, 70, 229, 0.35)" : "none",
             }}
           >
             <span>📚 Archived MCQs (Past Questions)</span>
             <span
               style={{
-                backgroundColor: activeTab === "archived" ? "rgba(255, 255, 255, 0.25)" : "rgba(0, 0, 0, 0.08)",
+                backgroundColor: activeTab === "archived" ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.08)",
                 padding: "2px 8px",
                 borderRadius: "12px",
                 fontSize: "11px",
@@ -445,8 +445,8 @@ export default function DailyMcqsPage() {
         ) : (
           <div
             style={{
-              backgroundColor: "rgba(11, 27, 61, 0.05)",
-              border: "1px solid rgba(11, 27, 61, 0.18)",
+              backgroundColor: "rgba(99, 102, 241, 0.08)",
+              border: "1px solid rgba(99, 102, 241, 0.25)",
               borderRadius: "14px",
               padding: "12px 18px",
               marginBottom: "20px",
@@ -457,8 +457,8 @@ export default function DailyMcqsPage() {
           >
             <span style={{ fontSize: "20px" }}>🔒</span>
             <div>
-              <strong style={{ fontSize: "13px", color: "#0B1B3D", display: "block" }}>
-                Test Closed — Sirf Solution Aur Revision Dekh Sakte Ho
+              <strong style={{ fontSize: "13px", color: "#818CF8", display: "block" }}>
+                Test Closed — Solution & Revision Mode Only
               </strong>
               <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                 These daily MCQs have completed their 24-hour test window. Students can no longer submit answers for score, but you can review the questions, options, answer key, and detailed faculty explanations.
@@ -483,12 +483,12 @@ export default function DailyMcqsPage() {
                     border: isActive
                       ? activeTab === "active"
                         ? "1.5px solid #E55200"
-                        : "1.5px solid #0B1B3D"
+                        : "1.5px solid #4F46E5"
                       : "1px solid var(--border-light, #EDE3DA)",
                     backgroundColor: isActive
                       ? activeTab === "active"
                         ? "#E55200"
-                        : "#0B1B3D"
+                        : "#4F46E5"
                       : "var(--cream-card, #FFFFFF)",
                     color: isActive ? "#FFFFFF" : "var(--text-main)",
                     fontSize: "12.5px",
@@ -563,7 +563,7 @@ export default function DailyMcqsPage() {
                 style={{
                   padding: "12px 24px",
                   borderRadius: "12px",
-                  backgroundColor: "#0B1B3D",
+                  backgroundColor: "#4F46E5",
                   color: "#FFFFFF",
                   fontWeight: 800,
                   fontSize: "13px",
@@ -572,7 +572,7 @@ export default function DailyMcqsPage() {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "8px",
-                  boxShadow: "0 4px 12px rgba(11, 27, 61, 0.2)",
+                  boxShadow: "0 4px 14px rgba(79, 70, 229, 0.35)",
                 }}
               >
                 <span>📚 Browse Archived MCQs ({archivedMcqs.length} Available)</span>
@@ -642,7 +642,7 @@ export default function DailyMcqsPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       <span
                         style={{
-                          backgroundColor: isItemActive ? "#E55200" : "#0B1B3D",
+                          backgroundColor: isItemActive ? "#E55200" : "#4F46E5",
                           color: "#FFFFFF",
                           padding: "3px 9px",
                           borderRadius: "6px",
@@ -654,8 +654,8 @@ export default function DailyMcqsPage() {
                       </span>
                       <span
                         style={{
-                          backgroundColor: isItemActive ? "rgba(229, 82, 0, 0.08)" : "rgba(11, 27, 61, 0.08)",
-                          color: isItemActive ? "#E55200" : "#0B1B3D",
+                          backgroundColor: isItemActive ? "rgba(229, 82, 0, 0.12)" : "rgba(79, 70, 229, 0.15)",
+                          color: isItemActive ? "#E55200" : "#818CF8",
                           padding: "3px 9px",
                           borderRadius: "6px",
                           fontSize: "11px",
@@ -679,7 +679,7 @@ export default function DailyMcqsPage() {
                           padding: "4px 10px",
                           borderRadius: "8px",
                           backgroundColor: "rgba(16, 185, 129, 0.12)",
-                          color: "#059669",
+                          color: "#10B981",
                           fontSize: "11.5px",
                           fontWeight: 800,
                         }}
@@ -695,8 +695,8 @@ export default function DailyMcqsPage() {
                           gap: "6px",
                           padding: "4px 10px",
                           borderRadius: "8px",
-                          backgroundColor: "rgba(107, 114, 128, 0.12)",
-                          color: "#4B5563",
+                          backgroundColor: "rgba(148, 163, 184, 0.12)",
+                          color: "#94A3B8",
                           fontSize: "11px",
                           fontWeight: 800,
                         }}
@@ -713,8 +713,8 @@ export default function DailyMcqsPage() {
                       style={{
                         padding: "8px 14px",
                         borderRadius: "10px",
-                        backgroundColor: "#F8FAFC",
-                        border: "1px dashed #CBD5E1",
+                        backgroundColor: "rgba(100, 116, 139, 0.08)",
+                        border: "1px dashed rgba(100, 116, 139, 0.3)",
                         marginBottom: "14px",
                         display: "flex",
                         alignItems: "center",
@@ -722,7 +722,7 @@ export default function DailyMcqsPage() {
                         flexWrap: "wrap",
                         gap: "6px",
                         fontSize: "11.5px",
-                        color: "#64748B",
+                        color: "var(--text-muted)",
                       }}
                     >
                       <span>
@@ -730,8 +730,8 @@ export default function DailyMcqsPage() {
                       </span>
                       <span
                         style={{
-                          backgroundColor: "#E2E8F0",
-                          color: "#334155",
+                          backgroundColor: "rgba(100, 116, 139, 0.18)",
+                          color: "var(--text-muted)",
                           padding: "1px 6px",
                           borderRadius: "4px",
                           fontSize: "10px",
@@ -776,7 +776,7 @@ export default function DailyMcqsPage() {
                       const isThisCorrect = opt.letter.toUpperCase() === mcq.correct_option?.toUpperCase();
 
                       let borderColor = "var(--border-light, #EDE3DA)";
-                      let bgColor = "transparent";
+                      let bgColor = "rgba(255, 255, 255, 0.02)";
                       let letterColor = "var(--text-muted)";
                       let showCheck = false;
                       let showCross = false;
@@ -786,25 +786,25 @@ export default function DailyMcqsPage() {
                         if (isRevealed) {
                           if (isThisCorrect) {
                             borderColor = "#10B981";
-                            bgColor = "rgba(16, 185, 129, 0.08)";
+                            bgColor = "rgba(16, 185, 129, 0.12)";
                             letterColor = "#10B981";
                             showCheck = true;
                           } else if (isSelected && !isThisCorrect) {
                             borderColor = "#EF4444";
-                            bgColor = "rgba(239, 68, 68, 0.08)";
+                            bgColor = "rgba(239, 68, 68, 0.12)";
                             letterColor = "#EF4444";
                             showCross = true;
                           }
                         } else if (isSelected) {
                           borderColor = "#E55200";
-                          bgColor = "rgba(229, 82, 0, 0.06)";
+                          bgColor = "rgba(229, 82, 0, 0.1)";
                           letterColor = "#E55200";
                         }
                       } else {
                         // In Archived / Expired: Test is closed, user cannot attempt, correct option is highlighted for review
                         if (isThisCorrect) {
                           borderColor = "#10B981";
-                          bgColor = "rgba(16, 185, 129, 0.08)";
+                          bgColor = "rgba(16, 185, 129, 0.12)";
                           letterColor = "#10B981";
                           showCheck = true;
                         }
@@ -823,20 +823,19 @@ export default function DailyMcqsPage() {
                             display: "flex",
                             alignItems: "flex-start",
                             gap: "12px",
-                            padding: "12px 16px",
+                            padding: "13px 16px",
                             borderRadius: "14px",
                             border: `1.5px solid ${borderColor}`,
                             backgroundColor: bgColor,
                             cursor: isItemActive && !isRevealed ? "pointer" : "default",
                             textAlign: "left",
                             transition: "all 0.15s ease",
-                            opacity: !isItemActive && !isThisCorrect ? 0.78 : 1,
                           }}
                         >
                           <span
                             style={{
-                              width: "26px",
-                              height: "26px",
+                              width: "28px",
+                              height: "28px",
                               borderRadius: "8px",
                               display: "inline-flex",
                               alignItems: "center",
@@ -847,8 +846,8 @@ export default function DailyMcqsPage() {
                                 ? "#10B981"
                                 : showCross
                                 ? "#EF4444"
-                                : "rgba(229, 82, 0, 0.08)",
-                              color: showCheck || showCross ? "#FFFFFF" : letterColor,
+                                : "rgba(229, 82, 0, 0.12)",
+                              color: showCheck || showCross ? "#FFFFFF" : isItemActive ? letterColor : "var(--text-main)",
                               flexShrink: 0,
                             }}
                           >
@@ -912,8 +911,8 @@ export default function DailyMcqsPage() {
                       style={{
                         padding: "16px 20px",
                         borderRadius: "16px",
-                        backgroundColor: "#F0F7FF",
-                        border: "1.5px solid #BAE6FD",
+                        backgroundColor: "rgba(2, 132, 199, 0.08)",
+                        border: "1.5px solid rgba(2, 132, 199, 0.28)",
                         marginBottom: "14px",
                       }}
                     >
@@ -926,7 +925,7 @@ export default function DailyMcqsPage() {
                       <p
                         style={{
                           fontSize: "13px",
-                          color: "#0F172A",
+                          color: "var(--text-main)",
                           margin: "0 0 10px",
                           lineHeight: 1.6,
                           whiteSpace: "pre-line",

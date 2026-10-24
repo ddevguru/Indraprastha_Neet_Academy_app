@@ -125,7 +125,7 @@ export default function LoginPage() {
       }, 700);
     } catch {
       setLoginLoading(false);
-      setLoginError("Server se connect nahi ho pa raha. Please check karein ki backend chal raha hai.");
+      setLoginError("Unable to connect to the server. Please check your internet connection.");
     }
   };
 
@@ -163,14 +163,14 @@ export default function LoginPage() {
       const data = await res.json();
       setLoginLoading(false);
       if (!res.ok || !data.success) {
-        setLoginError(data.error || "OTP bhejne mein error. Dobara koshish karein.");
+        setLoginError(data.error || "Failed to send OTP. Please try again.");
         return;
       }
       setLoginOtpSent(true);
       setLoginOtpCountdown(60);
     } catch {
       setLoginLoading(false);
-      setLoginError("Server se connect nahi ho pa raha.");
+      setLoginError("Unable to connect to the server.");
     }
   };
 
@@ -216,7 +216,7 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok || !data.success) {
         setLoginLoading(false);
-        setLoginError(data.error || "OTP galat hai ya expire ho gaya. Dobara bhejein.");
+        setLoginError(data.error || "Invalid or expired OTP. Please request a new one.");
         return;
       }
       if (typeof window !== "undefined") {
@@ -230,7 +230,7 @@ export default function LoginPage() {
       }, 700);
     } catch {
       setLoginLoading(false);
-      setLoginError("Server se connect nahi ho pa raha.");
+      setLoginError("Unable to connect to the server.");
     }
   };
 
@@ -576,7 +576,7 @@ export default function LoginPage() {
                 marginBottom: "14px",
               }}
             >
-              <span>🩺</span> INDRAPRASTHA NEET ACADEMY · STUDENT PORTAL
+              <span>🎓</span> INDRAPRASTHA NEET ACADEMY · STUDENT PORTAL
             </div>
             <h1
               style={{
@@ -608,7 +608,7 @@ export default function LoginPage() {
               }}
             >
               {view === "login"
-                ? "Access your NCERT Line-by-Line Question Banks, NTA Mock Test Results, and AI Rank Predictor diagnostics."
+                ? "Access your NCERT Line-by-Line Question Banks, NEET Mock Test Results, and AI Rank Predictor diagnostics."
                 : "Create your student account in 3 quick steps with phone OTP verification to access mock tests and test analysis."}
             </p>
           </div>
@@ -861,13 +861,13 @@ export default function LoginPage() {
                                 lineHeight: 1.6,
                               }}
                             >
-                              📱 <strong>Is number pe password set nahi hai.</strong> Aap OTP se login kar sakte hain.{" "}
+                              📱 <strong>No password is set for this mobile number.</strong> You can log in securely using OTP.{" "}
                               <button
                                 type="button"
                                 onClick={() => { setLoginOtpMode(false); setLoginOtp(""); setLoginOtpSent(false); setLoginError(""); }}
                                 style={{ background: "none", border: "none", color: "var(--orange)", fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline" }}
                               >
-                                Password se login karo
+                                Log in with password instead
                               </button>
                             </div>
 
@@ -879,7 +879,7 @@ export default function LoginPage() {
                                 className="btn-enroll-nav btn-orange-leather"
                                 style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#FFFFFF", fontSize: "14px", fontWeight: 800, cursor: "pointer", marginBottom: "16px" }}
                               >
-                                {loginLoading ? "OTP Bhej raha hai..." : "📲 OTP Bhejein (+91 " + loginPhone + ")"}
+                                {loginLoading ? "Sending OTP..." : "📲 Send OTP (+91 " + loginPhone + ")"}
                               </button>
                             ) : (
                               <>
@@ -923,7 +923,7 @@ export default function LoginPage() {
                                   className="btn-enroll-nav btn-orange-leather"
                                   style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#FFFFFF", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}
                                 >
-                                  {loginLoading ? "Verifying OTP..." : "✅ OTP Verify karke Login Karein →"}
+                                  {loginLoading ? "Verifying OTP..." : "✅ Verify OTP & Log In →"}
                                 </button>
                               </>
                             )}
@@ -944,7 +944,7 @@ export default function LoginPage() {
                                   Password <span style={{ color: "var(--orange)" }}>*</span>
                                 </label>
                                 <a
-                                  href="tel:+917203055682"
+                                  href="tel:+917703033682"
                                   style={{ fontSize: "11px", color: "var(--orange)", textDecoration: "none", fontWeight: 700 }}
                                 >
                                   Forgot Password?
@@ -1663,7 +1663,7 @@ export default function LoginPage() {
                         textAlign: "center",
                       }}
                     >
-                      <div style={{ fontSize: "42px", marginBottom: "8px" }}>🩺🎉</div>
+                      <div style={{ fontSize: "42px", marginBottom: "8px" }}>🎓🎉</div>
                       <h3 style={{ fontSize: "20px", fontWeight: 900, color: "#10B981", marginBottom: "8px" }}>
                         Student Account Verified!
                       </h3>
@@ -1760,7 +1760,7 @@ export default function LoginPage() {
                   Indraprastha Student Ecosystem
                 </h2>
                 <p style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.6, marginBottom: "20px" }}>
-                  Your dedicated NEET command platform built strictly on NMC curriculum guidelines and NTA computer-based exam pattern.
+                  Your dedicated NEET command platform built strictly on NMC curriculum guidelines and NEET computer-based exam pattern.
                 </p>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -1780,7 +1780,7 @@ export default function LoginPage() {
                     <span style={{ fontSize: "18px" }}>⚡</span>
                     <div>
                       <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-main)" }}>
-                        Exact NTA CBT Test Interface
+                        Exact NEET CBT Test Interface
                       </div>
                       <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                         Timed simulations with real negative mark diagnostics and error tracking.
@@ -1837,7 +1837,7 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <a
-                  href="tel:+917203055682"
+                  href="tel:+917703033682"
                   style={{
                     padding: "7px 12px",
                     borderRadius: "8px",

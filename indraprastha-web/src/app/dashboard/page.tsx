@@ -54,7 +54,7 @@ export default function StudentDashboardPage() {
 
       let parsedUser: StudentUserProfile = {
         full_name: "Deepak Mishra",
-        phone: "7028196172",
+        phone: "7703033682",
         target_exam_year: "NEET",
         subscription_plan: "Starter",
         subscription_status: "active",
@@ -189,7 +189,7 @@ export default function StudentDashboardPage() {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--cream-bg, #FAF6F0)" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "36px", marginBottom: "16px" }}>🩺</div>
+          <div style={{ fontSize: "36px", marginBottom: "16px" }}>🎓</div>
           <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-main)" }}>Opening Your Student Dashboard...</h2>
         </div>
       </div>
@@ -267,7 +267,7 @@ export default function StudentDashboardPage() {
                   }}
                   title="Click to view Profile &amp; Account Details"
                 >
-                  Namaste, {displayName}! 🩺
+                  Namaste, {displayName}!
                 </Link>
                 <span
                   style={{
@@ -391,7 +391,7 @@ export default function StudentDashboardPage() {
                     fontWeight: 800,
                   }}
                 >
-                  LIVE NTA PATTERN
+                  LIVE NEET PATTERN
                 </span>
               </div>
               <p style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.9)", margin: 0 }}>
@@ -1089,7 +1089,7 @@ export default function StudentDashboardPage() {
                     {displayName}
                   </h3>
                   <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                    Student ID #{user?.id || 1} · {user?.phone || "7028196172"}
+                    Student ID #{user?.id || 1} · {user?.phone || "7703033682"}
                   </span>
                 </div>
               </div>
@@ -1119,7 +1119,7 @@ export default function StudentDashboardPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "22px" }}>
               <div style={{ padding: "10px 14px", borderRadius: "10px", backgroundColor: "rgba(229, 82, 0, 0.04)", display: "flex", justifyContent: "space-between" }}>
                 <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 700 }}>PHONE NUMBER</span>
-                <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-main)" }}>{user?.phone || "7028196172"}</span>
+                <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-main)" }}>{user?.phone || "7703033682"}</span>
               </div>
 
               <div style={{ padding: "10px 14px", borderRadius: "10px", backgroundColor: "rgba(229, 82, 0, 0.04)", display: "flex", justifyContent: "space-between" }}>

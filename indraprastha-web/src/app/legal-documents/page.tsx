@@ -125,7 +125,7 @@ export default function LegalDocumentsPage() {
             <a href="mailto:contact@indraprasthaneetacademy.com" className="btn-legal-primary">
               <span>✉️</span> Email Us
             </a>
-            <a href="tel:+917203055682" className="btn-legal-outline">
+            <a href="tel:+917703033682" className="btn-legal-outline">
               <span>📞</span> Contact Us
             </a>
           </div>

@@ -154,7 +154,7 @@ export default function CbtQuestionPalette({
             {title}
           </h3>
           <span style={{ fontSize: "11px", color: "var(--text-muted)", fontWeight: 700 }}>
-            Official NTA NEET CBT Format
+            Official NEET CBT Format
           </span>
         </div>
 
@@ -334,7 +334,7 @@ export default function CbtQuestionPalette({
             isMarked: isMrk,
           });
 
-          // Style by NTA status
+          // Style by NEET status
           let bg = "#334155";
           let color = "#FFFFFF";
           let clipPath: string | undefined = undefined;
@@ -423,7 +423,7 @@ export default function CbtQuestionPalette({
         })}
       </div>
 
-      {/* Official NTA NEET CBT Legend (Image 2) */}
+      {/* Official NEET CBT Legend */}
       <div
         style={{
           borderTop: "1px solid var(--border-light, #EDE3DA)",

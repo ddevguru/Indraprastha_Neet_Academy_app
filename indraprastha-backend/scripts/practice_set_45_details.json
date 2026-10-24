@@ -1,0 +1,39 @@
+{
+  "success": true,
+  "questions": [
+    {
+      "id": 99,
+      "practice_set_id": 45,
+      "question": "Which is the correct sequence of air\r\npassages in man?",
+      "option_a": "External Nostril→ Nasal passage→\rInternal nostril→ Pharynx →Larynx→\rTrachea → Bronchi → Bronchioles →\rAlveoli",
+      "option_b": "Nose→ Larynx→ Pharynx→ \rBronchioles→ Bronchi → Alveoli",
+      "option_c": "Nose→ Pharynx →Trachea→ Larynx→\rBronchi → Bronchioles→ Alveoli",
+      "option_d": "Nose → Larynx→ Bronchi→ Pharynx→\rTrachea→ Bronchioles →Alveoli",
+      "correct_option": "A",
+      "explanation": "External Nostril→ Nasal passage→\r\nInternal nostril→ Pharynx →Larynx→\r\nTrachea → Bronchi → Bronchioles →\r\nAlveoli\r\n\nrefer Ncert Pg No 269",
+      "question_image_link": "",
+      "question_image_drive_file_id": "",
+      "question_image_drive_folder_id": "",
+      "explanation_image_link": "",
+      "explanation_video_link": "",
+      "similar_question": null
+    },
+    {
+      "id": 100,
+      "practice_set_id": 45,
+      "question": "Trachea divides into right and left primary\r\nbronchi at ______ thoracic vertebra.",
+      "option_a": "4",
+      "option_b": "5",
+      "option_c": "6",
+      "option_d": "9",
+      "correct_option": "B",
+      "explanation": "Refer NCERT Pg 269",
+      "question_image_link": "",
+      "question_image_drive_file_id": "",
+      "question_image_drive_folder_id": "",
+      "explanation_image_link": "",
+      "explanation_video_link": "",
+      "similar_question": null
+    }
+  ]
+}

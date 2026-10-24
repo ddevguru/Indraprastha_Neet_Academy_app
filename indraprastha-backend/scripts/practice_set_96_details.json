@@ -1,0 +1,56 @@
+{
+  "success": true,
+  "questions": [
+    {
+      "id": 13,
+      "practice_set_id": 96,
+      "question": "wkMmnnnkk",
+      "option_a": "lKm",
+      "option_b": "mammmb",
+      "option_c": "jwns vnsj",
+      "option_d": "jannj",
+      "correct_option": "C",
+      "explanation": "snzmsnb",
+      "question_image_link": "https://drive.google.com/thumbnail?id=11M6HpqiW0RWZwliWjb-yNeGoGLU4GYRS&sz=w1000",
+      "question_image_drive_file_id": "11M6HpqiW0RWZwliWjb-yNeGoGLU4GYRS",
+      "question_image_drive_folder_id": "",
+      "explanation_image_link": "https://drive.google.com/uc?export=view&id=1leX7v32fAOjkwU7HW0tDgOmdcO0x_CwZ",
+      "explanation_video_link": "",
+      "similar_question": null
+    },
+    {
+      "id": 56,
+      "practice_set_id": 96,
+      "question": "ghjjjgjjhjhj",
+      "option_a": "ghjj",
+      "option_b": "ghj",
+      "option_c": "hjj",
+      "option_d": "ghhj",
+      "correct_option": "B",
+      "explanation": "ghjjij",
+      "question_image_link": "",
+      "question_image_drive_file_id": "",
+      "question_image_drive_folder_id": "",
+      "explanation_image_link": "",
+      "explanation_video_link": "",
+      "similar_question": null
+    },
+    {
+      "id": 130,
+      "practice_set_id": 96,
+      "question": "Assertion ( A ) : Spontaneous generation theorey was dismissed once and for all \nReason ( R ) Oparin & Haldane proposed chemical evolution of life",
+      "option_a": "Both A & R are True & R is the correct explanation of A",
+      "option_b": "Both A & R are True & R is not  the correct explanation of A",
+      "option_c": "A is true But R is false",
+      "option_d": "Both A & R are False",
+      "correct_option": "B",
+      "explanation": "Assertion (A): Spontaneous generation theory was dismissed once and for all.\n✅ True — The theory of spontaneous generation was conclusively disproved by Louis Pasteur through his swan-neck flask experiment.\n\nReason (R): Alexander Oparin and J. B. S. Haldane proposed the chemical evolution of life.\n✅ True — They proposed that life originated from non-living matter through a gradual process of chemical evolution under primitive Earth conditions.\n\nHowever, the reason does not explain the assertion. Pasteur's experiments disproved spontaneous generation, while Oparin and Haldane proposed a separate hypothesis about the origin of the first life through chemical evolution.\n\nCorrect Answer:\n✅ Both A and R are true, but R is not the correct explanation of A.",
+      "question_image_link": "",
+      "question_image_drive_file_id": "",
+      "question_image_drive_folder_id": "",
+      "explanation_image_link": "",
+      "explanation_video_link": "",
+      "similar_question": null
+    }
+  ]
+}

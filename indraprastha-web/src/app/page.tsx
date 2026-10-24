@@ -24,8 +24,8 @@ const quizOptions = [
 const statsBar = [
   { icon: "📚", val: "10,000+", label: "NCERT Line-by-Line MCQs" },
   { icon: "🏛️", val: "15+ Years", label: "Chapter-Wise PYQs & Audited Solutions" },
-  { icon: "🎓", val: "99.8%", label: "NTA Exam Pattern Alignment" },
-  { icon: "📞", val: "24/7 Helpline", label: "+91 77020 22682" },
+  { icon: "🎓", val: "99.8%", label: "NEET Exam Pattern Alignment" },
+  { icon: "📞", val: "24/7 Helpline", label: "+91 77030 33682" },
 ];
 
 const batches = [
@@ -153,7 +153,7 @@ export default function Page() {
           <div>
             <div className="hero-pill-tag">
               <span>🔥 INDIA&apos;S MOST TRUSTED NEET 2026/2027 TARGET BATCHES</span>
-              <span className="tag-sub">⚡ NTA Exam Engine Aligned</span>
+              <span className="tag-sub">⚡ NEET Exam Engine Aligned</span>
             </div>
 
             <h1 className="hero-title">
@@ -162,7 +162,7 @@ export default function Page() {
             </h1>
 
             <p className="hero-subtitle">
-              Access 10,000+ NCERT-mapped MCQs, 15+ years chapter-wise PYQs, full syllabus NTA mock tests, and real-time AI performance analytics designed exclusively for future PRE-PG rankers.
+              Access 10,000+ NCERT-mapped MCQs, 15+ years chapter-wise PYQs, full syllabus NEET mock tests, and real-time AI performance analytics designed exclusively for future PRE-PG rankers.
             </p>
 
             <div className="hero-cta-group">
@@ -261,8 +261,8 @@ export default function Page() {
                 Bridging the vital gap between textbook memorization and exam-day rank. Every Indraprastha aspirant receives doctor-led 1-on-1 strategic guidance, tailored revision timelines, and psychological mindset coaching.
               </p>
             </div>
-            <a href="tel:+917203055682" className="engine-tag" style={{ textDecoration: "none" }}>
-              📞 Call Mentorship Desk: +91 72030 55682
+            <a href="tel:+917703033682" className="engine-tag" style={{ textDecoration: "none" }}>
+              📞 Call Mentorship Desk: +91 77030 33682
             </a>
           </div>
 
@@ -286,7 +286,7 @@ export default function Page() {
                 <div>
                   <h4 className="feat-card-title">Understand Exam Pattern</h4>
                   <p className="feat-card-desc">
-                    Deconstruct the exact NTA &amp; NMC question patterns. Learn how assertion-reason, statement-based, and multi-concept questions are designed.
+                    Deconstruct the exact NEET &amp; NMC question patterns. Learn how assertion-reason, statement-based, and multi-concept questions are designed.
                   </p>
                 </div>
               </div>
@@ -324,7 +324,7 @@ export default function Page() {
               </div>
 
               <div className="mentor-actions-group">
-                <a href="tel:+917203055682" className="btn-primary-hero btn-orange-leather">
+                <a href="tel:+917703033682" className="btn-primary-hero btn-orange-leather">
                   <span>Book Free 1-on-1 Mentorship Call 📞</span>
                 </a>
                 <a href="/target-batches" className="btn-secondary-hero">
@@ -346,7 +346,7 @@ export default function Page() {
               Built strictly adhering to the revised NMC syllabus with timed module simulations and verified doctor-faculty mentorship.
             </p>
           </div>
-          <span className="engine-tag">⚡ All batches include NTA Test Engine</span>
+          <span className="engine-tag">⚡ All batches include NEET Test Engine</span>
         </div>
 
         <div className="batches-grid">
@@ -576,8 +576,8 @@ export default function Page() {
           </div>
 
           <div className="cta-actions" style={{ position: "relative", zIndex: 1 }}>
-            <a href="tel:+917702022682" className="btn-cta-phone">
-              📞 Call +91 77020 22682
+            <a href="tel:+917703033682" className="btn-cta-phone">
+              📞 Call +91 77030 33682
             </a>
             <a href="#" className="btn-cta-online">
               Apply Online ↗

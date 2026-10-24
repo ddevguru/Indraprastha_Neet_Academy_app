@@ -37,7 +37,7 @@ const batchCards = [
       },
       {
         bold: "45+ Full-Length Tests",
-        text: "Simulated on exact NTA CBT interface with negative marking diagnostics.",
+        text: "Simulated on exact NEET CBT interface with negative marking diagnostics.",
       },
       {
         bold: "Dedicated Doctor-Mentor",
@@ -162,7 +162,7 @@ const batchCards = [
         text: "5 Board Mocks followed immediately by full-length NEET Mocks.",
       },
     ],
-    facultyLabel: "CBSE & NTA Expert Faculty",
+    facultyLabel: "CBSE & Medical Expert Faculty",
     facultySub: "Top Board Evaluators",
     startDate: "STARTS 1ST AUGUST",
     timing: "Evening (05:00 PM - 09:00 PM)",
@@ -274,7 +274,7 @@ export default function TargetBatchesPage() {
                 <span style={{ color: "var(--orange)", fontStyle: "italic" }}>Target Batches</span>
               </h1>
               <p className="hero-subtitle" style={{ fontSize: "15px", maxWidth: "680px", margin: 0 }}>
-                Curated programs built strictly on revised NMC &amp; NTA syllabus frameworks. Master complete NCERT line-by-line rigor under elite medical mentors and top AIIMS alumni faculties.
+                Curated programs built strictly on revised NMC syllabus frameworks. Master complete NCERT line-by-line rigor under elite medical mentors and top AIIMS alumni faculties.
               </p>
             </div>
 
@@ -374,8 +374,8 @@ export default function TargetBatchesPage() {
                   Personalised Mentorship by Dr Rahul Kumar
                 </span>
               </div>
-              <a href="tel:+917203055682" style={{ fontSize: "12px", fontWeight: 800, color: "var(--orange)", textDecoration: "none" }}>
-                📞 Book Free Counseling Call: +91 72030 55682 ↗
+              <a href="tel:+917703033682" style={{ fontSize: "12px", fontWeight: 800, color: "var(--orange)", textDecoration: "none" }}>
+                📞 Book Free Counseling Call: +91 77030 33682 ↗
               </a>
             </div>
             <div className="mentorship-banner-image-wrapper">
