@@ -730,12 +730,16 @@ function PyqsSolveComponent() {
             {/* Right: CBT Question Palette */}
             <div>
               <CbtQuestionPalette
-                totalQuestions={questions.length}
+                questions={questions}
                 currentIndex={currentIndex}
                 onSelectQuestion={(idx) => setCurrentIndex(idx)}
-                answeredMap={selectedAnswers}
-                markedMap={markedForReview}
-                visitedMap={visitedQuestions}
+                selectedAnswers={selectedAnswers}
+                markedForReview={markedForReview}
+                visitedQuestions={visitedQuestions}
+                title="Question Palette"
+                isPractice={true}
+                onSubmit={() => setIsCompleted(true)}
+                submitButtonText="Finish PYQ Drill & Review"
               />
             </div>
           </div>
