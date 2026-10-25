@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import StudentNavbar from "@/components/StudentNavbar";
 import Footer from "@/components/Footer";
 import SimilarQuestionsModal from "@/components/SimilarQuestionsModal";
@@ -39,8 +39,18 @@ interface QuestionItem {
 }
 
 function PracticeSolveComponent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const setId = searchParams.get("id") || "96";
+  const setId = searchParams.get("id");
+  const chapterId = searchParams.get("chapterId");
+
+  useEffect(() => {
+    if (chapterId) {
+      const title = encodeURIComponent(searchParams.get("title") || "");
+      const subject = encodeURIComponent(searchParams.get("subject") || "");
+      router.replace(`/pyqs/solve?chapterId=${chapterId}&title=${title}&subject=${subject}`);
+    }
+  }, [chapterId, searchParams, router]);
 
   const [practiceInfo, setPracticeInfo] = useState<any>(null);
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
@@ -69,9 +79,9 @@ function PracticeSolveComponent() {
     if (typeof window !== "undefined") {
       const storedToken = localStorage.getItem("indraprastha_token") || "";
       setAuthToken(storedToken);
-      loadPracticeQuestions(setId, storedToken);
+      loadPracticeQuestions(chapterId ? `chapter_${chapterId}` : (setId || "96"), storedToken);
     }
-  }, [setId]);
+  }, [setId, chapterId]);
 
   // Track visited questions for CBT Palette
   useEffect(() => {
@@ -85,6 +95,33 @@ function PracticeSolveComponent() {
   }, [currentIndex, questions]);
 
   const loadPracticeQuestions = async (id: string, token: string) => {
+    // 1. Chapter PYQ solve path
+    if (chapterId) {
+      try {
+        const titleParam = searchParams.get("title") || "Chapter PYQs";
+        const subjectParam = searchParams.get("subject") || "Physics";
+        const res = await fetch(`/api/pyqs/${chapterId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setPracticeInfo({
+            id: `chapter_${chapterId}`,
+            title: titleParam,
+            subject: subjectParam,
+            topic: "Previous Year Questions (PYQs)",
+            question_count: data.count || data.pyqs?.length || 0,
+          });
+          if (data.pyqs && Array.isArray(data.pyqs)) {
+            setQuestions(data.pyqs);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load chapter PYQs", e);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (id === "custom") {
       if (typeof window !== "undefined") {
         const stored = sessionStorage.getItem("indraprastha_custom_practice");
@@ -238,7 +275,7 @@ function PracticeSolveComponent() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--cream-bg, #FAF6F0)" }}>
-      <StudentNavbar activeTab="practice" />
+      <StudentNavbar activeTab={chapterId ? "pyqs" : "practice"} />
 
       <main style={{ flex: 1, padding: "20px 20px 80px", maxWidth: "1120px", width: "100%", margin: "0 auto" }}>
         {/* Top Header Card - Matching Test Player Exactly */}
@@ -323,7 +360,7 @@ function PracticeSolveComponent() {
             )}
 
             <Link
-              href="/practice"
+              href={chapterId ? "/pyqs" : "/practice"}
               style={{
                 padding: "9px 18px",
                 borderRadius: "10px",
@@ -335,7 +372,7 @@ function PracticeSolveComponent() {
                 textDecoration: "none",
               }}
             >
-              ← Back to Practice
+              ← Back to {chapterId ? "PYQs" : "Practice"}
             </Link>
           </div>
         </section>
@@ -365,7 +402,7 @@ function PracticeSolveComponent() {
               Please select another practice module.
             </p>
             <Link
-              href="/practice"
+              href={chapterId ? "/pyqs" : "/practice"}
               style={{
                 padding: "8px 18px",
                 borderRadius: "10px",
@@ -376,7 +413,7 @@ function PracticeSolveComponent() {
                 textDecoration: "none",
               }}
             >
-              Back to Practice Modules
+              Back to {chapterId ? "PYQ Chapters" : "Practice Modules"}
             </Link>
           </div>
         ) : !isCompleted ? (

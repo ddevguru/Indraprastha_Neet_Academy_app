@@ -23,7 +23,7 @@ export interface StudentUserProfile {
 }
 
 interface StudentNavbarProps {
-  activeTab?: "dashboard" | "daily-mcqs" | "practice" | "tests" | "subscriptions" | "leaderboard" | "streaks" | "profile";
+  activeTab?: "dashboard" | "daily-mcqs" | "practice" | "pyqs" | "tests" | "subscriptions" | "leaderboard" | "streaks" | "profile";
   userName?: string;
   onLogout?: () => void;
   onOpenProfile?: () => void;
@@ -284,6 +284,26 @@ export default function StudentNavbar({
           </Link>
 
           <Link
+            href="/pyqs"
+            style={{
+              padding: "6px 12px",
+              borderRadius: "7px",
+              fontSize: "12px",
+              fontWeight: 700,
+              textDecoration: "none",
+              color: activeTab === "pyqs" ? "#FFFFFF" : "var(--text-main)",
+              backgroundColor: activeTab === "pyqs" ? "#E55200" : "transparent",
+              transition: "all 0.15s ease",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "5px",
+            }}
+          >
+            <span>📜</span>
+            <span>PYQs</span>
+          </Link>
+
+          <Link
             href="/tests"
             style={{
               padding: "6px 12px",
@@ -541,7 +561,17 @@ export default function StudentNavbar({
                   onClick={closeMobile}
                 >
                   <span>📚</span>
-                  <span>Topic-Wise Practice &amp; PYQs</span>
+                  <span>Topic-Wise Practice</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/pyqs"
+                  className={`mobile-nav-link ${activeTab === "pyqs" ? "active" : ""}`}
+                  onClick={closeMobile}
+                >
+                  <span>📜</span>
+                  <span>Chapter-Wise PYQs</span>
                 </Link>
               </li>
               <li>

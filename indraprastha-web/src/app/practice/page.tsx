@@ -536,7 +536,7 @@ function PracticePageComponent() {
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px", flexWrap: "wrap" }}>
               <span style={{ fontSize: "26px" }}>🎯</span>
               <h1 style={{ fontSize: "22px", fontWeight: 900, color: "var(--text-main)", margin: 0 }}>
-                Practice &amp; Previous Year Questions (PYQs)
+                NCERT Topic-wise Practice Drill Modules
               </h1>
               <span
                 style={{
@@ -617,7 +617,7 @@ function PracticePageComponent() {
               boxShadow: activeTab === "pyqs" ? "0 4px 14px rgba(229, 82, 0, 0.28)" : "none",
             }}
           >
-            <span>🎯 Class-wise PYQs &amp; MCQs (6 Sections)</span>
+            <span>🎯 Class-wise Practice MCQs (6 Sections)</span>
             <span
               style={{
                 backgroundColor: activeTab === "pyqs" ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.08)",
