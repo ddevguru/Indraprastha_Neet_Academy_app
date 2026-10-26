@@ -66,10 +66,28 @@ function TestPlayerComponent() {
   const [confirmModalOpen, setConfirmModalOpen] = useState<boolean>(false);
 
   const [authToken, setAuthToken] = useState<string>("");
+  const [isLockedAccess, setIsLockedAccess] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedToken = localStorage.getItem("indraprastha_token") || "";
+      const storedUser = localStorage.getItem("indraprastha_user");
+      const freeTestId = localStorage.getItem("indraprastha_free_test_id") || "155";
+      let userObj: any = null;
+      if (storedUser) {
+        try {
+          userObj = JSON.parse(storedUser);
+        } catch {}
+      }
+      const hasSub = Boolean(userObj?.has_active_subscription || userObj?.subscription_status === "active");
+
+      // Subscription access guard: Only 1 test (freeTestId) is unlocked if !hasSub
+      if (!hasSub && testId !== "custom" && String(testId) !== String(freeTestId)) {
+        setIsLockedAccess(true);
+        setLoading(false);
+        return;
+      }
+
       setAuthToken(storedToken);
       loadTestQuestions(testId, storedToken);
     }
@@ -89,7 +107,14 @@ function TestPlayerComponent() {
   useEffect(() => {
     if (submitted || loading) return;
     const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setSubmitted(true);
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, [submitted, loading]);
@@ -115,7 +140,7 @@ function TestPlayerComponent() {
             );
             if (parsed.questions && Array.isArray(parsed.questions)) {
               setQuestions(parsed.questions);
-              const duration = parsed.duration_minutes || Math.round(parsed.questions.length * 1.0);
+              const duration = parsed.duration_minutes || Math.max(15, Math.round(parsed.questions.length * 1.0));
               setTimeLeft(duration * 60);
             }
             setLoading(false);
@@ -126,45 +151,38 @@ function TestPlayerComponent() {
         }
       }
 
+      try {
+        // 1. Fetch from reliable internal Next.js API route
+        const localRes = await fetch(`/api/tests/${id}`);
+        if (localRes.ok) {
+          const data = await localRes.json();
+          if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+            setTestInfo(data.test || null);
+            setQuestions(data.questions);
+            const duration = data.test?.duration_minutes || Math.max(15, Math.round(data.questions.length * 1.0));
+            setTimeLeft(duration * 60);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch {
+        // proceed to fallback
+      }
+
       let res = await fetch(`https://api.indraprasthaneetacademy.com/api/content/tests/${id}/questions`, {
         headers: {
-          Authorization: `Bearer ${activeToken}`,
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
           "Content-Type": "application/json",
         },
       });
-
-      if (res.status === 401 || !activeToken) {
-        try {
-          const renew = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: "7703033682", password: "Deepak" }),
-          });
-          const d = await renew.json();
-          if (d.token) {
-            activeToken = d.token;
-            setAuthToken(activeToken);
-            localStorage.setItem("indraprastha_token", activeToken);
-            res = await fetch(`https://api.indraprasthaneetacademy.com/api/content/tests/${id}/questions`, {
-              headers: {
-                Authorization: `Bearer ${activeToken}`,
-                "Content-Type": "application/json",
-              },
-            });
-          }
-        } catch {
-          // ignore
-        }
-      }
 
       if (res.ok) {
         const data = await res.json();
         setTestInfo(data.test || null);
         if (data.questions && Array.isArray(data.questions)) {
           setQuestions(data.questions);
-          if (data.test?.duration_minutes) {
-            setTimeLeft(data.test.duration_minutes * 60);
-          }
+          const duration = data.test?.duration_minutes || Math.max(15, Math.round(data.questions.length * 1.0));
+          setTimeLeft(duration * 60);
         }
       }
     } catch (e) {
@@ -277,25 +295,126 @@ function TestPlayerComponent() {
     return true;
   });
 
+  if (isLockedAccess) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--cream-bg, #FAF6F0)" }}>
+        <StudentNavbar activeTab="tests" />
+        <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+          <div
+            style={{
+              backgroundColor: "var(--cream-card, #FFFFFF)",
+              borderRadius: "24px",
+              border: "1.5px solid var(--border-light, #EDE3DA)",
+              maxWidth: "520px",
+              width: "100%",
+              padding: "40px 32px",
+              textAlign: "center",
+              boxShadow: "0 10px 40px rgba(0, 0, 0, 0.08)",
+            }}
+          >
+            <div style={{ fontSize: "56px", marginBottom: "16px" }}>🔒</div>
+            <div
+              style={{
+                display: "inline-block",
+                padding: "4px 12px",
+                borderRadius: "20px",
+                backgroundColor: "rgba(229, 82, 0, 0.12)",
+                color: "#E55200",
+                fontSize: "12px",
+                fontWeight: 800,
+                marginBottom: "16px",
+                textTransform: "uppercase",
+              }}
+            >
+              Subscription Required
+            </div>
+            <h2 style={{ fontSize: "22px", fontWeight: 900, color: "var(--text-main)", marginBottom: "12px" }}>
+              Unlock Chapterwise NEET Test Series
+            </h2>
+            <p style={{ fontSize: "14px", color: "var(--text-muted)", lineHeight: 1.6, marginBottom: "28px" }}>
+              This test is locked. Without an active subscription, only 1 Free Demo Test is unlocked for practice. Please upgrade your subscription to unlock all 100+ chapterwise tests, grand mocks, and AI scorecards.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <Link
+                href="/subscriptions"
+                style={{
+                  padding: "14px 24px",
+                  borderRadius: "12px",
+                  background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
+                  color: "#FFFFFF",
+                  fontSize: "15px",
+                  fontWeight: 800,
+                  textDecoration: "none",
+                  boxShadow: "0 4px 16px rgba(229, 82, 0, 0.35)",
+                }}
+              >
+                Upgrade / Buy Subscription →
+              </Link>
+              <Link
+                href="/tests"
+                style={{
+                  padding: "12px 24px",
+                  borderRadius: "12px",
+                  backgroundColor: "transparent",
+                  border: "1px solid var(--border-light, #EDE3DA)",
+                  color: "var(--text-main)",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                Back to Tests (Take Free Demo Test)
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--cream-bg, #FAF6F0)" }}>
+    <div
+      style={{
+        height: submitted ? "auto" : "100vh",
+        maxHeight: submitted ? "none" : "100vh",
+        minHeight: "100vh",
+        overflow: submitted ? "auto" : "hidden",
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: "var(--cream-bg, #FAF6F0)",
+      }}
+    >
       <StudentNavbar activeTab="tests" />
 
-      <main style={{ flex: 1, padding: "20px 20px 80px", maxWidth: "1120px", width: "100%", margin: "0 auto" }}>
+      <main
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          padding: submitted ? "20px 20px 80px" : "8px 16px 10px",
+          maxWidth: "1280px",
+          width: "100%",
+          margin: "0 auto",
+          minHeight: 0,
+          overflow: submitted ? "visible" : "hidden",
+          boxSizing: "border-box",
+        }}
+      >
         {/* Top Header Card */}
         <section
           style={{
             backgroundColor: "var(--cream-card, #FFFFFF)",
             border: "1px solid var(--border-light, #EDE3DA)",
-            borderRadius: "20px",
-            padding: "18px 24px",
-            marginBottom: "20px",
+            borderRadius: "16px",
+            padding: submitted ? "18px 24px" : "10px 18px",
+            marginBottom: submitted ? "20px" : "10px",
             boxShadow: "0 4px 20px rgba(0, 0, 0, 0.04)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
-            gap: "16px",
+            gap: "12px",
           }}
         >
           <div>
@@ -472,7 +591,8 @@ function TestPlayerComponent() {
                       setSubmitted(false);
                       setSelectedAnswers({});
                       setMarkedForReview({});
-                      setTimeLeft(testInfo?.duration_minutes ? testInfo.duration_minutes * 60 : 180 * 60);
+                      const reDuration = testInfo?.duration_minutes || Math.max(15, Math.round(questions.length * 1.0));
+                      setTimeLeft(reDuration * 60);
                       setCurrentIndex(0);
                       setReviewMode(false);
                     }}
@@ -927,141 +1047,164 @@ function TestPlayerComponent() {
           /* ========================================================================= */
           /* ACTIVE CBT EXAM INTERFACE (DURING TEST)                                   */
           /* ========================================================================= */
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "24px", alignItems: "start" }}>
+          <div
+            style={{
+              flex: 1,
+              display: "grid",
+              gridTemplateColumns: "1fr 340px",
+              gap: "16px",
+              alignItems: "stretch",
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
             {/* Left: Active Question Box */}
             <div
               style={{
                 backgroundColor: "var(--cream-card, #FFFFFF)",
                 border: "1px solid var(--border-light, #EDE3DA)",
                 borderRadius: "20px",
-                padding: "26px",
+                padding: "18px 22px 12px",
                 boxShadow: "0 4px 20px rgba(0, 0, 0, 0.04)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                height: "100%",
+                boxSizing: "border-box",
+                overflow: "hidden",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-                <span
+              {/* Question Scrollable Content Area */}
+              <div style={{ flex: 1, overflowY: "auto", paddingRight: "6px", marginBottom: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+                  <span
+                    style={{
+                      backgroundColor: "#E55200",
+                      color: "#FFFFFF",
+                      padding: "2px 8px",
+                      borderRadius: "6px",
+                      fontSize: "11.5px",
+                      fontWeight: 800,
+                    }}
+                  >
+                    Question {currentIndex + 1} of {questions.length}
+                  </span>
+
+                  <div style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 700 }}>
+                    {currentQ?.subject} {currentQ?.chapter || currentQ?.topic ? `• ${currentQ.chapter || currentQ.topic}` : ""}
+                  </div>
+                </div>
+
+                {/* Question text */}
+                <p
                   style={{
-                    backgroundColor: "#E55200",
-                    color: "#FFFFFF",
-                    padding: "3px 10px",
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    fontWeight: 800,
+                    fontSize: "15px",
+                    fontWeight: 600,
+                    color: "var(--text-main)",
+                    lineHeight: 1.55,
+                    whiteSpace: "pre-line",
+                    marginBottom: "16px",
                   }}
                 >
-                  Question {currentIndex + 1} of {questions.length}
-                </span>
+                  {currentQ?.question}
+                </p>
 
-                <div style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 700 }}>
-                  {currentQ?.subject} {currentQ?.chapter || currentQ?.topic ? `• ${currentQ.chapter || currentQ.topic}` : ""}
-                </div>
-              </div>
+                {/* Question Image if present */}
+                {(currentQ?.question_image_link || currentQ?.question_image_drive_file_id) && (
+                  <div style={{ marginBottom: "16px" }}>
+                    <FastNetworkImage
+                      url={currentQ?.question_image_link || currentQ?.question_image_drive_file_id}
+                      alt="Question Reference Diagram"
+                      maxHeight="220px"
+                    />
+                  </div>
+                )}
 
-              {/* Question text */}
-              <p
-                style={{
-                  fontSize: "16px",
-                  fontWeight: 600,
-                  color: "var(--text-main)",
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-line",
-                  marginBottom: "20px",
-                }}
-              >
-                {currentQ?.question}
-              </p>
+                {/* Options */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "9px", marginBottom: "8px" }}>
+                  {[
+                    { letter: "A", text: currentQ?.option_a, img: currentQ?.option_a_image_link },
+                    { letter: "B", text: currentQ?.option_b, img: currentQ?.option_b_image_link },
+                    { letter: "C", text: currentQ?.option_c, img: currentQ?.option_c_image_link },
+                    { letter: "D", text: currentQ?.option_d, img: currentQ?.option_d_image_link },
+                  ].map((opt) => {
+                    const isSelected = selectedAnswers[currentQ?.id] === opt.letter;
 
-              {/* Question Image if present */}
-              {(currentQ?.question_image_link || currentQ?.question_image_drive_file_id) && (
-                <div style={{ marginBottom: "20px" }}>
-                  <FastNetworkImage
-                    url={currentQ?.question_image_link || currentQ?.question_image_drive_file_id}
-                    alt="Question Reference Diagram"
-                    maxHeight="320px"
-                  />
-                </div>
-              )}
-
-              {/* Options */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" }}>
-                {[
-                  { letter: "A", text: currentQ?.option_a, img: currentQ?.option_a_image_link },
-                  { letter: "B", text: currentQ?.option_b, img: currentQ?.option_b_image_link },
-                  { letter: "C", text: currentQ?.option_c, img: currentQ?.option_c_image_link },
-                  { letter: "D", text: currentQ?.option_d, img: currentQ?.option_d_image_link },
-                ].map((opt) => {
-                  const isSelected = selectedAnswers[currentQ?.id] === opt.letter;
-
-                  return (
-                    <button
-                      key={opt.letter}
-                      onClick={() => handleSelectOption(opt.letter)}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: "12px",
-                        padding: "13px 16px",
-                        borderRadius: "14px",
-                        border: isSelected ? "2px solid #E55200" : "1.5px solid var(--border-light, #EDE3DA)",
-                        backgroundColor: isSelected ? "rgba(229, 82, 0, 0.08)" : "transparent",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <span
+                    return (
+                      <button
+                        key={opt.letter}
+                        onClick={() => handleSelectOption(opt.letter)}
                         style={{
-                          width: "28px",
-                          height: "28px",
-                          borderRadius: "8px",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "13px",
-                          fontWeight: 900,
-                          backgroundColor: isSelected ? "#E55200" : "rgba(229, 82, 0, 0.08)",
-                          color: isSelected ? "#FFFFFF" : "var(--text-main)",
-                          flexShrink: 0,
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "10px",
+                          padding: "10px 14px",
+                          borderRadius: "12px",
+                          border: isSelected ? "2px solid #E55200" : "1.5px solid var(--border-light, #EDE3DA)",
+                          backgroundColor: isSelected ? "rgba(229, 82, 0, 0.08)" : "transparent",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all 0.15s ease",
                         }}
                       >
-                        {opt.letter}
-                      </span>
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontSize: "14px", color: "var(--text-main)", lineHeight: 1.5, paddingTop: "2px", display: "block" }}>
-                          {opt.text}
+                        <span
+                          style={{
+                            width: "24px",
+                            height: "24px",
+                            borderRadius: "6px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "12px",
+                            fontWeight: 900,
+                            backgroundColor: isSelected ? "#E55200" : "rgba(229, 82, 0, 0.08)",
+                            color: isSelected ? "#FFFFFF" : "var(--text-main)",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {opt.letter}
                         </span>
-                        {opt.img && (
-                          <div style={{ marginTop: "8px" }}>
-                            <FastNetworkImage
-                              url={opt.img}
-                              alt={`Option ${opt.letter}`}
-                              maxHeight="140px"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontSize: "13.5px", color: "var(--text-main)", lineHeight: 1.4, paddingTop: "2px", display: "block" }}>
+                            {opt.text}
+                          </span>
+                          {opt.img && (
+                            <div style={{ marginTop: "6px" }}>
+                              <FastNetworkImage
+                                url={opt.img}
+                                alt={`Option ${opt.letter}`}
+                                maxHeight="120px"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Bottom Nav Controls */}
+              {/* Bottom Nav Controls (Exact Horizontal Line with Submit Test) */}
               <div
                 style={{
                   borderTop: "1px solid var(--border-light, #EDE3DA)",
-                  paddingTop: "18px",
+                  paddingTop: "12px",
+                  minHeight: "50px",
+                  height: "50px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  flexWrap: "wrap",
+                  flexWrap: "nowrap",
                   gap: "10px",
+                  boxSizing: "border-box",
                 }}
               >
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button
                     onClick={handleClearResponse}
                     style={{
-                      padding: "8px 14px",
+                      height: "36px",
+                      padding: "0 12px",
                       borderRadius: "8px",
                       border: "1px solid var(--border-light, #EDE3DA)",
                       backgroundColor: "transparent",
@@ -1069,6 +1212,8 @@ function TestPlayerComponent() {
                       fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
                     }}
                   >
                     Clear Response
@@ -1077,7 +1222,8 @@ function TestPlayerComponent() {
                   <button
                     onClick={toggleMarkForReview}
                     style={{
-                      padding: "8px 14px",
+                      height: "36px",
+                      padding: "0 12px",
                       borderRadius: "8px",
                       border: markedForReview[currentQ?.id] ? "1.5px solid #7C3AED" : "1px solid var(--border-light, #EDE3DA)",
                       backgroundColor: markedForReview[currentQ?.id] ? "rgba(124, 58, 237, 0.1)" : "transparent",
@@ -1085,18 +1231,21 @@ function TestPlayerComponent() {
                       fontSize: "12px",
                       fontWeight: 800,
                       cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
                     }}
                   >
                     {markedForReview[currentQ?.id] ? "★ Marked for Review" : "Mark for Review"}
                   </button>
                 </div>
 
-                <div style={{ display: "flex", gap: "10px" }}>
+                <div style={{ display: "flex", gap: "8px" }}>
                   <button
                     disabled={currentIndex === 0}
                     onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
                     style={{
-                      padding: "8px 16px",
+                      height: "36px",
+                      padding: "0 14px",
                       borderRadius: "8px",
                       border: "1px solid var(--border-light, #EDE3DA)",
                       backgroundColor: "transparent",
@@ -1105,6 +1254,8 @@ function TestPlayerComponent() {
                       fontWeight: 800,
                       cursor: currentIndex === 0 ? "not-allowed" : "pointer",
                       opacity: currentIndex === 0 ? 0.4 : 1,
+                      display: "flex",
+                      alignItems: "center",
                     }}
                   >
                     ← Previous
@@ -1119,7 +1270,8 @@ function TestPlayerComponent() {
                       }
                     }}
                     style={{
-                      padding: "8px 18px",
+                      height: "36px",
+                      padding: "0 16px",
                       borderRadius: "8px",
                       backgroundColor: "#E55200",
                       color: "#FFFFFF",
@@ -1127,6 +1279,9 @@ function TestPlayerComponent() {
                       fontWeight: 800,
                       border: "none",
                       cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
                     }}
                   >
                     {currentIndex < questions.length - 1 ? "Save & Next →" : "Final Submit →"}
@@ -1250,8 +1405,6 @@ function TestPlayerComponent() {
         title={activeVideo?.title}
         subtitle={activeVideo?.subtitle}
       />
-
-      <Footer />
     </div>
   );
 }

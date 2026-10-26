@@ -3,14 +3,38 @@ import "./globals.css";
 import DisableInspect from "@/components/DisableInspect";
 
 export const metadata: Metadata = {
-  title: "Indraprastha NEET Academy – Crack NEET 2026/2027 with NCERT Line-by-Line",
+  metadataBase: new URL("https://www.indraprasthaneetacademy.com"),
+  title: "Indraprastha NEET Academy | NEET Preparation App",
   description:
-    "India's most trusted NEET coaching academy. NCERT Line-by-Line teaching, 70,000+ students trained, 9+ years of excellence. Enroll now for NEET 2026/2027 batch.",
-  keywords: "NEET coaching, NEET 2026, NEET 2027, NCERT coaching, medical entrance, Indraprastha Academy",
+    "Prepare for NEET with chapter-wise MCQs, previous year questions, CBT-mode practice, similar questions and performance analytics.",
+  keywords: [
+    "NEET preparation app",
+    "NEET online question practice",
+    "NEET previous year questions chapter wise",
+    "NEET CBT mock test online",
+    "NEET similar questions practice",
+    "NEET Biology MCQs",
+    "NEET Physics MCQs",
+    "NEET Chemistry practice questions",
+    "Indraprastha NEET Academy",
+  ],
+  alternates: {
+    canonical: "https://www.indraprasthaneetacademy.com",
+  },
   openGraph: {
-    title: "Indraprastha NEET Academy – Crack NEET 2026/2027",
-    description: "India's most trusted NEET coaching. NCERT Line-by-Line teaching methodology.",
+    title: "Indraprastha NEET Academy | NEET Preparation App",
+    description:
+      "Prepare for NEET with chapter-wise MCQs, previous year questions, CBT-mode practice, similar questions and performance analytics.",
+    url: "https://www.indraprasthaneetacademy.com",
+    siteName: "Indraprastha NEET Academy",
     type: "website",
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Indraprastha NEET Academy | NEET Preparation App",
+    description:
+      "Prepare for NEET with chapter-wise MCQs, previous year questions, CBT-mode practice, similar questions and performance analytics.",
   },
 };
 
@@ -20,7 +44,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="dark" style={{ colorScheme: "dark", backgroundColor: "#0F0905" }}>
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="dark" />
@@ -34,22 +58,20 @@ export default function RootLayout({
               (function() {
                 try {
                   var saved = localStorage.getItem('indraprastha_theme');
-                  if (saved === 'light') {
-                    document.documentElement.setAttribute('data-theme', 'light');
-                    document.documentElement.classList.remove('dark-theme');
-                    document.documentElement.classList.add('light-theme');
-                    if (document.body) {
-                      document.body.classList.remove('dark-theme');
-                      document.body.classList.add('light-theme');
-                    }
+                  var isLight = saved === 'light';
+                  var root = document.documentElement;
+                  if (isLight) {
+                    root.setAttribute('data-theme', 'light');
+                    root.classList.remove('dark-theme');
+                    root.classList.add('light-theme');
+                    root.style.colorScheme = 'light';
+                    root.style.backgroundColor = '#FAF6F0';
                   } else {
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                    document.documentElement.classList.add('dark-theme');
-                    document.documentElement.classList.remove('light-theme');
-                    if (document.body) {
-                      document.body.classList.add('dark-theme');
-                      document.body.classList.remove('light-theme');
-                    }
+                    root.setAttribute('data-theme', 'dark');
+                    root.classList.add('dark-theme');
+                    root.classList.remove('light-theme');
+                    root.style.colorScheme = 'dark';
+                    root.style.backgroundColor = '#0F0905';
                   }
                 } catch(e) {}
 
@@ -81,7 +103,28 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="dark-theme">
+      <body suppressHydrationWarning>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var saved = localStorage.getItem('indraprastha_theme');
+                var isLight = saved === 'light';
+                if (isLight) {
+                  document.body.classList.remove('dark-theme');
+                  document.body.classList.add('light-theme');
+                  document.body.setAttribute('data-theme', 'light');
+                  document.body.style.backgroundColor = '#FAF6F0';
+                } else {
+                  document.body.classList.add('dark-theme');
+                  document.body.classList.remove('light-theme');
+                  document.body.setAttribute('data-theme', 'dark');
+                  document.body.style.backgroundColor = '#0F0905';
+                }
+              } catch(e) {}
+            `,
+          }}
+        />
         <DisableInspect />
         {children}
       </body>

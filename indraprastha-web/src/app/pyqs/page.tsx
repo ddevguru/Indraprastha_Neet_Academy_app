@@ -117,12 +117,32 @@ function PyqsPageComponent() {
   const [chapters, setChapters] = useState<ChapterItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [user, setUser] = useState<any>(null);
+  const [subModalOpen, setSubModalOpen] = useState<boolean>(false);
+  const [selectedLockedChapter, setSelectedLockedChapter] = useState<ChapterItem | null>(null);
 
   // Filters & State
   const [filterSubject, setFilterSubject] = useState<string>("All");
   const [filterStandard, setFilterStandard] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>(" ");
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
+
+  const hasActiveSub = Boolean(user?.has_active_subscription || user?.subscription_status === "active");
+
+  const freeChapterId = useMemo(() => {
+    const valid = chapters.find((c) => c.question_count > 0);
+    return valid ? valid.id : (chapters[0]?.id || null);
+  }, [chapters]);
+
+  useEffect(() => {
+    if (freeChapterId && typeof window !== "undefined") {
+      localStorage.setItem("indraprastha_free_pyq_id", String(freeChapterId));
+    }
+  }, [freeChapterId]);
+
+  const isChapterUnlocked = (ch: ChapterItem) => {
+    if (hasActiveSub) return true;
+    return freeChapterId !== null && ch.id === freeChapterId;
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -217,6 +237,11 @@ function PyqsPageComponent() {
 
   // Handle Chapter Solve Navigation
   const handleSolveChapter = (ch: ChapterItem) => {
+    if (!isChapterUnlocked(ch)) {
+      setSelectedLockedChapter(ch);
+      setSubModalOpen(true);
+      return;
+    }
     const title = encodeURIComponent(ch.title);
     const subject = encodeURIComponent(ch.subject);
     router.push(`/pyqs/solve?chapterId=${ch.id}&title=${title}&subject=${subject}`);
@@ -370,6 +395,76 @@ function PyqsPageComponent() {
             </div>
           </div>
         </section>
+
+        {/* ════════ SUBSCRIPTION STATUS BANNER ════════ */}
+        {!hasActiveSub ? (
+          <div
+            style={{
+              backgroundColor: "rgba(229, 82, 0, 0.08)",
+              border: "1.5px solid rgba(229, 82, 0, 0.25)",
+              borderRadius: "16px",
+              padding: "16px 20px",
+              marginBottom: "28px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "14px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span style={{ fontSize: "24px" }}>🎁</span>
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--text-main)" }}>
+                  Free Demo Mode: 1 Full Chapterwise PYQ Collection Unlocked
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  Subscribe to unlock all {chapters.length || "95+"} chapters of 15+ years NEET PYQs with audited step-by-step solutions.
+                </div>
+              </div>
+            </div>
+            <Link
+              href="/subscriptions"
+              style={{
+                padding: "8px 18px",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
+                color: "#FFFFFF",
+                fontSize: "12px",
+                fontWeight: 800,
+                textDecoration: "none",
+                boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Unlock All PYQ Chapters with Subscription →
+            </Link>
+          </div>
+        ) : (
+          <div
+            style={{
+              backgroundColor: "rgba(16, 185, 129, 0.08)",
+              border: "1.5px solid rgba(16, 185, 129, 0.25)",
+              borderRadius: "14px",
+              padding: "12px 18px",
+              marginBottom: "28px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "18px" }}>✨</span>
+              <div style={{ fontSize: "13px", fontWeight: 800, color: "#10B981" }}>
+                Active Plan: {user?.subscription_plan || "Pro Target Batch"}
+                <span style={{ fontSize: "12px", color: "var(--text-muted)", marginLeft: "8px", fontWeight: 500 }}>
+                  • All 15+ years chapterwise NEET PYQs unlocked!
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ════════ SEARCH & FILTER CONTROLS ════════ */}
         <section
@@ -666,18 +761,32 @@ function PyqsPageComponent() {
                                 </span>
                               </div>
 
-                              <span
-                                style={{
-                                  fontSize: "11px",
-                                  fontWeight: 800,
-                                  padding: "3px 8px",
-                                  borderRadius: "6px",
-                                  backgroundColor: hasPyqs ? "rgba(16, 185, 129, 0.12)" : "rgba(229, 82, 0, 0.08)",
-                                  color: hasPyqs ? "#059669" : "#E55200",
-                                }}
-                              >
-                                {hasPyqs ? `${ch.question_count} PYQs` : "NCERT Drill"}
-                              </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 800,
+                                    padding: "3px 8px",
+                                    borderRadius: "6px",
+                                    backgroundColor: isChapterUnlocked(ch) ? "rgba(16, 185, 129, 0.12)" : "rgba(229, 82, 0, 0.1)",
+                                    color: isChapterUnlocked(ch) ? "#059669" : "#E55200",
+                                  }}
+                                >
+                                  {isChapterUnlocked(ch) ? (hasActiveSub ? "Unlocked ✓" : "✨ Free Demo Chapter") : "🔒 Pro Only"}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 800,
+                                    padding: "3px 8px",
+                                    borderRadius: "6px",
+                                    backgroundColor: hasPyqs ? "rgba(16, 185, 129, 0.12)" : "rgba(229, 82, 0, 0.08)",
+                                    color: hasPyqs ? "#059669" : "#E55200",
+                                  }}
+                                >
+                                  {hasPyqs ? `${ch.question_count} PYQs` : "NCERT Drill"}
+                                </span>
+                              </div>
                             </div>
 
                             {/* Chapter Title */}
@@ -713,10 +822,10 @@ function PyqsPageComponent() {
                                 gap: "6px",
                                 fontSize: "13px",
                                 fontWeight: 800,
-                                color: color,
+                                color: isChapterUnlocked(ch) ? color : "#E55200",
                               }}
                             >
-                              <span>Solve PYQs</span>
+                              <span>{isChapterUnlocked(ch) ? "Solve PYQs" : "🔒 Unlock Chapter"}</span>
                               <span>→</span>
                             </div>
                           </div>
@@ -876,6 +985,152 @@ function PyqsPageComponent() {
               </div>
             )}
           </>
+        )}
+        {/* ════════ SUBSCRIPTION UNLOCK MODAL ════════ */}
+        {subModalOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.65)",
+              backdropFilter: "blur(6px)",
+              zIndex: 9999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "16px",
+            }}
+            onClick={() => setSubModalOpen(false)}
+          >
+            <div
+              style={{
+                backgroundColor: "var(--cream-card, #FFFFFF)",
+                borderRadius: "20px",
+                maxWidth: "520px",
+                width: "100%",
+                padding: "28px",
+                border: "1.5px solid var(--border-light, #EDE3DA)",
+                boxShadow: "0 20px 50px rgba(0, 0, 0, 0.35)",
+                position: "relative",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "24px" }}>🔒</span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#E55200",
+                      backgroundColor: "rgba(229, 82, 0, 0.1)",
+                      padding: "3px 10px",
+                      borderRadius: "6px",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Subscription Required
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubModalOpen(false)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    fontSize: "20px",
+                    cursor: "pointer",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <h3 style={{ fontSize: "20px", fontWeight: 800, color: "var(--text-main)", marginBottom: "8px" }}>
+                Unlock {selectedLockedChapter?.title || "Chapterwise NEET PYQs"}
+              </h3>
+
+              <p style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.6, marginBottom: "20px" }}>
+                You are currently exploring the Free Demo. 1 Complete Chapter of PYQs is unlocked for you. To practice all 15+ years of chapterwise NEET PYQs with audited step-by-step solutions and AI Similar Questions, please upgrade to a subscription plan.
+              </p>
+
+              <div
+                style={{
+                  backgroundColor: "rgba(229, 82, 0, 0.04)",
+                  border: "1px solid rgba(229, 82, 0, 0.12)",
+                  borderRadius: "12px",
+                  padding: "14px 16px",
+                  marginBottom: "24px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  fontSize: "13px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-main)" }}>
+                  <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
+                  <span>10,000+ NCERT Line-by-Line &amp; 15+ Years PYQs</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-main)" }}>
+                  <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
+                  <span>Audited Step-by-Step Derivations &amp; Video Explanations</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-main)" }}>
+                  <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
+                  <span>AI Solve Similar Questions Generator for Every MCQ</span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <Link
+                  href="/subscriptions"
+                  style={{
+                    flex: 1,
+                    minWidth: "180px",
+                    padding: "12px 20px",
+                    borderRadius: "10px",
+                    background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
+                    color: "#FFFFFF",
+                    fontSize: "14px",
+                    fontWeight: 800,
+                    textAlign: "center",
+                    textDecoration: "none",
+                    boxShadow: "0 4px 12px rgba(229, 82, 0, 0.3)",
+                  }}
+                >
+                  Explore Subscription Plans →
+                </Link>
+                {freeChapterId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubModalOpen(false);
+                      const freeCh = chapters.find((c) => c.id === freeChapterId);
+                      if (freeCh) {
+                        const title = encodeURIComponent(freeCh.title);
+                        const subject = encodeURIComponent(freeCh.subject);
+                        router.push(`/pyqs/solve?chapterId=${freeCh.id}&title=${title}&subject=${subject}`);
+                      }
+                    }}
+                    style={{
+                      padding: "12px 18px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--border-light, #EDE3DA)",
+                      backgroundColor: "transparent",
+                      color: "var(--text-main)",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      textAlign: "center",
+                    }}
+                  >
+                    Solve Free Demo Chapter
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </main>
 

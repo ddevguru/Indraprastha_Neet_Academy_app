@@ -199,43 +199,40 @@ function PracticePageComponent() {
   }, [searchParams]);
 
   const fetchPracticeSets = async (token: string) => {
+    try {
+      // 1. Fetch from reliable Next.js API route
+      const localRes = await fetch("/api/practice");
+      if (localRes.ok) {
+        const data = await localRes.json();
+        if (data.practiceSets && Array.isArray(data.practiceSets) && data.practiceSets.length > 0) {
+          setSets(data.practiceSets);
+          if (typeof window !== "undefined" && data.practiceSets[0]?.id) {
+            localStorage.setItem("indraprastha_free_practice_id", String(data.practiceSets[0].id));
+          }
+          setLoading(false);
+          return;
+        }
+      }
+    } catch {
+      // proceed to fallback
+    }
+
     let activeToken = token;
     try {
-      let res = await fetch("https://api.indraprasthaneetacademy.com/api/content/practice-sets", {
+      const res = await fetch("https://api.indraprasthaneetacademy.com/api/content/practice-sets", {
         headers: {
-          Authorization: `Bearer ${activeToken}`,
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
           "Content-Type": "application/json",
         },
       });
-
-      if (res.status === 401 || !activeToken) {
-        try {
-          const renewRes = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: "7703033682", password: "Deepak" }),
-          });
-          const renewData = await renewRes.json();
-          if (renewData.token) {
-            activeToken = renewData.token;
-            setAuthToken(activeToken);
-            localStorage.setItem("indraprastha_token", activeToken);
-            res = await fetch("https://api.indraprasthaneetacademy.com/api/content/practice-sets", {
-              headers: {
-                Authorization: `Bearer ${activeToken}`,
-                "Content-Type": "application/json",
-              },
-            });
-          }
-        } catch {
-          // ignore
-        }
-      }
 
       if (res.ok) {
         const data = await res.json();
         if (data.practiceSets && Array.isArray(data.practiceSets)) {
           setSets(data.practiceSets);
+          if (typeof window !== "undefined" && data.practiceSets[0]?.id) {
+            localStorage.setItem("indraprastha_free_practice_id", String(data.practiceSets[0].id));
+          }
         }
       }
     } catch (e) {
@@ -373,12 +370,15 @@ function PracticePageComponent() {
 
       const questionFetches = setsToQuery.map(async (s) => {
         try {
-          const res = await fetch(`https://api.indraprasthaneetacademy.com/api/content/practice-sets/${s.id}/questions`, {
-            headers: {
-              Authorization: `Bearer ${activeToken}`,
-              "Content-Type": "application/json",
-            },
-          });
+          let res = await fetch(`/api/practice/${s.id}`);
+          if (!res.ok) {
+            res = await fetch(`https://api.indraprasthaneetacademy.com/api/content/practice-sets/${s.id}/questions`, {
+              headers: {
+                ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+                "Content-Type": "application/json",
+              },
+            });
+          }
           if (res.ok) {
             const data = await res.json();
             return (data.questions || []).map((q: any) => ({

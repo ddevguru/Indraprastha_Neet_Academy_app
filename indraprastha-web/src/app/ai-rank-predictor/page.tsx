@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { applyTheme, getStoredTheme, ThemeMode } from "@/lib/theme";
 import "./predictor.css";
 
 /* ─── COLLEGE DATA ─── */
@@ -138,18 +139,17 @@ export default function AiRankPredictorPage() {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("indraprastha_theme") as "light" | "dark" | null;
-    const initialTheme = savedTheme === "light" ? "light" : "dark";
+    const initialTheme = getStoredTheme();
     setTheme(initialTheme);
-    if (initialTheme === "dark") {
-      document.body.classList.add("dark-theme");
-      document.body.classList.remove("light-theme");
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.body.classList.remove("dark-theme");
-      document.body.classList.add("light-theme");
-      document.documentElement.setAttribute("data-theme", "light");
-    }
+    applyTheme(initialTheme);
+
+    const handleThemeChange = (e: any) => {
+      if (e.detail?.theme) {
+        setTheme(e.detail.theme);
+      }
+    };
+    window.addEventListener("indraprastha_theme_change", handleThemeChange);
+    return () => window.removeEventListener("indraprastha_theme_change", handleThemeChange);
   }, []);
 
   // Calculated State — results ONLY show when "Calculate My Rank" is clicked!
@@ -319,7 +319,9 @@ export default function AiRankPredictorPage() {
 
   // Toggle Theme
   const toggleTheme = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    const next: ThemeMode = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    applyTheme(next);
   };
 
   return (

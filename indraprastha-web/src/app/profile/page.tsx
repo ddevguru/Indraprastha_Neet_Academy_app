@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import StudentNavbar, { StudentUserProfile } from "@/components/StudentNavbar";
 import Footer from "@/components/Footer";
+import { applyTheme, getStoredTheme, ThemeMode } from "@/lib/theme";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -23,14 +24,22 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const storedTheme = (localStorage.getItem("indraprastha_theme") === "light" ? "light" : "dark");
-      setTheme(storedTheme);
+      const initialTheme = getStoredTheme();
+      setTheme(initialTheme);
+      applyTheme(initialTheme);
+
+      const handleThemeChange = (e: any) => {
+        if (e.detail?.theme) {
+          setTheme(e.detail.theme);
+        }
+      };
+      window.addEventListener("indraprastha_theme_change", handleThemeChange);
 
       const storedUser = localStorage.getItem("indraprastha_user");
       const storedToken = localStorage.getItem("indraprastha_token");
       if (!storedUser && !storedToken) {
         router.push("/login");
-        return;
+        return () => window.removeEventListener("indraprastha_theme_change", handleThemeChange);
       }
 
       if (storedUser) {
@@ -45,6 +54,8 @@ export default function ProfilePage() {
       if (storedToken) {
         fetchProfileAndStats(storedToken);
       }
+
+      return () => window.removeEventListener("indraprastha_theme_change", handleThemeChange);
     }
   }, [router]);
 
@@ -97,18 +108,9 @@ export default function ProfilePage() {
   };
 
   const handleToggleTheme = () => {
-    const nextTheme = theme === "light" ? "dark" : "light";
+    const nextTheme: ThemeMode = theme === "light" ? "dark" : "light";
     setTheme(nextTheme);
-    localStorage.setItem("indraprastha_theme", nextTheme);
-    if (nextTheme === "dark") {
-      document.body.classList.add("dark-theme");
-      document.body.classList.remove("light-theme");
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.body.classList.remove("dark-theme");
-      document.body.classList.add("light-theme");
-      document.documentElement.setAttribute("data-theme", "light");
-    }
+    applyTheme(nextTheme);
   };
 
   const handleSignOut = () => {

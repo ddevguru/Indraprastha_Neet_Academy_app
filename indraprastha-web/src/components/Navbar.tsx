@@ -3,15 +3,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { applyTheme, getStoredTheme, ThemeMode } from "@/lib/theme";
 
 interface NavbarProps {
-  activePage?: "home" | "target-batches" | "ai-rank-predictor" | "methodology" | "legal" | "login";
+  activePage?: "home" | "target-batches" | "ai-rank-predictor" | "methodology" | "legal" | "login" | "tests" | "pyqs" | "practice";
   currentTheme?: "light" | "dark";
   onThemeToggle?: (newTheme: "light" | "dark") => void;
 }
 
 export default function Navbar({ activePage, currentTheme, onThemeToggle }: NavbarProps) {
-  const [theme, setTheme] = useState<"light" | "dark">(currentTheme || "dark");
+  const [theme, setTheme] = useState<ThemeMode>(currentTheme || "dark");
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -23,19 +24,17 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
   }, []);
 
   useEffect(() => {
-    // Default to dark mode across all pages
-    const savedTheme = localStorage.getItem("indraprastha_theme") as "light" | "dark" | null;
-    const initialTheme = currentTheme || (savedTheme === "light" ? "light" : "dark");
+    const initialTheme = currentTheme || getStoredTheme();
     setTheme(initialTheme);
-    if (initialTheme === "dark") {
-      document.body.classList.add("dark-theme");
-      document.body.classList.remove("light-theme");
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.body.classList.remove("dark-theme");
-      document.body.classList.add("light-theme");
-      document.documentElement.setAttribute("data-theme", "light");
-    }
+    applyTheme(initialTheme);
+
+    const handleThemeChange = (e: any) => {
+      if (e.detail?.theme) {
+        setTheme(e.detail.theme);
+      }
+    };
+    window.addEventListener("indraprastha_theme_change", handleThemeChange);
+    return () => window.removeEventListener("indraprastha_theme_change", handleThemeChange);
   }, [currentTheme]);
 
   useEffect(() => {
@@ -60,18 +59,9 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
   }, [isMobileMenuOpen]);
 
   const toggleTheme = () => {
-    const nextTheme = theme === "light" ? "dark" : "light";
+    const nextTheme: ThemeMode = theme === "light" ? "dark" : "light";
     setTheme(nextTheme);
-    localStorage.setItem("indraprastha_theme", nextTheme);
-    if (nextTheme === "dark") {
-      document.body.classList.add("dark-theme");
-      document.body.classList.remove("light-theme");
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.body.classList.remove("dark-theme");
-      document.body.classList.add("light-theme");
-      document.documentElement.setAttribute("data-theme", "light");
-    }
+    applyTheme(nextTheme);
     if (onThemeToggle) {
       onThemeToggle(nextTheme);
     }
@@ -193,13 +183,18 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
         {/* Right Action Buttons */}
         <div className="pred-nav-actions">
           <button
+            id="nav-theme-toggle-btn"
             onClick={toggleTheme}
             className="theme-toggle-btn"
             title="Toggle Light / Dark Mode"
             aria-label="Toggle Theme"
+            type="button"
           >
-            <span style={{ whiteSpace: "nowrap" }}>
-              {theme === "light" ? "☀️ / 🌙" : "🌙 / ☀️"}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "14px" }}>{theme === "light" ? "☀️" : "🌙"}</span>
+              <span className="theme-toggle-label" style={{ fontWeight: 800 }}>
+                {theme === "light" ? "Light" : "Dark"}
+              </span>
             </span>
           </button>
 
@@ -318,6 +313,24 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
             </li>
             <li>
               <Link
+                href="/neet-test-series"
+                className={`mobile-nav-link ${activePage === "tests" ? "active" : ""}`}
+                onClick={closeMobile}
+              >
+                <span>🎯 NEET Test Series 2027</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/neet-pyq-chapterwise"
+                className={`mobile-nav-link ${activePage === "pyqs" ? "active" : ""}`}
+                onClick={closeMobile}
+              >
+                <span>📜 NEET PYQ Chapterwise</span>
+              </Link>
+            </li>
+            <li>
+              <Link
                 href="/ai-rank-predictor"
                 className={`mobile-nav-link ${activePage === "ai-rank-predictor" ? "active" : ""}`}
                 onClick={closeMobile}
@@ -366,6 +379,48 @@ export default function Navbar({ activePage, currentTheme, onThemeToggle }: Navb
           </ul>
 
           <div className="mobile-drawer-footer">
+            {/* Mobile Mode Switcher */}
+            <div style={{ marginBottom: "12px" }}>
+              <button
+                type="button"
+                id="drawer-theme-toggle-btn"
+                onClick={toggleTheme}
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-light, #EDE3DA)",
+                  backgroundColor: "var(--cream-bg, #FAF6F0)",
+                  color: "var(--text-main, #140A03)",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "18px" }}>{theme === "light" ? "☀️" : "🌙"}</span>
+                  <span>Appearance Mode</span>
+                </span>
+                <span
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    backgroundColor: theme === "light" ? "#E55200" : "#FF6B00",
+                    color: "#FFFFFF",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                  }}
+                >
+                  {theme === "light" ? "Switch to Dark 🌙" : "Switch to Light ☀️"}
+                </span>
+              </button>
+            </div>
+
             <div className="mobile-phone-cta">
               <a href="tel:+917703033682" className="mobile-phone-link">
                 <span>📞 +91 77030 33682</span>

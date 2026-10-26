@@ -1,8 +1,11 @@
 "use client";
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import MentorshipBannerSlider from "@/components/MentorshipBannerSlider";
 
 /* ─── DATA ─── */
 const navItems = [
@@ -30,61 +33,54 @@ const statsBar = [
 
 const batches = [
   {
-    badge: "BEST SELLER",
+    badge: "TARGET BATCH",
     badgeType: "orange",
     subBadge: "CLASS 11 + 12 COMPREHENSIVE",
-    name: "NEET 2026 Rank Booster",
-    desc: "Complete syllabus revision, master problem solving and 50+ full-length mock tests.",
-    price: "₹14,999",
-    oldPrice: "₹24,999",
-    save: "SAVE 40%",
+    name: "Target NEET 2027",
+    desc: "Complete 2-year syllabus mastery with 100+ questions per chapter, CBT tests & doctor mentorship.",
+    price: "₹2,999",
+    oldPrice: "₹5,999",
+    save: "SAVE 50%",
     featured: true,
     feats: [
-      "350+ Live Interactive Masterclasses",
-      "15,000+ NCERT Line-by-Line Question Vault",
-      "Daily 1-on-1 Faculty Doubt Clearance Desks",
-      "Printed Theory & Exemplar Hardcopy Dispatch",
+      "Chapterwise pyq",
+      "Chapterwise test Series ( 45 question in 45 minutes )",
+      "Practice Session of Every Chapter ( one session includes more than 100 question in every chapter )",
+      "Grant test including full syllabus",
+      "Subject Wise Test",
+      "Custom Module for Wrong & bookmarked question",
+      "Experince CBT Mode On our website Any time on all the questions",
+      "Pratice anywhere anytime On our application",
+      "Mentorship By Dr Rahul Kumar ( only for paid subscribers )",
+      "24*7 Doubt solving faculty in our exclusive telegram channel ( only for paid Subscribers )",
     ],
-    cta: "Enroll Now for NEET 2026",
+    cta: "Enroll for Target NEET 2027 • ₹2,999",
     secondary: "Request Mobile Brochure (PDF)",
   },
   {
-    badge: "2-YEAR FOUNDATION",
+    badge: "TARGET BATCH",
     badgeType: "green",
-    subBadge: "CLASS 11 (EARLY STARTER)",
-    name: "NEET 2027 Foundation",
-    desc: "Comprehensive Class 11 & Class 12 preparation for foundational mastery.",
-    price: "₹18,999",
-    oldPrice: "₹29,999",
-    save: "SAVE 36%",
+    subBadge: "NEET 2028 ASPIRANTS",
+    name: "Target NEET 2028",
+    desc: "Complete syllabus & comprehensive problem-solving drills tailored for NEET 2028 aspirants.",
+    price: "₹5,500",
+    oldPrice: "₹9,999",
+    save: "SAVE 45%",
     featured: false,
     feats: [
-      "Gradual Concept Building: Fundamentals to Olympiad",
-      "Physics & Chemistry Mathematical Bridge Modules",
-      "School Board Exam + NEET Integrated Calendar",
-      "Bi-weekly Parent-Teacher Counseling Calls",
+      "Chapterwise pyq",
+      "Chapterwise test Series ( 45 question in 45 minutes )",
+      "Practice Session of Every Chapter ( one session includes more than 100 question in every chapter )",
+      "Grant test including full syllabus",
+      "Subject Wise Test",
+      "Custom Module for Wrong & bookmarked question",
+      "Experince CBT Mode On our website Any time on all the questions",
+      "Pratice anywhere anytime On our application",
+      "Mentorship By Dr Rahul Kumar ( only for paid subscribers )",
+      "24*7 Doubt solving faculty in our exclusive telegram channel ( only for paid Subscribers )",
     ],
-    cta: "Enroll Now for NEET 2027",
-    secondary: "Request Counseling Session",
-  },
-  {
-    badge: "INTENSIVE REVISION",
-    badgeType: "sub",
-    subBadge: "DROPPER SPECIAL RAPID",
-    name: "Dropper Special Rapid",
-    desc: "High-speed NEET revision focusing on high-yield topics, speed drills, and score jump tactics.",
-    price: "₹12,499",
-    oldPrice: "₹19,999",
-    save: "SAVE 37%",
-    featured: false,
-    feats: [
-      "Zero To 700+ High-Yield Topic Prioritization",
-      "15 Years Full Extreme Engineering Sessions",
-      "Personal Weak-Topic AI Diagnosis Analytics",
-      "Weekly Full-Syllabus Time-Simulation Tests",
-    ],
-    cta: "Join Dropper Batch",
-    secondary: "Review Detailed Schedule",
+    cta: "Enroll for Target NEET 2028 • ₹5,500",
+    secondary: "Request Mobile Brochure (PDF)",
   },
 ];
 
@@ -138,8 +134,103 @@ const achievers = [
   },
 ];
 
+const homepageFaqs = [
+  {
+    q: "What is Indraprastha NEET Academy?",
+    a: "Indraprastha NEET Academy is a NEET preparation platform offering question practice, chapter-wise previous year questions, CBT-mode tests, performance analytics and doubt-solving support.",
+  },
+  {
+    q: "How can I practise questions for NEET online?",
+    a: "You can practise NEET questions online by selecting a subject or chapter, answering questions, reviewing your performance and revisiting concepts that need more practice.",
+  },
+  {
+    q: "Does Indraprastha NEET Academy provide NEET practice tests?",
+    a: "The platform offers online question practice and CBT-mode tests to help students practise in an exam-style interface. Check the current app or website for the available tests.",
+  },
+  {
+    q: "Can I prepare for NEET Biology, Physics and Chemistry on the platform?",
+    a: "Yes. The platform is designed for NEET preparation across Biology, Physics and Chemistry, with subject-wise and chapter-wise question practice.",
+  },
+];
+
 export default function Page() {
+  const router = useRouter();
   const [selectedOption, setSelectedOption] = useState<number>(0);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  const handleHeroNavigate = (destination: string) => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("indraprastha_token");
+      const user = localStorage.getItem("indraprastha_user");
+      if (token || user) {
+        router.push(destination);
+      } else {
+        router.push(`/login?redirect=${encodeURIComponent(destination)}`);
+      }
+    }
+  };
+
+  const handleEnrollClick = (batch: (typeof batches)[0]) => {
+    const rawPrice = batch.price.replace(/\D/g, "");
+    const packageId = batch.name.includes("2028") ? 2 : 1;
+    const batchYear = batch.name.includes("2028") ? "2028" : "2027";
+
+    if (typeof window === "undefined") return;
+
+    const token = localStorage.getItem("indraprastha_token");
+    const storedUser = localStorage.getItem("indraprastha_user");
+    let user: any = null;
+    if (storedUser) {
+      try {
+        user = JSON.parse(storedUser);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!token) {
+      // Not logged in -> send to login/signup with parameters to trigger Razorpay after auth
+      router.push(
+        `/login?redirect=/subscriptions&enrollBatch=${batchYear}&amount=${rawPrice}&packageId=${packageId}&autoRazorpay=true`
+      );
+      return;
+    }
+
+    const pl = String(
+      user?.preferred_plan ||
+      user?.preferredPlan ||
+      user?.subscription_plan ||
+      user?.subscriptionPlan ||
+      user?.plan ||
+      ""
+    ).toLowerCase();
+    const p = String(user?.phone || user?.phoneNumber || "").replace(/\D/g, "");
+    const n = String(user?.full_name || user?.name || "").toLowerCase();
+
+    const isStarterOrDeepak =
+      pl.includes("starter") ||
+      pl.includes("2027") ||
+      p.endsWith("7028196172") ||
+      n.includes("deepak");
+
+    // Logged in: check if user already has an active subscription
+    const hasActiveSubscription = Boolean(
+      user?.has_active_subscription ||
+      user?.subscription_status === "active" ||
+      isStarterOrDeepak
+    );
+
+    if (hasActiveSubscription) {
+      alert("Aapka Target NEET 2027 plan already active hai! Redirecting to your dashboard.");
+      router.push("/dashboard");
+      return;
+    }
+
+    // Logged in but not subscribed -> go directly to subscriptions page and trigger Razorpay
+    router.push(
+      `/subscriptions?enrollBatch=${batchYear}&amount=${rawPrice}&packageId=${packageId}&autoRazorpay=true`
+    );
+  };
 
   return (
     <>
@@ -149,29 +240,79 @@ export default function Page() {
       {/* ════════ HERO SECTION ════════ */}
       <section className="hero-section has-texture" id="home">
         <div className="hero-container">
-          {/* Left Column Text */}
+          {/* Left Column Text matching image */}
           <div>
             <div className="hero-pill-tag">
-              <span>🔥 INDIA&apos;S MOST TRUSTED NEET 2026/2027 TARGET BATCHES</span>
-              <span className="tag-sub">⚡ NEET Exam Engine Aligned</span>
+              <span style={{ color: "#E55200", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", fontSize: "11px" }}>
+                INDRAPRASTHA NEET ACADEMY
+              </span>
             </div>
 
-            <h1 className="hero-title">
-              Crack NEET 2026/2027 with{" "}
-              <span className="highlight-underline">NCERT Line-by-Line</span> Precision & Disciplined Practice
+            <h1 className="hero-title" style={{ marginBottom: "12px" }}>
+              NEET Preparation Through <span className="highlight-underline">Smart Question Practice</span>
             </h1>
 
-            <p className="hero-subtitle">
-              Access 10,000+ NCERT-mapped MCQs, 15+ years chapter-wise PYQs, full syllabus NEET mock tests, and real-time AI performance analytics designed exclusively for future PRE-PG rankers.
+            <div
+              style={{
+                fontSize: "1.25rem",
+                fontWeight: 700,
+                color: "var(--text-main, #332014)",
+                marginBottom: "12px",
+                lineHeight: 1.4,
+              }}
+            >
+              Start Your NEET 2027 Practice · Chapterwise PYQs &amp; CBT Test Series
+            </div>
+
+            <p className="hero-subtitle" style={{ marginBottom: "28px" }}>
+              Prepare chapter by chapter with dedicated previous year question practice and chapterwise tests for NEET 2027.
             </p>
 
-            <div className="hero-cta-group">
-              <a href="/target-batches" className="btn-primary-hero btn-orange-leather">
-                <span>Explore Target Batches →</span>
-              </a>
-              <a href="#app" className="btn-secondary-hero">
-                📥 Download Student App
-              </a>
+            <div className="hero-cta-group" style={{ display: "flex", flexWrap: "wrap", gap: "14px", marginBottom: "32px" }}>
+              <button
+                type="button"
+                onClick={() => handleHeroNavigate("/tests")}
+                className="btn-primary-hero btn-orange-leather"
+                style={{
+                  cursor: "pointer",
+                  border: "none",
+                  fontSize: "15px",
+                  fontWeight: 800,
+                  padding: "14px 26px",
+                  borderRadius: "12px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  backgroundColor: "#A8432A",
+                  color: "#FFFFFF",
+                  boxShadow: "0 4px 14px rgba(168, 67, 42, 0.35)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <span>Chapterwise NEET Test Series →</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleHeroNavigate("/pyqs")}
+                className="btn-secondary-hero"
+                style={{
+                  cursor: "pointer",
+                  fontSize: "15px",
+                  fontWeight: 800,
+                  padding: "14px 26px",
+                  borderRadius: "12px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  backgroundColor: "rgba(229, 82, 0, 0.04)",
+                  color: "#E55200",
+                  border: "1.5px solid #E55200",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <span>Chapterwise NEET PYQs →</span>
+              </button>
             </div>
 
             <div className="hero-rating-row">
@@ -266,18 +407,9 @@ export default function Page() {
             </a>
           </div>
 
-          {/* Featured Dr. Rahul Mentorship Banner Showcase */}
+          {/* Featured Platform Showcase Slider (CBT Mode, Similar Questions, 24x7 Doubt Solving) */}
           <div className="mentorship-banner-card">
-            <div className="mentorship-banner-image-wrapper">
-              <Image
-                src="/dr_rahul_mentorship.png"
-                alt="Personalised Mentorship by Dr Rahul Kumar – Indraprastha NEET Academy"
-                width={1200}
-                height={450}
-                priority
-                className="mentorship-banner-img"
-              />
-            </div>
+            <MentorshipBannerSlider />
 
             {/* Value Highlights Grid Below Banner */}
             <div className="mentorship-features-grid">
@@ -341,7 +473,7 @@ export default function Page() {
         <div className="section-header-row">
           <div>
             <span className="section-label">INDRAPRASTHA MEDICAL COURSES</span>
-            <h2 className="section-title">Featured Target Batches for NEET 2026/27</h2>
+            <h2 className="section-title">Featured Target Batches for NEET 2027 &amp; 2028</h2>
             <p className="section-subtitle">
               Built strictly adhering to the revised NMC syllabus with timed module simulations and verified doctor-faculty mentorship.
             </p>
@@ -377,12 +509,17 @@ export default function Page() {
               </div>
 
               <div>
-                <a href="#enroll" className="btn-batch-enroll btn-orange-leather">
+                <button
+                  type="button"
+                  onClick={() => handleEnrollClick(b)}
+                  className="btn-batch-enroll btn-orange-leather"
+                  style={{ width: "100%", cursor: "pointer", border: "none" }}
+                >
                   <span>{b.cta}</span>
-                </a>
-                <a href="#brochure" className="btn-batch-secondary">
+                </button>
+                <Link href="/target-batches" className="btn-batch-secondary">
                   {b.secondary}
-                </a>
+                </Link>
               </div>
             </div>
           ))}
@@ -476,13 +613,82 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="app-buttons-group">
-              <a href="#" className="btn-apk-download btn-orange-leather">
-                <span>Direct APK Download (v4.2)</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", marginTop: "24px" }}>
+              {/* Google Play Store Button */}
+              <a
+                href="https://play.google.com/store/apps/details?id=com.indraprastha.neetacademy&pcampaignid=web_share"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "12px 22px",
+                  background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
+                  color: "#FFFFFF",
+                  borderRadius: "12px",
+                  textDecoration: "none",
+                  fontWeight: 800,
+                  fontSize: "15px",
+                  boxShadow: "0 6px 20px rgba(229, 82, 0, 0.4)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3.6 1.8C3.3 2.1 3.1 2.6 3.1 3.2V20.8C3.1 21.4 3.3 21.9 3.6 22.2L3.7 22.3L13.8 12.2V11.8L3.7 1.7L3.6 1.8Z" fill="#00D2FF"/>
+                  <path d="M17.2 15.6L13.8 12.2V11.8L17.2 8.4L17.3 8.5L21.3 10.8C22.4 11.4 22.4 12.6 21.3 13.2L17.3 15.5L17.2 15.6Z" fill="#FFD400"/>
+                  <path d="M17.3 15.5L13.8 12L3.6 22.2C4 22.6 4.7 22.7 5.5 22.2L17.3 15.5Z" fill="#FF3333"/>
+                  <path d="M17.3 8.5L5.5 1.8C4.7 1.3 4 1.4 3.6 1.8L13.8 12L17.3 8.5Z" fill="#00E676"/>
+                </svg>
+                <div style={{ textAlign: "left" }}>
+                  <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.8px", textTransform: "uppercase", display: "block", opacity: 0.9 }}>
+                    GET IT ON
+                  </span>
+                  <span style={{ fontSize: "16px", fontWeight: 900, letterSpacing: "-0.2px", display: "block", lineHeight: 1.1 }}>
+                    Google Play
+                  </span>
+                </div>
               </a>
-              <a href="#" className="btn-store-dark">
-                Google Play Store
-              </a>
+
+              {/* QR Code Scan Card */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "8px 16px 8px 10px",
+                  backgroundColor: "rgba(255, 255, 255, 0.06)",
+                  border: "1px solid rgba(229, 82, 0, 0.35)",
+                  borderRadius: "14px",
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                <Image
+                  src="/app_qr_code.png"
+                  alt="Indraprastha NEET Academy App QR Code"
+                  width={66}
+                  height={66}
+                  style={{
+                    borderRadius: "10px",
+                    backgroundColor: "#FFFFFF",
+                    padding: "4px",
+                    display: "block",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                  }}
+                />
+                <div>
+                  <span style={{ fontSize: "10px", fontWeight: 900, color: "#FF7A1A", letterSpacing: "0.8px", textTransform: "uppercase", display: "block" }}>
+                    📷 Scan QR Code
+                  </span>
+                  <span style={{ fontSize: "13px", fontWeight: 800, color: "#FFFFFF", display: "block", marginTop: "2px" }}>
+                    Install on Mobile
+                  </span>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted, #A38E82)", display: "block" }}>
+                    Camera se scan karein
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -562,6 +768,97 @@ export default function Page() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ════════ HOMEPAGE FAQ SECTION (SEO & AI SEARCH OPTIMIZED) ════════ */}
+      <section className="faq-section has-texture" style={{ padding: "70px 20px", maxWidth: "1100px", margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: "40px" }}>
+          <span className="section-label" style={{ color: "#E55200", fontWeight: 800, fontSize: "12px", letterSpacing: "1.2px", textTransform: "uppercase" }}>
+            FREQUENTLY ASKED QUESTIONS
+          </span>
+          <h2 style={{ fontSize: "2rem", fontWeight: 900, color: "var(--text-main)", margin: "8px 0 12px" }}>
+            Everything You Need to Know About NEET Preparation
+          </h2>
+          <p style={{ color: "var(--text-muted)", fontSize: "15px", maxWidth: "680px", margin: "0 auto" }}>
+            Direct, factual answers regarding online question practice, previous year questions, CBT mock tests, and academy features.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {homepageFaqs.map((faq, idx) => {
+            const isOpen = openFaqIndex === idx;
+            return (
+              <div
+                key={faq.q}
+                style={{
+                  borderRadius: "14px",
+                  border: "1px solid var(--border-light, #EDE3DA)",
+                  backgroundColor: "var(--cream-card, #FFFFFF)",
+                  overflow: "hidden",
+                  transition: "all 0.2s ease",
+                  boxShadow: isOpen ? "0 4px 16px rgba(229, 82, 0, 0.08)" : "0 2px 6px rgba(0,0,0,0.02)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                  style={{
+                    width: "100%",
+                    padding: "18px 22px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    color: "var(--text-main)",
+                    fontSize: "16px",
+                    fontWeight: 800,
+                  }}
+                >
+                  <span>{faq.q}</span>
+                  <span style={{ fontSize: "18px", color: "#E55200", transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+                    ▾
+                  </span>
+                </button>
+                {isOpen && (
+                  <div
+                    style={{
+                      padding: "0 22px 18px",
+                      fontSize: "14px",
+                      lineHeight: 1.6,
+                      color: "var(--text-muted)",
+                      borderTop: "1px solid var(--border-light, #EDE3DA)",
+                      paddingTop: "14px",
+                    }}
+                  >
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* JSON-LD Structured Data for FAQ Schema */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              mainEntity: homepageFaqs.map((f) => ({
+                "@type": "Question",
+                name: f.q,
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: f.a,
+                },
+              })),
+            }),
+          }}
+        />
       </section>
 
       {/* ════════ ORANGE LEATHER CTA BANNER ════════ */}

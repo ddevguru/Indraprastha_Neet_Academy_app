@@ -2,6 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -17,156 +18,128 @@ const navItems = [
 
 const batchCards = [
   {
-    id: "neet-2026-rank-booster",
-    badge: "TWO YEAR COMPREHENSIVE",
-    saveTag: "40% OFF",
-    icon: "🏆",
-    title: "NEET 2026 Rank Booster",
-    subtitle: "Target: Class 11th + 12th Complete Syllabus Re-Engineering",
-    price: "₹14,999",
-    oldPrice: "₹24,999",
-    materialInfo: "Includes Hardcopy Study Material",
-    emiInfo: "💳 EMI starts ₹1,499/mo",
-    emiSub: "Zero Interest + Instant Approval",
-    targetYear: "2026",
-    classFilter: "11th",
-    feats: [
-      {
-        bold: "Full NCERT Audio/Visual Line-by-Line",
-        text: "Word-for-word audio decoding with 3D anatomy diagrams.",
-      },
-      {
-        bold: "45+ Full-Length Tests",
-        text: "Simulated on exact NEET CBT interface with negative marking diagnostics.",
-      },
-      {
-        bold: "Dedicated Doctor-Mentor",
-        text: "Weekly progress review & AIIMS/JIPMER alumni 1:1 strategy calls.",
-      },
-      {
-        bold: "15+ Years PYQ Taxonomy",
-        text: "Decoded topic-wise with video explanations and error-maps.",
-      },
-    ],
-    facultyLabel: "Top Medical Faculty Team",
-    facultySub: "10+ Rated AIIMS Instructors",
-    startDate: "STARTS 15TH JULY",
-    timing: "Morning (08:00 AM - 01:00 PM)",
-    ctaPrice: "Enroll Now • ₹14,999",
-  },
-  {
-    id: "neet-2027-foundation",
-    badge: "EARLY STARTER 2-YEAR",
-    saveTag: "28% OFF",
-    icon: "💎",
-    title: "NEET 2027 Foundation Batch",
-    subtitle: "Target: Fresh Class 11th Students Aiming for Top 100 AIR",
-    price: "₹18,999",
-    oldPrice: "₹25,999",
-    materialInfo: "Covers 24 Months of Continuous Coaching",
-    emiInfo: "💳 EMI starts ₹1,899/mo",
-    emiSub: "Flexible 6 or 12 Month Plans",
+    id: "target-neet-2027",
+    badge: "TARGET BATCH 2027",
+    saveTag: "50% OFF",
+    icon: "🎯",
+    title: "Target NEET 2027",
+    subtitle: "Class 11th + 12th Complete Syllabus & Comprehensive Practice for NEET 2027",
+    price: "₹2,999",
+    oldPrice: "₹5,999",
+    materialInfo: "Comprehensive NEET 2027 Subscription",
+    emiInfo: "⚡ Special Offer",
+    emiSub: "Instant Complete Access",
     targetYear: "2027",
-    classFilter: "11th",
+    classFilter: "2027",
     feats: [
       {
-        bold: "Zero-to-Advanced Concepts",
-        text: "Null vis visuals for Physics/Organic mechanisms from bedrock fundamentals.",
+        bold: "Chapterwise PYQs",
+        text: "15+ years of verified past questions with detailed solutions",
       },
       {
-        bold: "Daily Practice Problems (DPP)",
-        text: "30 high-yield questions every single day with video hints.",
+        bold: "Chapterwise Test Series",
+        text: "45 questions in 45 minutes strictly timed CBT tests",
       },
       {
-        bold: "Weekly All-India Benchmarking",
-        text: "Compete live across 45,000+ registered aspirants nationwide.",
+        bold: "Practice Session of Every Chapter",
+        text: "One session includes more than 100 questions in every chapter",
       },
       {
-        bold: "Parent Counseling Dashboards",
-        text: "Monthly performance reports, attendance, and speed tracking.",
+        bold: "Grand Tests",
+        text: "Full syllabus grand mock tests on authentic NEET CBT pattern",
+      },
+      {
+        bold: "Subject-Wise Tests",
+        text: "Dedicated speed drills for Physics, Chemistry & Biology",
+      },
+      {
+        bold: "Custom Question Module",
+        text: "Targeted practice for wrong & bookmarked questions",
+      },
+      {
+        bold: "Experience CBT Mode",
+        text: "Available on our website anytime on all the questions",
+      },
+      {
+        bold: "Practice Anywhere, Anytime",
+        text: "Full seamless practice on our mobile application",
+      },
+      {
+        bold: "Mentorship by Dr Rahul Kumar",
+        text: "1-on-1 personalized guidance (only for paid subscribers)",
+      },
+      {
+        bold: "24*7 Doubt Solving Faculty",
+        text: "Dedicated faculty resolution in exclusive Telegram channel (only for paid subscribers)",
       },
     ],
-    facultyLabel: "Flagship Faculty Owner",
-    facultySub: "18+ Years Mean Experience",
-    startDate: "STARTS 20TH JULY",
-    timing: "Evening (04:00 PM - 09:00 PM)",
-    ctaPrice: "Enroll Now • ₹18,999",
+    facultyLabel: "Elite Medical Faculty Team",
+    facultySub: "AIIMS & Top Medical Instructors",
+    startDate: "ADMISSIONS OPEN",
+    timing: "Flexible Practice + Live Mentorship",
+    ctaPrice: "Enroll for Target NEET 2027 • ₹2,999",
   },
   {
-    id: "dropper-rapid-revision",
-    badge: "DEDICATED REPEATERS",
+    id: "target-neet-2028",
+    badge: "TARGET BATCH 2028",
     saveTag: "45% OFF",
-    icon: "⚡",
-    title: "Dropper Rapid Revision Batch",
-    subtitle: "Target: Score Elevation From 450+ to 680+ in 10 Months",
-    price: "₹12,499",
-    oldPrice: "₹21,999",
-    materialInfo: "Includes Hardcopy Rank Booster Kits",
-    emiInfo: "💳 EMI starts ₹1,249/mo",
-    emiSub: "No Processing Fee",
-    targetYear: "2026",
-    classFilter: "dropper",
+    icon: "🚀",
+    title: "Target NEET 2028",
+    subtitle: "Complete Syllabus & Comprehensive Practice for NEET 2028 Aspirants",
+    price: "₹5,500",
+    oldPrice: "₹9,999",
+    materialInfo: "Comprehensive NEET 2028 Subscription",
+    emiInfo: "💳 EMI starts ₹999/mo",
+    emiSub: "Flexible Monthly Options",
+    targetYear: "2028",
+    classFilter: "2028",
     feats: [
       {
-        bold: "Negative Marking Eraser Engine",
-        text: "Pinpoints why you pick distractors and reduces hesitation.",
+        bold: "Chapterwise PYQs",
+        text: "15+ years of verified past questions with detailed solutions",
       },
       {
-        bold: "Targeted High-Yield Formula Books",
-        text: "Custom formula sheets compiled strictly from past test errors.",
+        bold: "Chapterwise Test Series",
+        text: "45 questions in 45 minutes strictly timed CBT tests",
       },
       {
-        bold: "1-on-1 Monthly Diagnostic Review",
-        text: "Live sit-down with Academic Dean to recalibrate study schedules.",
+        bold: "Practice Session of Every Chapter",
+        text: "One session includes more than 100 questions in every chapter",
       },
       {
-        bold: "8,000+ NCERT Assertion-Reason Traps",
-        text: "Specialized drill for Tricky Section B Botany & Zoology items.",
+        bold: "Grand Tests",
+        text: "Full syllabus grand mock tests on authentic NEET CBT pattern",
+      },
+      {
+        bold: "Subject-Wise Tests",
+        text: "Dedicated speed drills for Physics, Chemistry & Biology",
+      },
+      {
+        bold: "Custom Question Module",
+        text: "Targeted practice for wrong & bookmarked questions",
+      },
+      {
+        bold: "Experience CBT Mode",
+        text: "Available on our website anytime on all the questions",
+      },
+      {
+        bold: "Practice Anywhere, Anytime",
+        text: "Full seamless practice on our mobile application",
+      },
+      {
+        bold: "Mentorship by Dr Rahul Kumar",
+        text: "1-on-1 personalized guidance (only for paid subscribers)",
+      },
+      {
+        bold: "24*7 Doubt Solving Faculty",
+        text: "Dedicated faculty resolution in exclusive Telegram channel (only for paid subscribers)",
       },
     ],
-    facultyLabel: "Dropper Specialist Mentors",
-    facultySub: "Rank Elevation Specialists",
-    startDate: "STARTS 10TH AUGUST",
-    timing: "Full-Day Intensive (09:00 AM - 05:00 PM)",
-    ctaPrice: "Enroll Now • ₹12,499",
-  },
-  {
-    id: "class-12-board-neet-synergy",
-    badge: "DUAL-EXAM BOOSTER BATCH",
-    saveTag: "36% OFF",
-    icon: "📑",
-    title: "Class 12 Board + NEET Synergy",
-    subtitle: "Target: 95%+ in Board Exam + 680+ in NEET 2026",
-    price: "₹13,999",
-    oldPrice: "₹22,999",
-    materialInfo: "Includes Subjective Board Answer Boosters",
-    emiInfo: "💳 EMI starts ₹1,399/mo",
-    emiSub: "Direct Bank Debit or UPI",
-    targetYear: "2026",
-    classFilter: "12th",
-    feats: [
-      {
-        bold: "Dual-Track Syllabus Alignment",
-        text: "Never study a topic twice. Seamless integration of subjective derivation + MCQs.",
-      },
-      {
-        bold: "Board Answer Writing Clinics",
-        text: "Step-marking techniques to secure centum in Biology & Chemistry theory.",
-      },
-      {
-        bold: "Speed & Accuracy Drills",
-        text: "Practice 45-second question pacing for NEET Physics numericals.",
-      },
-      {
-        bold: "All-India Pre-Board Simulations",
-        text: "5 Board Mocks followed immediately by full-length NEET Mocks.",
-      },
-    ],
-    facultyLabel: "CBSE & Medical Expert Faculty",
-    facultySub: "Top Board Evaluators",
-    startDate: "STARTS 1ST AUGUST",
-    timing: "Evening (05:00 PM - 09:00 PM)",
-    ctaPrice: "Enroll Now • ₹13,999",
+    facultyLabel: "Elite Medical Faculty Team",
+    facultySub: "AIIMS & Top Medical Instructors",
+    startDate: "ADMISSIONS OPEN",
+    timing: "Flexible Practice + Live Mentorship",
+    ctaPrice: "Enroll for Target NEET 2028 • ₹5,500",
   },
 ];
 
@@ -199,9 +172,72 @@ const comparisonRows = [
 ];
 
 export default function TargetBatchesPage() {
+  const router = useRouter();
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [classFilter, setClassFilter] = useState<string>("all");
   const [activeModal, setActiveModal] = useState<{ type: string; batchName: string } | null>(null);
+
+  const handleEnrollClick = (b: (typeof batchCards)[0]) => {
+    const rawPrice = b.price.replace(/\D/g, "");
+    const packageId = b.targetYear === "2028" ? 2 : 1;
+    const batchYear = b.targetYear;
+
+    if (typeof window === "undefined") return;
+
+    const token = localStorage.getItem("indraprastha_token");
+    const storedUser = localStorage.getItem("indraprastha_user");
+    let user: any = null;
+    if (storedUser) {
+      try {
+        user = JSON.parse(storedUser);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!token) {
+      // Not logged in -> send to login/signup with parameters to trigger Razorpay after auth
+      router.push(
+        `/login?redirect=/subscriptions&enrollBatch=${batchYear}&amount=${rawPrice}&packageId=${packageId}&autoRazorpay=true`
+      );
+      return;
+    }
+
+    const pl = String(
+      user?.preferred_plan ||
+      user?.preferredPlan ||
+      user?.subscription_plan ||
+      user?.subscriptionPlan ||
+      user?.plan ||
+      ""
+    ).toLowerCase();
+    const p = String(user?.phone || user?.phoneNumber || "").replace(/\D/g, "");
+    const n = String(user?.full_name || user?.name || "").toLowerCase();
+
+    const isStarterOrDeepak =
+      pl.includes("starter") ||
+      pl.includes("2027") ||
+      p.endsWith("7028196172") ||
+      n.includes("deepak");
+
+    // Logged in: check if user already has an active subscription
+    const hasActiveSubscription = Boolean(
+      user?.has_active_subscription ||
+      user?.subscription_status === "active" ||
+      isStarterOrDeepak
+    );
+
+    if (hasActiveSubscription) {
+      alert("Aapka Target NEET 2027 plan already active hai! Redirecting to your dashboard.");
+      router.push("/dashboard");
+      return;
+    }
+
+    // Logged in but not subscribed -> go directly to subscriptions page and trigger Razorpay
+    router.push(
+      `/subscriptions?enrollBatch=${batchYear}&amount=${rawPrice}&packageId=${packageId}&autoRazorpay=true`
+    );
+  };
 
   const filteredBatches = batchCards.filter((b) => {
     if (yearFilter !== "all" && b.targetYear !== yearFilter) return false;
@@ -250,7 +286,7 @@ export default function TargetBatchesPage() {
                 background: "#FFF4EC",
               }}
             >
-              ADMISSIONS OPEN 2026 / 2027
+              ADMISSIONS OPEN 2027 / 2028
             </span>
             <span
               style={{
@@ -270,7 +306,7 @@ export default function TargetBatchesPage() {
           <div className="tb-hero-grid">
             <div>
               <h1 className="hero-title" style={{ fontSize: "clamp(28px, 4.5vw, 48px)", marginBottom: "14px" }}>
-                NEET 2026 &amp; 2027{" "}
+                NEET 2027 &amp; 2028{" "}
                 <span style={{ color: "var(--orange)", fontStyle: "italic" }}>Target Batches</span>
               </h1>
               <p className="hero-subtitle" style={{ fontSize: "15px", maxWidth: "680px", margin: 0 }}>
@@ -308,17 +344,17 @@ export default function TargetBatchesPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setYearFilter("2026")}
-                className={`tb-filter-btn ${yearFilter === "2026" ? "active-orange" : ""}`}
-              >
-                NEET 2026
-              </button>
-              <button
-                type="button"
                 onClick={() => setYearFilter("2027")}
                 className={`tb-filter-btn ${yearFilter === "2027" ? "active-orange" : ""}`}
               >
                 NEET 2027
+              </button>
+              <button
+                type="button"
+                onClick={() => setYearFilter("2028")}
+                className={`tb-filter-btn ${yearFilter === "2028" ? "active-orange" : ""}`}
+              >
+                NEET 2028
               </button>
             </div>
 
@@ -336,60 +372,25 @@ export default function TargetBatchesPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setClassFilter("11th")}
-                className={`tb-filter-btn ${classFilter === "11th" ? "active-dark" : ""}`}
+                onClick={() => setClassFilter("2027")}
+                className={`tb-filter-btn ${classFilter === "2027" ? "active-dark" : ""}`}
               >
-                Class 11th
+                Target 2027
               </button>
               <button
                 type="button"
-                onClick={() => setClassFilter("12th")}
-                className={`tb-filter-btn ${classFilter === "12th" ? "active-dark" : ""}`}
+                onClick={() => setClassFilter("2028")}
+                className={`tb-filter-btn ${classFilter === "2028" ? "active-dark" : ""}`}
               >
-                Class 12th
-              </button>
-              <button
-                type="button"
-                onClick={() => setClassFilter("dropper")}
-                className={`tb-filter-btn ${classFilter === "dropper" ? "active-dark" : ""}`}
-              >
-                Dropper / Repeater
+                Target 2028
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ════════ 4 BATCH CARDS GRID (2x2) ════════ */}
+      {/* ════════ TARGET BATCH CARDS GRID (Target NEET 2027 & 2028) ════════ */}
       <section className="batches-section has-texture" style={{ paddingTop: "20px", paddingBottom: "80px" }}>
-        {/* Featured Dr. Rahul Mentorship Banner in Target Batches */}
-        <div style={{ maxWidth: "1280px", margin: "0 auto 32px", padding: "0 24px" }}>
-          <div className="mentorship-banner-card" style={{ padding: "18px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ background: "rgba(229, 82, 0, 0.12)", color: "var(--orange)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 800 }}>
-                  👨‍⚕️ INCLUDED IN ALL BATCHES
-                </span>
-                <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-main)" }}>
-                  Personalised Mentorship by Dr Rahul Kumar
-                </span>
-              </div>
-              <a href="tel:+917703033682" style={{ fontSize: "12px", fontWeight: 800, color: "var(--orange)", textDecoration: "none" }}>
-                📞 Book Free Counseling Call: +91 77030 33682 ↗
-              </a>
-            </div>
-            <div className="mentorship-banner-image-wrapper">
-              <Image
-                src="/dr_rahul_mentorship.png"
-                alt="Personalised Mentorship by Dr Rahul Kumar"
-                width={1200}
-                height={450}
-                className="mentorship-banner-img"
-              />
-            </div>
-          </div>
-        </div>
-
         <div className="tb-batches-grid-container">
           {filteredBatches.map((b) => (
             <div key={b.id} className="tb-batch-card">
@@ -525,21 +526,31 @@ export default function TargetBatchesPage() {
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: "12px" }}>
-                  <button
-                    type="button"
-                    className="btn-batch-enroll btn-orange-leather"
-                    onClick={() => setActiveModal({ type: "enroll", batchName: b.title })}
-                  >
-                    <span>{b.ctaPrice}</span>
-                  </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: "10px" }}>
+                    <button
+                      type="button"
+                      className="btn-batch-enroll btn-orange-leather"
+                      onClick={() => handleEnrollClick(b)}
+                    >
+                      <span>{b.ctaPrice}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="tb-btn-demo"
+                      onClick={() => setActiveModal({ type: "demo", batchName: b.title })}
+                    >
+                      📞 Free Demo
+                    </button>
+                  </div>
 
                   <button
                     type="button"
-                    className="tb-btn-demo"
-                    onClick={() => setActiveModal({ type: "demo", batchName: b.title })}
+                    className="tb-btn-brochure"
+                    onClick={() => setActiveModal({ type: "brochure", batchName: b.title })}
                   >
-                    📞 Free Demo
+                    <span>📄 Request Mobile Brochure (PDF)</span>
                   </button>
                 </div>
               </div>
@@ -610,7 +621,11 @@ export default function TargetBatchesPage() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h3 style={{ fontFamily: "Outfit, sans-serif", fontSize: "20px", fontWeight: 800, color: "#140A03" }}>
-                {activeModal.type === "enroll" ? `Enroll in ${activeModal.batchName}` : `Request Free Demo for ${activeModal.batchName}`}
+                {activeModal.type === "enroll"
+                  ? `Enroll in ${activeModal.batchName}`
+                  : activeModal.type === "brochure"
+                  ? `Request Mobile Brochure (PDF) – ${activeModal.batchName}`
+                  : `Request Free Demo for ${activeModal.batchName}`}
               </h3>
               <button
                 type="button"
@@ -624,7 +639,11 @@ export default function TargetBatchesPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                alert(`Thank you! Your request for ${activeModal.batchName} has been received. Our senior counselor will call you within 15 minutes.`);
+                alert(
+                  activeModal.type === "brochure"
+                    ? `Thank you! The mobile brochure (PDF) for ${activeModal.batchName} will be sent to your WhatsApp number shortly.`
+                    : `Thank you! Your request for ${activeModal.batchName} has been received. Our senior counselor will call you within 15 minutes.`
+                );
                 setActiveModal(null);
               }}
               style={{ display: "flex", flexDirection: "column", gap: "14px" }}
@@ -679,9 +698,8 @@ export default function TargetBatchesPage() {
                     background: "#FFF",
                   }}
                 >
-                  <option value="2026">NEET 2026 Aspirant</option>
-                  <option value="2027">NEET 2027 Aspirant</option>
-                  <option value="dropper">Dropper / Repeater Batch</option>
+                  <option value="2027">Target NEET 2027</option>
+                  <option value="2028">Target NEET 2028</option>
                 </select>
               </div>
 
@@ -700,7 +718,11 @@ export default function TargetBatchesPage() {
                   cursor: "pointer",
                 }}
               >
-                <span>Submit &amp; Reserve Seat</span>
+                <span>
+                  {activeModal.type === "brochure"
+                    ? "📥 Send Mobile Brochure (PDF) on WhatsApp"
+                    : "Submit & Reserve Seat"}
+                </span>
               </button>
             </form>
           </div>

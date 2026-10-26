@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
@@ -14,8 +14,39 @@ import {
 } from "@/lib/firebase";
 import type { ConfirmationResult } from "firebase/auth";
 
-export default function LoginPage() {
+function LoginComponent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectParam = searchParams.get("redirect") || searchParams.get("returnUrl");
+  const autoRazorpayParam = searchParams.get("autoRazorpay");
+  const enrollBatchParam = searchParams.get("enrollBatch");
+  const amountParam = searchParams.get("amount");
+  const packageIdParam = searchParams.get("packageId");
+
+  const getPostAuthUrl = (userObj: any) => {
+    const hasSub = Boolean(userObj?.has_active_subscription || userObj?.subscription_status === "active");
+
+    // If coming from Enroll flow
+    if (autoRazorpayParam === "true" || enrollBatchParam) {
+      if (hasSub) {
+        return "/dashboard";
+      }
+      const params = new URLSearchParams();
+      params.set("autoRazorpay", "true");
+      if (enrollBatchParam) params.set("enrollBatch", enrollBatchParam);
+      if (amountParam) params.set("amount", amountParam);
+      if (packageIdParam) params.set("packageId", packageIdParam);
+      return `/subscriptions?${params.toString()}`;
+    }
+
+    if (redirectParam && redirectParam.startsWith("/")) {
+      return redirectParam;
+    }
+    return "/dashboard";
+  };
+
+  const redirectUrl = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/dashboard";
+
   // Main view: "login" or "signup"
   const [view, setView] = useState<"login" | "signup">("login");
 
@@ -120,8 +151,9 @@ export default function LoginPage() {
       }
       setLoginLoading(false);
       setLoginSuccess(true);
+      const targetUrl = getPostAuthUrl(data.user);
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push(targetUrl);
       }, 700);
     } catch {
       setLoginLoading(false);
@@ -225,8 +257,9 @@ export default function LoginPage() {
       }
       setLoginLoading(false);
       setLoginSuccess(true);
+      const targetUrl = getPostAuthUrl(data.user);
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push(targetUrl);
       }, 700);
     } catch {
       setLoginLoading(false);
@@ -259,8 +292,9 @@ export default function LoginPage() {
           if (data.user) localStorage.setItem("indraprastha_user", JSON.stringify(data.user));
         }
         setLoginSuccess(true);
+        const targetUrl = getPostAuthUrl(data.user);
         setTimeout(() => {
-          router.push("/dashboard");
+          router.push(targetUrl);
         }, 700);
       } else if (data.isNewUser || flow === "signup") {
         // New student -> prefill Google details & advance to Step 2 (Phone OTP verification)
@@ -507,8 +541,9 @@ export default function LoginPage() {
         if (data.user) localStorage.setItem("indraprastha_user", JSON.stringify(data.user));
       }
       setSignupStep(4);
+      const targetUrl = getPostAuthUrl(data.user);
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push(targetUrl);
       }, 1500);
     } catch {
       setSignupLoading(false);
@@ -722,11 +757,11 @@ export default function LoginPage() {
                         Welcome back to Indraprastha NEET Academy! Loading your study modules and daily tests...
                       </p>
                       <Link
-                        href="/dashboard"
+                        href={redirectUrl}
                         className="btn-enroll-nav btn-orange-leather"
                         style={{ width: "100%", justifyContent: "center" }}
                       >
-                        <span>Open Study Dashboard →</span>
+                        <span>{redirectUrl === "/dashboard" ? "Open Study Dashboard →" : "Proceed to Your Destination →"}</span>
                       </Link>
                     </div>
                   ) : (
@@ -1687,11 +1722,11 @@ export default function LoginPage() {
                       </div>
 
                       <Link
-                        href="/dashboard"
+                        href={redirectUrl}
                         className="btn-enroll-nav btn-orange-leather"
                         style={{ width: "100%", justifyContent: "center" }}
                       >
-                        <span>Proceed to Student Dashboard →</span>
+                        <span>{redirectUrl === "/dashboard" ? "Proceed to Student Dashboard →" : "Proceed to Your Destination →"}</span>
                       </Link>
                     </div>
                   )}
@@ -1988,5 +2023,13 @@ export default function LoginPage() {
       {/* ════════ FOOTER ════════ */}
       <Footer />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", backgroundColor: "var(--cream-bg, #FAF6F0)" }} />}>
+      <LoginComponent />
+    </Suspense>
   );
 }

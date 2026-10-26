@@ -40,6 +40,11 @@ export default function TestsPage() {
   const [customFilterMode, setCustomFilterMode] = useState<"all" | "bookmarked" | "wrong" | "both">("all");
   const [customDuration, setCustomDuration] = useState<number>(45);
   const [buildingTest, setBuildingTest] = useState<boolean>(false);
+  const [subModalOpen, setSubModalOpen] = useState<boolean>(false);
+  const [selectedLockedItem, setSelectedLockedItem] = useState<TestItem | null>(null);
+
+  const hasActiveSub = Boolean(user?.has_active_subscription || user?.subscription_status === "active");
+  const freeTestId = tests.length > 0 ? tests[0].id : 155;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -58,42 +63,40 @@ export default function TestsPage() {
   }, []);
 
   const fetchTests = async (token: string) => {
+    try {
+      // 1. Fetch from reliable Next.js API route
+      const localRes = await fetch("/api/tests");
+      if (localRes.ok) {
+        const data = await localRes.json();
+        if (data.tests && Array.isArray(data.tests) && data.tests.length > 0) {
+          setTests(data.tests);
+          if (typeof window !== "undefined" && data.tests[0]?.id) {
+            localStorage.setItem("indraprastha_free_test_id", String(data.tests[0].id));
+          }
+          setLoading(false);
+          return;
+        }
+      }
+    } catch {
+      // proceed to fallback
+    }
+
     let activeToken = token;
     try {
-      let res = await fetch("https://api.indraprasthaneetacademy.com/api/content/tests", {
+      const res = await fetch("https://api.indraprasthaneetacademy.com/api/content/tests", {
         headers: {
-          Authorization: `Bearer ${activeToken}`,
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
           "Content-Type": "application/json",
         },
       });
-
-      if (res.status === 401 || !activeToken) {
-        try {
-          const renewRes = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: "7703033682", password: "Deepak" }),
-          });
-          const renewData = await renewRes.json();
-          if (renewData.token) {
-            activeToken = renewData.token;
-            localStorage.setItem("indraprastha_token", activeToken);
-            res = await fetch("https://api.indraprasthaneetacademy.com/api/content/tests", {
-              headers: {
-                Authorization: `Bearer ${activeToken}`,
-                "Content-Type": "application/json",
-              },
-            });
-          }
-        } catch {
-          // ignore
-        }
-      }
 
       if (res.ok) {
         const data = await res.json();
         if (data.tests && Array.isArray(data.tests)) {
           setTests(data.tests);
+          if (typeof window !== "undefined" && data.tests[0]?.id) {
+            localStorage.setItem("indraprastha_free_test_id", String(data.tests[0].id));
+          }
         }
       }
     } catch (e) {
@@ -165,6 +168,21 @@ export default function TestsPage() {
   });
 
   const handleStartCustomTest = async () => {
+    if (!hasActiveSub) {
+      setSelectedLockedItem({
+        id: -1,
+        title: "Custom Drill Builder",
+        category: "Custom Test",
+        subject: customSubject,
+        topic: customTopic,
+        duration_minutes: customDuration,
+        marks: customQuestionCount * 4,
+        question_count: customQuestionCount,
+      });
+      setSubModalOpen(true);
+      return;
+    }
+
     if (matchingTestsForCustom.length === 0) {
       alert("No test papers match the chosen criteria. Please adjust your selections.");
       return;
@@ -176,9 +194,14 @@ export default function TestsPage() {
       const selectedSources = matchingTestsForCustom.slice(0, 6);
       const questionFetches = selectedSources.map(async (item) => {
         try {
-          const res = await fetch(`https://api.indraprasthaneetacademy.com/api/content/tests/${item.id}/questions`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          let res = await fetch(`/api/tests/${item.id}`);
+          if (!res.ok) {
+            res = await fetch(`https://api.indraprasthaneetacademy.com/api/content/tests/${item.id}/questions`, {
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+            });
+          }
           if (res.ok) {
             const data = await res.json();
             return data.questions || [];
@@ -381,6 +404,76 @@ export default function TestsPage() {
             </button>
           </div>
         </section>
+
+        {/* ════════ SUBSCRIPTION STATUS BANNER ════════ */}
+        {!hasActiveSub ? (
+          <div
+            style={{
+              backgroundColor: "rgba(229, 82, 0, 0.08)",
+              border: "1.5px solid rgba(229, 82, 0, 0.25)",
+              borderRadius: "16px",
+              padding: "16px 20px",
+              marginBottom: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "14px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span style={{ fontSize: "24px" }}>🎁</span>
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--text-main)" }}>
+                  Free Demo Mode: 1 Full-Length NEET Test Paper Unlocked
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  Subscribe to unlock all {tests.length || "100+"} chapterwise mock papers, AI analytics &amp; video solutions.
+                </div>
+              </div>
+            </div>
+            <Link
+              href="/subscriptions"
+              style={{
+                padding: "8px 18px",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
+                color: "#FFFFFF",
+                fontSize: "12px",
+                fontWeight: 800,
+                textDecoration: "none",
+                boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Unlock All Tests with Subscription →
+            </Link>
+          </div>
+        ) : (
+          <div
+            style={{
+              backgroundColor: "rgba(16, 185, 129, 0.08)",
+              border: "1.5px solid rgba(16, 185, 129, 0.25)",
+              borderRadius: "14px",
+              padding: "12px 18px",
+              marginBottom: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "18px" }}>✨</span>
+              <div style={{ fontSize: "13px", fontWeight: 800, color: "#10B981" }}>
+                Active Plan: {user?.subscription_plan || "Pro Target Batch"}
+                <span style={{ fontSize: "12px", color: "var(--text-muted)", marginLeft: "8px", fontWeight: 500 }}>
+                  • All chapterwise &amp; full syllabus test series unlocked!
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filters Section (Category + Standard + Subject + Search) */}
         <div
@@ -1094,33 +1187,203 @@ export default function TestsPage() {
                       Score: {test.last_score || 0}/{test.marks || 720}
                     </span>
                   ) : (
-                    <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 600 }}>
-                      Ready to Start
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        color: (hasActiveSub || test.id === freeTestId) ? "#10B981" : "var(--text-muted)",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {hasActiveSub ? "Unlocked ✓" : test.id === freeTestId ? "✨ Free Demo Test" : "🔒 Pro Only"}
                     </span>
                   )}
 
-                  <Link
-                    href={`/tests/take?id=${test.id}`}
-                    style={{
-                      padding: "8px 18px",
-                      borderRadius: "10px",
-                      background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
-                      color: "#FFFFFF",
-                      fontSize: "12px",
-                      fontWeight: 800,
-                      textDecoration: "none",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
-                    }}
-                  >
-                    <span>{test.is_completed ? "Re-attempt Test" : "Take Test"}</span>
-                    <span>→</span>
-                  </Link>
+                  {(hasActiveSub || test.id === freeTestId) ? (
+                    <Link
+                      href={`/tests/take?id=${test.id}`}
+                      style={{
+                        padding: "8px 18px",
+                        borderRadius: "10px",
+                        background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
+                        color: "#FFFFFF",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
+                      }}
+                    >
+                      <span>{test.is_completed ? "Re-attempt Test" : "Take Test"}</span>
+                      <span>→</span>
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedLockedItem(test);
+                        setSubModalOpen(true);
+                      }}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "10px",
+                        background: "rgba(229, 82, 0, 0.08)",
+                        border: "1px solid rgba(229, 82, 0, 0.28)",
+                        color: "#E55200",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <span>🔒 Unlock Test</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ════════ SUBSCRIPTION UNLOCK MODAL ════════ */}
+        {subModalOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.65)",
+              backdropFilter: "blur(6px)",
+              zIndex: 9999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "16px",
+            }}
+            onClick={() => setSubModalOpen(false)}
+          >
+            <div
+              style={{
+                backgroundColor: "var(--cream-card, #FFFFFF)",
+                borderRadius: "20px",
+                maxWidth: "520px",
+                width: "100%",
+                padding: "28px",
+                border: "1.5px solid var(--border-light, #EDE3DA)",
+                boxShadow: "0 20px 50px rgba(0, 0, 0, 0.35)",
+                position: "relative",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "24px" }}>🔒</span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      color: "#E55200",
+                      backgroundColor: "rgba(229, 82, 0, 0.1)",
+                      padding: "3px 10px",
+                      borderRadius: "6px",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Subscription Required
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubModalOpen(false)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    fontSize: "20px",
+                    cursor: "pointer",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <h3 style={{ fontSize: "20px", fontWeight: 800, color: "var(--text-main)", marginBottom: "8px" }}>
+                Unlock {selectedLockedItem?.title || "Chapterwise Test Series"}
+              </h3>
+
+              <p style={{ fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.6, marginBottom: "20px" }}>
+                You are currently exploring the Free Demo. 1 Full-Length NEET Mock Paper is unlocked for you. To attempt all 100+ Chapterwise tests, full-syllabus mocks, and AI analysis, please upgrade to a subscription plan.
+              </p>
+
+              <div
+                style={{
+                  backgroundColor: "rgba(229, 82, 0, 0.04)",
+                  border: "1px solid rgba(229, 82, 0, 0.12)",
+                  borderRadius: "12px",
+                  padding: "14px 16px",
+                  marginBottom: "24px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  fontSize: "13px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-main)" }}>
+                  <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
+                  <span>100+ Curated Chapter Tests &amp; Full Mock Papers</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-main)" }}>
+                  <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
+                  <span>AI Negative Mark &amp; Time-Wasted Diagnostic Analytics</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-main)" }}>
+                  <span style={{ color: "#10B981", fontWeight: 800 }}>✓</span>
+                  <span>Audited Step-by-Step Explanations &amp; Video Solutions</span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <Link
+                  href="/subscriptions"
+                  style={{
+                    flex: 1,
+                    minWidth: "180px",
+                    padding: "12px 20px",
+                    borderRadius: "10px",
+                    background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
+                    color: "#FFFFFF",
+                    fontSize: "14px",
+                    fontWeight: 800,
+                    textAlign: "center",
+                    textDecoration: "none",
+                    boxShadow: "0 4px 12px rgba(229, 82, 0, 0.3)",
+                  }}
+                >
+                  Explore Subscription Plans →
+                </Link>
+                {freeTestId && (
+                  <Link
+                    href={`/tests/take?id=${freeTestId}`}
+                    onClick={() => setSubModalOpen(false)}
+                    style={{
+                      padding: "12px 18px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--border-light, #EDE3DA)",
+                      color: "var(--text-main)",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      textDecoration: "none",
+                      textAlign: "center",
+                    }}
+                  >
+                    Try Free Demo Test
+                  </Link>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </main>

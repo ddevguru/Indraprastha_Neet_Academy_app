@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import MentorshipBannerSlider from "@/components/MentorshipBannerSlider";
+import { applyTheme, getStoredTheme, ThemeMode } from "@/lib/theme";
 import "./methodology.css";
 
 export default function MethodologyPage() {
@@ -12,18 +14,17 @@ export default function MethodologyPage() {
   const [selectedRuBisCOOpt, setSelectedRuBisCOOpt] = useState<number>(1); // B by default
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("indraprastha_theme") as "light" | "dark" | null;
-    const initialTheme = savedTheme === "light" ? "light" : "dark";
+    const initialTheme = getStoredTheme();
     setTheme(initialTheme);
-    if (initialTheme === "dark") {
-      document.body.classList.add("dark-theme");
-      document.body.classList.remove("light-theme");
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.body.classList.remove("dark-theme");
-      document.body.classList.add("light-theme");
-      document.documentElement.setAttribute("data-theme", "light");
-    }
+    applyTheme(initialTheme);
+
+    const handleThemeChange = (e: any) => {
+      if (e.detail?.theme) {
+        setTheme(e.detail.theme);
+      }
+    };
+    window.addEventListener("indraprastha_theme_change", handleThemeChange);
+    return () => window.removeEventListener("indraprastha_theme_change", handleThemeChange);
   }, []);
 
   return (
@@ -487,15 +488,7 @@ export default function MethodologyPage() {
                 📞 Book Free Mentorship Session: +91 77030 33682 ↗
               </a>
             </div>
-            <div className="mentorship-banner-image-wrapper">
-              <Image
-                src="/dr_rahul_mentorship.png"
-                alt="Personalised Mentorship by Dr Rahul Kumar"
-                width={1200}
-                height={450}
-                className="mentorship-banner-img"
-              />
-            </div>
+            <MentorshipBannerSlider />
           </div>
         </div>
 

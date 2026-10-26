@@ -100,38 +100,29 @@ export default function DailyMcqsPage() {
   }, []);
 
   const fetchDailyMcqs = async (token: string) => {
+    try {
+      // 1. Fetch from reliable internal Next.js API route
+      const localRes = await fetch("/api/mcqs");
+      if (localRes.ok) {
+        const data = await localRes.json();
+        if (data.mcqs && Array.isArray(data.mcqs) && data.mcqs.length > 0) {
+          setMcqs(data.mcqs);
+          setLoading(false);
+          return;
+        }
+      }
+    } catch {
+      // proceed to fallback
+    }
+
     let activeToken = token;
     try {
-      let res = await fetch("https://api.indraprasthaneetacademy.com/api/content/mcqs", {
+      const res = await fetch("https://api.indraprasthaneetacademy.com/api/content/mcqs", {
         headers: {
-          Authorization: `Bearer ${activeToken}`,
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
           "Content-Type": "application/json",
         },
       });
-
-      if (res.status === 401 || !activeToken) {
-        try {
-          const renewRes = await fetch("https://api.indraprasthaneetacademy.com/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: "7703033682", password: "Deepak" }),
-          });
-          const renewData = await renewRes.json();
-          if (renewData.token) {
-            activeToken = renewData.token;
-            setAuthToken(activeToken);
-            localStorage.setItem("indraprastha_token", activeToken);
-            res = await fetch("https://api.indraprasthaneetacademy.com/api/content/mcqs", {
-              headers: {
-                Authorization: `Bearer ${activeToken}`,
-                "Content-Type": "application/json",
-              },
-            });
-          }
-        } catch {
-          // ignore
-        }
-      }
 
       if (res.ok) {
         const data = await res.json();
