@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'screens/error_logs_page.dart';
+import 'screens/teacher_management_page.dart';
+import 'screens/doubt_monitoring_page.dart';
 import 'services/admin_error_logger.dart';
 import 'utils/drive_image_url.dart';
 import 'widgets/fast_network_image.dart';
@@ -444,6 +446,8 @@ class _AdminHomeState extends State<AdminHome> {
     'Complaints',
     'Notifications',
     'Slider Banners',
+    'Teacher Management',
+    'Doubt Monitoring',
   ];
   static const _navItems = [
     (Icons.dashboard_outlined, 'Dashboard'),
@@ -458,6 +462,8 @@ class _AdminHomeState extends State<AdminHome> {
     (Icons.report_outlined, 'Complaints'),
     (Icons.notifications_outlined, 'Notifications'),
     (Icons.view_carousel_outlined, 'Slider Banners'),
+    (Icons.school_outlined, 'Teacher Management'),
+    (Icons.track_changes_outlined, 'Doubt Monitoring'),
   ];
 
   @override
@@ -524,6 +530,8 @@ class _AdminHomeState extends State<AdminHome> {
       ComplaintsPage(api: _api),
       NotificationsPage(api: _api),
       SliderBannersPage(api: _api),
+      const TeacherManagementPage(),
+      const DoubtMonitoringPage(),
     ];
     final isLoggedIn = _api.token != null;
     if (isLoggedIn && !_checkedDriveAfterLogin) {

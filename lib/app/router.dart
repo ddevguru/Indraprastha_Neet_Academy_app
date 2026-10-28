@@ -102,9 +102,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) {
           final tabIndex = int.tryParse(state.pathParameters['tab'] ?? '0') ?? 0;
           return NoTransitionPage(
-            child: DashboardShellScreen(tabIndex: tabIndex.clamp(0, 4)),
+            child: DashboardShellScreen(tabIndex: tabIndex.clamp(0, 5)),
           );
         },
+      ),
+      GoRoute(
+        path: '/community',
+        redirect: (context, state) => '/dashboard/5',
       ),
       GoRoute(
         path: '/books/chapter/:chapterId',

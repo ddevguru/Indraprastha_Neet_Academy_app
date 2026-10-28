@@ -25,6 +25,7 @@ class AdaptiveScaffold extends ConsumerWidget {
     NavigationDestination(icon: Icon(Icons.bolt_outlined), label: 'Practice'),
     NavigationDestination(icon: Icon(Icons.assignment_outlined), label: 'Tests'),
     NavigationDestination(icon: Icon(Icons.play_circle_outline_rounded), label: 'Videos'),
+    NavigationDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum_rounded), label: 'Community'),
   ];
 
   static const _railDestinations = [
@@ -47,6 +48,11 @@ class AdaptiveScaffold extends ConsumerWidget {
     NavigationRailDestination(
       icon: Icon(Icons.play_circle_outline_rounded),
       label: Text('Videos'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.forum_outlined),
+      selectedIcon: Icon(Icons.forum_rounded),
+      label: Text('Community'),
     ),
   ];
 

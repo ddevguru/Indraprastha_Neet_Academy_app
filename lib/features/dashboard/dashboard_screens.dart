@@ -16,6 +16,7 @@ import '../books/books_screens.dart';
 import '../practice/practice_screens.dart';
 import '../tests/tests_screens.dart';
 import '../videos/videos_screen.dart';
+import '../community/screens/community_home_screen.dart';
 import 'widgets/home_image_slider.dart';
 import 'widgets/weekly_streak_widget.dart';
 import 'widgets/home_leaderboard_widget.dart';
@@ -42,6 +43,7 @@ class DashboardShellScreen extends StatelessWidget {
     'Practice',
     'Tests',
     'Videos',
+    'Community',
   ];
 
   @override
@@ -52,6 +54,7 @@ class DashboardShellScreen extends StatelessWidget {
       const PracticeHomeScreen(),
       const TestsScreen(),
       const VideosScreen(),
+      const CommunityHomeScreen(),
     ];
 
     final index = tabIndex.clamp(0, pages.length - 1);
