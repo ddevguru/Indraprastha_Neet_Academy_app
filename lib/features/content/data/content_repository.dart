@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../models/daily_mcq_item.dart';
+import '../../practice/pyq_chapters_seed.dart';
 
 class ContentRepository {
   ContentRepository({
@@ -98,25 +100,127 @@ class ContentRepository {
     return _mapsFromListKey(data, 'chapters');
   }
 
+  static List<Map<String, dynamic>>? _cachedPyqChapters;
+  static const String _pyqChaptersStorageKey = 'cached_pyq_chapters_catalog_v1';
+
+  List<Map<String, dynamic>> _filterPyqChapters(
+    List<Map<String, dynamic>> list, {
+    String? subject,
+    String? topic,
+  }) {
+    final s = subject?.trim().toLowerCase() ?? '';
+    final t = topic?.trim().toLowerCase() ?? '';
+    if (s.isEmpty && t.isEmpty) return list;
+    return list.where((item) {
+      if (s.isNotEmpty &&
+          (item['subject']?.toString().trim().toLowerCase() ?? '') != s) {
+        return false;
+      }
+      if (t.isNotEmpty &&
+          (item['topic']?.toString().trim().toLowerCase() ?? '') != t) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  /// Synchronously returns cached or bundled seed PYQ chapters in 0ms (no spinner/skeleton)
+  List<Map<String, dynamic>> getInitialPyqChapters({
+    String? subject,
+    String? topic,
+  }) {
+    if (_cachedPyqChapters != null && _cachedPyqChapters!.isNotEmpty) {
+      return _filterPyqChapters(_cachedPyqChapters!, subject: subject, topic: topic);
+    }
+    final raw = _prefs?.getString(_pyqChaptersStorageKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List && decoded.isNotEmpty) {
+          _cachedPyqChapters = decoded
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          return _filterPyqChapters(_cachedPyqChapters!, subject: subject, topic: topic);
+        }
+      } catch (_) {}
+    }
+    _cachedPyqChapters = List<Map<String, dynamic>>.from(kPyqChaptersSeed);
+    return _filterPyqChapters(_cachedPyqChapters!, subject: subject, topic: topic);
+  }
+
   Future<List<Map<String, dynamic>>> fetchPyqChapters({
     String? subject,
     String? topic,
+    bool forceRefresh = false,
   }) async {
-    final data = await _get(
-      _scopedPath('/content/pyq-chapters', subject: subject, topic: topic),
-    );
-    return _mapsFromListKey(data, 'chapters');
+    final initial = getInitialPyqChapters(subject: subject, topic: topic);
+
+    // Silently refresh in background without blocking UI
+    unawaited(_refreshPyqChaptersNetwork());
+
+    return initial;
+  }
+
+  Future<void> _refreshPyqChaptersNetwork() async {
+    try {
+      final data = await _get('/content/pyq-chapters');
+      final list = _mapsFromListKey(data, 'chapters');
+      if (list.isNotEmpty) {
+        _cachedPyqChapters = list;
+        unawaited(_prefs?.setString(_pyqChaptersStorageKey, jsonEncode(list)));
+      }
+    } catch (_) {}
+  }
+
+  bool hasCachedPyqs(int chapterId) {
+    final key = 'cached_chapter_pyqs_$chapterId';
+    final raw = _prefs?.getString(key);
+    return raw != null && raw.isNotEmpty;
   }
 
   Future<List<Map<String, dynamic>>> fetchPyqs(
     int chapterId, {
     bool bypassCache = false,
   }) async {
+    final localKey = 'cached_chapter_pyqs_$chapterId';
+    if (!bypassCache) {
+      final cachedStr = _prefs?.getString(localKey);
+      if (cachedStr != null && cachedStr.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(cachedStr);
+          if (decoded is List && decoded.isNotEmpty) {
+            final list = decoded
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+            unawaited(_refreshSingleChapterPyqs(chapterId, localKey));
+            return list;
+          }
+        } catch (_) {}
+      }
+    }
+
     final data = await _get(
       '/content/chapters/$chapterId/pyqs',
       bypassCache: bypassCache,
     );
-    return _mapsFromListKey(data, 'pyqs');
+    final list = _mapsFromListKey(data, 'pyqs');
+    if (list.isNotEmpty) {
+      unawaited(_prefs?.setString(localKey, jsonEncode(list)));
+    }
+    return list;
+  }
+
+  Future<void> _refreshSingleChapterPyqs(int chapterId, String localKey) async {
+    try {
+      final data = await _get(
+        '/content/chapters/$chapterId/pyqs',
+        bypassCache: true,
+      );
+      final list = _mapsFromListKey(data, 'pyqs');
+      if (list.isNotEmpty) {
+        await _prefs?.setString(localKey, jsonEncode(list));
+      }
+    } catch (_) {}
   }
 
   Future<List<Map<String, dynamic>>> fetchPracticeSets({

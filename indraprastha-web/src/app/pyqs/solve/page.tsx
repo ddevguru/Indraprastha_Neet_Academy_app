@@ -97,7 +97,7 @@ function PyqsSolveComponent() {
     if (typeof window !== "undefined") {
       const storedToken = localStorage.getItem("indraprastha_token") || "";
       const storedUser = localStorage.getItem("indraprastha_user");
-      const freeChapterId = localStorage.getItem("indraprastha_free_pyq_id");
+      const freeChapterId = localStorage.getItem("indraprastha_free_pyq_id") || "2";
       setAuthToken(storedToken);
       let userObj: any = null;
       if (storedUser) {
@@ -112,7 +112,7 @@ function PyqsSolveComponent() {
       const hasSub = Boolean(userObj?.has_active_subscription || userObj?.subscription_status === "active");
 
       // Subscription access guard: If unsubscribed, only the 1 free demo chapter is accessible
-      if (!hasSub && freeChapterId && String(chapterId) !== String(freeChapterId)) {
+      if (!hasSub && String(chapterId) !== String(freeChapterId)) {
         setIsLockedAccess(true);
         setLoading(false);
         return;
@@ -163,6 +163,7 @@ function PyqsSolveComponent() {
   };
 
   const handleSelectOption = (qid: number, letter: string) => {
+    if (selectedAnswers[qid] || revealed[qid]) return;
     setSelectedAnswers((prev) => ({
       ...prev,
       [qid]: letter,
@@ -181,6 +182,7 @@ function PyqsSolveComponent() {
   };
 
   const handleClearResponse = (qid: number) => {
+    if (selectedAnswers[qid] || revealed[qid]) return;
     setSelectedAnswers((prev) => {
       const copy = { ...prev };
       delete copy[qid];
@@ -231,6 +233,7 @@ function PyqsSolveComponent() {
 
   const currentQ = questions[currentIndex];
   const isCurrentRevealed = Boolean(currentQ && revealed[currentQ.id]);
+  const isCurrentAnswered = Boolean(currentQ && (selectedAnswers[currentQ.id] || revealed[currentQ.id]));
   const isCurrentCorrect = Boolean(
     isCurrentRevealed &&
       selectedAnswers[currentQ?.id]?.toUpperCase() === currentQ?.correct_option?.toUpperCase()
@@ -648,7 +651,8 @@ function PyqsSolveComponent() {
                     return (
                       <button
                         key={opt.letter}
-                        onClick={() => handleSelectOption(currentQ.id, opt.letter)}
+                        disabled={isCurrentAnswered}
+                        onClick={() => !isCurrentAnswered && handleSelectOption(currentQ.id, opt.letter)}
                         style={{
                           display: "flex",
                           alignItems: "flex-start",
@@ -657,7 +661,7 @@ function PyqsSolveComponent() {
                           borderRadius: "12px",
                           border: `1.5px solid ${borderColor}`,
                           backgroundColor: bgColor,
-                          cursor: "pointer",
+                          cursor: isCurrentAnswered ? "default" : "pointer",
                           textAlign: "left",
                           transition: "all 0.15s ease",
                         }}
@@ -836,7 +840,8 @@ function PyqsSolveComponent() {
               >
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button
-                    onClick={() => handleClearResponse(currentQ.id)}
+                    disabled={isCurrentAnswered}
+                    onClick={() => !isCurrentAnswered && handleClearResponse(currentQ.id)}
                     style={{
                       height: "36px",
                       padding: "0 12px",
@@ -846,7 +851,8 @@ function PyqsSolveComponent() {
                       color: "var(--text-muted)",
                       fontSize: "12px",
                       fontWeight: 700,
-                      cursor: "pointer",
+                      cursor: isCurrentAnswered ? "not-allowed" : "pointer",
+                      opacity: isCurrentAnswered ? 0.4 : 1,
                       display: "flex",
                       alignItems: "center",
                     }}

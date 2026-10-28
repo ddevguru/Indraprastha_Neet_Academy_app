@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import seedChapters from "@/lib/pyqChaptersSeed.json";
+
 interface ChapterItem {
   id: number;
   book_id: number;
@@ -11,8 +13,8 @@ interface ChapterItem {
   order_index: number;
 }
 
-// In-memory cache for ultra-fast response
-let cachedChapters: ChapterItem[] | null = null;
+// In-memory cache initialized with compiled seed catalog for instant response
+let cachedChapters: ChapterItem[] = (seedChapters as ChapterItem[]) || [];
 let cacheTime = 0;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
@@ -32,7 +34,8 @@ async function getAdminToken(): Promise<string> {
 
 export async function GET() {
   const now = Date.now();
-  if (cachedChapters && now - cacheTime < CACHE_TTL) {
+  // If cached and fresh, return immediately
+  if (cachedChapters && cachedChapters.length > 0 && now - cacheTime < CACHE_TTL) {
     return NextResponse.json({ success: true, chapters: cachedChapters, cached: true });
   }
 

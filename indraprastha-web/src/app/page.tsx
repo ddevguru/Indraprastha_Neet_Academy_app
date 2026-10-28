@@ -159,15 +159,7 @@ export default function Page() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const handleHeroNavigate = (destination: string) => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("indraprastha_token");
-      const user = localStorage.getItem("indraprastha_user");
-      if (token || user) {
-        router.push(destination);
-      } else {
-        router.push(`/login?redirect=${encodeURIComponent(destination)}`);
-      }
-    }
+    router.push(destination);
   };
 
   const handleEnrollClick = (batch: (typeof batches)[0]) => {
@@ -448,7 +440,7 @@ export default function Page() {
             <div className="mentorship-bottom-cta">
               <div className="mentor-quote-box">
                 <p className="mentor-quote-text">
-                  &ldquo;Cracking NEET is not about studying 16 hours haphazardly; it is about precision, eliminating careless negative marks, and calm execution under timed pressure.&rdquo;
+                  &ldquo;Cracking Neet is not about studying 16 hours haphazardly; it is about revision & Question practicing as many questions as  you can do form a Topic&rdquo;
                 </p>
                 <div className="mentor-sign-text">
                   <strong>— Dr Rahul Kumar</strong> · Founder &amp; Academic Director

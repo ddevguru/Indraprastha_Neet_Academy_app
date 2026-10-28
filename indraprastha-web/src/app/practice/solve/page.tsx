@@ -252,6 +252,7 @@ function PracticeSolveComponent() {
   };
 
   const handleSelectOption = (qid: number, letter: string) => {
+    if (selectedAnswers[qid] || revealed[qid]) return;
     setSelectedAnswers((prev) => ({
       ...prev,
       [qid]: letter,
@@ -270,6 +271,7 @@ function PracticeSolveComponent() {
   };
 
   const handleClearResponse = (qid: number) => {
+    if (selectedAnswers[qid] || revealed[qid]) return;
     setSelectedAnswers((prev) => {
       const copy = { ...prev };
       delete copy[qid];
@@ -320,6 +322,7 @@ function PracticeSolveComponent() {
 
   const currentQ = questions[currentIndex];
   const isCurrentRevealed = Boolean(currentQ && revealed[currentQ.id]);
+  const isCurrentAnswered = Boolean(currentQ && (selectedAnswers[currentQ.id] || revealed[currentQ.id]));
   const isCurrentCorrect = Boolean(
     isCurrentRevealed &&
       selectedAnswers[currentQ?.id]?.toUpperCase() === currentQ?.correct_option?.toUpperCase()
@@ -730,7 +733,8 @@ function PracticeSolveComponent() {
                     return (
                       <button
                         key={opt.letter}
-                        onClick={() => handleSelectOption(currentQ.id, opt.letter)}
+                        disabled={isCurrentAnswered}
+                        onClick={() => !isCurrentAnswered && handleSelectOption(currentQ.id, opt.letter)}
                         style={{
                           display: "flex",
                           alignItems: "flex-start",
@@ -739,7 +743,7 @@ function PracticeSolveComponent() {
                           borderRadius: "12px",
                           border: `1.5px solid ${borderColor}`,
                           backgroundColor: bgColor,
-                          cursor: "pointer",
+                          cursor: isCurrentAnswered ? "default" : "pointer",
                           textAlign: "left",
                           transition: "all 0.15s ease",
                         }}
@@ -920,7 +924,8 @@ function PracticeSolveComponent() {
               >
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button
-                    onClick={() => handleClearResponse(currentQ.id)}
+                    disabled={isCurrentAnswered}
+                    onClick={() => !isCurrentAnswered && handleClearResponse(currentQ.id)}
                     style={{
                       height: "36px",
                       padding: "0 12px",
@@ -930,7 +935,8 @@ function PracticeSolveComponent() {
                       color: "var(--text-muted)",
                       fontSize: "12px",
                       fontWeight: 700,
-                      cursor: "pointer",
+                      cursor: isCurrentAnswered ? "not-allowed" : "pointer",
+                      opacity: isCurrentAnswered ? 0.4 : 1,
                       display: "flex",
                       alignItems: "center",
                     }}

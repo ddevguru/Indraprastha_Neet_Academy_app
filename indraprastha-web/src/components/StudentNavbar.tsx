@@ -66,16 +66,6 @@ export default function StudentNavbar({
 
     // Read saved user
     const storedUser = localStorage.getItem("indraprastha_user");
-    let u: StudentUserProfile = {
-      full_name: "Deepak Mishra",
-      phone: "7028196172",
-      preferred_plan: "Target NEET 2027",
-      subscription_plan: "Target NEET 2027",
-      subscription_status: "active",
-      has_active_subscription: true,
-      subscription_expires_at: "2028-01-19T20:04:05.145Z",
-    };
-
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
@@ -91,7 +81,7 @@ export default function StudentNavbar({
           p.endsWith("7028196172") ||
           n.includes("deepak");
 
-        u = {
+        const u: StudentUserProfile = {
           ...parsed,
           preferred_plan: isStarterOrDeepak ? "Target NEET 2027" : (parsed.preferred_plan || parsed.preferredPlan || "Target NEET 2027"),
           subscription_plan: isStarterOrDeepak ? "Target NEET 2027" : (parsed.subscription_plan || parsed.subscriptionPlan || "Target NEET 2027"),
@@ -99,12 +89,14 @@ export default function StudentNavbar({
           has_active_subscription: Boolean(isStarterOrDeepak || parsed.has_active_subscription || parsed.hasActiveSubscription),
           subscription_expires_at: parsed.subscription_expires_at || (isStarterOrDeepak ? "2028-01-19T20:04:05.145Z" : null),
         };
+        localStorage.setItem("indraprastha_user", JSON.stringify(u));
+        setProfile(u);
       } catch {
-        // ignore
+        setProfile(null);
       }
+    } else {
+      setProfile(null);
     }
-    localStorage.setItem("indraprastha_user", JSON.stringify(u));
-    setProfile(u);
     return () => window.removeEventListener("indraprastha_theme_change", handleThemeChange);
   }, [userName]);
 
@@ -164,8 +156,9 @@ export default function StudentNavbar({
     }
   };
 
-  const displayName = profile?.full_name || profile?.name || userName || "Deepak Mishra";
-  const firstName = displayName.split(" ")[0];
+  const isGuest = !profile && !userName;
+  const displayName = profile?.full_name || profile?.name || userName || "Guest Student";
+  const firstName = isGuest ? "Guest" : displayName.split(" ")[0];
 
   const rawNavPlan = String(
     profile?.subscription_plan ||
@@ -177,22 +170,26 @@ export default function StudentNavbar({
   ).toLowerCase();
 
   const phoneStr = String(profile?.phone || "").replace(/\D/g, "");
-  const isStarterOr2027 =
+  const isStarterOr2027 = !isGuest && (
     rawNavPlan.includes("starter") ||
     rawNavPlan.includes("2027") ||
     phoneStr.endsWith("7028196172") ||
-    displayName.toLowerCase().includes("deepak");
+    displayName.toLowerCase().includes("deepak")
+  );
 
-  const isRankProOr2028 =
+  const isRankProOr2028 = !isGuest && (
     rawNavPlan.includes("rank pro") ||
-    rawNavPlan.includes("2028");
+    rawNavPlan.includes("2028")
+  );
 
   const hasNavSubscription = Boolean(
-    profile?.has_active_subscription ||
-    profile?.hasActiveSubscription ||
-    profile?.subscription_status === "active" ||
-    isStarterOr2027 ||
-    isRankProOr2028
+    !isGuest && (
+      profile?.has_active_subscription ||
+      profile?.hasActiveSubscription ||
+      profile?.subscription_status === "active" ||
+      isStarterOr2027 ||
+      isRankProOr2028
+    )
   );
 
   const navPlan = hasNavSubscription
@@ -436,78 +433,101 @@ export default function StudentNavbar({
             <span className="student-desktop-pill-text">{theme === "light" ? " Light" : " Dark"}</span>
           </button>
 
-          {/* Student Profile Pill - Clickable to open profile */}
-          <button
-            type="button"
-            onClick={() => {
-              if (onOpenProfile) {
-                onOpenProfile();
-              } else {
-                router.push("/profile");
-              }
-            }}
-            title="Click to view Profile & Account Details"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "4px 10px 4px 5px",
-              borderRadius: "100px",
-              border: "1.5px solid rgba(229, 82, 0, 0.35)",
-              backgroundColor: "rgba(229, 82, 0, 0.08)",
-              cursor: "pointer",
-              textAlign: "left",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <div
+          {isGuest ? (
+            <Link
+              href="/login"
               style={{
-                width: "26px",
-                height: "26px",
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, #FF6B00, #E55200)",
+                padding: "7px 16px",
+                borderRadius: "8px",
+                background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
                 color: "#FFFFFF",
                 fontSize: "12px",
-                fontWeight: 900,
-                display: "flex",
+                fontWeight: 800,
+                textDecoration: "none",
+                display: "inline-flex",
                 alignItems: "center",
-                justifyContent: "center",
+                gap: "6px",
+                boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
               }}
             >
-              {firstName.charAt(0).toUpperCase()}
-            </div>
-            <div className="student-desktop-pill-text" style={{ lineHeight: 1.1 }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--text-main)" }}>
-                {firstName}
-              </div>
-              <div style={{ fontSize: "9px", color: hasNavSubscription ? "#10B981" : "#E55200", fontWeight: 700 }}>
-                {navPlan} ▾
-              </div>
-            </div>
-          </button>
+              <span>Login →</span>
+            </Link>
+          ) : (
+            <>
+              {/* Student Profile Pill - Clickable to open profile */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenProfile) {
+                    onOpenProfile();
+                  } else {
+                    router.push("/profile");
+                  }
+                }}
+                title="Click to view Profile & Account Details"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "4px 10px 4px 5px",
+                  borderRadius: "100px",
+                  border: "1.5px solid rgba(229, 82, 0, 0.35)",
+                  backgroundColor: "rgba(229, 82, 0, 0.08)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <div
+                  style={{
+                    width: "26px",
+                    height: "26px",
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #FF6B00, #E55200)",
+                    color: "#FFFFFF",
+                    fontSize: "12px",
+                    fontWeight: 900,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {firstName.charAt(0).toUpperCase()}
+                </div>
+                <div className="student-desktop-pill-text" style={{ lineHeight: 1.1 }}>
+                  <div style={{ fontSize: "12px", fontWeight: 800, color: "var(--text-main)" }}>
+                    {firstName}
+                  </div>
+                  <div style={{ fontSize: "9px", color: hasNavSubscription ? "#10B981" : "#E55200", fontWeight: 700 }}>
+                    {navPlan} ▾
+                  </div>
+                </div>
+              </button>
 
-          {/* Desktop Sign Out Button */}
-          <button
-            type="button"
-            onClick={handleSignOut}
-            title="Sign Out of Academy"
-            className="student-desktop-signout"
-            style={{
-              padding: "6px 10px",
-              borderRadius: "8px",
-              border: "1px solid rgba(239, 68, 68, 0.25)",
-              backgroundColor: "rgba(239, 68, 68, 0.08)",
-              color: "#EF4444",
-              fontSize: "11px",
-              fontWeight: 800,
-              cursor: "pointer",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            <span>🚪</span>
-            <span>Sign Out</span>
-          </button>
+              {/* Desktop Sign Out Button */}
+              <button
+                type="button"
+                onClick={handleSignOut}
+                title="Sign Out of Academy"
+                className="student-desktop-signout"
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(239, 68, 68, 0.25)",
+                  backgroundColor: "rgba(239, 68, 68, 0.08)",
+                  color: "#EF4444",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                <span>🚪</span>
+                <span>Sign Out</span>
+              </button>
+            </>
+          )}
 
           {/* ── Mobile Hamburger Toggle Button (Mobile Only) ── */}
           <button
@@ -729,30 +749,53 @@ export default function StudentNavbar({
                 <span>{theme === "light" ? "Dark Mode" : "Light Mode"}</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  closeMobile();
-                  handleSignOut();
-                }}
-                style={{
-                  flex: 1,
-                  padding: "10px",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(239, 68, 68, 0.4)",
-                  backgroundColor: "rgba(239, 68, 68, 0.12)",
-                  color: "#EF4444",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                }}
-              >
-                <span>🚪 Sign Out</span>
-              </button>
+              {isGuest ? (
+                <Link
+                  href="/login"
+                  onClick={closeMobile}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    borderRadius: "8px",
+                    background: "linear-gradient(135deg, #FF6B00 0%, #E55200 100%)",
+                    color: "#FFFFFF",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    textDecoration: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <span>🔑 Login</span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobile();
+                    handleSignOut();
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(239, 68, 68, 0.4)",
+                    backgroundColor: "rgba(239, 68, 68, 0.12)",
+                    color: "#EF4444",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <span>🚪 Sign Out</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

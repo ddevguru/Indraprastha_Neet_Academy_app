@@ -318,7 +318,7 @@ export default function TargetBatchesPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               <div className="tb-trust-pill">
                 <span style={{ fontSize: "16px" }}>🎓</span>
-                <span>1:25 Mentor Ratio Guaranteed</span>
+                <span>1:1 Mentor Ratio Guaranteed</span>
               </div>
 
               <div className="tb-trust-pill">
@@ -456,23 +456,6 @@ export default function TargetBatchesPage() {
                     </div>
                     <div className="tb-material-info">{b.materialInfo}</div>
                   </div>
-
-                  <div style={{ textAlign: "right" }}>
-                    <span
-                      style={{
-                        background: "#16A34A",
-                        color: "#FFF",
-                        fontSize: "11px",
-                        fontWeight: 800,
-                        padding: "4px 10px",
-                        borderRadius: "6px",
-                        display: "inline-block",
-                      }}
-                    >
-                      {b.emiInfo}
-                    </span>
-                    <div style={{ fontSize: "10px", color: "#8C786B", marginTop: "3px" }}>{b.emiSub}</div>
-                  </div>
                 </div>
 
                 {/* Course Highlights Header */}
@@ -527,23 +510,13 @@ export default function TargetBatchesPage() {
 
                 {/* Actions */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: "10px" }}>
-                    <button
-                      type="button"
-                      className="btn-batch-enroll btn-orange-leather"
-                      onClick={() => handleEnrollClick(b)}
-                    >
-                      <span>{b.ctaPrice}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="tb-btn-demo"
-                      onClick={() => setActiveModal({ type: "demo", batchName: b.title })}
-                    >
-                      📞 Free Demo
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="btn-batch-enroll btn-orange-leather"
+                    onClick={() => handleEnrollClick(b)}
+                  >
+                    <span>{b.ctaPrice}</span>
+                  </button>
 
                   <button
                     type="button"

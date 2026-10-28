@@ -196,6 +196,7 @@ function TestPlayerComponent() {
 
   const handleSelectOption = (letter: string) => {
     if (submitted || !currentQ) return;
+    if (selectedAnswers[currentQ.id]) return;
     setSelectedAnswers((prev) => ({
       ...prev,
       [currentQ.id]: letter,
@@ -204,6 +205,7 @@ function TestPlayerComponent() {
 
   const handleClearResponse = () => {
     if (submitted || !currentQ) return;
+    if (selectedAnswers[currentQ.id]) return;
     setSelectedAnswers((prev) => {
       const next = { ...prev };
       delete next[currentQ.id];
@@ -1129,11 +1131,13 @@ function TestPlayerComponent() {
                     { letter: "D", text: currentQ?.option_d, img: currentQ?.option_d_image_link },
                   ].map((opt) => {
                     const isSelected = selectedAnswers[currentQ?.id] === opt.letter;
+                    const isQuestionAnswered = Boolean(selectedAnswers[currentQ?.id]);
 
                     return (
                       <button
                         key={opt.letter}
-                        onClick={() => handleSelectOption(opt.letter)}
+                        disabled={submitted || isQuestionAnswered}
+                        onClick={() => !(submitted || isQuestionAnswered) && handleSelectOption(opt.letter)}
                         style={{
                           display: "flex",
                           alignItems: "flex-start",
@@ -1142,7 +1146,7 @@ function TestPlayerComponent() {
                           borderRadius: "12px",
                           border: isSelected ? "2px solid #E55200" : "1.5px solid var(--border-light, #EDE3DA)",
                           backgroundColor: isSelected ? "rgba(229, 82, 0, 0.08)" : "transparent",
-                          cursor: "pointer",
+                          cursor: (submitted || isQuestionAnswered) ? "default" : "pointer",
                           textAlign: "left",
                           transition: "all 0.15s ease",
                         }}
@@ -1201,7 +1205,8 @@ function TestPlayerComponent() {
               >
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button
-                    onClick={handleClearResponse}
+                    disabled={Boolean(submitted || selectedAnswers[currentQ?.id])}
+                    onClick={() => !(submitted || selectedAnswers[currentQ?.id]) && handleClearResponse()}
                     style={{
                       height: "36px",
                       padding: "0 12px",
@@ -1211,7 +1216,8 @@ function TestPlayerComponent() {
                       color: "var(--text-muted)",
                       fontSize: "12px",
                       fontWeight: 700,
-                      cursor: "pointer",
+                      cursor: (submitted || selectedAnswers[currentQ?.id]) ? "not-allowed" : "pointer",
+                      opacity: (submitted || selectedAnswers[currentQ?.id]) ? 0.4 : 1,
                       display: "flex",
                       alignItems: "center",
                     }}

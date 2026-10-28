@@ -114,15 +114,15 @@ const collegesList: CollegeData[] = [
 /* ─── FAQ DATA ─── */
 const faqs = [
   {
-    q: "How does the 2024 NEET normalization paper controversy affect 2026/2027 rank predictions?",
-    a: "The 2024 NEET exam witnessed unprecedented score inflation at the 650–700 plateau where each single mark shifted ~1,200 All-India positions. Our AI Rank Engine incorporates audited national percentile calibrations and models conservative seat allocation shifts for 2026/2027 aspirants, factoring in potential syllabus rationalization and stricter paper parity.",
+    q: "How does the 2024 NEET normalization paper controversy affect 2027 rank predictions?",
+    a: "The 2024 NEET exam witnessed unprecedented score inflation at the 650–700 plateau where each single mark shifted ~1,200 All-India positions. Our AI Rank Engine incorporates audited national percentile calibrations and models conservative seat allocation shifts for 2027 aspirants, factoring in potential syllabus rationalization and stricter paper parity.",
   },
   {
     q: "What is the difference between All India Quota (AIQ) 15% and State Quota 85%?",
     a: "In Government Medical Colleges across India, 15% of all MBBS/BDS seats are pooled under the Medical Counselling Committee (MCC) for students nationwide without state domicile. The remaining 85% seats are reserved exclusively for students holding valid State Domicile through their state's Department of Medical Education (DGME) counseling rounds, where cutoffs often close 15-40 marks lower than AIQ.",
   },
   {
-    q: "Is 650 safe for a Government Medical College (MBBS) in 2026?",
+    q: "Is 650 safe for a Government Medical College (MBBS) in 2027?",
     a: "A score of 650 places you safely in the 99.6+ percentile bracket, securing high-probability admission in top State Government Medical Colleges through 85% State Quotas across UP, Rajasthan, Bihar, MP, and Maharashtra. Under AIQ 15%, 650 reliably clears Round 1 and Round 2 for reputable regional GMCs and newly accredited AIIMS campuses.",
   },
 ];
@@ -131,7 +131,7 @@ export default function AiRankPredictorPage() {
   const [score, setScore] = useState<number>(655);
   const [category, setCategory] = useState<string>("General (UR)");
   const [homeState, setHomeState] = useState<string>("Delhi (NCT) - IPU/DU");
-  const [examCycle, setExamCycle] = useState<string>("NEET UG 2026 Aspirant 📅");
+  const [examCycle, setExamCycle] = useState<string>("NEET UG 2027 Aspirant 📅");
   const [defenceQuota, setDefenceQuota] = useState<boolean>(false);
   const [pwdCandidate, setPwdCandidate] = useState<boolean>(false);
   const [collegeFilter, setCollegeFilter] = useState<string>("all");
@@ -292,7 +292,7 @@ export default function AiRankPredictorPage() {
     setScore(655);
     setCategory("General (UR)");
     setHomeState("Delhi (NCT) - IPU/DU");
-    setExamCycle("NEET UG 2026 Aspirant 📅");
+    setExamCycle("NEET UG 2027 Aspirant 📅");
     setDefenceQuota(false);
     setPwdCandidate(false);
     setHasCalculated(false);
@@ -353,10 +353,10 @@ export default function AiRankPredictorPage() {
         <div className="pred-hero-top-row">
           <div>
             <div className="pred-tagline-capsule">
-              <span>PREDICTIVE ARTICLE & ENGINE 2026/2027</span>
+              <span>PREDICTIVE ARTICLE & ENGINE 2027</span>
             </div>
             <h1 className="pred-main-title">
-              NEET 2026/2027 <span className="pred-title-highlight">AI Rank</span> Predictor
+              NEET 2027 <span className="pred-title-highlight">AI Rank</span> Predictor
             </h1>
             <p className="pred-subtitle">
               Benchmarked against 24.3 Lakh candidate score distributions, recent shift normalizations, 15% AIQ counseling rounds, and 85% State Quota closing cutoffs.
@@ -471,8 +471,8 @@ export default function AiRankPredictorPage() {
                 className="pred-select"
                 aria-label="Target Exam Cycle"
               >
-                <option value="NEET UG 2026 Aspirant 📅">NEET UG 2026 Aspirant 📅</option>
                 <option value="NEET UG 2027 Aspirant 📅">NEET UG 2027 Aspirant 📅</option>
+                <option value="NEET UG 2028 Aspirant 📅">NEET UG 2028 Aspirant 📅</option>
               </select>
             </div>
           </div>
@@ -758,7 +758,7 @@ export default function AiRankPredictorPage() {
           <div className="graph-header-row">
             <div>
               <span className="pred-tagline-capsule" style={{ marginBottom: "6px" }}>
-                NEET DATA ENGINE 2024 VS 2026 PROJECTED
+                NEET DATA ENGINE 2024 VS 2027 PROJECTED
               </span>
               <h3 className="pred-card-title">NEET Score vs AIR Distribution Curve</h3>
             </div>
@@ -767,7 +767,7 @@ export default function AiRankPredictorPage() {
                 <span className="legend-dot orange"></span> 2024 Actual
               </span>
               <span>
-                <span className="legend-dot yellow"></span> 2026/2027 Projected
+                <span className="legend-dot yellow"></span> 2027 Projected
               </span>
             </div>
           </div>
@@ -917,10 +917,10 @@ export default function AiRankPredictorPage() {
 
           {/* Bottom: Dark Leather Target Batches Promo Card */}
           <div className="dark-promo-card">
-            <span className="promo-tag">INDRAPRASTHA TARGET BATCHES 2026</span>
+            <span className="promo-tag">INDRAPRASTHA TARGET BATCHES 2027</span>
             <h3 className="promo-title">Want to jump from 580 to 670+?</h3>
             <p className="promo-desc">
-              Join our Target 2026/Foundation Cohort featuring daily NCERT line-by-line testing and doctor-led error analytics.
+              Join our Target 2027/Foundation Cohort featuring daily NCERT line-by-line testing and doctor-led error analytics.
             </p>
             <div className="promo-actions">
               <Link href="/target-batches" className="btn-promo-enroll btn-orange-leather">
@@ -956,7 +956,7 @@ export default function AiRankPredictorPage() {
               </li>
               <li className="counsel-bullet-item">
                 <span className="bullet-check">✔</span>
-                <span>Custom score improvement plan tailored for NEET 2026/2027</span>
+                <span>Custom score improvement plan tailored for NEET 2027</span>
               </li>
             </ul>
 

@@ -2028,69 +2028,18 @@ class TopicWiseMcqsScreen extends ConsumerStatefulWidget {
 
 class _TopicWiseMcqsScreenState extends ConsumerState<TopicWiseMcqsScreen> {
   late Future<List<Map<String, dynamic>>> _combinedFuture;
+  late List<Map<String, dynamic>> _initialItems;
 
   @override
   void initState() {
     super.initState();
-    _combinedFuture = _loadCombinedSets();
-  }
-
-  Future<List<Map<String, dynamic>>> _loadCombinedSets() async {
     final repo = ref.read(contentRepositoryProvider);
     if (widget.isPyqCategory) {
-      // 1. Fast path: Fetch all PYQ-linked chapters in one single aggregated API call
-      try {
-        final chapters = await repo.fetchPyqChapters();
-        if (chapters.isNotEmpty) {
-          return chapters.map((ch) => <String, dynamic>{
-            'id': ch['id']?.toString() ?? 'ch_${ch['chapter_id']}',
-            'chapter_id': ch['chapter_id'] ?? ch['id'],
-            'title': ch['title']?.toString() ?? 'Chapter',
-            'topic': ch['topic']?.toString() ?? ch['title']?.toString() ?? '',
-            'subject': ch['subject']?.toString() ?? '',
-            'class_label': ch['class_label']?.toString() ?? '',
-            'question_count': _parseInt(ch['question_count'] ?? ch['linked_pyq_count']),
-            'is_book_chapter': true,
-            'book_id': ch['book_id'],
-            'order_index': _parseInt(ch['order_index'] ?? ch['chapter_id'] ?? ch['id']),
-          }).toList();
-        }
-      } catch (_) {}
-
-      // 2. Fallback path: Parallel fetch across books instead of sequential waterfall
-      final pyqSets = <Map<String, dynamic>>[];
-      try {
-        final books = await repo.fetchBooks();
-        final chapterResults = await Future.wait(
-          books.map((book) async {
-            final bookId = int.tryParse(book['id']?.toString() ?? '');
-            if (bookId == null) return <Map<String, dynamic>>[];
-            try {
-              final chapters = await repo.fetchChapters(bookId);
-              return chapters.map((ch) => <String, dynamic>{
-                'id': 'ch_${ch['id']}',
-                'chapter_id': ch['id'],
-                'title': ch['title']?.toString() ?? 'Chapter',
-                'topic': book['topic']?.toString() ?? ch['title']?.toString() ?? '',
-                'subject': book['subject']?.toString() ?? '',
-                'class_label': book['class_label']?.toString() ?? '',
-                'question_count': _parseInt(ch['linked_pyq_count']),
-                'is_book_chapter': true,
-                'book_id': bookId,
-                'order_index': _parseInt(ch['order_index'] ?? ch['id']),
-              }).toList();
-            } catch (_) {
-              return <Map<String, dynamic>>[];
-            }
-          }),
-        );
-        for (final list in chapterResults) {
-          pyqSets.addAll(list);
-        }
-      } catch (_) {}
-      return pyqSets;
+      _initialItems = repo.getInitialPyqChapters();
+      _combinedFuture = repo.fetchPyqChapters();
     } else {
-      return widget.allSets;
+      _initialItems = widget.allSets;
+      _combinedFuture = Future.value(widget.allSets);
     }
   }
 
@@ -2121,11 +2070,15 @@ class _TopicWiseMcqsScreenState extends ConsumerState<TopicWiseMcqsScreen> {
       appBar: AppBar(title: Text(screenTitle)),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _combinedFuture,
+        initialData: _initialItems.isNotEmpty ? _initialItems : null,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          final items = (snapshot.data != null && snapshot.data!.isNotEmpty)
+              ? snapshot.data!
+              : _initialItems;
+
+          if (items.isEmpty && snapshot.connectionState == ConnectionState.waiting) {
             return const SkeletonLoader(cardCount: 4);
           }
-          final items = snapshot.data ?? widget.allSets;
           final groups = _groupByClassAndSubject(items);
 
           if (groups.isEmpty) {
@@ -2261,6 +2214,29 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
     final chapterId = _parseInt(set['chapter_id']);
     if (chapterId <= 0) return;
 
+    final repo = ref.read(contentRepositoryProvider);
+
+    // Instant launch if already cached in memory or local storage
+    if (repo.hasCachedPyqs(chapterId)) {
+      try {
+        final cachedQuestions = await repo.fetchPyqs(chapterId);
+        if (!mounted) return;
+        if (cachedQuestions.isNotEmpty) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PracticeAttemptScreen(
+                setId: 0,
+                chapterName: set['title']?.toString() ?? 'Chapter PYQs',
+                chapterQuestions: cachedQuestions,
+              ),
+            ),
+          );
+          _refreshSets();
+          return;
+        }
+      } catch (_) {}
+    }
+
     bool dialogShowing = true;
     showDialog(
       context: context,
@@ -2271,7 +2247,6 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
     });
 
     try {
-      final repo = ref.read(contentRepositoryProvider);
       final pyqs = await repo.fetchPyqs(chapterId);
       if (mounted && dialogShowing) {
         Navigator.of(context).pop();
