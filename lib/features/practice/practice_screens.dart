@@ -2349,6 +2349,7 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
         } catch (_) {}
       }
 
+      if (!mounted) return;
       bool dialogShowing = true;
       showDialog(
         context: context,
