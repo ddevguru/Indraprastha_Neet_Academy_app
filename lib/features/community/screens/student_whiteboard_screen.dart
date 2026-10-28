@@ -9,6 +9,8 @@ class StudentWhiteboardScreen extends StatefulWidget {
   final String classLevel;
   final String subject;
   final Map<String, dynamic>? initialDocument;
+  final bool isEmbedded;
+  final VoidCallback? onSwitchToChat;
 
   const StudentWhiteboardScreen({
     super.key,
@@ -16,6 +18,8 @@ class StudentWhiteboardScreen extends StatefulWidget {
     required this.classLevel,
     required this.subject,
     this.initialDocument,
+    this.isEmbedded = false,
+    this.onSwitchToChat,
   });
 
   @override
@@ -189,6 +193,267 @@ class _StudentWhiteboardScreenState extends State<StudentWhiteboardScreen> {
     const navyColor = Color(0xFF002350);
     const goldColor = Color(0xFFD2AE39);
 
+    final content = _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : Column(
+            children: [
+              // Responsive Toolbar: Row 1 (Tools, History, Zoom, Save, Doubt)
+              Container(
+                color: isDark ? const Color(0xFF171A22) : Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      // Pen
+                      IconButton(
+                        icon: Icon(
+                          Icons.edit,
+                          size: 20,
+                          color: _activeTool == WhiteboardTool.pen ? (isDark ? goldColor : navyColor) : Colors.grey,
+                        ),
+                        tooltip: 'Pen',
+                        onPressed: () => setState(() => _activeTool = WhiteboardTool.pen),
+                      ),
+                      // Eraser
+                      IconButton(
+                        icon: Icon(
+                          Icons.cleaning_services_outlined,
+                          size: 20,
+                          color: _activeTool == WhiteboardTool.eraser ? Colors.red : Colors.grey,
+                        ),
+                        tooltip: 'Eraser',
+                        onPressed: () => setState(() => _activeTool = WhiteboardTool.eraser),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(width: 1, height: 24, color: Colors.grey.withValues(alpha: 0.3)),
+                      const SizedBox(width: 4),
+
+                      // Undo
+                      IconButton(
+                        icon: const Icon(Icons.undo, size: 20),
+                        tooltip: 'Undo',
+                        onPressed: _strokes.isNotEmpty ? _undo : null,
+                      ),
+                      // Redo
+                      IconButton(
+                        icon: const Icon(Icons.redo, size: 20),
+                        tooltip: 'Redo',
+                        onPressed: _redoStack.isNotEmpty ? _redo : null,
+                      ),
+                      // Clear
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                        tooltip: 'Clear Canvas',
+                        onPressed: _strokes.isNotEmpty ? _clearCanvas : null,
+                      ),
+
+                      const SizedBox(width: 4),
+                      Container(width: 1, height: 24, color: Colors.grey.withValues(alpha: 0.3)),
+                      const SizedBox(width: 4),
+
+                      // Zoom Out
+                      IconButton(
+                        icon: const Icon(Icons.zoom_out, size: 20),
+                        tooltip: 'Zoom Out',
+                        onPressed: _zoomScale > 0.5 ? _zoomOut : null,
+                      ),
+                      // Zoom display
+                      GestureDetector(
+                        onTap: _resetZoom,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${(_zoomScale * 100).toInt()}%',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Zoom In
+                      IconButton(
+                        icon: const Icon(Icons.zoom_in, size: 20),
+                        tooltip: 'Zoom In',
+                        onPressed: _zoomScale < 3.0 ? _zoomIn : null,
+                      ),
+
+                      const SizedBox(width: 4),
+                      Container(width: 1, height: 24, color: Colors.grey.withValues(alpha: 0.3)),
+                      const SizedBox(width: 4),
+
+                      // Cloud Save
+                      IconButton(
+                        icon: _isSaving
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : Icon(Icons.cloud_upload_outlined, size: 20, color: isDark ? goldColor : navyColor),
+                        tooltip: 'Save to Cloud',
+                        onPressed: _isSaving ? null : () => _saveWhiteboard(showToast: true),
+                      ),
+
+                      // Fullscreen toggle (in embedded mode)
+                      if (widget.isEmbedded) ...[
+                        IconButton(
+                          icon: const Icon(Icons.fullscreen, size: 20),
+                          tooltip: 'Open Fullscreen Whiteboard',
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (ctx) => StudentWhiteboardScreen(
+                                  communityId: widget.communityId,
+                                  classLevel: widget.classLevel,
+                                  subject: widget.subject,
+                                  isEmbedded: false,
+                                ),
+                              ),
+                            ).then((_) => _loadWhiteboard());
+                          },
+                        ),
+                      ],
+
+                      const SizedBox(width: 4),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: goldColor,
+                          foregroundColor: navyColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: _submitAsDoubt,
+                        icon: const Icon(Icons.send_rounded, size: 14),
+                        label: const Text('Ask Doubt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const Divider(height: 1, thickness: 1),
+
+              // Responsive Toolbar: Row 2 (Palette & Thickness)
+              Container(
+                color: isDark ? const Color(0xFF171A22) : Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Row(
+                  children: [
+                    // Palette
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: _palette.map((color) {
+                            final isSelected = _selectedColor == color && _activeTool != WhiteboardTool.eraser;
+                            return GestureDetector(
+                              onTap: () => setState(() {
+                                _selectedColor = color;
+                                _activeTool = WhiteboardTool.pen;
+                              }),
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                width: isSelected ? 26 : 20,
+                                height: isSelected ? 26 : 20,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected ? (isDark ? Colors.white : Colors.black) : Colors.grey.shade400,
+                                    width: isSelected ? 2.5 : 1,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Brush thickness slider
+                    SizedBox(
+                      width: 90,
+                      child: Slider(
+                        value: _strokeWidth,
+                        min: 2,
+                        max: 18,
+                        activeColor: isDark ? goldColor : navyColor,
+                        onChanged: (v) => setState(() => _strokeWidth = v),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Whiteboard Drawing Canvas Area with Zoom Transform
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade300,
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: GestureDetector(
+                      onPanStart: (details) {
+                        final localPos = details.localPosition / _zoomScale;
+                        setState(() {
+                          _redoStack.clear();
+                          _strokes.add(
+                            WhiteboardStroke(
+                              points: [localPos],
+                              color: _selectedColor,
+                              strokeWidth: _activeTool == WhiteboardTool.eraser ? 24.0 : _strokeWidth,
+                              isEraser: _activeTool == WhiteboardTool.eraser,
+                            ),
+                          );
+                        });
+                      },
+                      onPanUpdate: (details) {
+                        final localPos = details.localPosition / _zoomScale;
+                        setState(() {
+                          if (_strokes.isNotEmpty) {
+                            _strokes.last.points.add(localPos);
+                          }
+                        });
+                      },
+                      onPanEnd: (_) {
+                        _saveWhiteboard(showToast: false);
+                      },
+                      child: CustomPaint(
+                        painter: _ScaledStrokePainter(strokes: _strokes, scale: _zoomScale),
+                        size: Size.infinite,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+
+    if (widget.isEmbedded) {
+      return Container(
+        color: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
+        child: content,
+      );
+    }
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -236,212 +501,7 @@ class _StudentWhiteboardScreenState extends State<StudentWhiteboardScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Responsive Toolbar: Row 1 (Tools, History & Zoom)
-                Container(
-                  color: isDark ? const Color(0xFF171A22) : Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        // Pen
-                        IconButton(
-                          icon: Icon(
-                            Icons.edit,
-                            size: 20,
-                            color: _activeTool == WhiteboardTool.pen ? (isDark ? goldColor : navyColor) : Colors.grey,
-                          ),
-                          tooltip: 'Pen',
-                          onPressed: () => setState(() => _activeTool = WhiteboardTool.pen),
-                        ),
-                        // Eraser
-                        IconButton(
-                          icon: Icon(
-                            Icons.cleaning_services_outlined,
-                            size: 20,
-                            color: _activeTool == WhiteboardTool.eraser ? Colors.red : Colors.grey,
-                          ),
-                          tooltip: 'Eraser',
-                          onPressed: () => setState(() => _activeTool = WhiteboardTool.eraser),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(width: 1, height: 24, color: Colors.grey.withValues(alpha: 0.3)),
-                        const SizedBox(width: 4),
-
-                        // Undo
-                        IconButton(
-                          icon: const Icon(Icons.undo, size: 20),
-                          tooltip: 'Undo',
-                          onPressed: _strokes.isNotEmpty ? _undo : null,
-                        ),
-                        // Redo
-                        IconButton(
-                          icon: const Icon(Icons.redo, size: 20),
-                          tooltip: 'Redo',
-                          onPressed: _redoStack.isNotEmpty ? _redo : null,
-                        ),
-                        // Clear
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                          tooltip: 'Clear Canvas',
-                          onPressed: _strokes.isNotEmpty ? _clearCanvas : null,
-                        ),
-
-                        const SizedBox(width: 4),
-                        Container(width: 1, height: 24, color: Colors.grey.withValues(alpha: 0.3)),
-                        const SizedBox(width: 4),
-
-                        // Zoom Out
-                        IconButton(
-                          icon: const Icon(Icons.zoom_out, size: 20),
-                          tooltip: 'Zoom Out',
-                          onPressed: _zoomScale > 0.5 ? _zoomOut : null,
-                        ),
-                        // Zoom display
-                        GestureDetector(
-                          onTap: _resetZoom,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '${(_zoomScale * 100).toInt()}%',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Zoom In
-                        IconButton(
-                          icon: const Icon(Icons.zoom_in, size: 20),
-                          tooltip: 'Zoom In',
-                          onPressed: _zoomScale < 3.0 ? _zoomIn : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const Divider(height: 1, thickness: 1),
-
-                // Responsive Toolbar: Row 2 (Palette & Thickness)
-                Container(
-                  color: isDark ? const Color(0xFF171A22) : Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: Row(
-                    children: [
-                      // Palette
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: _palette.map((color) {
-                              final isSelected = _selectedColor == color && _activeTool != WhiteboardTool.eraser;
-                              return GestureDetector(
-                                onTap: () => setState(() {
-                                  _selectedColor = color;
-                                  _activeTool = WhiteboardTool.pen;
-                                }),
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                                  width: isSelected ? 26 : 20,
-                                  height: isSelected ? 26 : 20,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isSelected ? (isDark ? Colors.white : Colors.black) : Colors.grey.shade400,
-                                      width: isSelected ? 2.5 : 1,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Brush thickness slider
-                      SizedBox(
-                        width: 90,
-                        child: Slider(
-                          value: _strokeWidth,
-                          min: 2,
-                          max: 18,
-                          activeColor: isDark ? goldColor : navyColor,
-                          onChanged: (v) => setState(() => _strokeWidth = v),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Whiteboard Drawing Canvas Area with Zoom Transform
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade300,
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: GestureDetector(
-                        onPanStart: (details) {
-                          final localPos = details.localPosition / _zoomScale;
-                          setState(() {
-                            _redoStack.clear();
-                            _strokes.add(
-                              WhiteboardStroke(
-                                points: [localPos],
-                                color: _selectedColor,
-                                strokeWidth: _activeTool == WhiteboardTool.eraser ? 24.0 : _strokeWidth,
-                                isEraser: _activeTool == WhiteboardTool.eraser,
-                              ),
-                            );
-                          });
-                        },
-                        onPanUpdate: (details) {
-                          final localPos = details.localPosition / _zoomScale;
-                          setState(() {
-                            if (_strokes.isNotEmpty) {
-                              _strokes.last.points.add(localPos);
-                            }
-                          });
-                        },
-                        onPanEnd: (_) {
-                          _saveWhiteboard(showToast: false);
-                        },
-                        child: CustomPaint(
-                          painter: _ScaledStrokePainter(strokes: _strokes, scale: _zoomScale),
-                          size: Size.infinite,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      body: content,
     );
   }
 }
