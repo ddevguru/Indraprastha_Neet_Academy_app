@@ -2035,8 +2035,22 @@ class _TopicWiseMcqsScreenState extends ConsumerState<TopicWiseMcqsScreen> {
     super.initState();
     final repo = ref.read(contentRepositoryProvider);
     if (widget.isPyqCategory) {
-      _initialItems = repo.getInitialPyqChapters();
-      _combinedFuture = repo.fetchPyqChapters();
+      if (widget.allSets.isNotEmpty) {
+        _initialItems = widget.allSets
+            .map((s) => Map<String, dynamic>.from(s)..['is_pyq'] = true)
+            .toList();
+        _combinedFuture = Future.value(_initialItems);
+      } else {
+        _initialItems = repo.getInitialPyqChapters();
+        _combinedFuture = repo.fetchPracticeSets().then((sets) {
+          if (sets.isNotEmpty) {
+            return sets
+                .map((s) => Map<String, dynamic>.from(s)..['is_pyq'] = true)
+                .toList();
+          }
+          return _initialItems;
+        });
+      }
     } else {
       _initialItems = widget.allSets;
       _combinedFuture = Future.value(widget.allSets);
@@ -2210,79 +2224,177 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
     });
   }
 
+  int? _findMatchingPracticeSetId(
+      Map<String, dynamic> chapter, List<Map<String, dynamic>> allSets) {
+    final directId = int.tryParse(chapter['id']?.toString() ?? '');
+    if (directId != null && directId > 0 && !chapter['id'].toString().startsWith('ch_')) {
+      return directId;
+    }
+
+    String normalize(String? text) {
+      if (text == null) return '';
+      return text
+          .toLowerCase()
+          .replaceAll('thern', 'therm')
+          .replaceAll('sexsual', 'sexual')
+          .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+          .trim();
+    }
+
+    List<String> tokenize(String? text) {
+      final normalized = normalize(text);
+      return normalized
+          .split(RegExp(r'\s+'))
+          .where((w) => w.length > 2 && !{'and', 'the', 'their', 'for', 'part'}.contains(w))
+          .map((w) => w.endsWith('s') ? w.substring(0, w.length - 1) : w)
+          .toList();
+    }
+
+    final targetTokens = tokenize('${chapter['title'] ?? ''} ${chapter['topic'] ?? ''}');
+    final targetSubj = normalize(chapter['subject']?.toString());
+    final targetClass = normalize(chapter['class_label']?.toString());
+
+    int bestScore = 0;
+    int? bestSetId;
+
+    for (final s in allSets) {
+      final sId = int.tryParse(s['id']?.toString() ?? '') ?? 0;
+      if (sId <= 0) continue;
+
+      final sSubj = normalize(s['subject']?.toString());
+      final sClass = normalize(s['class_label']?.toString());
+
+      if (targetSubj.isNotEmpty && sSubj.isNotEmpty) {
+        final prefix = targetSubj.substring(0, targetSubj.length.clamp(0, 4));
+        if (!sSubj.contains(prefix) && !targetSubj.contains(sSubj.substring(0, sSubj.length.clamp(0, 4)))) {
+          continue;
+        }
+      }
+      if (targetClass.isNotEmpty && sClass.isNotEmpty) {
+        final is11 = targetClass.contains('11');
+        final is12 = targetClass.contains('12');
+        if (is11 && !sClass.contains('11')) continue;
+        if (is12 && !sClass.contains('12')) continue;
+      }
+
+      final sTokens = tokenize('${s['title'] ?? ''} ${s['topic'] ?? ''}');
+      int overlap = 0;
+      for (final t in targetTokens) {
+        if (sTokens.contains(t)) overlap++;
+      }
+
+      if (overlap > bestScore && overlap >= 1) {
+        bestScore = overlap;
+        bestSetId = sId;
+      }
+    }
+
+    return bestSetId;
+  }
+
   Future<void> _openBookChapterPyqs(Map<String, dynamic> set) async {
-    final chapterId = _parseInt(set['chapter_id']);
-    if (chapterId <= 0) return;
+    final directId = int.tryParse(set['id']?.toString() ?? '');
+    if (directId != null && directId > 0 && !set['id'].toString().startsWith('ch_')) {
+      await context.push('/practice/attempt/$directId');
+      _refreshSets();
+      return;
+    }
 
     final repo = ref.read(contentRepositoryProvider);
+    final chapterId = _parseInt(set['chapter_id']);
 
-    // Instant launch if already cached in memory or local storage
-    if (repo.hasCachedPyqs(chapterId)) {
+    // 1. Check if matching practice set exists in widget.allSets
+    int? matchedSetId = _findMatchingPracticeSetId(set, widget.allSets);
+
+    // 2. If not found, check cached practiceSets from repo
+    if (matchedSetId == null) {
       try {
-        final cachedQuestions = await repo.fetchPyqs(chapterId);
+        final allSets = await repo.fetchPracticeSets();
+        matchedSetId = _findMatchingPracticeSetId(set, allSets);
+      } catch (_) {}
+    }
+
+    if (matchedSetId != null && matchedSetId > 0) {
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PracticeAttemptScreen(
+            setId: matchedSetId!,
+            chapterName: set['title']?.toString() ?? 'Chapter PYQs',
+          ),
+        ),
+      );
+      _refreshSets();
+      return;
+    }
+
+    // 3. Fallback: try fetching pyqs for chapterId
+    if (chapterId > 0) {
+      if (repo.hasCachedPyqs(chapterId)) {
+        try {
+          final cachedQuestions = await repo.fetchPyqs(chapterId);
+          if (mounted && cachedQuestions.isNotEmpty) {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PracticeAttemptScreen(
+                  setId: 0,
+                  chapterName: set['title']?.toString() ?? 'Chapter PYQs',
+                  chapterQuestions: cachedQuestions,
+                ),
+              ),
+            );
+            _refreshSets();
+            return;
+          }
+        } catch (_) {}
+      }
+
+      bool dialogShowing = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      ).then((_) {
+        dialogShowing = false;
+      });
+
+      try {
+        final pyqs = await repo.fetchPyqs(chapterId);
+        if (mounted && dialogShowing) {
+          Navigator.of(context).pop();
+          dialogShowing = false;
+        }
+
         if (!mounted) return;
-        if (cachedQuestions.isNotEmpty) {
+        if (pyqs.isNotEmpty) {
           await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => PracticeAttemptScreen(
                 setId: 0,
                 chapterName: set['title']?.toString() ?? 'Chapter PYQs',
-                chapterQuestions: cachedQuestions,
+                chapterQuestions: pyqs,
               ),
             ),
           );
           _refreshSets();
           return;
         }
-      } catch (_) {}
+      } catch (_) {
+        if (mounted && dialogShowing) {
+          Navigator.of(context).pop();
+          dialogShowing = false;
+        }
+      }
     }
 
-    bool dialogShowing = true;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    ).then((_) {
-      dialogShowing = false;
-    });
-
-    try {
-      final pyqs = await repo.fetchPyqs(chapterId);
-      if (mounted && dialogShowing) {
-        Navigator.of(context).pop();
-        dialogShowing = false;
-      }
-
-      if (!mounted) return;
-      if (pyqs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No previous year questions available for this chapter yet.'),
-          ),
-        );
-        return;
-      }
-
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => PracticeAttemptScreen(
-            setId: 0,
-            chapterName: set['title']?.toString() ?? 'Chapter PYQs',
-            chapterQuestions: pyqs,
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Questions for ${set['title'] ?? 'this chapter'} are currently being compiled. Try again shortly.',
           ),
         ),
       );
-      _refreshSets();
-    } catch (e) {
-      if (mounted && dialogShowing) {
-        Navigator.of(context).pop();
-        dialogShowing = false;
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to load PYQs: $e')),
-        );
-      }
     }
   }
 
@@ -2365,7 +2477,7 @@ class _SubjectTopicsScreenState extends ConsumerState<_SubjectTopicsScreen> {
                         estimatedMinutes: _parseInt(set['estimated_minutes'],
                             defaultValue: 20),
                         accuracy: completed ? lastAccuracy / 100 : 0,
-                        tag: isBookChapter
+                        tag: isBookChapter || (set['is_pyq'] == true)
                             ? 'Chapter PYQs'
                             : (set['class_label']?.toString() ??
                                 set['standard_label']?.toString() ??

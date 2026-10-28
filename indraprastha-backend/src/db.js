@@ -251,6 +251,12 @@ async function ensureDatabaseSchema() {
   await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS option_c_image_link TEXT DEFAULT '';`);
   await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS option_d_image_link TEXT DEFAULT '';`);
   await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS similar_question JSONB DEFAULT NULL;`);
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS explanation_image_link TEXT DEFAULT '';`).catch(() => {});
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS explanation_image_drive_file_id TEXT DEFAULT '';`).catch(() => {});
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS explanation_image_drive_folder_id TEXT DEFAULT '';`).catch(() => {});
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS explanation_video_link TEXT DEFAULT '';`).catch(() => {});
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS explanation_video_drive_file_id TEXT DEFAULT '';`).catch(() => {});
+  await pool.query(`ALTER TABLE pyqs ADD COLUMN IF NOT EXISTS explanation_video_drive_folder_id TEXT DEFAULT '';`).catch(() => {});
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS practice_sets (

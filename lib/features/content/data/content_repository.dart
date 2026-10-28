@@ -199,15 +199,19 @@ class ContentRepository {
       }
     }
 
-    final data = await _get(
-      '/content/chapters/$chapterId/pyqs',
-      bypassCache: bypassCache,
-    );
-    final list = _mapsFromListKey(data, 'pyqs');
-    if (list.isNotEmpty) {
-      unawaited(_prefs?.setString(localKey, jsonEncode(list)));
+    try {
+      final data = await _get(
+        '/content/chapters/$chapterId/pyqs',
+        bypassCache: bypassCache,
+      );
+      final list = _mapsFromListKey(data, 'pyqs');
+      if (list.isNotEmpty) {
+        unawaited(_prefs?.setString(localKey, jsonEncode(list)));
+      }
+      return list;
+    } catch (_) {
+      return const [];
     }
-    return list;
   }
 
   Future<void> _refreshSingleChapterPyqs(int chapterId, String localKey) async {
