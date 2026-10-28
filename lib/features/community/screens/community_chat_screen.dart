@@ -292,8 +292,10 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     const themeNavy = Color(0xFF002350);
     const themeGold = Color(0xFFD2AE39);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor: themeNavy,
         foregroundColor: Colors.white,
@@ -327,6 +329,29 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
           ],
         ),
         actions: [
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFD2AE39),
+              foregroundColor: const Color(0xFF002350),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: const Icon(Icons.help_outline, size: 16),
+            label: const Text('Ask Doubt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (ctx) => SubmitDoubtDialog(
+                  initialClassLevel: widget.classLevel,
+                  initialSubject: widget.subject,
+                  communityId: widget.communityId,
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.draw_outlined),
             tooltip: 'My Whiteboard — Editable',
@@ -343,37 +368,25 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            tooltip: 'Ask Teacher / Submit Doubt',
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (ctx) => SubmitDoubtDialog(
-                  initialClassLevel: widget.classLevel,
-                  initialSubject: widget.subject,
-                  communityId: widget.communityId,
-                ),
-              );
-            },
-          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            color: const Color(0xFFEBF8FF),
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEBF8FF),
             child: Row(
               children: [
-                const Icon(Icons.lock_outline, size: 14, color: Color(0xFF3182CE)),
+                Icon(Icons.lock_outline, size: 14, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF3182CE)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'This workspace is strictly private to you. Teachers only see questions you explicitly submit via "Ask Teacher".',
-                    style: TextStyle(fontSize: 11, color: Colors.blue.shade900),
+                    'This workspace is strictly private to you. Teachers only see questions you explicitly submit via "Ask Doubt".',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? const Color(0xFFBFDBFE) : Colors.blue.shade900,
+                    ),
                   ),
                 ),
               ],
@@ -540,19 +553,70 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
           if (_isUploading)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              color: Colors.white,
-              child: const Row(
+              color: isDark ? const Color(0xFF171A22) : Colors.white,
+              child: Row(
                 children: [
-                  SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                  SizedBox(width: 8),
-                  Text('Uploading to Admin Google Drive...', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Uploading to Admin Google Drive...',
+                    style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
+                  ),
                 ],
               ),
             ),
+
+          // Subject-specific Doubt Quick Bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E222D) : const Color(0xFFFFF9E6),
+              border: Border(
+                top: BorderSide(color: isDark ? const Color(0xFF2E3545) : const Color(0xFFFFE082)),
+                bottom: BorderSide(color: isDark ? const Color(0xFF2E3545) : const Color(0xFFFFE082)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.help_outline, size: 16, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFFB78103)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Have a doubt in ${widget.classLevel} ${widget.subject}?',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : const Color(0xFF5D4037),
+                    ),
+                  ),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: const Color(0xFFD2AE39),
+                  ),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => SubmitDoubtDialog(
+                        initialClassLevel: widget.classLevel,
+                        initialSubject: widget.subject,
+                        communityId: widget.communityId,
+                      ),
+                    );
+                  },
+                  child: const Text('Ask Teacher →', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF171A22) : Colors.white,
               boxShadow: [
                 BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, -2)),
               ],
@@ -561,7 +625,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.add_circle_outline, color: Color(0xFF002350)),
+                    icon: Icon(Icons.add_circle_outline, color: isDark ? themeGold : themeNavy),
                     onPressed: _isUploading
                         ? null
                         : () {
@@ -610,22 +674,32 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                           },
                   ),
                   Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      maxLines: null,
-                      keyboardType: TextInputType.multiline,
-                      decoration: const InputDecoration(
-                        hintText: 'Type notes or formulas...',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E222D) : const Color(0xFFF0F4F8),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
+                      child: TextField(
+                        controller: _textController,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                        decoration: InputDecoration(
+                          hintText: 'Type notes, formulas, or questions...',
+                          hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 4),
                   IconButton(
                     icon: _isSending
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.send, color: Color(0xFF002350)),
+                        : Icon(Icons.send, color: isDark ? themeGold : themeNavy),
                     onPressed: _isSending ? null : _sendMessage,
                   ),
                 ],

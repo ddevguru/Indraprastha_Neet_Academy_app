@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/whiteboard_canvas.dart';
 import 'student_whiteboard_screen.dart';
 
-class TeacherSolutionWhiteboardScreen extends StatelessWidget {
+class TeacherSolutionWhiteboardScreen extends StatefulWidget {
   final int doubtId;
   final String classLevel;
   final String subject;
@@ -19,8 +19,56 @@ class TeacherSolutionWhiteboardScreen extends StatelessWidget {
     this.communityId,
   });
 
+  @override
+  State<TeacherSolutionWhiteboardScreen> createState() => _TeacherSolutionWhiteboardScreenState();
+}
+
+class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhiteboardScreen> {
+  final TransformationController _transController = TransformationController();
+  double _currentScale = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _transController.addListener(_onTransformChanged);
+  }
+
+  @override
+  void dispose() {
+    _transController.removeListener(_onTransformChanged);
+    _transController.dispose();
+    super.dispose();
+  }
+
+  void _onTransformChanged() {
+    final scale = _transController.value.getMaxScaleOnAxis();
+    if (scale != _currentScale) {
+      setState(() => _currentScale = scale);
+    }
+  }
+
+  void _zoomIn() {
+    final newScale = (_currentScale * 1.25).clamp(0.5, 4.0);
+    _setZoom(newScale);
+  }
+
+  void _zoomOut() {
+    final newScale = (_currentScale / 1.25).clamp(0.5, 4.0);
+    _setZoom(newScale);
+  }
+
+  void _resetZoom() {
+    _transController.value = Matrix4.identity();
+    setState(() => _currentScale = 1.0);
+  }
+
+  void _setZoom(double targetScale) {
+    _transController.value = Matrix4.diagonal3Values(targetScale, targetScale, 1.0);
+    setState(() => _currentScale = targetScale);
+  }
+
   List<WhiteboardStroke> _parseStrokes() {
-    final rawDoc = solutionWhiteboard['documentJson'] ?? solutionWhiteboard['document_json'];
+    final rawDoc = widget.solutionWhiteboard['documentJson'] ?? widget.solutionWhiteboard['document_json'];
     if (rawDoc == null) return [];
     try {
       final map = rawDoc is String ? jsonDecode(rawDoc) : rawDoc;
@@ -29,27 +77,32 @@ class TeacherSolutionWhiteboardScreen extends StatelessWidget {
             .map((e) => WhiteboardStroke.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList();
       }
+      if (map is Map && map['strokes'] is List) {
+        return (map['strokes'] as List)
+            .map((e) => WhiteboardStroke.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+      }
     } catch (_) {}
     return [];
   }
 
   void _copyToMyWhiteboard(BuildContext context) {
-    if (communityId == null) {
+    if (widget.communityId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Personal workspace ID unavailable for copy')),
       );
       return;
     }
 
-    final rawDoc = solutionWhiteboard['documentJson'] ?? solutionWhiteboard['document_json'];
+    final rawDoc = widget.solutionWhiteboard['documentJson'] ?? widget.solutionWhiteboard['document_json'];
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (ctx) => StudentWhiteboardScreen(
-          communityId: communityId!,
-          classLevel: classLevel,
-          subject: subject,
+          communityId: widget.communityId!,
+          classLevel: widget.classLevel,
+          subject: widget.subject,
           initialDocument: rawDoc is Map ? Map<String, dynamic>.from(rawDoc) : (rawDoc is String ? jsonDecode(rawDoc) : null),
         ),
       ),
@@ -65,10 +118,11 @@ class TeacherSolutionWhiteboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final strokes = _parseStrokes();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor: const Color(0xFF002350),
         foregroundColor: Colors.white,
@@ -87,7 +141,7 @@ class TeacherSolutionWhiteboardScreen extends StatelessWidget {
               ],
             ),
             Text(
-              'Doubt #$doubtId • $classLevel $subject',
+              'Doubt #${widget.doubtId} • ${widget.classLevel} ${widget.subject}',
               style: const TextStyle(fontSize: 11, color: Colors.white70),
             ),
           ],
@@ -110,9 +164,10 @@ class TeacherSolutionWhiteboardScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
+          // Banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: const Color(0xFFFFFBEB),
+            color: isDark ? const Color(0xFF1E222D) : const Color(0xFFFFFBEB),
             child: Row(
               children: [
                 const Icon(Icons.visibility, color: Color(0xFFD2AE39), size: 18),
@@ -120,14 +175,58 @@ class TeacherSolutionWhiteboardScreen extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'This canvas was published by your teacher. You can pan and zoom to inspect steps. Click "Copy to My Whiteboard" to edit a private copy.',
-                    style: TextStyle(fontSize: 11, color: Colors.brown.shade900),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white70 : Colors.brown.shade900,
+                    ),
                   ),
+                ),
+                // Zoom toolbar controls
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.zoom_out, size: 18, color: isDark ? Colors.white70 : Colors.black87),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Zoom Out',
+                      onPressed: _zoomOut,
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: _resetZoom,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${(_currentScale * 100).toInt()}%',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: Icon(Icons.zoom_in, size: 18, color: isDark ? Colors.white70 : Colors.black87),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Zoom In',
+                      onPressed: _zoomIn,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           Expanded(
             child: InteractiveViewer(
+              transformationController: _transController,
               minScale: 0.5,
               maxScale: 4.0,
               boundaryMargin: const EdgeInsets.all(200),
@@ -137,8 +236,15 @@ class TeacherSolutionWhiteboardScreen extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade300,
+                      ),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
                       ],
                     ),
                     child: CustomPaint(

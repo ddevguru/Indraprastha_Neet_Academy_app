@@ -80,14 +80,16 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       body: Column(
         children: [
           // Filter Chips
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: Colors.white,
+            color: isDark ? const Color(0xFF171A22) : Colors.white,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -100,7 +102,7 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
                       selected: isSelected,
                       selectedColor: const Color(0xFF002350),
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
+                        color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                         fontSize: 12,
                       ),
@@ -152,8 +154,14 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
-                              elevation: 1,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 0,
+                              color: isDark ? const Color(0xFF1E222D) : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: BorderSide(
+                                  color: isDark ? const Color(0xFF2E3545) : Colors.black.withValues(alpha: 0.08),
+                                ),
+                              ),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(14),
                                 onTap: () => _openDoubtDetail(d),
@@ -168,15 +176,15 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFF002350).withValues(alpha: 0.08),
+                                              color: (isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)).withValues(alpha: 0.12),
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             child: Text(
                                               '${d.classLevel} • ${d.subject}',
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
-                                                color: Color(0xFF002350),
+                                                color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
                                               ),
                                             ),
                                           ),
@@ -200,14 +208,21 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
                                       const SizedBox(height: 10),
                                       Text(
                                         d.title,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
                                         d.description,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                                        ),
                                       ),
                                       const SizedBox(height: 12),
                                       Row(
@@ -350,11 +365,12 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final d = _currentDoubt;
     final timeStr = DateFormat('dd MMM yyyy, hh:mm a').format(d.createdAt.toLocal());
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor: const Color(0xFF002350),
         foregroundColor: Colors.white,
@@ -368,8 +384,12 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 1,
+                    color: isDark ? const Color(0xFF1E222D) : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.black.withValues(alpha: 0.08)),
+                    ),
+                    elevation: 0,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -381,21 +401,39 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF002350).withValues(alpha: 0.08),
+                                  color: (isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   '${d.classLevel} • ${d.subject}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF002350)),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                                  ),
                                 ),
                               ),
-                              Text(timeStr, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text(timeStr, style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey)),
                             ],
                           ),
                           const SizedBox(height: 12),
-                          Text(d.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                          Text(
+                            d.title,
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
                           const SizedBox(height: 8),
-                          Text(d.description, style: const TextStyle(fontSize: 14, height: 1.4)),
+                          Text(
+                            d.description,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.4,
+                              color: isDark ? Colors.grey.shade300 : Colors.black87,
+                            ),
+                          ),
                           if (d.attachments.isNotEmpty) ...[
                             const SizedBox(height: 14),
                             const Text('Submitted Media (Stored in Google Drive):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),

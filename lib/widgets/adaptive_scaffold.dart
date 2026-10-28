@@ -158,12 +158,29 @@ class AdaptiveScaffold extends ConsumerWidget {
       ),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: NavigationBar(
-          selectedIndex: currentIndex,
-          destinations: _destinations,
-          onDestinationSelected: onDestinationSelected,
-          indicatorColor: scheme.secondaryContainer,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        child: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            height: 66,
+            labelTextStyle: WidgetStateProperty.resolveWith((states) {
+              final isSelected = states.contains(WidgetState.selected);
+              return TextStyle(
+                fontSize: 10.0,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                letterSpacing: -0.45,
+                overflow: TextOverflow.ellipsis,
+              );
+            }),
+            iconTheme: WidgetStateProperty.resolveWith((states) {
+              return const IconThemeData(size: 22);
+            }),
+          ),
+          child: NavigationBar(
+            selectedIndex: currentIndex,
+            destinations: _destinations,
+            onDestinationSelected: onDestinationSelected,
+            indicatorColor: scheme.secondaryContainer,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          ),
         ),
       ),
     );

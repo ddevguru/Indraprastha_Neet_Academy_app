@@ -4,7 +4,6 @@ import '../models/community_models.dart';
 import '../services/community_service.dart';
 import 'community_chat_screen.dart';
 import 'my_doubts_screen.dart';
-import 'submit_doubt_dialog.dart';
 
 class CommunityHomeScreen extends StatefulWidget {
   const CommunityHomeScreen({super.key});
@@ -16,13 +15,11 @@ class CommunityHomeScreen extends StatefulWidget {
 class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTickerProviderStateMixin {
   final CommunityService _service = CommunityService();
   late TabController _tabController;
-
   List<CommunitySubject> _subjects = [];
   bool _isLoading = true;
 
-  static const Color navyColor = Color(0xFF002350);
-  static const Color goldColor = Color(0xFFD2AE39);
-  static const Color bgLight = Color(0xFFF5F7FA);
+  static const navyColor = Color(0xFF002350);
+  static const goldColor = Color(0xFFD2AE39);
 
   @override
   void initState() {
@@ -40,17 +37,92 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
   Future<void> _loadSubjects() async {
     setState(() => _isLoading = true);
     try {
-      final list = await _service.fetchSubjects();
-      if (mounted) setState(() => _subjects = list);
-    } catch (e) {
+      final subjects = await _service.fetchSubjects();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load subject workspaces: $e')),
-        );
+        setState(() {
+          _subjects = subjects;
+          _isLoading = false;
+        });
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _subjects = _getFallbackSubjects();
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  List<CommunitySubject> _getFallbackSubjects() {
+    return [
+      CommunitySubject(
+        communityId: 1,
+        classLevel: 'Class 11',
+        subject: 'Chemistry',
+        icon: '⚗️',
+        color: const Color(0xFFE53E3E),
+        totalMessages: 0,
+        lastActivityAt: DateTime.now(),
+        lastMessageSnippet: '',
+        lastMessageType: 'text',
+      ),
+      CommunitySubject(
+        communityId: 2,
+        classLevel: 'Class 11',
+        subject: 'Biology',
+        icon: '🧬',
+        color: const Color(0xFF2E8B57),
+        totalMessages: 0,
+        lastActivityAt: DateTime.now(),
+        lastMessageSnippet: '',
+        lastMessageType: 'text',
+      ),
+      CommunitySubject(
+        communityId: 3,
+        classLevel: 'Class 11',
+        subject: 'Physics',
+        icon: '⚛️',
+        color: const Color(0xFF3182CE),
+        totalMessages: 0,
+        lastActivityAt: DateTime.now(),
+        lastMessageSnippet: '',
+        lastMessageType: 'text',
+      ),
+      CommunitySubject(
+        communityId: 4,
+        classLevel: 'Class 12',
+        subject: 'Chemistry',
+        icon: '🧪',
+        color: const Color(0xFFDD6B20),
+        totalMessages: 0,
+        lastActivityAt: DateTime.now(),
+        lastMessageSnippet: '',
+        lastMessageType: 'text',
+      ),
+      CommunitySubject(
+        communityId: 5,
+        classLevel: 'Class 12',
+        subject: 'Biology',
+        icon: '🌿',
+        color: const Color(0xFF38A169),
+        totalMessages: 0,
+        lastActivityAt: DateTime.now(),
+        lastMessageSnippet: '',
+        lastMessageType: 'text',
+      ),
+      CommunitySubject(
+        communityId: 6,
+        classLevel: 'Class 12',
+        subject: 'Physics',
+        icon: '⚡',
+        color: const Color(0xFF805AD5),
+        totalMessages: 0,
+        lastActivityAt: DateTime.now(),
+        lastMessageSnippet: '',
+        lastMessageType: 'text',
+      ),
+    ];
   }
 
   void _openChat(CommunitySubject sub) {
@@ -61,96 +133,65 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
           communityId: sub.communityId,
           classLevel: sub.classLevel,
           subject: sub.subject,
-          icon: sub.icon,
           color: sub.color,
+          icon: sub.icon,
         ),
       ),
-    ).then((_) => _loadSubjects());
-  }
-
-  void _openSubmitDoubt() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => const SubmitDoubtDialog(
-        initialClassLevel: 'Class 11',
-        initialSubject: 'Physics',
-      ),
     ).then((_) {
-      if (_tabController.index == 1) {
-        setState(() {});
-      }
+      _loadSubjects();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor = isDark ? Colors.white : navyColor;
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
     return Scaffold(
-      backgroundColor: bgLight,
+      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       body: Column(
         children: [
+          // Header
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            color: isDark ? const Color(0xFF171A22) : Colors.white,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: navyColor.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.forum, color: navyColor, size: 20),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Private Student Community',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: navyColor,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Your isolated subject workspaces, persistent notes & doubt resolution',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: goldColor,
-                        foregroundColor: navyColor,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: (isDark ? goldColor : navyColor).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      onPressed: _openSubmitDoubt,
-                      icon: const Icon(Icons.add_comment_outlined, size: 16),
-                      label: const Text('Ask Teacher', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      child: Icon(Icons.forum, color: isDark ? goldColor : navyColor, size: 20),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Private Student Community',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: headingColor,
+                        letterSpacing: -0.3,
+                      ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Your isolated subject workspaces, persistent notes & doubt resolution',
+                  style: TextStyle(fontSize: 12, color: subtitleColor),
                 ),
                 const SizedBox(height: 12),
                 TabBar(
                   controller: _tabController,
-                  indicatorColor: navyColor,
-                  labelColor: navyColor,
-                  unselectedLabelColor: Colors.grey,
+                  indicatorColor: isDark ? goldColor : navyColor,
+                  labelColor: isDark ? goldColor : navyColor,
+                  unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey,
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   tabs: const [
                     Tab(
@@ -181,13 +222,13 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                               padding: const EdgeInsets.all(14),
                               margin: const EdgeInsets.only(bottom: 16),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEBF8FF),
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEBF8FF),
                                 borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFFBEE3F8)),
+                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBEE3F8)),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.shield_outlined, color: Color(0xFF3182CE), size: 24),
+                                  Icon(Icons.shield_outlined, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF3182CE), size: 24),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
@@ -195,12 +236,19 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                                       children: [
                                         Text(
                                           'Strict Student Privacy Guaranteed',
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue.shade900),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: isDark ? const Color(0xFF93C5FD) : Colors.blue.shade900,
+                                          ),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          'Each of the 6 workspaces below belongs only to your account. Other students and teachers cannot see your private notes or whiteboard drawings.',
-                                          style: TextStyle(fontSize: 11, color: Colors.blue.shade800),
+                                          'Each of the 6 workspaces below belongs only to your account. Open a subject to chat, draw on whiteboard, and ask doubts.',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark ? const Color(0xFFBFDBFE) : Colors.blue.shade800,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -237,23 +285,22 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: navyColor,
-        foregroundColor: Colors.white,
-        onPressed: _openSubmitDoubt,
-        icon: const Icon(Icons.help_outline, color: goldColor),
-        label: const Text('Ask Doubt', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
     );
   }
 
   Widget _buildSubjectCard(CommunitySubject sub) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final timeStr = DateFormat('dd MMM').format(sub.lastActivityAt.toLocal());
 
     return Card(
-      elevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.08),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      color: isDark ? const Color(0xFF1E222D) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF2E3545) : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => _openChat(sub),
@@ -280,12 +327,16 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: navyColor.withValues(alpha: 0.08),
+                        color: (isDark ? goldColor : navyColor).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         '${sub.totalMessages} msgs',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: navyColor),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? goldColor : navyColor,
+                        ),
                       ),
                     ),
                 ],
@@ -312,10 +363,10 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                   const SizedBox(height: 4),
                   Text(
                     sub.subject,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A202C),
+                      color: isDark ? Colors.white : const Color(0xFF1A202C),
                     ),
                   ),
                 ],
@@ -325,7 +376,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                 children: [
                   Text(
                     'Active $timeStr',
-                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    style: TextStyle(fontSize: 10, color: isDark ? Colors.grey.shade400 : Colors.grey),
                   ),
                   Row(
                     children: [

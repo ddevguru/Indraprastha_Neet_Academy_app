@@ -198,6 +198,9 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350);
+
     return Container(
       padding: EdgeInsets.only(
         top: 20,
@@ -205,9 +208,9 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
         right: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF171A22) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -222,20 +225,24 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF002350).withValues(alpha: 0.08),
+                        color: (isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.help_outline, color: Color(0xFF002350), size: 22),
+                      child: Icon(Icons.help_outline, color: primaryColor, size: 22),
                     ),
                     const SizedBox(width: 10),
-                    const Text(
+                    Text(
                       'Ask Teacher / Submit Doubt',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF002350)),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF002350),
+                      ),
                     ),
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: Icon(Icons.close, color: isDark ? Colors.white70 : Colors.black54),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -248,8 +255,11 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     initialValue: _selectedClass,
+                    dropdownColor: isDark ? const Color(0xFF1E222D) : Colors.white,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                     decoration: InputDecoration(
                       labelText: 'Class',
+                      labelStyle: TextStyle(color: isDark ? Colors.white70 : null),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
@@ -261,8 +271,11 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     initialValue: _selectedSubject,
+                    dropdownColor: isDark ? const Color(0xFF1E222D) : Colors.white,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                     decoration: InputDecoration(
                       labelText: 'Subject',
+                      labelStyle: TextStyle(color: isDark ? Colors.white70 : null),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
@@ -277,9 +290,12 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
             // Title
             TextField(
               controller: _titleController,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
               decoration: InputDecoration(
                 labelText: 'Topic / Doubt Title *',
+                labelStyle: TextStyle(color: isDark ? Colors.white70 : null),
                 hintText: 'e.g. Lenz Law Direction, Aldol Condensation Mechanism',
+                hintStyle: TextStyle(color: isDark ? Colors.white38 : null),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               ),
@@ -290,9 +306,12 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
             TextField(
               controller: _descController,
               maxLines: 4,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
               decoration: InputDecoration(
                 labelText: 'Detailed Explanation of your Doubt *',
+                labelStyle: TextStyle(color: isDark ? Colors.white70 : null),
                 hintText: 'State where you are stuck, formulas tried, or specific step question...',
+                hintStyle: TextStyle(color: isDark ? Colors.white38 : null),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               ),
@@ -300,9 +319,13 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
             const SizedBox(height: 14),
 
             // Media Attachments
-            const Text(
+            Text(
               'Attach Media (Uploaded directly to Google Drive):',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
             ),
             const SizedBox(height: 8),
 
@@ -314,36 +337,51 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                   onPressed: _isUploading ? null : () => _pickAndUploadMedia(FileType.image),
                   icon: const Icon(Icons.photo_outlined, size: 16),
                   label: const Text('Image', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
                 ),
                 OutlinedButton.icon(
                   onPressed: _isUploading ? null : () => _pickAndUploadMedia(FileType.video),
                   icon: const Icon(Icons.videocam_outlined, size: 16),
                   label: const Text('Video', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
                 ),
                 OutlinedButton.icon(
                   onPressed: _isUploading ? null : () => _pickAndUploadMedia(FileType.audio),
                   icon: const Icon(Icons.mic_none, size: 16),
                   label: const Text('Audio', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
                 ),
                 OutlinedButton.icon(
                   onPressed: _isUploading ? null : () => _pickAndUploadMedia(FileType.custom),
                   icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
                   label: const Text('PDF / Doc', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
                 ),
               ],
             ),
 
             if (_isUploading) ...[
               const SizedBox(height: 10),
-              const Row(
+              Row(
                 children: [
-                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                  SizedBox(width: 10),
-                  Text('Uploading directly to Admin Google Drive...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Uploading directly to Admin Google Drive...',
+                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.grey),
+                  ),
                 ],
               ),
             ],
@@ -357,10 +395,14 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                   final index = entry.key;
                   final att = entry.value;
                   return Chip(
+                    backgroundColor: isDark ? const Color(0xFF1E222D) : null,
                     avatar: const Icon(Icons.cloud_done, color: Color(0xFF2E8B57), size: 16),
                     label: Text(
                       att['originalFilename'] ?? 'File',
-                      style: const TextStyle(fontSize: 11),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                     onDeleted: () => setState(() => _attachments.removeAt(index)),
@@ -378,13 +420,13 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF002350),
-                  foregroundColor: Colors.white,
+                  backgroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                  foregroundColor: isDark ? const Color(0xFF002350) : Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: _isSubmitting || _isUploading ? null : _submitDoubt,
                 child: _isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? CircularProgressIndicator(color: isDark ? const Color(0xFF002350) : Colors.white)
                     : const Text(
                         'Submit Doubt to Teachers',
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
