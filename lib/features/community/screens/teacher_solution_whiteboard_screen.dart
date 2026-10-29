@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../widgets/whiteboard_canvas.dart';
-import 'student_whiteboard_screen.dart';
 
 class TeacherSolutionWhiteboardScreen extends StatefulWidget {
   final int doubtId;
@@ -86,36 +85,6 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
     return [];
   }
 
-  void _copyToMyWhiteboard(BuildContext context) {
-    if (widget.communityId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Personal workspace ID unavailable for copy')),
-      );
-      return;
-    }
-
-    final rawDoc = widget.solutionWhiteboard['documentJson'] ?? widget.solutionWhiteboard['document_json'];
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (ctx) => StudentWhiteboardScreen(
-          communityId: widget.communityId!,
-          classLevel: widget.classLevel,
-          subject: widget.subject,
-          initialDocument: rawDoc is Map ? Map<String, dynamic>.from(rawDoc) : (rawDoc is String ? jsonDecode(rawDoc) : null),
-        ),
-      ),
-    );
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Copied solution to your editable personal whiteboard!'),
-        backgroundColor: Color(0xFF2E8B57),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -146,21 +115,6 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
             ),
           ],
         ),
-        actions: [
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD2AE39),
-              foregroundColor: const Color(0xFF002350),
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () => _copyToMyWhiteboard(context),
-            icon: const Icon(Icons.copy, size: 16),
-            label: const Text('Copy to My Whiteboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
-          const SizedBox(width: 10),
-        ],
       ),
       body: Column(
         children: [
@@ -174,7 +128,7 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'This canvas was published by your teacher. You can pan and zoom to inspect steps. Click "Copy to My Whiteboard" to edit a private copy.',
+                    'This solution canvas was drawn and published by your teacher. You can pan and zoom to inspect steps.',
                     style: TextStyle(
                       fontSize: 11,
                       color: isDark ? Colors.white70 : Colors.brown.shade900,

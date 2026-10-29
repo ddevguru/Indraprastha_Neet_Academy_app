@@ -6,8 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/community_models.dart';
 import '../services/community_service.dart';
-import 'student_whiteboard_screen.dart';
-import 'submit_doubt_dialog.dart';
 
 class CommunityChatScreen extends StatefulWidget {
   final int communityId;
@@ -29,11 +27,10 @@ class CommunityChatScreen extends StatefulWidget {
   State<CommunityChatScreen> createState() => _CommunityChatScreenState();
 }
 
-class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTickerProviderStateMixin {
+class _CommunityChatScreenState extends State<CommunityChatScreen> {
   final CommunityService _service = CommunityService();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  late TabController _tabController;
 
   List<CommunityMessage> _messages = [];
   bool _isLoading = true;
@@ -44,13 +41,11 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadMessages();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -330,7 +325,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                   const Text(
-                    'Private Workspace • Chat & Whiteboard',
+                    'Private Subject Workspace • Direct Chat',
                     style: TextStyle(fontSize: 10, color: Colors.white70),
                   ),
                 ],
@@ -338,120 +333,54 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
             ),
           ],
         ),
-        actions: [
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFD2AE39),
-              foregroundColor: const Color(0xFF002350),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              visualDensity: VisualDensity.compact,
-            ),
-            icon: const Icon(Icons.help_outline, size: 16),
-            label: const Text('Ask Doubt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (ctx) => SubmitDoubtDialog(
-                  initialClassLevel: widget.classLevel,
-                  initialSubject: widget.subject,
-                  communityId: widget.communityId,
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.draw_outlined),
-            tooltip: 'Whiteboard Canvas',
-            onPressed: () {
-              _tabController.animateTo(1);
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: themeGold,
-          indicatorWeight: 3,
-          labelColor: themeGold,
-          unselectedLabelColor: Colors.white70,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          tabs: const [
-            Tab(
-              icon: Icon(Icons.chat_bubble_outline, size: 18),
-              text: 'Chat & Notes',
-            ),
-            Tab(
-              icon: Icon(Icons.draw, size: 18),
-              text: 'Whiteboard Canvas',
-            ),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        physics: const NeverScrollableScrollPhysics(),
+      body: Column(
         children: [
-          // Tab 0: Chat & Notes
-          Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEBF8FF),
-                child: Row(
-                  children: [
-                    Icon(Icons.lock_outline, size: 14, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF3182CE)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This workspace is strictly private to you. Teachers only see questions you explicitly submit via "Ask Doubt".',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? const Color(0xFFBFDBFE) : Colors.blue.shade900,
-                        ),
-                      ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEBF8FF),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 15, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF3182CE)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Directly type your doubts, questions, or notes below. Teachers can review and assist you right here.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? const Color(0xFFBFDBFE) : Colors.blue.shade900,
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _messages.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(widget.icon, style: const TextStyle(fontSize: 48)),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'Welcome to ${widget.classLevel} ${widget.subject}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                                const SizedBox(height: 6),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 40),
-                                  child: Text(
-                                    'Write notes, save formulas, attach diagrams, or switch to the Whiteboard tab to sketch equations.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                OutlinedButton.icon(
-                                  onPressed: () => _tabController.animateTo(1),
-                                  icon: const Icon(Icons.draw_outlined),
-                                  label: const Text('Open Whiteboard Canvas'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: isDark ? themeGold : themeNavy,
-                                    side: BorderSide(color: isDark ? themeGold : themeNavy),
-                                  ),
-                                ),
-                              ],
+              ],
+            ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _messages.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(widget.icon, style: const TextStyle(fontSize: 48)),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Welcome to ${widget.classLevel} ${widget.subject}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
-                          )
+                            const SizedBox(height: 6),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 40),
+                              child: Text(
+                                'Ask doubts, send questions, or attach images, audio notes, and documents directly in this chat.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
                         : ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.all(16),
@@ -604,68 +533,6 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                   ),
                 ),
 
-              // Subject-specific Doubt Quick Bar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E222D) : const Color(0xFFFFF9E6),
-                  border: Border(
-                    top: BorderSide(color: isDark ? const Color(0xFF2E3545) : const Color(0xFFFFE082)),
-                    bottom: BorderSide(color: isDark ? const Color(0xFF2E3545) : const Color(0xFFFFE082)),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.help_outline, size: 16, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFFB78103)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${widget.classLevel} ${widget.subject} Doubt?',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white70 : const Color(0xFF5D4037),
-                        ),
-                      ),
-                    ),
-                    TextButton.icon(
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        foregroundColor: isDark ? const Color(0xFF90CDF4) : const Color(0xFF2B6CB0),
-                      ),
-                      onPressed: () {
-                        _tabController.animateTo(1);
-                      },
-                      icon: const Icon(Icons.draw_outlined, size: 15),
-                      label: const Text('Draw on Canvas', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                    ),
-                    const SizedBox(width: 4),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD2AE39),
-                        foregroundColor: const Color(0xFF002350),
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        elevation: 0,
-                      ),
-                      onPressed: () {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (ctx) => SubmitDoubtDialog(
-                            initialClassLevel: widget.classLevel,
-                            initialSubject: widget.subject,
-                            communityId: widget.communityId,
-                          ),
-                        );
-                      },
-                      child: const Text('Ask Teacher →', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                    ),
-                  ],
-                ),
-              ),
-
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
@@ -689,15 +556,6 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                                   builder: (ctx) => SafeArea(
                                     child: Wrap(
                                       children: [
-                                        ListTile(
-                                          leading: const Icon(Icons.draw, color: Color(0xFFD2AE39)),
-                                          title: Text('Open Whiteboard / Canvas', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                                          subtitle: Text('Draw equations, diagrams or mind maps', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey)),
-                                          onTap: () {
-                                            Navigator.pop(ctx);
-                                            _tabController.animateTo(1);
-                                          },
-                                        ),
                                         ListTile(
                                           leading: const Icon(Icons.photo_library_outlined, color: Colors.blue),
                                           title: Text('Attach Image', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
@@ -749,7 +607,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                             keyboardType: TextInputType.multiline,
                             style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                             decoration: InputDecoration(
-                              hintText: 'Type notes, formulas, or questions...',
+                              hintText: 'Type your question, doubt, or note here...',
                               hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(vertical: 8),
@@ -771,17 +629,6 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
               ),
             ],
           ),
-
-          // Tab 1: Whiteboard Canvas
-          StudentWhiteboardScreen(
-            communityId: widget.communityId,
-            classLevel: widget.classLevel,
-            subject: widget.subject,
-            isEmbedded: true,
-            onSwitchToChat: () => _tabController.animateTo(0),
-          ),
-        ],
-      ),
     );
   }
 }
