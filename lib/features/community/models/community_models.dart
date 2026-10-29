@@ -99,6 +99,7 @@ class CommunityMessage {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<CommunityAttachment> attachments;
+  final int? doubtId;
 
   CommunityMessage({
     required this.id,
@@ -109,6 +110,7 @@ class CommunityMessage {
     required this.createdAt,
     required this.updatedAt,
     this.attachments = const [],
+    this.doubtId,
   });
 
   factory CommunityMessage.fromJson(Map<String, dynamic> json) {
@@ -117,6 +119,8 @@ class CommunityMessage {
     if (rawAtts is List) {
       atts = rawAtts.map((e) => CommunityAttachment.fromJson(Map<String, dynamic>.from(e as Map))).toList();
     }
+
+    final rawDoubtId = json['doubt_id'] ?? json['doubtId'];
 
     return CommunityMessage(
       id: json['id'] is int ? json['id'] : int.tryParse('${json['id']}') ?? 0,
@@ -127,6 +131,7 @@ class CommunityMessage {
       createdAt: json['created_at'] != null ? DateTime.tryParse('${json['created_at']}') ?? DateTime.now() : DateTime.now(),
       updatedAt: json['updated_at'] != null ? DateTime.tryParse('${json['updated_at']}') ?? DateTime.now() : DateTime.now(),
       attachments: atts,
+      doubtId: rawDoubtId is int ? rawDoubtId : int.tryParse('$rawDoubtId'),
     );
   }
 }

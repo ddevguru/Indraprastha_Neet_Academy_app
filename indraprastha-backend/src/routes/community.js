@@ -155,6 +155,7 @@ router.get('/:communityId/messages', studentAuth, async (req, res) => {
         cm.student_id,
         cm.message_type,
         cm.text_content,
+        cm.doubt_id,
         cm.created_at,
         cm.updated_at,
         COALESCE(
@@ -253,24 +254,91 @@ router.post('/:communityId/messages', studentAuth, async (req, res) => {
       textContent = '',
       messageType = 'text',
       attachments = [], // Array of attachment objects from /upload
+      doubtId = null,
     } = req.body;
 
-    // Verify ownership
+    // Verify ownership & get subject/class
     const commRes = await client.query(
-      'SELECT id FROM student_communities WHERE id = $1 AND student_id = $2',
+      'SELECT id, class_level, subject FROM student_communities WHERE id = $1 AND student_id = $2',
       [communityId, studentId]
     );
     if (commRes.rows.length === 0) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    const { class_level, subject } = commRes.rows[0];
+
     await client.query('BEGIN');
 
+    // If doubtId was not already provided by client, auto-create a doubt so it immediately shows up in 'My Doubts' and Teacher Queue
+    let finalDoubtId = doubtId ? parseInt(doubtId, 10) : null;
+    if (!finalDoubtId) {
+      const trimmedText = textContent.trim();
+      const title = trimmedText.length > 60
+        ? `${trimmedText.substring(0, 57)}...`
+        : (trimmedText || (attachments.length > 0 ? `Question: ${attachments[0].originalFilename || 'Media'}` : 'New Question'));
+      const description = trimmedText || 'Please see the attached question.';
+
+      const doubtRes = await client.query(
+        `INSERT INTO doubts (
+           student_id, community_id, class_level, subject, title, description, status, version, created_at, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, 'Pending', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         RETURNING *`,
+        [studentId, communityId, class_level, subject, title, description]
+      );
+      const newDoubt = doubtRes.rows[0];
+      finalDoubtId = newDoubt.id;
+
+      for (const att of attachments) {
+        await client.query(
+          `INSERT INTO doubt_attachments (
+             doubt_id, storage_key, original_filename, mime_type, file_size,
+             drive_file_id, drive_view_link, drive_download_link
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            newDoubt.id,
+            att.storageKey || `gdrive://${att.driveFileId || Date.now()}`,
+            att.originalFilename || 'attachment',
+            att.mimeType || 'application/octet-stream',
+            att.fileSize || 0,
+            att.driveFileId || '',
+            att.driveViewLink || att.viewLink || '',
+            att.driveDownloadLink || att.downloadLink || '',
+          ]
+        );
+      }
+
+      await client.query(
+        `INSERT INTO doubt_status_history (doubt_id, previous_status, new_status, changed_by_user_id, changed_by_role, reason)
+         VALUES ($1, NULL, 'Pending', $2, 'student', 'Submitted via Subject Community Chat')`,
+        [newDoubt.id, studentId]
+      );
+
+      await client.query(
+        `INSERT INTO doubt_activity_events (
+           doubt_id, actor_id, actor_role, event_type, previous_status, new_status, metadata_json
+         ) VALUES ($1, $2, 'student', 'DOUBT_SUBMITTED', NULL, 'Pending', $3)`,
+        [newDoubt.id, studentId, JSON.stringify({ title, classLevel: class_level, subject, fromChat: true })]
+      );
+
+      await client.query(
+        `INSERT INTO doubt_resolution_cycles (doubt_id, cycle_number, started_at)
+         VALUES ($1, 1, CURRENT_TIMESTAMP)`,
+        [newDoubt.id]
+      );
+
+      await client.query(
+        `INSERT INTO doubt_audit_logs (doubt_id, actor_id, actor_role, action, metadata_json)
+         VALUES ($1, $2, 'student', 'SUBMIT_DOUBT_FROM_CHAT', $3)`,
+        [newDoubt.id, studentId, JSON.stringify({ doubtId: newDoubt.id, title })]
+      );
+    }
+
     const msgRes = await client.query(
-      `INSERT INTO community_messages (community_id, student_id, message_type, text_content)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO community_messages (community_id, student_id, message_type, text_content, doubt_id)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [communityId, studentId, messageType, textContent]
+      [communityId, studentId, messageType, textContent, finalDoubtId]
     );
     const message = msgRes.rows[0];
 
@@ -303,9 +371,11 @@ router.post('/:communityId/messages', studentAuth, async (req, res) => {
 
     res.json({
       success: true,
+      doubtId: finalDoubtId,
       message: {
         ...message,
         attachments: savedAttachments,
+        doubt_id: finalDoubtId,
       },
     });
   } catch (err) {

@@ -1187,6 +1187,9 @@ async function ensureCommunityAndDoubtsSchema() {
       CREATE INDEX IF NOT EXISTS idx_doubts_filter ON doubts(class_level, subject, status);
       CREATE INDEX IF NOT EXISTS idx_doubts_teacher ON doubts(assigned_teacher_id);
 
+      ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS doubt_id INTEGER REFERENCES doubts(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_comm_messages_doubt ON community_messages(doubt_id);
+
       CREATE TABLE IF NOT EXISTS doubt_attachments (
         id SERIAL PRIMARY KEY,
         doubt_id INTEGER NOT NULL REFERENCES doubts(id) ON DELETE CASCADE,

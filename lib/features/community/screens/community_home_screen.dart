@@ -17,6 +17,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
   late TabController _tabController;
   List<CommunitySubject> _subjects = [];
   bool _isLoading = true;
+  int _doubtsKey = 0;
 
   static const navyColor = Color(0xFF002350);
   static const goldColor = Color(0xFFD2AE39);
@@ -25,6 +26,11 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.index == 1 && mounted) {
+        setState(() => _doubtsKey++);
+      }
+    });
     _loadSubjects();
   }
 
@@ -139,6 +145,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
       ),
     ).then((_) {
       _loadSubjects();
+      if (mounted) setState(() => _doubtsKey++);
     });
   }
 
@@ -279,7 +286,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                           ],
                         ),
                       ),
-                const MyDoubtsScreen(),
+                MyDoubtsScreen(key: ValueKey(_doubtsKey)),
               ],
             ),
           ),

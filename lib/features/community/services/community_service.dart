@@ -69,6 +69,7 @@ class CommunityService {
     required String textContent,
     String messageType = 'text',
     List<Map<String, dynamic>> attachments = const [],
+    int? doubtId,
   }) async {
     final url = Uri.parse('$baseUrl/community/$communityId/messages');
     final headers = await _authHeaders();
@@ -76,6 +77,7 @@ class CommunityService {
       'textContent': textContent,
       'messageType': messageType,
       'attachments': attachments,
+      if (doubtId != null) 'doubtId': doubtId,
     });
 
     final res = await _client.post(url, headers: headers, body: payload);

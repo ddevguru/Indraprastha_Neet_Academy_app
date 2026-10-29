@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/community_models.dart';
 import '../services/community_service.dart';
+import 'my_doubts_screen.dart';
 
 class CommunityChatScreen extends StatefulWidget {
   final int communityId;
@@ -86,11 +87,37 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
 
     setState(() => _isSending = true);
     try {
+      final attachments = List<Map<String, dynamic>>.from(_pendingAttachments);
+
+      // 1. Submit as Doubt so it immediately appears in 'My Doubts' and Teacher App Queue
+      DoubtItem? doubt;
+      try {
+        final title = text.isNotEmpty
+            ? (text.length > 60 ? '${text.substring(0, 57)}...' : text)
+            : (attachments.isNotEmpty ? 'Question: ${attachments.first['originalFilename'] ?? 'Media'}' : 'New Question');
+        final desc = text.isNotEmpty ? text : 'Please see the attached question.';
+
+        doubt = await _service.submitDoubt(
+          title: title,
+          description: desc,
+          classLevel: widget.classLevel,
+          subject: widget.subject,
+          communityId: widget.communityId,
+          attachments: attachments,
+        );
+      } catch (e) {
+        debugPrint('[SUBMIT_DOUBT_FROM_CHAT_ERROR] $e');
+      }
+
+      // 2. Send message into Subject Chat Workspace with doubtId link
       final msg = await _service.sendMessage(
         widget.communityId,
         textContent: text,
-        messageType: _pendingAttachments.isNotEmpty ? _pendingAttachments.first['mimeType'].toString().split('/').first : 'text',
-        attachments: List.from(_pendingAttachments),
+        messageType: attachments.isNotEmpty
+            ? attachments.first['mimeType'].toString().split('/').first
+            : 'text',
+        attachments: attachments,
+        doubtId: doubt?.id,
       );
 
       _textController.clear();
@@ -101,6 +128,28 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
           _messages.add(msg);
         });
         _scrollToBottom();
+
+        if (doubt != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Doubt #${doubt.id} submitted! Visible in "My Doubts" section.'),
+              backgroundColor: const Color(0xFF2E8B57),
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'View Doubts',
+                textColor: const Color(0xFFD2AE39),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => const MyDoubtsScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -411,6 +460,30 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
+                                        if (msg.doubtId != null)
+                                          Container(
+                                            margin: const EdgeInsets.only(bottom: 6),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: themeGold.withValues(alpha: 0.25),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.help_outline, size: 12, color: themeGold),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  'Doubt #${msg.doubtId}',
+                                                  style: const TextStyle(
+                                                    color: themeGold,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         if (msg.attachments.isNotEmpty) ...[
                                           ...msg.attachments.map((att) {
                                             if (att.isImage) {
@@ -479,9 +552,23 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                             ),
                                           ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          timeStr,
-                                          style: const TextStyle(color: Colors.white60, fontSize: 10),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              timeStr,
+                                              style: const TextStyle(color: Colors.white60, fontSize: 10),
+                                            ),
+                                            if (msg.doubtId != null) ...[
+                                              const SizedBox(width: 6),
+                                              const Icon(Icons.check_circle_outline, color: themeGold, size: 11),
+                                              const SizedBox(width: 2),
+                                              const Text(
+                                                'Active Doubt',
+                                                style: TextStyle(color: themeGold, fontSize: 10, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                       ],
                                     ),
