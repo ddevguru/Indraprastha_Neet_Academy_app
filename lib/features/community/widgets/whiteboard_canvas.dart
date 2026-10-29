@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
-enum WhiteboardTool { pen, eraser, line, rectangle, circle, text }
+enum WhiteboardTool { pen, eraser, move, line, rectangle, circle, text }
 
 class WhiteboardStroke {
   final List<Offset> points;
@@ -71,15 +71,15 @@ class WhiteboardPainter extends CustomPainter {
     canvas.drawRect(Offset.zero & size, bgPaint);
 
     for (final stroke in strokes) {
-      _drawStroke(canvas, stroke);
+      drawStrokeToCanvas(canvas, stroke, backgroundColor);
     }
 
     if (currentStroke != null) {
-      _drawStroke(canvas, currentStroke!);
+      drawStrokeToCanvas(canvas, currentStroke!, backgroundColor);
     }
   }
 
-  void _drawStroke(Canvas canvas, WhiteboardStroke stroke) {
+  static void drawStrokeToCanvas(Canvas canvas, WhiteboardStroke stroke, Color backgroundColor) {
     if (stroke.points.isEmpty) return;
 
     final paint = Paint()
@@ -119,8 +119,45 @@ class WhiteboardSnapshotter {
   static Future<Uint8List?> capturePng(List<WhiteboardStroke> strokes, {Size size = const Size(800, 600)}) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Offset.zero & size);
-    final painter = WhiteboardPainter(strokes: strokes);
-    painter.paint(canvas, size);
+    final bgPaint = Paint()..color = Colors.white;
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    if (strokes.isNotEmpty) {
+      double minX = double.infinity, minY = double.infinity;
+      double maxX = -double.infinity, maxY = -double.infinity;
+
+      for (final s in strokes) {
+        for (final p in s.points) {
+          if (p.dx < minX) minX = p.dx;
+          if (p.dy < minY) minY = p.dy;
+          if (p.dx > maxX) maxX = p.dx;
+          if (p.dy > maxY) maxY = p.dy;
+        }
+      }
+
+      canvas.save();
+      if (minX.isFinite && maxX.isFinite && maxX > minX && maxY > minY) {
+        const padding = 40.0;
+        final contentW = maxX - minX;
+        final contentH = maxY - minY;
+        final scaleX = (size.width - padding * 2) / contentW;
+        final scaleY = (size.height - padding * 2) / contentH;
+        final fitScale = (scaleX < scaleY ? scaleX : scaleY).clamp(0.05, 1.2);
+
+        final targetCenterX = size.width / 2;
+        final targetCenterY = size.height / 2;
+        final contentCenterX = (minX + maxX) / 2;
+        final contentCenterY = (minY + maxY) / 2;
+
+        canvas.translate(targetCenterX - contentCenterX * fitScale, targetCenterY - contentCenterY * fitScale);
+        canvas.scale(fitScale, fitScale);
+      }
+
+      for (final s in strokes) {
+        WhiteboardPainter.drawStrokeToCanvas(canvas, s, Colors.white);
+      }
+      canvas.restore();
+    }
 
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.width.toInt(), size.height.toInt());

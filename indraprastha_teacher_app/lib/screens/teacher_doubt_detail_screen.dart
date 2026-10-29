@@ -402,6 +402,7 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
                   children: [
                     // Tab 1: Written Answer Composer
                     Padding(

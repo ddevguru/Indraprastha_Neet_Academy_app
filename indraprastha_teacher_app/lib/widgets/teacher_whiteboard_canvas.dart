@@ -88,8 +88,23 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
   Color _selectedColor = const Color(0xFF002350);
   double _strokeWidth = 3.0;
   bool _isEraser = false;
+  bool _isMove = false;
   bool _savingDraft = false;
   bool _publishing = false;
+  double _zoomScale = 1.0;
+  Offset _panOffset = Offset.zero;
+
+  WhiteboardStroke? _currentStroke;
+  bool _isDrawing = false;
+  Size _viewportSize = const Size(800, 600);
+
+  // Multi-touch tracking
+  final Map<int, Offset> _activePointers = {};
+  double _initialPinchDistance = 0.0;
+  double _initialPinchScale = 1.0;
+  Offset _initialPinchMidpoint = Offset.zero;
+  Offset _initialPanOffset = Offset.zero;
+  Offset _lastSingleFingerPos = Offset.zero;
 
   final List<Color> _palette = const [
     Color(0xFF002350), // Navy
@@ -115,6 +130,139 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
         }
       } catch (_) {}
     }
+  }
+
+  void _onPointerDown(PointerDownEvent event) {
+    _activePointers[event.pointer] = event.localPosition;
+
+    if (_activePointers.length == 1) {
+      if (_isMove) {
+        _lastSingleFingerPos = event.localPosition;
+      } else {
+        _isDrawing = true;
+        _redoStack.clear();
+        final worldPos = (event.localPosition - _panOffset) / _zoomScale;
+        _currentStroke = WhiteboardStroke(
+          points: [worldPos],
+          color: _selectedColor,
+          strokeWidth: _isEraser ? 28.0 : _strokeWidth,
+          isEraser: _isEraser,
+        );
+        setState(() {});
+      }
+    } else if (_activePointers.length >= 2) {
+      if (_isDrawing) {
+        _isDrawing = false;
+        _currentStroke = null;
+      }
+      final p1 = _activePointers.values.elementAt(0);
+      final p2 = _activePointers.values.elementAt(1);
+      _initialPinchDistance = (p1 - p2).distance;
+      _initialPinchScale = _zoomScale;
+      _initialPinchMidpoint = (p1 + p2) / 2;
+      _initialPanOffset = _panOffset;
+      setState(() {});
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    _activePointers[event.pointer] = event.localPosition;
+
+    if (_activePointers.length == 1) {
+      if (_isMove) {
+        final delta = event.localPosition - _lastSingleFingerPos;
+        _lastSingleFingerPos = event.localPosition;
+        setState(() {
+          _panOffset += delta;
+        });
+      } else if (_isDrawing && _currentStroke != null) {
+        final worldPos = (event.localPosition - _panOffset) / _zoomScale;
+        setState(() {
+          _currentStroke!.points.add(worldPos);
+        });
+      }
+    } else if (_activePointers.length >= 2) {
+      final p1 = _activePointers.values.elementAt(0);
+      final p2 = _activePointers.values.elementAt(1);
+      final currentDistance = (p1 - p2).distance;
+      final currentMidpoint = (p1 + p2) / 2;
+
+      double newScale = _zoomScale;
+      if (_initialPinchDistance > 12 && currentDistance > 12) {
+        final factor = currentDistance / _initialPinchDistance;
+        newScale = (_initialPinchScale * factor).clamp(0.4, 5.0);
+      }
+
+      Offset newPan = _initialPanOffset;
+      if (_initialPinchScale > 0) {
+        final worldFocal = (_initialPinchMidpoint - _initialPanOffset) / _initialPinchScale;
+        newPan = currentMidpoint - worldFocal * newScale;
+      }
+
+      setState(() {
+        _zoomScale = newScale;
+        _panOffset = newPan;
+      });
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    _activePointers.remove(event.pointer);
+
+    if (_activePointers.length < 2) {
+      _initialPinchDistance = 0.0;
+    }
+
+    if (_activePointers.length == 1) {
+      _lastSingleFingerPos = _activePointers.values.first;
+    }
+
+    if (_activePointers.isEmpty) {
+      if (_isDrawing && _currentStroke != null) {
+        if (_currentStroke!.points.isNotEmpty) {
+          _strokes.add(_currentStroke!);
+        }
+        _currentStroke = null;
+        _isDrawing = false;
+        setState(() {});
+      }
+    }
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    _activePointers.remove(event.pointer);
+    if (_activePointers.isEmpty) {
+      _currentStroke = null;
+      _isDrawing = false;
+      _initialPinchDistance = 0.0;
+      setState(() {});
+    }
+  }
+
+  void _zoomIn() {
+    _zoomAroundCenter(1.25);
+  }
+
+  void _zoomOut() {
+    _zoomAroundCenter(1 / 1.25);
+  }
+
+  void _zoomAroundCenter(double factor) {
+    final center = Offset(_viewportSize.width / 2, _viewportSize.height / 2);
+    final newScale = (_zoomScale * factor).clamp(0.4, 5.0);
+    if (_zoomScale > 0) {
+      _panOffset = center - (center - _panOffset) * (newScale / _zoomScale);
+    }
+    setState(() {
+      _zoomScale = newScale;
+    });
+  }
+
+  void _resetZoomAndPan() {
+    setState(() {
+      _zoomScale = 1.0;
+      _panOffset = Offset.zero;
+    });
   }
 
   Map<String, dynamic> _getDocumentJson() {
@@ -221,27 +369,44 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
               // Pen tool
               IconButton(
                 icon: const Icon(Icons.edit),
-                color: !_isEraser ? const Color(0xFF002350) : Colors.grey,
-                tooltip: 'Pen',
-                onPressed: () => setState(() => _isEraser = false),
+                color: (!_isEraser && !_isMove) ? const Color(0xFF002350) : Colors.grey,
+                tooltip: 'Pen (Draw)',
+                onPressed: () => setState(() {
+                  _isEraser = false;
+                  _isMove = false;
+                }),
               ),
               // Eraser tool
               IconButton(
                 icon: const Icon(Icons.cleaning_services_outlined),
                 color: _isEraser ? const Color(0xFFD92D20) : Colors.grey,
                 tooltip: 'Eraser',
-                onPressed: () => setState(() => _isEraser = true),
+                onPressed: () => setState(() {
+                  _isEraser = true;
+                  _isMove = false;
+                }),
+              ),
+              // Move / Pan Canvas tool
+              IconButton(
+                icon: const Icon(Icons.pan_tool_outlined),
+                color: _isMove ? const Color(0xFF002350) : Colors.grey,
+                tooltip: 'Move Canvas (Drag to move, Pinch to zoom)',
+                onPressed: () => setState(() {
+                  _isMove = true;
+                  _isEraser = false;
+                }),
               ),
               const SizedBox(width: 4),
 
               // Color palette
               ..._palette.map((c) {
-                final isSelected = !_isEraser && _selectedColor == c;
+                final isSelected = !_isEraser && !_isMove && _selectedColor == c;
                 return GestureDetector(
                   onTap: () {
                     setState(() {
                       _selectedColor = c;
                       _isEraser = false;
+                      _isMove = false;
                     });
                   },
                   child: Container(
@@ -322,6 +487,49 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
                         });
                       },
               ),
+
+              const SizedBox(width: 4),
+
+              // Zoom Out
+              IconButton(
+                icon: const Icon(Icons.zoom_out, size: 20),
+                tooltip: 'Zoom Out',
+                onPressed: _zoomScale > 0.45 ? _zoomOut : null,
+              ),
+
+              // Zoom Display / Reset
+              GestureDetector(
+                onTap: _resetZoomAndPan,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${(_zoomScale * 100).toInt()}%',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Zoom In
+              IconButton(
+                icon: const Icon(Icons.zoom_in, size: 20),
+                tooltip: 'Zoom In',
+                onPressed: _zoomScale < 4.9 ? _zoomIn : null,
+              ),
+
+              // Recenter View
+              IconButton(
+                icon: const Icon(Icons.center_focus_strong, size: 18),
+                tooltip: 'Recenter View (100%)',
+                onPressed: _resetZoomAndPan,
+              ),
             ],
           ),
         ),
@@ -344,35 +552,115 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: GestureDetector(
-                onPanStart: (details) {
-                  final renderBox = context.findRenderObject() as RenderBox?;
-                  if (renderBox == null) return;
-                  final localPos = details.localPosition;
-                  setState(() {
-                    _redoStack.clear();
-                    _strokes.add(
-                      WhiteboardStroke(
-                        points: [localPos],
-                        color: _selectedColor,
-                        strokeWidth: _isEraser ? 24.0 : _strokeWidth,
-                        isEraser: _isEraser,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+                  final hasTransformed = _zoomScale != 1.0 || _panOffset != Offset.zero;
+
+                  return Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Listener(
+                          behavior: HitTestBehavior.opaque,
+                          onPointerDown: _onPointerDown,
+                          onPointerMove: _onPointerMove,
+                          onPointerUp: _onPointerUp,
+                          onPointerCancel: _onPointerCancel,
+                          child: CustomPaint(
+                            painter: _StrokePainter(
+                              strokes: _strokes,
+                              currentStroke: _currentStroke,
+                              scale: _zoomScale,
+                              offset: _panOffset,
+                            ),
+                            size: Size.infinite,
+                          ),
+                        ),
                       ),
-                    );
-                  });
+
+                      // Floating Re-center Badge when panned or zoomed
+                      if (hasTransformed)
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _resetZoomAndPan,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.92),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFF002350), width: 1.2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.12),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.center_focus_strong, size: 14, color: Color(0xFF002350)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${(_zoomScale * 100).toInt()}% • Reset View',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF002350),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // Subtle bottom guidance pill
+                      Positioned(
+                        bottom: 8,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: IgnorePointer(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _isMove
+                                        ? Icons.pan_tool_outlined
+                                        : (_isEraser ? Icons.cleaning_services_outlined : Icons.edit),
+                                    size: 11,
+                                    color: Colors.black54,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    _isMove
+                                        ? '1 finger: Drag to move • 2 fingers: Pinch to zoom'
+                                        : '1 finger: ${_isEraser ? "Erase" : "Draw"} • 2 fingers: Zoom & Move',
+                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black54),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
                 },
-                onPanUpdate: (details) {
-                  final localPos = details.localPosition;
-                  setState(() {
-                    if (_strokes.isNotEmpty) {
-                      _strokes.last.points.add(localPos);
-                    }
-                  });
-                },
-                child: CustomPaint(
-                  painter: _StrokePainter(strokes: _strokes),
-                  size: Size.infinite,
-                ),
               ),
             ),
           ),
@@ -409,32 +697,91 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
 
 class _StrokePainter extends CustomPainter {
   final List<WhiteboardStroke> strokes;
-  const _StrokePainter({required this.strokes});
+  final WhiteboardStroke? currentStroke;
+  final double scale;
+  final Offset offset;
+
+  const _StrokePainter({
+    required this.strokes,
+    this.currentStroke,
+    this.scale = 1.0,
+    this.offset = Offset.zero,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 1. Subtle grid dots
+    _drawGrid(canvas, size);
+
+    // 2. Pan & zoom transform
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
+    canvas.scale(scale, scale);
+
     for (final stroke in strokes) {
-      if (stroke.points.isEmpty) continue;
+      _drawSingleStroke(canvas, stroke);
+    }
 
-      final paint = Paint()
-        ..color = stroke.isEraser ? Colors.white : stroke.color
-        ..strokeWidth = stroke.strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke;
+    if (currentStroke != null) {
+      _drawSingleStroke(canvas, currentStroke!);
+    }
 
-      if (stroke.points.length == 1) {
-        canvas.drawCircle(stroke.points.first, stroke.strokeWidth / 2, paint);
-      } else {
-        final path = Path()..moveTo(stroke.points.first.dx, stroke.points.first.dy);
-        for (int i = 1; i < stroke.points.length; i++) {
-          path.lineTo(stroke.points[i].dx, stroke.points[i].dy);
-        }
-        canvas.drawPath(path, paint);
+    canvas.restore();
+  }
+
+  void _drawGrid(Canvas canvas, Size size) {
+    final dotPaint = Paint()
+      ..color = const Color(0xFFE2E8F0)
+      ..style = PaintingStyle.fill;
+
+    const baseSpacing = 36.0;
+    final spacing = baseSpacing * scale;
+    if (spacing < 14) return;
+
+    final startX = offset.dx % spacing;
+    final startY = offset.dy % spacing;
+
+    for (double x = startX; x < size.width; x += spacing) {
+      for (double y = startY; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 1.2, dotPaint);
       }
     }
   }
 
+  void _drawSingleStroke(Canvas canvas, WhiteboardStroke stroke) {
+    if (stroke.points.isEmpty) return;
+
+    final paint = Paint()
+      ..color = stroke.isEraser ? Colors.white : stroke.color
+      ..strokeWidth = stroke.strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    if (stroke.points.length == 1) {
+      canvas.drawCircle(stroke.points.first, stroke.strokeWidth / 2, paint..style = PaintingStyle.fill);
+      return;
+    }
+
+    final path = Path()..moveTo(stroke.points.first.dx, stroke.points.first.dy);
+    for (int i = 1; i < stroke.points.length; i++) {
+      final p0 = stroke.points[i - 1];
+      final p1 = stroke.points[i];
+      path.quadraticBezierTo(
+        p0.dx,
+        p0.dy,
+        (p0.dx + p1.dx) / 2,
+        (p0.dy + p1.dy) / 2,
+      );
+    }
+    canvas.drawPath(path, paint);
+  }
+
   @override
-  bool shouldRepaint(covariant _StrokePainter oldDelegate) => true;
+  bool shouldRepaint(covariant _StrokePainter oldDelegate) {
+    return oldDelegate.strokes != strokes ||
+        oldDelegate.currentStroke != currentStroke ||
+        oldDelegate.scale != scale ||
+        oldDelegate.offset != offset;
+  }
 }

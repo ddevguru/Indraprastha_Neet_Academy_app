@@ -460,48 +460,6 @@ router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {
       return res.json({ success: true, pyqs: pyqs.rows.map(mapQuestionImageLink) });
     }
 
-    // Fallback: Check if there is a matching practice set by chapter title or topic
-    const chapterMeta = await pool.query(
-      `SELECT ch.id, ch.title, bk.subject, bk.class_label, bk.topic
-       FROM book_chapters ch
-       JOIN books bk ON bk.id = ch.book_id
-       WHERE ch.id = $1 LIMIT 1`,
-      [chapterId]
-    ).catch(() => ({ rows: [] }));
-
-    if (chapterMeta.rows.length > 0) {
-      const ch = chapterMeta.rows[0];
-      const matchSet = await pool.query(
-        `SELECT id FROM practice_sets
-         WHERE LOWER(TRIM(title)) = LOWER(TRIM($1))
-            OR LOWER(TRIM(topic)) = LOWER(TRIM($1))
-            OR LOWER(TRIM(title)) LIKE LOWER(TRIM('%' || $1 || '%'))
-         LIMIT 1`,
-        [ch.title]
-      ).catch(() => ({ rows: [] }));
-
-      if (matchSet.rows.length > 0) {
-        const setId = matchSet.rows[0].id;
-        const practiceQs = await pool.query(
-          `SELECT pq.id, $1::int AS chapter_id, pq.question, pq.option_a, pq.option_b, pq.option_c, pq.option_d,
-                  pq.correct_option, pq.explanation, 'NEET' AS year_label,
-                  pq.question_image_link, pq.question_image_drive_file_id, pq.question_image_drive_folder_id,
-                  pq.explanation_image_link, pq.explanation_image_drive_file_id,
-                  '' AS explanation_video_link, '' AS explanation_video_drive_file_id,
-                  pq.option_a_image_link, pq.option_b_image_link, pq.option_c_image_link, pq.option_d_image_link,
-                  pq.similar_question
-           FROM practice_questions pq
-           WHERE pq.practice_set_id = $2
-           ORDER BY pq.id ASC`,
-          [chapterId, setId]
-        ).catch(() => ({ rows: [] }));
-
-        if (practiceQs.rows.length > 0) {
-          return res.json({ success: true, pyqs: practiceQs.rows.map(mapQuestionImageLink) });
-        }
-      }
-    }
-
     res.json({ success: true, pyqs: [] });
   } catch (err) {
     console.error('[PYQ_FETCH_ERROR]', err);

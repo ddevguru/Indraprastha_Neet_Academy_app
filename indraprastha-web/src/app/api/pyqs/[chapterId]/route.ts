@@ -44,57 +44,6 @@ export async function GET(
       }
     } catch (_) {}
 
-    // If empty or failed, fallback to practice set questions for this chapter
-    if (pyqs.length === 0) {
-      try {
-        const seedItem = (seedChapters as any[])?.find(
-          (c) => c.id === idNum || c.chapter_id === idNum
-        );
-        const searchTitle = seedItem?.title || "";
-
-        const setsRes = await fetch(
-          "https://api.indraprasthaneetacademy.com/api/admin/practice-sets",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          }
-        );
-        if (setsRes.ok) {
-          const setsData = await setsRes.json();
-          const sets: any[] = setsData.practiceSets || [];
-          const clean = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-          const matchedSet = sets.find((s) => {
-            const sTitle = clean(s.title);
-            const target = clean(searchTitle);
-            return (
-              sTitle === target ||
-              clean(s.topic) === target ||
-              (target && sTitle.includes(target)) ||
-              (target && target.includes(sTitle))
-            );
-          });
-
-          if (matchedSet) {
-            const qsRes = await fetch(
-              `https://api.indraprasthaneetacademy.com/api/admin/practice-sets/${matchedSet.id}/questions`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-                cache: "no-store",
-              }
-            );
-            if (qsRes.ok) {
-              const qsData = await qsRes.json();
-              pyqs = (qsData.questions || []).map((q: any) => ({
-                ...q,
-                chapter_id: idNum,
-                year_label: q.year_label || "NEET",
-              }));
-            }
-          }
-        }
-      } catch (_) {}
-    }
-
     return NextResponse.json({
       success: true,
       chapter_id: idNum,

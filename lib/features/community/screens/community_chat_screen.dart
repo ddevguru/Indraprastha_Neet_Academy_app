@@ -392,6 +392,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
       ),
       body: TabBarView(
         controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           // Tab 0: Chat & Notes
           Column(

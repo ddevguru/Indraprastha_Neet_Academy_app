@@ -3,7 +3,7 @@
 
 const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
   {
-    'id': 'ch_32',
+    'id': "ch_32",
     'chapter_id': 32,
     'title': "Living World",
     'topic': "Living World",
@@ -15,7 +15,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 32,
   },
   {
-    'id': 'ch_33',
+    'id': "ch_33",
     'chapter_id': 33,
     'title': "Biological Classification",
     'topic': "Biological Classification",
@@ -27,7 +27,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 33,
   },
   {
-    'id': 'ch_34',
+    'id': "ch_34",
     'chapter_id': 34,
     'title': "Plant Kingdom",
     'topic': "Plant Kingdom",
@@ -39,7 +39,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 34,
   },
   {
-    'id': 'ch_35',
+    'id': "ch_35",
     'chapter_id': 35,
     'title': "Morphology Of Flowering Plants",
     'topic': "Morphology Of Flowering Plants",
@@ -51,7 +51,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 35,
   },
   {
-    'id': 'ch_36',
+    'id': "ch_36",
     'chapter_id': 36,
     'title': "Anatomy Of Flowering Plants",
     'topic': "Anatomy Of Flowering Plants",
@@ -63,7 +63,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 36,
   },
   {
-    'id': 'ch_37',
+    'id': "ch_37",
     'chapter_id': 37,
     'title': "Animal Kingdom",
     'topic': "Animal Kingdom",
@@ -75,7 +75,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 37,
   },
   {
-    'id': 'ch_38',
+    'id': "ch_38",
     'chapter_id': 38,
     'title': "Photosynthesis",
     'topic': "Photosynthesis",
@@ -87,7 +87,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 38,
   },
   {
-    'id': 'ch_39',
+    'id': "ch_39",
     'chapter_id': 39,
     'title': "Respiration in Plants",
     'topic': "Respiration in Plants",
@@ -99,7 +99,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 39,
   },
   {
-    'id': 'ch_40',
+    'id': "ch_40",
     'chapter_id': 40,
     'title': "Plant Growth & Development",
     'topic': "Plant Growth & Development",
@@ -111,7 +111,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 40,
   },
   {
-    'id': 'ch_41',
+    'id': "ch_41",
     'chapter_id': 41,
     'title': "Structural Organisation in Animals",
     'topic': "Structural Organisation in Animals",
@@ -123,7 +123,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 41,
   },
   {
-    'id': 'ch_42',
+    'id': "ch_42",
     'chapter_id': 42,
     'title': "Biomolecules",
     'topic': "Biomolecules",
@@ -135,7 +135,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 42,
   },
   {
-    'id': 'ch_43',
+    'id': "ch_43",
     'chapter_id': 43,
     'title': "Cell- Unit Of Life",
     'topic': "Cell- Unit Of Life",
@@ -147,7 +147,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 43,
   },
   {
-    'id': 'ch_44',
+    'id': "ch_44",
     'chapter_id': 44,
     'title': "Cell Cycle & Cell Division",
     'topic': "Cell Cycle & Cell Division",
@@ -159,7 +159,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 44,
   },
   {
-    'id': 'ch_45',
+    'id': "ch_45",
     'chapter_id': 45,
     'title': "Breathing & Exchange of Gases",
     'topic': "Breathing & Exchange of Gases",
@@ -171,7 +171,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 45,
   },
   {
-    'id': 'ch_46',
+    'id': "ch_46",
     'chapter_id': 46,
     'title': "Body Fluids & Circulation",
     'topic': "Body Fluids & Circulation",
@@ -183,7 +183,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 46,
   },
   {
-    'id': 'ch_47',
+    'id': "ch_47",
     'chapter_id': 47,
     'title': "Excretory Products & Their Elimination",
     'topic': "Excretory Products & Their Elimination",
@@ -195,7 +195,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 47,
   },
   {
-    'id': 'ch_48',
+    'id': "ch_48",
     'chapter_id': 48,
     'title': "Locomotion & Movement",
     'topic': "Locomotion & Movement",
@@ -207,7 +207,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 48,
   },
   {
-    'id': 'ch_49',
+    'id': "ch_49",
     'chapter_id': 49,
     'title': "Neural Control & Coordination",
     'topic': "Neural Control & Coordination",
@@ -219,7 +219,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 49,
   },
   {
-    'id': 'ch_50',
+    'id': "ch_50",
     'chapter_id': 50,
     'title': "Chemical Coordination & Integration",
     'topic': "Chemical Coordination & Integration",
@@ -231,19 +231,19 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 50,
   },
   {
-    'id': 'ch_51',
+    'id': "ch_51",
     'chapter_id': 51,
     'title': "Some Basic Concepts of Chemistry",
     'topic': "Some Basic Concepts of Chemistry",
     'subject': "Chemistry",
     'class_label': "Class 11",
-    'question_count': 0,
+    'question_count': 3,
     'is_book_chapter': true,
     'book_id': 47,
     'order_index': 51,
   },
   {
-    'id': 'ch_52',
+    'id': "ch_52",
     'chapter_id': 52,
     'title': "Structure of Atom",
     'topic': "Structure of Atom",
@@ -255,7 +255,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 52,
   },
   {
-    'id': 'ch_53',
+    'id': "ch_53",
     'chapter_id': 53,
     'title': "Classification of Elements & Periodicity",
     'topic': "Classification of Elements & Periodicity",
@@ -267,7 +267,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 53,
   },
   {
-    'id': 'ch_54',
+    'id': "ch_54",
     'chapter_id': 54,
     'title': "Chemical Bonding",
     'topic': "Chemical Bonding",
@@ -279,7 +279,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 54,
   },
   {
-    'id': 'ch_55',
+    'id': "ch_55",
     'chapter_id': 55,
     'title': "Thermodynamics",
     'topic': "Thermodynamics",
@@ -291,7 +291,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 55,
   },
   {
-    'id': 'ch_56',
+    'id': "ch_56",
     'chapter_id': 56,
     'title': "States of Matter",
     'topic': "States of Matter",
@@ -303,7 +303,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 56,
   },
   {
-    'id': 'ch_57',
+    'id': "ch_57",
     'chapter_id': 57,
     'title': "Chemical Equilibrium",
     'topic': "Chemical Equilibrium",
@@ -315,7 +315,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 57,
   },
   {
-    'id': 'ch_58',
+    'id': "ch_58",
     'chapter_id': 58,
     'title': "Redox Reactions",
     'topic': "Redox Reactions",
@@ -327,7 +327,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 58,
   },
   {
-    'id': 'ch_59',
+    'id': "ch_59",
     'chapter_id': 59,
     'title': "Hydrogen",
     'topic': "Hydrogen",
@@ -339,7 +339,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 59,
   },
   {
-    'id': 'ch_60',
+    'id': "ch_60",
     'chapter_id': 60,
     'title': "S Block",
     'topic': "S Block",
@@ -351,7 +351,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 60,
   },
   {
-    'id': 'ch_61',
+    'id': "ch_61",
     'chapter_id': 61,
     'title': "P-Block Elements",
     'topic': "P-Block Elements",
@@ -363,7 +363,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 61,
   },
   {
-    'id': 'ch_62',
+    'id': "ch_62",
     'chapter_id': 62,
     'title': "Organic Chemistry Basic Principles",
     'topic': "Organic Chemistry Basic Principles",
@@ -375,7 +375,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 62,
   },
   {
-    'id': 'ch_63',
+    'id': "ch_63",
     'chapter_id': 63,
     'title': "Hydrocarbons",
     'topic': "Hydrocarbons",
@@ -387,7 +387,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 63,
   },
   {
-    'id': 'ch_64',
+    'id': "ch_64",
     'chapter_id': 64,
     'title': "Ionic Equilibrium",
     'topic': "Ionic Equilibrium",
@@ -399,7 +399,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 64,
   },
   {
-    'id': 'ch_65',
+    'id': "ch_65",
     'chapter_id': 65,
     'title': "Basic Mathematics",
     'topic': "Basic Mathematics",
@@ -411,7 +411,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 65,
   },
   {
-    'id': 'ch_66',
+    'id': "ch_66",
     'chapter_id': 66,
     'title': "Unit & Dimension",
     'topic': "Unit & Dimension",
@@ -423,7 +423,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 66,
   },
   {
-    'id': 'ch_67',
+    'id': "ch_67",
     'chapter_id': 67,
     'title': "Vectors",
     'topic': "Vectors",
@@ -435,7 +435,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 67,
   },
   {
-    'id': 'ch_68',
+    'id': "ch_68",
     'chapter_id': 68,
     'title': "Motion in a Straight Line",
     'topic': "Motion in a Straight Line",
@@ -447,7 +447,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 68,
   },
   {
-    'id': 'ch_69',
+    'id': "ch_69",
     'chapter_id': 69,
     'title': "Motion in a Plane",
     'topic': "Motion in a Plane",
@@ -459,7 +459,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 69,
   },
   {
-    'id': 'ch_70',
+    'id': "ch_70",
     'chapter_id': 70,
     'title': "Laws Of Motion",
     'topic': "Laws Of Motion",
@@ -471,7 +471,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 70,
   },
   {
-    'id': 'ch_71',
+    'id': "ch_71",
     'chapter_id': 71,
     'title': "Work Power Energy",
     'topic': "Work Power Energy",
@@ -483,7 +483,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 71,
   },
   {
-    'id': 'ch_72',
+    'id': "ch_72",
     'chapter_id': 72,
     'title': "System of Particles & Rotational Motion",
     'topic': "System of Particles & Rotational Motion",
@@ -495,7 +495,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 72,
   },
   {
-    'id': 'ch_73',
+    'id': "ch_73",
     'chapter_id': 73,
     'title': "Gravitation",
     'topic': "Gravitation",
@@ -507,7 +507,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 73,
   },
   {
-    'id': 'ch_74',
+    'id': "ch_74",
     'chapter_id': 74,
     'title': "Mechanical Properties of Solid",
     'topic': "Mechanical Properties of Solid",
@@ -519,7 +519,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 74,
   },
   {
-    'id': 'ch_75',
+    'id': "ch_75",
     'chapter_id': 75,
     'title': "Mechanical Properties Of Fluids",
     'topic': "Mechanical Properties Of Fluids",
@@ -531,7 +531,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 75,
   },
   {
-    'id': 'ch_76',
+    'id': "ch_76",
     'chapter_id': 76,
     'title': "Thernal Properties of Matter",
     'topic': "Thernal Properties of Matter",
@@ -543,7 +543,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 76,
   },
   {
-    'id': 'ch_77',
+    'id': "ch_77",
     'chapter_id': 77,
     'title': "Thermodynamics",
     'topic': "Thermodynamics",
@@ -555,7 +555,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 77,
   },
   {
-    'id': 'ch_78',
+    'id': "ch_78",
     'chapter_id': 78,
     'title': "Kinetic Theory",
     'topic': "Kinetic Theory",
@@ -567,7 +567,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 78,
   },
   {
-    'id': 'ch_79',
+    'id': "ch_79",
     'chapter_id': 79,
     'title': "Oscillations",
     'topic': "Oscillations",
@@ -579,7 +579,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 79,
   },
   {
-    'id': 'ch_80',
+    'id': "ch_80",
     'chapter_id': 80,
     'title': "Waves",
     'topic': "Waves",
@@ -591,7 +591,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 80,
   },
   {
-    'id': 'ch_81',
+    'id': "ch_81",
     'chapter_id': 81,
     'title': "Reproduction In Organisms",
     'topic': "Reproduction In Organisms",
@@ -603,7 +603,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 81,
   },
   {
-    'id': 'ch_82',
+    'id': "ch_82",
     'chapter_id': 82,
     'title': "Sexsual Reproduction in Flowering Plants",
     'topic': "Sexsual Reproduction in Flowering Plants",
@@ -615,7 +615,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 82,
   },
   {
-    'id': 'ch_83',
+    'id': "ch_83",
     'chapter_id': 83,
     'title': "Human Reproduction",
     'topic': "Human Reproduction",
@@ -627,7 +627,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 83,
   },
   {
-    'id': 'ch_84',
+    'id': "ch_84",
     'chapter_id': 84,
     'title': "Reproductive Health",
     'topic': "Reproductive Health",
@@ -639,7 +639,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 84,
   },
   {
-    'id': 'ch_85',
+    'id': "ch_85",
     'chapter_id': 85,
     'title': "Principle of Inheritance & Variation",
     'topic': "Principle of Inheritance & Variation",
@@ -651,7 +651,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 85,
   },
   {
-    'id': 'ch_86',
+    'id': "ch_86",
     'chapter_id': 86,
     'title': "Molecular Basis of Inheritance",
     'topic': "Molecular Basis of Inheritance",
@@ -663,7 +663,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 86,
   },
   {
-    'id': 'ch_87',
+    'id': "ch_87",
     'chapter_id': 87,
     'title': "Chapter 66",
     'topic': "Chapter 66",
@@ -675,7 +675,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 87,
   },
   {
-    'id': 'ch_88',
+    'id': "ch_88",
     'chapter_id': 88,
     'title': "Human Health & Disease",
     'topic': "Human Health & Disease",
@@ -687,7 +687,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 88,
   },
   {
-    'id': 'ch_89',
+    'id': "ch_89",
     'chapter_id': 89,
     'title': "Strategies For Enhancement in Food Production",
     'topic': "Strategies For Enhancement in Food Production",
@@ -699,7 +699,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 89,
   },
   {
-    'id': 'ch_90',
+    'id': "ch_90",
     'chapter_id': 90,
     'title': "Microbes in Human Welfare",
     'topic': "Microbes in Human Welfare",
@@ -711,7 +711,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 90,
   },
   {
-    'id': 'ch_91',
+    'id': "ch_91",
     'chapter_id': 91,
     'title': "Biotechnology-Principles & Processes",
     'topic': "Biotechnology-Principles & Processes",
@@ -723,7 +723,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 91,
   },
   {
-    'id': 'ch_92',
+    'id': "ch_92",
     'chapter_id': 92,
     'title': "Biotechnology & its Application",
     'topic': "Biotechnology & its Application",
@@ -735,7 +735,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 92,
   },
   {
-    'id': 'ch_93',
+    'id': "ch_93",
     'chapter_id': 93,
     'title': "Organism & Populations",
     'topic': "Organism & Populations",
@@ -747,7 +747,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 93,
   },
   {
-    'id': 'ch_94',
+    'id': "ch_94",
     'chapter_id': 94,
     'title': "Ecosystem",
     'topic': "Ecosystem",
@@ -759,7 +759,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 94,
   },
   {
-    'id': 'ch_95',
+    'id': "ch_95",
     'chapter_id': 95,
     'title': "Biodiversity & Conservation",
     'topic': "Biodiversity & Conservation",
@@ -771,7 +771,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 95,
   },
   {
-    'id': 'ch_98',
+    'id': "ch_98",
     'chapter_id': 98,
     'title': "Solid State",
     'topic': "Solid State",
@@ -783,7 +783,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 98,
   },
   {
-    'id': 'ch_99',
+    'id': "ch_99",
     'chapter_id': 99,
     'title': "Solutions",
     'topic': "Solutions",
@@ -795,7 +795,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 99,
   },
   {
-    'id': 'ch_100',
+    'id': "ch_100",
     'chapter_id': 100,
     'title': "Electrochemistry",
     'topic': "Electrochemistry",
@@ -807,7 +807,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 100,
   },
   {
-    'id': 'ch_101',
+    'id': "ch_101",
     'chapter_id': 101,
     'title': "Chemical Kinetics",
     'topic': "Chemical Kinetics",
@@ -819,7 +819,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 101,
   },
   {
-    'id': 'ch_102',
+    'id': "ch_102",
     'chapter_id': 102,
     'title': "Surface Chemistry",
     'topic': "Surface Chemistry",
@@ -831,7 +831,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 102,
   },
   {
-    'id': 'ch_103',
+    'id': "ch_103",
     'chapter_id': 103,
     'title': "D & F Block Elements",
     'topic': "D & F Block Elements",
@@ -843,7 +843,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 103,
   },
   {
-    'id': 'ch_104',
+    'id': "ch_104",
     'chapter_id': 104,
     'title': "Co-ordination Compounds",
     'topic': "Co-ordination Compounds",
@@ -855,7 +855,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 104,
   },
   {
-    'id': 'ch_105',
+    'id': "ch_105",
     'chapter_id': 105,
     'title': "Haloalkanes & Haloalkenes",
     'topic': "Haloalkanes & Haloalkenes",
@@ -867,7 +867,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 105,
   },
   {
-    'id': 'ch_106',
+    'id': "ch_106",
     'chapter_id': 106,
     'title': "Alcohol Phenol & Ethers",
     'topic': "Alcohol Phenol & Ethers",
@@ -879,7 +879,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 106,
   },
   {
-    'id': 'ch_107',
+    'id': "ch_107",
     'chapter_id': 107,
     'title': "Aldehyde Ketone & Carboxylic Acids",
     'topic': "Aldehyde Ketone & Carboxylic Acids",
@@ -891,7 +891,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 107,
   },
   {
-    'id': 'ch_108',
+    'id': "ch_108",
     'chapter_id': 108,
     'title': "Organic Compounds Containing Nitrogen",
     'topic': "Organic Compounds Containing Nitrogen",
@@ -903,7 +903,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 108,
   },
   {
-    'id': 'ch_109',
+    'id': "ch_109",
     'chapter_id': 109,
     'title': "Biomolecules",
     'topic': "Biomolecules",
@@ -915,7 +915,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 109,
   },
   {
-    'id': 'ch_110',
+    'id': "ch_110",
     'chapter_id': 110,
     'title': "Electric Charges & Fields",
     'topic': "Electric Charges & Fields",
@@ -927,7 +927,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 110,
   },
   {
-    'id': 'ch_111',
+    'id': "ch_111",
     'chapter_id': 111,
     'title': "Electrostatics Potential & Capacitance",
     'topic': "Electrostatics Potential & Capacitance",
@@ -939,7 +939,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 111,
   },
   {
-    'id': 'ch_112',
+    'id': "ch_112",
     'chapter_id': 112,
     'title': "Current Electricity",
     'topic': "Current Electricity",
@@ -951,7 +951,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 112,
   },
   {
-    'id': 'ch_113',
+    'id': "ch_113",
     'chapter_id': 113,
     'title': "Magnetic Effects of Current",
     'topic': "Magnetic Effects of Current",
@@ -963,7 +963,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 113,
   },
   {
-    'id': 'ch_114',
+    'id': "ch_114",
     'chapter_id': 114,
     'title': "Magnetism",
     'topic': "Magnetism",
@@ -975,31 +975,31 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 114,
   },
   {
-    'id': 'ch_115',
+    'id': "ch_115",
     'chapter_id': 115,
     'title': "Electromagnetic Induction",
     'topic': "Electromagnetic Induction",
     'subject': "Physics",
     'class_label': "Class 12",
-    'question_count': 0,
+    'question_count': 31,
     'is_book_chapter': true,
     'book_id': 111,
     'order_index': 115,
   },
   {
-    'id': 'ch_116',
+    'id': "ch_116",
     'chapter_id': 116,
     'title': "Alternating Current",
     'topic': "Alternating Current",
     'subject': "Physics",
     'class_label': "Class 12",
-    'question_count': 0,
+    'question_count': 64,
     'is_book_chapter': true,
     'book_id': 112,
     'order_index': 116,
   },
   {
-    'id': 'ch_117',
+    'id': "ch_117",
     'chapter_id': 117,
     'title': "Alternating Current",
     'topic': "Alternating Current",
@@ -1011,19 +1011,19 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 117,
   },
   {
-    'id': 'ch_118',
+    'id': "ch_118",
     'chapter_id': 118,
     'title': "Electromagnetic Waves",
     'topic': "Electromagnetic Waves",
     'subject': "Physics",
     'class_label': "Class 12",
-    'question_count': 0,
+    'question_count': 39,
     'is_book_chapter': true,
     'book_id': 114,
     'order_index': 118,
   },
   {
-    'id': 'ch_119',
+    'id': "ch_119",
     'chapter_id': 119,
     'title': "Ray Optics",
     'topic': "Ray Optics",
@@ -1035,7 +1035,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 119,
   },
   {
-    'id': 'ch_120',
+    'id': "ch_120",
     'chapter_id': 120,
     'title': "Wave Optics",
     'topic': "Wave Optics",
@@ -1047,19 +1047,19 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 120,
   },
   {
-    'id': 'ch_121',
+    'id': "ch_121",
     'chapter_id': 121,
     'title': "Dual Nature of Radiation & Matter",
     'topic': "Dual Nature of Radiation & Matter",
     'subject': "Physics",
     'class_label': "Class 12",
-    'question_count': 0,
+    'question_count': 87,
     'is_book_chapter': true,
     'book_id': 117,
     'order_index': 121,
   },
   {
-    'id': 'ch_122',
+    'id': "ch_122",
     'chapter_id': 122,
     'title': "Atoms",
     'topic': "Atoms",
@@ -1071,7 +1071,7 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 122,
   },
   {
-    'id': 'ch_123',
+    'id': "ch_123",
     'chapter_id': 123,
     'title': "Nuclei",
     'topic': "Nuclei",
@@ -1083,13 +1083,13 @@ const List<Map<String, dynamic>> kPyqChaptersSeed = <Map<String, dynamic>>[
     'order_index': 123,
   },
   {
-    'id': 'ch_124',
+    'id': "ch_124",
     'chapter_id': 124,
     'title': "Semiconductor Electronics",
     'topic': "Semiconductor Electronics",
     'subject': "Physics",
     'class_label': "Class 12",
-    'question_count': 1,
+    'question_count': 114,
     'is_book_chapter': true,
     'book_id': 120,
     'order_index': 124,

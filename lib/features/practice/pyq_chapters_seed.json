@@ -234,7 +234,7 @@
     "topic": "Some Basic Concepts of Chemistry",
     "subject": "Chemistry",
     "class_label": "Class 11",
-    "question_count": 0,
+    "question_count": 3,
     "is_book_chapter": true,
     "book_id": 47,
     "order_index": 51
@@ -978,7 +978,7 @@
     "topic": "Electromagnetic Induction",
     "subject": "Physics",
     "class_label": "Class 12",
-    "question_count": 0,
+    "question_count": 31,
     "is_book_chapter": true,
     "book_id": 111,
     "order_index": 115
@@ -990,7 +990,7 @@
     "topic": "Alternating Current",
     "subject": "Physics",
     "class_label": "Class 12",
-    "question_count": 0,
+    "question_count": 64,
     "is_book_chapter": true,
     "book_id": 112,
     "order_index": 116
@@ -1014,7 +1014,7 @@
     "topic": "Electromagnetic Waves",
     "subject": "Physics",
     "class_label": "Class 12",
-    "question_count": 0,
+    "question_count": 39,
     "is_book_chapter": true,
     "book_id": 114,
     "order_index": 118
@@ -1050,7 +1050,7 @@
     "topic": "Dual Nature of Radiation & Matter",
     "subject": "Physics",
     "class_label": "Class 12",
-    "question_count": 0,
+    "question_count": 87,
     "is_book_chapter": true,
     "book_id": 117,
     "order_index": 121
@@ -1086,7 +1086,7 @@
     "topic": "Semiconductor Electronics",
     "subject": "Physics",
     "class_label": "Class 12",
-    "question_count": 1,
+    "question_count": 114,
     "is_book_chapter": true,
     "book_id": 120,
     "order_index": 124
