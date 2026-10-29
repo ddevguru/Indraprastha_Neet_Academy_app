@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
+const { findBestTeacherForDoubt } = require('../utils/autoAssignTeacher');
 
 // Student Auth Middleware
 async function studentAuth(req, res, next) {
@@ -56,13 +57,18 @@ router.post('/', studentAuth, async (req, res) => {
 
     await client.query('BEGIN');
 
+    // Automatically match best faculty for this subject and class
+    const autoTeacher = await findBestTeacherForDoubt(client, classLevel, subject);
+    const initialStatus = autoTeacher ? 'Assigned' : 'Pending';
+    const assignedTeacherId = autoTeacher ? autoTeacher.id : null;
+
     // 1. Create doubt record
     const doubtRes = await client.query(
       `INSERT INTO doubts (
-         student_id, community_id, class_level, subject, title, description, status, version, created_at, updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, 'Pending', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+         student_id, community_id, class_level, subject, title, description, status, assigned_teacher_id, version, created_at, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING *`,
-      [studentId, communityId || null, classLevel, subject, title.trim(), description.trim()]
+      [studentId, communityId || null, classLevel, subject, title.trim(), description.trim(), initialStatus, assignedTeacherId]
     );
     const doubt = doubtRes.rows[0];
 
@@ -92,17 +98,52 @@ router.post('/', studentAuth, async (req, res) => {
     // 3. Record status history
     await client.query(
       `INSERT INTO doubt_status_history (doubt_id, previous_status, new_status, changed_by_user_id, changed_by_role, reason)
-       VALUES ($1, NULL, 'Pending', $2, 'student', 'Initial doubt submission')`,
-      [doubt.id, studentId]
+       VALUES ($1, NULL, $2, $3, $4, $5)`,
+      [
+        doubt.id,
+        initialStatus,
+        studentId,
+        autoTeacher ? 'system' : 'student',
+        autoTeacher
+          ? `Automatically assigned to faculty: ${autoTeacher.display_name}`
+          : 'Initial doubt submission (Pending teacher assignment)',
+      ]
     );
 
     // 4. Record activity event
     await client.query(
       `INSERT INTO doubt_activity_events (
          doubt_id, actor_id, actor_role, event_type, previous_status, new_status, metadata_json
-       ) VALUES ($1, $2, 'student', 'DOUBT_SUBMITTED', NULL, 'Pending', $3)`,
-      [doubt.id, studentId, JSON.stringify({ title, classLevel, subject, attachmentCount: attachments.length })]
+       ) VALUES ($1, $2, $3, $4, NULL, $5, $6)`,
+      [
+        doubt.id,
+        studentId,
+        autoTeacher ? 'system' : 'student',
+        autoTeacher ? 'DOUBT_AUTO_ASSIGNED' : 'DOUBT_SUBMITTED',
+        initialStatus,
+        JSON.stringify({
+          title,
+          classLevel,
+          subject,
+          assignedTeacherId,
+          assignedTeacherName: autoTeacher ? autoTeacher.display_name : null,
+          attachmentCount: attachments.length,
+        }),
+      ]
     );
+
+    // 5. Notify assigned teacher
+    if (autoTeacher) {
+      await client.query(
+        `INSERT INTO community_notifications (user_id, user_role, title, message, doubt_id)
+         VALUES ($1, 'teacher', 'New Doubt Assigned', $2, $3)`,
+        [
+          autoTeacher.id,
+          `New doubt submitted for ${subject} (${classLevel}): "${title.slice(0, 80)}"`,
+          doubt.id,
+        ]
+      );
+    }
 
     // 5. Create resolution cycle #1
     await client.query(
@@ -148,7 +189,7 @@ router.get('/my', studentAuth, async (req, res) => {
     let queryText = `
       SELECT 
         d.*,
-        'Subject Faculty' as assigned_teacher_name,
+        COALESCE(tp.display_name, 'Subject Faculty') as assigned_teacher_name,
         COALESCE(
           (
             SELECT json_agg(
@@ -170,7 +211,7 @@ router.get('/my', studentAuth, async (req, res) => {
               json_build_object(
                 'id', dr.id,
                 'responseText', dr.response_text,
-                'teacherName', 'Subject Faculty',
+                'teacherName', COALESCE(tp.display_name, 'Subject Faculty'),
                 'createdAt', dr.created_at,
                 'publishedAt', dr.published_at,
                 'attachments', (
@@ -332,9 +373,9 @@ router.post('/:doubtId/reopen', studentAuth, async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Verify ownership
+    // Verify ownership & get class and subject
     const doubtRes = await client.query(
-      'SELECT id, status, assigned_teacher_id FROM doubts WHERE id = $1 AND student_id = $2 FOR UPDATE',
+      'SELECT id, status, assigned_teacher_id, class_level, subject, title FROM doubts WHERE id = $1 AND student_id = $2 FOR UPDATE',
       [doubtId, studentId]
     );
     if (doubtRes.rows.length === 0) {
@@ -345,12 +386,21 @@ router.post('/:doubtId/reopen', studentAuth, async (req, res) => {
     const prevStatus = doubt.status;
     const newStatus = 'Reopened';
 
+    // Ensure teacher is assigned
+    let targetTeacherId = doubt.assigned_teacher_id;
+    if (!targetTeacherId) {
+      const autoTeacher = await findBestTeacherForDoubt(client, doubt.class_level, doubt.subject);
+      if (autoTeacher) {
+        targetTeacherId = autoTeacher.id;
+      }
+    }
+
     // 1. Update doubt status
     await client.query(
       `UPDATE doubts 
-       SET status = $1, version = version + 1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
-      [newStatus, doubtId]
+       SET status = $1, assigned_teacher_id = COALESCE(assigned_teacher_id, $2), version = version + 1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [newStatus, targetTeacherId, doubtId]
     );
 
     // 2. Status history
@@ -365,7 +415,7 @@ router.post('/:doubtId/reopen', studentAuth, async (req, res) => {
       `INSERT INTO doubt_activity_events (
          doubt_id, actor_id, actor_role, event_type, previous_status, new_status, metadata_json
        ) VALUES ($1, $2, 'student', 'DOUBT_REOPENED', $3, $4, $5)`,
-      [doubtId, studentId, prevStatus, newStatus, JSON.stringify({ clarificationText })]
+      [doubtId, studentId, prevStatus, newStatus, JSON.stringify({ clarificationText, targetTeacherId })]
     );
 
     // 4. Close previous cycle & create new resolution cycle
@@ -389,12 +439,12 @@ router.post('/:doubtId/reopen', studentAuth, async (req, res) => {
     );
 
     // 5. Notify teacher if assigned
-    if (doubt.assigned_teacher_id) {
+    if (targetTeacherId) {
       await client.query(
         `INSERT INTO community_notifications (user_id, user_role, title, message, doubt_id)
          VALUES ($1, 'teacher', 'Doubt Reopened', $2, $3)`,
         [
-          doubt.assigned_teacher_id,
+          targetTeacherId,
           `Student requested clarification on Doubt #${doubtId}: "${clarificationText.slice(0, 100)}"`,
           doubtId,
         ]

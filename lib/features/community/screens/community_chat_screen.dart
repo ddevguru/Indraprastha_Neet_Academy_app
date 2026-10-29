@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/community_models.dart';
 import '../services/community_service.dart';
 import 'my_doubts_screen.dart';
@@ -39,14 +43,24 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   bool _isUploading = false;
   final List<Map<String, dynamic>> _pendingAttachments = [];
 
+  // Voice Recording state
+  AudioRecorder? _audioRecorder;
+  bool _isRecording = false;
+  int _recordSeconds = 0;
+  Timer? _recordTimer;
+  String? _recordingPath;
+
   @override
   void initState() {
     super.initState();
+    _audioRecorder = AudioRecorder();
     _loadMessages();
   }
 
   @override
   void dispose() {
+    _recordTimer?.cancel();
+    _audioRecorder?.dispose();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -224,6 +238,141 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       }
     } finally {
       if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      if (_audioRecorder == null) return;
+      if (!await _audioRecorder!.hasPermission()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Microphone permission is required to record voice notes.')),
+          );
+        }
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final path = '${tempDir.path}/voice_note_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      _recordingPath = path;
+
+      await _audioRecorder!.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+        ),
+        path: path,
+      );
+
+      setState(() {
+        _isRecording = true;
+        _recordSeconds = 0;
+      });
+
+      _recordTimer?.cancel();
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted && _isRecording) {
+          setState(() => _recordSeconds++);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start recording: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    try {
+      _recordTimer?.cancel();
+      if (_audioRecorder != null && await _audioRecorder!.isRecording()) {
+        await _audioRecorder!.stop();
+      }
+      if (_recordingPath != null) {
+        final f = File(_recordingPath!);
+        if (await f.exists()) {
+          await f.delete();
+        }
+      }
+    } catch (e) {
+      debugPrint('[CANCEL_RECORD_ERROR] $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _recordSeconds = 0;
+          _recordingPath = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _finishRecording() async {
+    try {
+      _recordTimer?.cancel();
+      if (_audioRecorder == null) return;
+      final path = await _audioRecorder!.stop();
+      setState(() {
+        _isRecording = false;
+      });
+
+      final finalPath = path ?? _recordingPath;
+      if (finalPath == null) return;
+      final file = File(finalPath);
+      if (!await file.exists()) return;
+
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return;
+
+      setState(() => _isUploading = true);
+
+      final fileName = 'voice_note_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final res = await _service.uploadMedia(
+        fileBytes: bytes,
+        fileName: fileName,
+        mimeType: 'audio/m4a',
+        subfolder: '${widget.classLevel} - ${widget.subject}',
+      );
+
+      if (mounted) {
+        setState(() {
+          _pendingAttachments.add({
+            'storageKey': res['storageKey'],
+            'originalFilename': fileName,
+            'mimeType': 'audio/m4a',
+            'fileSize': res['fileSize'] ?? bytes.length,
+            'driveFileId': res['driveFileId'] ?? '',
+            'driveViewLink': res['viewLink'] ?? '',
+            'driveDownloadLink': res['downloadLink'] ?? '',
+          });
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Voice note recorded & attached! Tap Send to submit.'),
+            backgroundColor: Color(0xFF2E8B57),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save voice note: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+          _recordSeconds = 0;
+          _recordingPath = null;
+        });
+      }
     }
   }
 
@@ -514,30 +663,43 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                                 ),
                                               );
                                             } else {
-                                              return Container(
-                                                margin: const EdgeInsets.only(bottom: 6),
-                                                padding: const EdgeInsets.all(8),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white12,
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      att.isVideo ? Icons.videocam : (att.isAudio ? Icons.audiotrack : Icons.insert_drive_file),
-                                                      color: themeGold,
-                                                      size: 20,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Flexible(
-                                                      child: Text(
-                                                        att.originalFilename,
-                                                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                                                        overflow: TextOverflow.ellipsis,
+                                              return InkWell(
+                                                onTap: () {
+                                                  final link = att.driveViewLink.isNotEmpty
+                                                      ? att.driveViewLink
+                                                      : (att.driveDownloadLink.isNotEmpty ? att.driveDownloadLink : att.storageKey);
+                                                  if (link.isNotEmpty) {
+                                                    launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                                  }
+                                                },
+                                                borderRadius: BorderRadius.circular(8),
+                                                child: Container(
+                                                  margin: const EdgeInsets.only(bottom: 6),
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white12,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        att.isVideo ? Icons.videocam : (att.isAudio ? Icons.audiotrack : Icons.insert_drive_file),
+                                                        color: themeGold,
+                                                        size: 20,
                                                       ),
-                                                    ),
-                                                  ],
+                                                      const SizedBox(width: 8),
+                                                      Flexible(
+                                                        child: Text(
+                                                          att.originalFilename,
+                                                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                                                          overflow: TextOverflow.ellipsis,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 6),
+                                                      const Icon(Icons.open_in_new, color: Colors.white60, size: 13),
+                                                    ],
+                                                  ),
                                                 ),
                                               );
                                             }
@@ -652,19 +814,29 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                           },
                                         ),
                                         ListTile(
-                                          leading: const Icon(Icons.video_library_outlined, color: Colors.red),
+                                          leading: const Icon(Icons.mic, color: Colors.redAccent),
+                                          title: Text('Record Voice Note (Mic)', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold)),
+                                          subtitle: Text('Record live voice explanation directly with microphone', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11)),
+                                          onTap: () {
+                                            Navigator.pop(ctx);
+                                            _startRecording();
+                                          },
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.audio_file_outlined, color: Colors.amber),
+                                          title: Text('Pick Audio File (Storage)', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold)),
+                                          subtitle: Text('Choose existing .mp3, .m4a, or .wav file from device', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11)),
+                                          onTap: () {
+                                            Navigator.pop(ctx);
+                                            _pickAttachment(FileType.audio);
+                                          },
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.video_library_outlined, color: Colors.deepPurple),
                                           title: Text('Attach Video', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
                                           onTap: () {
                                             Navigator.pop(ctx);
                                             _pickAttachment(FileType.video);
-                                          },
-                                        ),
-                                        ListTile(
-                                          leading: const Icon(Icons.mic_none, color: Colors.amber),
-                                          title: Text('Attach Audio Note', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                                          onTap: () {
-                                            Navigator.pop(ctx);
-                                            _pickAttachment(FileType.audio);
                                           },
                                         ),
                                         ListTile(
@@ -681,35 +853,75 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                 );
                               },
                       ),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E222D) : const Color(0xFFF0F4F8),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: TextField(
-                            controller: _textController,
-                            maxLines: null,
-                            keyboardType: TextInputType.multiline,
-                            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                            decoration: InputDecoration(
-                              hintText: 'Type your question, doubt, or note here...',
-                              hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      if (_isRecording)
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: isDark ? 0.2 : 0.1),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
                             ),
-                            onSubmitted: (_) => _sendMessage(),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.fiber_manual_record, color: Colors.red, size: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Recording  ${(_recordSeconds ~/ 60).toString().padLeft(2, '0')}:${(_recordSeconds % 60).toString().padLeft(2, '0')}',
+                                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                const Spacer(),
+                                IconButton(
+                                  tooltip: 'Cancel & Discard',
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red, size: 22),
+                                  onPressed: _cancelRecording,
+                                ),
+                                IconButton(
+                                  tooltip: 'Attach Voice Note',
+                                  icon: const Icon(Icons.check_circle, color: Color(0xFF2E8B57), size: 26),
+                                  onPressed: _finishRecording,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else ...[
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E222D) : const Color(0xFFF0F4F8),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: TextField(
+                              controller: _textController,
+                              maxLines: null,
+                              keyboardType: TextInputType.multiline,
+                              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                              decoration: InputDecoration(
+                                hintText: 'Type your question, doubt, or note here...',
+                                hintStyle: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: _isSending
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Icon(Icons.send, color: isDark ? themeGold : themeNavy),
-                        onPressed: _isSending ? null : _sendMessage,
-                      ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: 'Record Voice Note',
+                          icon: Icon(Icons.mic, color: isDark ? themeGold : themeNavy),
+                          onPressed: _isUploading || _isSending ? null : _startRecording,
+                        ),
+                        IconButton(
+                          tooltip: 'Send',
+                          icon: _isSending
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                              : Icon(Icons.send, color: isDark ? themeGold : themeNavy),
+                          onPressed: _isSending ? null : _sendMessage,
+                        ),
+                      ],
                     ],
                   ),
                 ),

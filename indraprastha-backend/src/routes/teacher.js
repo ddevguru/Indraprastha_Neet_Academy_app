@@ -189,7 +189,7 @@ router.get('/dashboard', teacherAuth, async (req, res) => {
            EXTRACT(EPOCH FROM (d.resolved_at - d.created_at)) / 60
          ) FILTER (WHERE d.assigned_teacher_id = ${teacherId} AND d.resolved_at IS NOT NULL) as avg_resolution_mins
        FROM doubts d
-       WHERE (${matchConditions})`,
+       WHERE (${matchConditions} OR d.assigned_teacher_id = ${teacherId})`,
       matchParams
     );
 
@@ -202,7 +202,7 @@ router.get('/dashboard', teacherAuth, async (req, res) => {
               'Student' as student_name
        FROM doubts d
        LEFT JOIN teacher_profiles tp ON tp.id = d.assigned_teacher_id
-       WHERE (${matchConditions})
+       WHERE (${matchConditions} OR d.assigned_teacher_id = ${teacherId})
        ORDER BY d.updated_at DESC LIMIT 10`,
       matchParams
     );
@@ -268,7 +268,7 @@ router.get('/doubts', teacherAuth, async (req, res) => {
         (SELECT COUNT(*) FROM doubt_responses WHERE doubt_id = d.id) as response_count
       FROM doubts d
       LEFT JOIN teacher_profiles tp ON tp.id = d.assigned_teacher_id
-      WHERE (${matchConditions})
+      WHERE (${matchConditions} OR d.assigned_teacher_id = ${teacherId})
     `;
 
     if (status) {

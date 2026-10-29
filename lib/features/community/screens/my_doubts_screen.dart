@@ -388,6 +388,20 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
         backgroundColor: const Color(0xFF002350),
         foregroundColor: Colors.white,
         title: Text('Doubt #${d.id}'),
+        actions: [
+          if (d.status == 'Resolved')
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                onPressed: _reopenDialog,
+                icon: const Icon(Icons.replay_rounded, color: Color(0xFFD2AE39), size: 18),
+                label: const Text(
+                  'Reopen',
+                  style: TextStyle(color: Color(0xFFD2AE39), fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -704,24 +718,49 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                       ],
                     )
                   else
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2E8B57).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF2E8B57).withValues(alpha: 0.3)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_circle, color: Color(0xFF2E8B57)),
-                          SizedBox(width: 8),
-                          Text(
-                            'This doubt has been resolved successfully.',
-                            style: TextStyle(color: Color(0xFF2E8B57), fontWeight: FontWeight.bold),
+                    Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2E8B57).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF2E8B57).withValues(alpha: 0.3)),
                           ),
-                        ],
-                      ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle, color: Color(0xFF2E8B57)),
+                              SizedBox(width: 8),
+                              Text(
+                                'This doubt has been resolved successfully.',
+                                style: TextStyle(color: Color(0xFF2E8B57), fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              side: BorderSide(
+                                color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                                width: 1.5,
+                              ),
+                              foregroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: _reopenDialog,
+                            icon: const Icon(Icons.replay_rounded, size: 20),
+                            label: const Text(
+                              'Still Have Questions? Reopen Doubt',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),

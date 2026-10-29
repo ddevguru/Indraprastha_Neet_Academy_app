@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import '../services/community_service.dart';
 
 class SubmitDoubtDialog extends StatefulWidget {
@@ -34,17 +37,167 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
   bool _isUploading = false;
   bool _isSubmitting = false;
 
+  // Voice recording state
+  AudioRecorder? _audioRecorder;
+  bool _isRecording = false;
+  int _recordSeconds = 0;
+  Timer? _recordTimer;
+  String? _recordingPath;
+
   final List<String> _classes = ['Class 11', 'Class 12'];
   final List<String> _subjects = ['Physics', 'Chemistry', 'Biology'];
 
   @override
   void initState() {
     super.initState();
+    _audioRecorder = AudioRecorder();
     _selectedClass = widget.initialClassLevel.isNotEmpty ? widget.initialClassLevel : 'Class 11';
     _selectedSubject = widget.initialSubject.isNotEmpty ? widget.initialSubject : 'Physics';
 
     if (widget.whiteboardSnapshotBytes != null) {
       _uploadSnapshot(widget.whiteboardSnapshotBytes!);
+    }
+  }
+
+  @override
+  void dispose() {
+    _recordTimer?.cancel();
+    _audioRecorder?.dispose();
+    _titleController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      if (_audioRecorder == null) return;
+      if (!await _audioRecorder!.hasPermission()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Microphone permission is required to record voice notes.')),
+          );
+        }
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final path = '${tempDir.path}/doubt_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      _recordingPath = path;
+
+      await _audioRecorder!.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+        ),
+        path: path,
+      );
+
+      setState(() {
+        _isRecording = true;
+        _recordSeconds = 0;
+      });
+
+      _recordTimer?.cancel();
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted && _isRecording) {
+          setState(() => _recordSeconds++);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start recording: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    try {
+      _recordTimer?.cancel();
+      if (_audioRecorder != null && await _audioRecorder!.isRecording()) {
+        await _audioRecorder!.stop();
+      }
+      if (_recordingPath != null) {
+        final f = File(_recordingPath!);
+        if (await f.exists()) {
+          await f.delete();
+        }
+      }
+    } catch (e) {
+      debugPrint('[CANCEL_RECORD_ERROR] $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _recordSeconds = 0;
+          _recordingPath = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _finishRecording() async {
+    try {
+      _recordTimer?.cancel();
+      if (_audioRecorder == null) return;
+      final path = await _audioRecorder!.stop();
+      setState(() => _isRecording = false);
+
+      final finalPath = path ?? _recordingPath;
+      if (finalPath == null) return;
+      final file = File(finalPath);
+      if (!await file.exists()) return;
+
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return;
+
+      setState(() => _isUploading = true);
+
+      final fileName = 'voice_explanation_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final res = await _service.uploadMedia(
+        fileBytes: bytes,
+        fileName: fileName,
+        mimeType: 'audio/m4a',
+        subfolder: '$_selectedClass - $_selectedSubject',
+      );
+
+      if (mounted) {
+        setState(() {
+          _attachments.add({
+            'storageKey': res['storageKey'],
+            'originalFilename': fileName,
+            'mimeType': 'audio/m4a',
+            'fileSize': res['fileSize'] ?? bytes.length,
+            'driveFileId': res['driveFileId'] ?? '',
+            'driveViewLink': res['viewLink'] ?? '',
+            'driveDownloadLink': res['downloadLink'] ?? '',
+          });
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Voice explanation recorded & attached!'),
+            backgroundColor: Color(0xFF2E8B57),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save voice note: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+          _recordSeconds = 0;
+          _recordingPath = null;
+        });
+      }
     }
   }
 
@@ -351,17 +504,49 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   ),
                 ),
-                OutlinedButton.icon(
-                  onPressed: _isUploading ? null : () => _pickAndUploadMedia(FileType.audio),
-                  icon: const Icon(Icons.mic_none, size: 16),
-                  label: const Text('Audio', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                if (_isRecording) ...[
+                  ElevatedButton.icon(
+                    onPressed: _finishRecording,
+                    icon: const Icon(Icons.stop_circle, size: 16),
+                    label: Text('Stop & Attach (${(_recordSeconds ~/ 60).toString().padLeft(2, '0')}:${(_recordSeconds % 60).toString().padLeft(2, '0')})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    ),
                   ),
-                ),
+                  OutlinedButton.icon(
+                    onPressed: _cancelRecording,
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    ),
+                  ),
+                ] else ...[
+                  OutlinedButton.icon(
+                    onPressed: _isUploading ? null : _startRecording,
+                    icon: const Icon(Icons.mic, size: 16, color: Colors.redAccent),
+                    label: const Text('Record Voice', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _isUploading ? null : () => _pickAndUploadMedia(FileType.audio),
+                    icon: const Icon(Icons.audio_file_outlined, size: 16, color: Colors.amber),
+                    label: const Text('Pick Audio', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    ),
+                  ),
+                ],
                 OutlinedButton.icon(
-                  onPressed: _isUploading ? null : () => _pickAndUploadMedia(FileType.custom),
+                  onPressed: _isUploading || _isRecording ? null : () => _pickAndUploadMedia(FileType.custom),
                   icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
                   label: const Text('PDF / Doc', style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(

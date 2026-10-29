@@ -6,6 +6,7 @@ const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
 const { uploadMediaToAdminDrive, LOCAL_FALLBACK_DIR } = require('../services/communityDriveService');
+const { findBestTeacherForDoubt } = require('../utils/autoAssignTeacher');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -279,12 +280,16 @@ router.post('/:communityId/messages', studentAuth, async (req, res) => {
         : (trimmedText || (attachments.length > 0 ? `Question: ${attachments[0].originalFilename || 'Media'}` : 'New Question'));
       const description = trimmedText || 'Please see the attached question.';
 
+      const autoTeacher = await findBestTeacherForDoubt(client, class_level, subject);
+      const initialStatus = autoTeacher ? 'Assigned' : 'Pending';
+      const assignedTeacherId = autoTeacher ? autoTeacher.id : null;
+
       const doubtRes = await client.query(
         `INSERT INTO doubts (
-           student_id, community_id, class_level, subject, title, description, status, version, created_at, updated_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, 'Pending', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           student_id, community_id, class_level, subject, title, description, status, assigned_teacher_id, version, created_at, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
          RETURNING *`,
-        [studentId, communityId, class_level, subject, title, description]
+        [studentId, communityId, class_level, subject, title, description, initialStatus, assignedTeacherId]
       );
       const newDoubt = doubtRes.rows[0];
       finalDoubtId = newDoubt.id;
@@ -310,16 +315,50 @@ router.post('/:communityId/messages', studentAuth, async (req, res) => {
 
       await client.query(
         `INSERT INTO doubt_status_history (doubt_id, previous_status, new_status, changed_by_user_id, changed_by_role, reason)
-         VALUES ($1, NULL, 'Pending', $2, 'student', 'Submitted via Subject Community Chat')`,
-        [newDoubt.id, studentId]
+         VALUES ($1, NULL, $2, $3, $4, $5)`,
+        [
+          newDoubt.id,
+          initialStatus,
+          studentId,
+          autoTeacher ? 'system' : 'student',
+          autoTeacher
+            ? `Automatically assigned to faculty: ${autoTeacher.display_name}`
+            : 'Submitted via Subject Community Chat (Pending teacher assignment)',
+        ]
       );
 
       await client.query(
         `INSERT INTO doubt_activity_events (
            doubt_id, actor_id, actor_role, event_type, previous_status, new_status, metadata_json
-         ) VALUES ($1, $2, 'student', 'DOUBT_SUBMITTED', NULL, 'Pending', $3)`,
-        [newDoubt.id, studentId, JSON.stringify({ title, classLevel: class_level, subject, fromChat: true })]
+         ) VALUES ($1, $2, $3, $4, NULL, $5, $6)`,
+        [
+          newDoubt.id,
+          studentId,
+          autoTeacher ? 'system' : 'student',
+          autoTeacher ? 'DOUBT_AUTO_ASSIGNED' : 'DOUBT_SUBMITTED',
+          initialStatus,
+          JSON.stringify({
+            title,
+            classLevel: class_level,
+            subject,
+            assignedTeacherId,
+            assignedTeacherName: autoTeacher ? autoTeacher.display_name : null,
+            fromChat: true,
+          }),
+        ]
       );
+
+      if (autoTeacher) {
+        await client.query(
+          `INSERT INTO community_notifications (user_id, user_role, title, message, doubt_id)
+           VALUES ($1, 'teacher', 'New Doubt Assigned', $2, $3)`,
+          [
+            autoTeacher.id,
+            `New question submitted in ${subject} (${class_level}): "${title.slice(0, 80)}"`,
+            newDoubt.id,
+          ]
+        );
+      }
 
       await client.query(
         `INSERT INTO doubt_resolution_cycles (doubt_id, cycle_number, started_at)
