@@ -74,20 +74,72 @@ class CommunityAttachment {
   factory CommunityAttachment.fromJson(Map<String, dynamic> json) {
     return CommunityAttachment(
       id: json['id'] is int ? json['id'] : int.tryParse('${json['id']}') ?? 0,
-      storageKey: json['storageKey'] ?? '',
-      originalFilename: json['originalFilename'] ?? 'attachment',
-      mimeType: json['mimeType'] ?? 'application/octet-stream',
-      fileSize: json['fileSize'] is int ? json['fileSize'] : int.tryParse('${json['fileSize']}') ?? 0,
-      driveFileId: json['driveFileId'] ?? '',
-      driveViewLink: json['driveViewLink'] ?? '',
-      driveDownloadLink: json['driveDownloadLink'] ?? '',
+      storageKey: json['storageKey'] ?? json['storage_key'] ?? '',
+      originalFilename: json['originalFilename'] ?? json['original_filename'] ?? 'attachment',
+      mimeType: json['mimeType'] ?? json['mime_type'] ?? 'application/octet-stream',
+      fileSize: json['fileSize'] is int
+          ? json['fileSize']
+          : int.tryParse('${json['file_size'] ?? json['fileSize']}') ?? 0,
+      driveFileId: json['driveFileId'] ?? json['drive_file_id'] ?? '',
+      driveViewLink: json['driveViewLink'] ?? json['drive_view_link'] ?? '',
+      driveDownloadLink: json['driveDownloadLink'] ?? json['drive_download_link'] ?? '',
     );
   }
 
-  bool get isImage => mimeType.startsWith('image/') || originalFilename.endsWith('.jpg') || originalFilename.endsWith('.png') || originalFilename.endsWith('.jpeg');
-  bool get isVideo => mimeType.startsWith('video/') || originalFilename.endsWith('.mp4') || originalFilename.endsWith('.mov');
-  bool get isAudio => mimeType.startsWith('audio/') || originalFilename.endsWith('.mp3') || originalFilename.endsWith('.m4a') || originalFilename.endsWith('.wav');
-  bool get isPdf => mimeType.contains('pdf') || originalFilename.endsWith('.pdf');
+  bool get isImage =>
+      mimeType.startsWith('image/') ||
+      originalFilename.toLowerCase().endsWith('.jpg') ||
+      originalFilename.toLowerCase().endsWith('.png') ||
+      originalFilename.toLowerCase().endsWith('.jpeg') ||
+      originalFilename.toLowerCase().endsWith('.webp');
+
+  bool get isVideo =>
+      mimeType.startsWith('video/') ||
+      originalFilename.toLowerCase().endsWith('.mp4') ||
+      originalFilename.toLowerCase().endsWith('.mov');
+
+  bool get isAudio =>
+      mimeType.startsWith('audio/') ||
+      originalFilename.toLowerCase().endsWith('.mp3') ||
+      originalFilename.toLowerCase().endsWith('.m4a') ||
+      originalFilename.toLowerCase().endsWith('.wav') ||
+      originalFilename.toLowerCase().endsWith('.aac');
+
+  bool get isPdf =>
+      mimeType.contains('pdf') || originalFilename.toLowerCase().endsWith('.pdf');
+
+  String get directImageUrl {
+    String id = driveFileId.trim();
+    if (id.isEmpty && driveViewLink.isNotEmpty) {
+      final match = RegExp(r'/d/([a-zA-Z0-9_-]+)').firstMatch(driveViewLink);
+      if (match != null) {
+        id = match.group(1) ?? '';
+      }
+    }
+    if (id.isNotEmpty) {
+      return 'https://drive.google.com/thumbnail?id=$id&sz=w1000';
+    }
+    if (driveViewLink.isNotEmpty && !driveViewLink.contains('drive.google.com/file/d/')) {
+      return driveViewLink;
+    }
+    return storageKey;
+  }
+
+  String get directAudioUrl {
+    String id = driveFileId.trim();
+    if (id.isEmpty && driveViewLink.isNotEmpty) {
+      final match = RegExp(r'/d/([a-zA-Z0-9_-]+)').firstMatch(driveViewLink);
+      if (match != null) {
+        id = match.group(1) ?? '';
+      }
+    }
+    if (id.isNotEmpty) {
+      return 'https://docs.google.com/uc?export=download&id=$id';
+    }
+    return driveDownloadLink.isNotEmpty
+        ? driveDownloadLink
+        : (driveViewLink.isNotEmpty ? driveViewLink : storageKey);
+  }
 }
 
 class CommunityMessage {

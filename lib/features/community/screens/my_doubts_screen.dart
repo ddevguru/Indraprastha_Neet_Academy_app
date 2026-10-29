@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/community_models.dart';
 import '../services/community_service.dart';
 import 'teacher_solution_whiteboard_screen.dart';
@@ -477,25 +478,45 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                               runSpacing: 8,
                               children: d.attachments.map((att) {
                                 if (att.isImage) {
-                                  return ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: CachedNetworkImage(
-                                      imageUrl: att.driveViewLink.isNotEmpty ? att.driveViewLink : att.storageKey,
-                                      width: 100,
-                                      height: 100,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (context, url, error) => Container(
+                                  return GestureDetector(
+                                    onTap: () {
+                                      final link = att.driveViewLink.isNotEmpty ? att.driveViewLink : att.directImageUrl;
+                                      if (link.isNotEmpty) launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                    },
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: CachedNetworkImage(
+                                        imageUrl: att.directImageUrl,
                                         width: 100,
                                         height: 100,
-                                        color: Colors.grey.shade200,
-                                        child: const Icon(Icons.image),
+                                        fit: BoxFit.cover,
+                                        errorWidget: (context, url, error) => Container(
+                                          width: 100,
+                                          height: 100,
+                                          color: Colors.grey.shade200,
+                                          child: const Icon(Icons.image),
+                                        ),
                                       ),
                                     ),
                                   );
                                 }
-                                return Chip(
+                                if (att.isAudio) {
+                                  return ActionChip(
+                                    avatar: const Icon(Icons.audiotrack, size: 16, color: Color(0xFFD2AE39)),
+                                    label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
+                                    onPressed: () {
+                                      final link = att.directAudioUrl;
+                                      if (link.isNotEmpty) launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                    },
+                                  );
+                                }
+                                return ActionChip(
                                   avatar: const Icon(Icons.attachment, size: 16),
                                   label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
+                                  onPressed: () {
+                                    final link = att.driveViewLink.isNotEmpty ? att.driveViewLink : att.storageKey;
+                                    if (link.isNotEmpty) launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                  },
                                 );
                               }).toList(),
                             ),
@@ -677,6 +698,46 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                                   color: isDark ? Colors.grey.shade200 : Colors.black87,
                                 ),
                               ),
+                              if (resp.attachments.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: resp.attachments.map((att) {
+                                    if (att.isImage) {
+                                      return GestureDetector(
+                                        onTap: () {
+                                          final link = att.driveViewLink.isNotEmpty ? att.driveViewLink : att.directImageUrl;
+                                          if (link.isNotEmpty) launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                        },
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: CachedNetworkImage(
+                                            imageUrl: att.directImageUrl,
+                                            width: 90,
+                                            height: 90,
+                                            fit: BoxFit.cover,
+                                            errorWidget: (_, __, ___) => Container(
+                                              width: 90,
+                                              height: 90,
+                                              color: Colors.grey.shade200,
+                                              child: const Icon(Icons.image),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return ActionChip(
+                                      avatar: Icon(att.isAudio ? Icons.audiotrack : Icons.attachment, size: 15, color: const Color(0xFFD2AE39)),
+                                      label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
+                                      onPressed: () {
+                                        final link = att.isAudio ? att.directAudioUrl : (att.driveViewLink.isNotEmpty ? att.driveViewLink : att.storageKey);
+                                        if (link.isNotEmpty) launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                      },
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
                             ],
                           ),
                         ),

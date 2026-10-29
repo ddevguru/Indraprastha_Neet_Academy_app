@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/whiteboard_canvas.dart';
 
 class TeacherSolutionWhiteboardScreen extends StatefulWidget {
@@ -47,12 +48,12 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
   }
 
   void _zoomIn() {
-    final newScale = (_currentScale * 1.25).clamp(0.5, 4.0);
+    final newScale = (_currentScale * 1.25).clamp(0.4, 5.0);
     _setZoom(newScale);
   }
 
   void _zoomOut() {
-    final newScale = (_currentScale / 1.25).clamp(0.5, 4.0);
+    final newScale = (_currentScale / 1.25).clamp(0.4, 5.0);
     _setZoom(newScale);
   }
 
@@ -67,7 +68,10 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
   }
 
   List<WhiteboardStroke> _parseStrokes() {
-    final rawDoc = widget.solutionWhiteboard['documentJson'] ?? widget.solutionWhiteboard['document_json'];
+    dynamic rawDoc = widget.solutionWhiteboard['documentJson'] ?? widget.solutionWhiteboard['document_json'];
+    if (rawDoc == null && (widget.solutionWhiteboard.containsKey('elements') || widget.solutionWhiteboard.containsKey('strokes'))) {
+      rawDoc = widget.solutionWhiteboard;
+    }
     if (rawDoc == null) return [];
     try {
       final map = rawDoc is String ? jsonDecode(rawDoc) : rawDoc;
@@ -81,8 +85,25 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
             .map((e) => WhiteboardStroke.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList();
       }
+      if (map is List) {
+        return map
+            .map((e) => WhiteboardStroke.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+      }
     } catch (_) {}
     return [];
+  }
+
+  String _getSnapshotDirectUrl() {
+    final rawLink = widget.solutionWhiteboard['snapshotDriveLink'] ??
+        widget.solutionWhiteboard['snapshot_drive_link'] ??
+        '';
+    if (rawLink is! String || rawLink.isEmpty) return '';
+    final match = RegExp(r'/d/([a-zA-Z0-9_-]+)').firstMatch(rawLink);
+    if (match != null) {
+      return 'https://drive.google.com/thumbnail?id=${match.group(1)}&sz=w1000';
+    }
+    return rawLink;
   }
 
   @override
@@ -181,8 +202,8 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
           Expanded(
             child: InteractiveViewer(
               transformationController: _transController,
-              minScale: 0.5,
-              maxScale: 4.0,
+              minScale: 0.3,
+              maxScale: 5.0,
               boundaryMargin: const EdgeInsets.all(200),
               child: Center(
                 child: AspectRatio(
@@ -201,10 +222,22 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
                         ),
                       ],
                     ),
-                    child: CustomPaint(
-                      painter: WhiteboardPainter(strokes: strokes),
-                      size: Size.infinite,
-                    ),
+                    child: strokes.isEmpty && _getSnapshotDirectUrl().isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: _getSnapshotDirectUrl(),
+                            fit: BoxFit.contain,
+                            placeholder: (_, __) => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                            errorWidget: (_, __, ___) => CustomPaint(
+                              painter: WhiteboardPainter(strokes: strokes),
+                              size: Size.infinite,
+                            ),
+                          )
+                        : CustomPaint(
+                            painter: WhiteboardPainter(strokes: strokes),
+                            size: Size.infinite,
+                          ),
                   ),
                 ),
               ),

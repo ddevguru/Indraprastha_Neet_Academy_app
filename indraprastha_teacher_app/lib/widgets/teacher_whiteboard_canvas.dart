@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/teacher_api_service.dart';
 
@@ -122,14 +123,27 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
   }
 
   void _loadInitialStrokes() {
-    if (widget.initialDocument != null && widget.initialDocument!['strokes'] is List) {
-      try {
-        final list = widget.initialDocument!['strokes'] as List;
+    if (widget.initialDocument == null) return;
+    try {
+      dynamic doc = widget.initialDocument!['document_json'] ??
+          widget.initialDocument!['documentJson'] ??
+          widget.initialDocument;
+      if (doc is String) {
+        doc = jsonDecode(doc);
+      }
+      List? list;
+      if (doc is Map) {
+        list = (doc['elements'] as List?) ?? (doc['strokes'] as List?);
+      } else if (doc is List) {
+        list = doc;
+      }
+      if (list != null) {
+        _strokes.clear();
         for (final item in list) {
           _strokes.add(WhiteboardStroke.fromJson(Map<String, dynamic>.from(item as Map)));
         }
-      } catch (_) {}
-    }
+      }
+    } catch (_) {}
   }
 
   void _onPointerDown(PointerDownEvent event) {
@@ -266,8 +280,11 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
   }
 
   Map<String, dynamic> _getDocumentJson() {
+    final strokeList = _strokes.map((s) => s.toJson()).toList();
     return {
-      'strokes': _strokes.map((s) => s.toJson()).toList(),
+      'version': 1,
+      'strokes': strokeList,
+      'elements': strokeList,
       'updatedAt': DateTime.now().toIso8601String(),
     };
   }

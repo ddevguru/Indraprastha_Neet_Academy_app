@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -186,6 +187,7 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
       _answerAttachments.clear();
       await _fetchDetail();
       if (mounted) {
+        _tabController.animateTo(2);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✓ Answer successfully submitted to student!'),
@@ -359,11 +361,54 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
                         spacing: 8,
                         runSpacing: 6,
                         children: _doubt!.attachments.map((att) {
-                          final isImg = att.mimeType.startsWith('image/');
+                          if (att.isImage) {
+                            return GestureDetector(
+                              onTap: () {
+                                final link = att.driveViewLink ?? att.directImageUrl;
+                                if (link.isNotEmpty) {
+                                  launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                }
+                              },
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CachedNetworkImage(
+                                  imageUrl: att.directImageUrl,
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                    width: 80,
+                                    height: 80,
+                                    color: Colors.grey.shade200,
+                                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  ),
+                                  errorWidget: (_, __, ___) => Container(
+                                    width: 80,
+                                    height: 80,
+                                    color: Colors.grey.shade200,
+                                    child: const Icon(Icons.image),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          if (att.isAudio) {
+                            return ActionChip(
+                              avatar: const Icon(Icons.audiotrack, size: 16, color: Color(0xFFD2AE39)),
+                              label: Text('🎵 ${att.originalFilename} (Play Audio)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              backgroundColor: const Color(0xFFD2AE39).withValues(alpha: 0.15),
+                              onPressed: () {
+                                final link = att.directAudioUrl;
+                                if (link.isNotEmpty) {
+                                  launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                }
+                              },
+                            );
+                          }
                           final link = att.driveViewLink ?? att.fileUrl ?? '';
                           return ActionChip(
                             avatar: Icon(
-                              isImg ? Icons.image : Icons.attach_file,
+                              att.isPdf ? Icons.picture_as_pdf : Icons.attach_file,
                               size: 16,
                               color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
                             ),
@@ -443,162 +488,162 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
                                       fillColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF9FAFC),
                                     ),
                                   ),
-                                        const SizedBox(height: 12),
+                                  const SizedBox(height: 12),
 
-                                        // Attachments
-                                        Row(
-                                          children: [
-                                            OutlinedButton.icon(
-                                              icon: _uploadingFile
-                                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                                  : const Icon(Icons.upload_file, size: 18),
-                                              label: const Text('Add File to Drive'),
-                                              onPressed: _uploadingFile ? null : _pickAndUploadAttachment,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              'Saved to Admin Drive',
-                                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                            ),
-                                          ],
-                                        ),
-
-                                        if (_answerAttachments.isNotEmpty) ...[
-                                          const SizedBox(height: 10),
-                                          Wrap(
-                                            spacing: 6,
-                                            children: _answerAttachments.asMap().entries.map((entry) {
-                                              final idx = entry.key;
-                                              final att = entry.value;
-                                              return Chip(
-                                                label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
-                                                deleteIcon: const Icon(Icons.close, size: 14),
-                                                onDeleted: () => setState(() => _answerAttachments.removeAt(idx)),
-                                              );
-                                            }).toList(),
-                                          ),
-                                        ],
-
-                                        const SizedBox(height: 16),
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: FilledButton.icon(
-                                            style: FilledButton.styleFrom(
-                                              backgroundColor: const Color(0xFF002350),
-                                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                            ),
-                                            onPressed: _submittingAnswer ? null : _submitAnswer,
-                                            icon: _submittingAnswer
-                                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                                : const Icon(Icons.send, size: 18),
-                                            label: const Text('Submit Answer', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Tab 2: Interactive Solution Whiteboard
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: TeacherWhiteboardCanvas(
-                              doubtId: widget.doubtId,
-                              initialDocument: _doubt!.whiteboard,
-                              onPublished: _fetchDetail,
-                            ),
-                          ),
-
-                          // Tab 3: Response History
-                          ListView(
-                            padding: const EdgeInsets.all(16),
-                            children: [
-                              if (_doubt!.responses.isEmpty)
-                                Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(32),
-                                    child: Text(
-                                      'No responses submitted yet by faculty.',
-                                      style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey),
-                                    ),
-                                  ),
-                                )
-                              else
-                                ..._doubt!.responses.map((resp) {
-                                  return Card(
-                                    elevation: 0,
-                                    color: isDark ? const Color(0xFF1E222D) : Colors.white,
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15)),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(14),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                'Answer by ${resp.teacherName}',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                  color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
-                                                ),
-                                              ),
-                                              Text(
-                                                resp.createdAt != null
-                                                    ? resp.createdAt.toString().split('.').first
-                                                    : '',
-                                                style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            resp.responseText,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              height: 1.4,
-                                              color: isDark ? Colors.grey.shade300 : Colors.black87,
-                                            ),
-                                          ),
-                                          if (resp.attachments.isNotEmpty) ...[
-                                            const SizedBox(height: 10),
-                                            Wrap(
-                                              spacing: 6,
-                                              children: resp.attachments.map((att) {
-                                                final link = att.driveViewLink ?? att.fileUrl ?? '';
-                                                return ActionChip(
-                                                  avatar: Icon(Icons.open_in_new, size: 14, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
-                                                  label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
-                                                  onPressed: () {
-                                                    if (link.isNotEmpty) {
-                                                      launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
-                                                    }
-                                                  },
-                                                );
-                                              }).toList(),
-                                            ),
-                                          ],
-                                        ],
+                                  // Attachments
+                                  Row(
+                                    children: [
+                                      OutlinedButton.icon(
+                                        icon: _uploadingFile
+                                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                            : const Icon(Icons.upload_file, size: 18),
+                                        label: const Text('Add File to Drive'),
+                                        onPressed: _uploadingFile ? null : _pickAndUploadAttachment,
                                       ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Saved to Admin Drive',
+                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                      ),
+                                    ],
+                                  ),
+
+                                  if (_answerAttachments.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    Wrap(
+                                      spacing: 6,
+                                      children: _answerAttachments.asMap().entries.map((entry) {
+                                        final idx = entry.key;
+                                        final att = entry.value;
+                                        return Chip(
+                                          label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
+                                          deleteIcon: const Icon(Icons.close, size: 14),
+                                          onDeleted: () => setState(() => _answerAttachments.removeAt(idx)),
+                                        );
+                                      }).toList(),
                                     ),
-                                  );
-                                }),
-                            ],
+                                  ],
+
+                                  const SizedBox(height: 16),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: FilledButton.icon(
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: const Color(0xFF002350),
+                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                      ),
+                                      onPressed: _submittingAnswer ? null : _submitAnswer,
+                                      icon: _submittingAnswer
+                                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                          : const Icon(Icons.send, size: 18),
+                                      label: const Text('Submit Answer', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
+
+                    // Tab 2: Interactive Solution Whiteboard
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: TeacherWhiteboardCanvas(
+                        doubtId: widget.doubtId,
+                        initialDocument: _doubt!.whiteboard ?? _doubt!.publishedWhiteboard,
+                        onPublished: _fetchDetail,
+                      ),
+                    ),
+
+                    // Tab 3: Response History
+                    ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        if (_doubt!.responses.isEmpty)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Text(
+                                'No responses submitted yet by faculty.',
+                                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey),
+                              ),
+                            ),
+                          )
+                        else
+                          ..._doubt!.responses.map((resp) {
+                            return Card(
+                              elevation: 0,
+                              color: isDark ? const Color(0xFF1E222D) : Colors.white,
+                              margin: const EdgeInsets.only(bottom: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15)),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Answer by ${resp.teacherName}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                                          ),
+                                        ),
+                                        Text(
+                                          resp.createdAt != null
+                                              ? resp.createdAt.toString().split('.').first
+                                              : '',
+                                          style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      resp.responseText,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        height: 1.4,
+                                        color: isDark ? Colors.grey.shade300 : Colors.black87,
+                                      ),
+                                    ),
+                                    if (resp.attachments.isNotEmpty) ...[
+                                      const SizedBox(height: 10),
+                                      Wrap(
+                                        spacing: 6,
+                                        children: resp.attachments.map((att) {
+                                          final link = att.driveViewLink ?? att.fileUrl ?? '';
+                                          return ActionChip(
+                                            avatar: Icon(Icons.open_in_new, size: 14, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
+                                            label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
+                                            onPressed: () {
+                                              if (link.isNotEmpty) {
+                                                launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                              }
+                                            },
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                      ],
+                    ),
                   ],
-                );
+                ),
+              ),
+            ],
+          );
         },
       ),
     );

@@ -108,13 +108,15 @@ export default function TeacherDoubtDetail({ doubtId, onBack }) {
     setSubmittingAnswer(true);
     try {
       await submitTeacherResponse(doubtId, {
+        responseText: responseText,
         response_text: responseText,
         attachments: attachments
       });
       setResponseText('');
       setAttachments([]);
       await fetchDetail();
-      alert('Answer submitted successfully!');
+      setActiveTab('history');
+      alert('✓ Answer submitted successfully!');
     } catch (err) {
       alert(`Submission failed: ${err.message}`);
     } finally {
@@ -228,29 +230,50 @@ export default function TeacherDoubtDetail({ doubtId, onBack }) {
               {doubt.attachments && doubt.attachments.length > 0 ? (
                 <div className="attachments-grid">
                   {doubt.attachments.map((att, idx) => {
-                    const isImg = att.mime_type && att.mime_type.startsWith('image/');
+                    const isImg = (att.mime_type && att.mime_type.startsWith('image/')) ||
+                      att.original_filename?.endsWith('.jpg') ||
+                      att.original_filename?.endsWith('.png') ||
+                      att.original_filename?.endsWith('.jpeg') ||
+                      att.original_filename?.endsWith('.webp');
+                    const isAudio = (att.mime_type && att.mime_type.startsWith('audio/')) ||
+                      att.original_filename?.endsWith('.mp3') ||
+                      att.original_filename?.endsWith('.m4a') ||
+                      att.original_filename?.endsWith('.wav') ||
+                      att.original_filename?.endsWith('.aac');
+                    const fileId = att.drive_file_id || (att.drive_view_link && att.drive_view_link.match(/\/d\/([^/]+)/)?.[1]);
+                    const imgUrl = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : (att.drive_view_link || att.file_url);
+                    const audioStreamUrl = fileId ? `https://docs.google.com/uc?export=download&id=${fileId}` : (att.drive_download_link || att.file_url || att.drive_view_link);
                     const viewUrl = att.drive_view_link || att.file_url;
+
                     return (
-                      <div key={att.id || idx} className="attachment-card">
+                      <div key={att.id || idx} className="attachment-card" style={{ border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden', padding: '10px', background: '#FFF' }}>
                         {isImg ? (
-                          <div style={{ height: '140px', overflow: 'hidden', borderRadius: '4px', background: '#000' }}>
+                          <div style={{ height: '150px', overflow: 'hidden', borderRadius: '4px', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <img
-                              src={viewUrl}
+                              src={imgUrl}
                               alt={att.original_filename}
-                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                             />
+                          </div>
+                        ) : isAudio ? (
+                          <div style={{ padding: '12px 8px', textAlign: 'center', background: '#EEF2F7', borderRadius: '6px' }}>
+                            <span style={{ fontSize: '26px' }}>🎵</span>
+                            <div style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600 }} className="truncate">
+                              {att.original_filename}
+                            </div>
+                            <audio controls src={audioStreamUrl} style={{ width: '100%', height: '36px', marginTop: '10px' }} />
                           </div>
                         ) : (
                           <div style={{ padding: '24px 12px', textAlign: 'center', background: '#EEF2F7', borderRadius: '4px' }}>
                             <span style={{ fontSize: '28px' }}>
-                              {att.mime_type?.includes('pdf') ? '📄' : att.mime_type?.includes('audio') ? '🎵' : '📁'}
+                              {att.mime_type?.includes('pdf') ? '📄' : '📁'}
                             </span>
                             <div style={{ fontSize: '12px', marginTop: '6px', fontWeight: 600 }} className="truncate">
                               {att.original_filename}
                             </div>
                           </div>
                         )}
-                        <div style={{ padding: '8px 0', textAlign: 'center' }}>
+                        <div style={{ padding: '8px 0 0 0', textAlign: 'center' }}>
                           <a
                             href={viewUrl}
                             target="_blank"

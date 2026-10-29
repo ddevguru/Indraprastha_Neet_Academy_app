@@ -272,8 +272,9 @@ router.get('/doubts', teacherAuth, async (req, res) => {
     `;
 
     if (status) {
-      params.push(status);
-      queryText += ` AND d.status = $${params.length}`;
+      const normalizedStatus = status.toLowerCase().replace(/_/g, ' ');
+      params.push(normalizedStatus);
+      queryText += ` AND LOWER(REPLACE(d.status, '_', ' ')) = $${params.length}`;
     }
     if (classLevel) {
       params.push(classLevel);
@@ -324,14 +325,16 @@ router.get('/doubts/:doubtId', teacherAuth, async (req, res) => {
     }
     const doubt = doubtRes.rows[0];
 
-    // Verify teacher is assigned this subject
-    const authCheck = await pool.query(
-      `SELECT id FROM teacher_subject_assignments 
-       WHERE teacher_id = $1 AND class_level = $2 AND subject = $3`,
-      [teacherId, doubt.class_level, doubt.subject]
-    );
-    if (authCheck.rows.length === 0) {
-      return res.status(403).json({ error: 'You are not assigned to this subject/class' });
+    // Verify teacher is assigned this subject or this doubt is assigned to teacher
+    if (doubt.assigned_teacher_id !== teacherId) {
+      const authCheck = await pool.query(
+        `SELECT id FROM teacher_subject_assignments 
+         WHERE teacher_id = $1 AND (class_level = $2 OR class_level = 'All') AND subject = $3`,
+        [teacherId, doubt.class_level, doubt.subject]
+      );
+      if (authCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'You are not assigned to this subject/class' });
+      }
     }
 
     // Record first opened if null
@@ -390,6 +393,7 @@ router.get('/doubts/:doubtId', teacherAuth, async (req, res) => {
         attachments: attRes.rows,
         responses,
         solutionWhiteboard: wbRes.rows[0] || null,
+        whiteboard: wbRes.rows[0] || null,
         history: histRes.rows,
       },
     });
@@ -517,9 +521,10 @@ router.post('/doubts/:doubtId/responses', teacherAuth, async (req, res) => {
   try {
     const teacherId = req.teacher.id;
     const doubtId = parseInt(req.params.doubtId, 10);
-    const { responseText, attachments = [] } = req.body;
+    const text = req.body.responseText || req.body.response_text || '';
+    const attachments = req.body.attachments || [];
 
-    if (!responseText || !responseText.trim()) {
+    if (!text || !text.trim()) {
       return res.status(400).json({ error: 'Answer explanation text is required' });
     }
 
@@ -530,7 +535,7 @@ router.post('/doubts/:doubtId/responses', teacherAuth, async (req, res) => {
       `INSERT INTO doubt_responses (doubt_id, teacher_id, response_text, created_at, published_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING *`,
-      [doubtId, teacherId, responseText.trim()]
+      [doubtId, teacherId, text.trim()]
     );
     const response = respRes.rows[0];
 
@@ -730,23 +735,39 @@ router.post('/doubts/:doubtId/publish-solution', teacherAuth, async (req, res) =
     await client.query('BEGIN');
 
     let whiteboard;
+    const existing = await client.query(
+      'SELECT id, version FROM teacher_solution_whiteboards WHERE doubt_id = $1 ORDER BY updated_at DESC LIMIT 1',
+      [doubtId]
+    );
+
     if (documentJson) {
       const docStr = typeof documentJson === 'string' ? documentJson : JSON.stringify(documentJson);
-      const upd = await client.query(
-        `INSERT INTO teacher_solution_whiteboards (
-           doubt_id, teacher_id, document_json, snapshot_drive_link, snapshot_drive_file_id, version, is_published, published_at, updated_at
-         ) VALUES ($1, $2, $3, $4, $5, 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-         ON CONFLICT (id) DO UPDATE SET
-           document_json = EXCLUDED.document_json,
-           snapshot_drive_link = EXCLUDED.snapshot_drive_link,
-           is_published = TRUE,
-           published_at = CURRENT_TIMESTAMP,
-           version = teacher_solution_whiteboards.version + 1,
-           updated_at = CURRENT_TIMESTAMP
-         RETURNING *`,
-        [doubtId, teacherId, docStr, snapshotDriveLink, snapshotDriveFileId]
-      );
-      whiteboard = upd.rows[0];
+      if (existing.rows.length === 0) {
+        const ins = await client.query(
+          `INSERT INTO teacher_solution_whiteboards (
+             doubt_id, teacher_id, document_json, snapshot_drive_link, snapshot_drive_file_id, version, is_published, published_at, updated_at
+           ) VALUES ($1, $2, $3, $4, $5, 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           RETURNING *`,
+          [doubtId, teacherId, docStr, snapshotDriveLink, snapshotDriveFileId]
+        );
+        whiteboard = ins.rows[0];
+      } else {
+        const upd = await client.query(
+          `UPDATE teacher_solution_whiteboards
+           SET teacher_id = $1,
+               document_json = $2,
+               snapshot_drive_link = COALESCE(NULLIF($3, ''), snapshot_drive_link),
+               snapshot_drive_file_id = COALESCE(NULLIF($4, ''), snapshot_drive_file_id),
+               is_published = TRUE,
+               published_at = CURRENT_TIMESTAMP,
+               version = version + 1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $5
+           RETURNING *`,
+          [teacherId, docStr, snapshotDriveLink, snapshotDriveFileId, existing.rows[0].id]
+        );
+        whiteboard = upd.rows[0];
+      }
     } else {
       const upd = await client.query(
         `UPDATE teacher_solution_whiteboards
@@ -757,6 +778,14 @@ router.post('/doubts/:doubtId/publish-solution', teacherAuth, async (req, res) =
       );
       whiteboard = upd.rows[0];
     }
+
+    // Advance doubt status to Answered if currently Assigned or In Progress
+    await client.query(
+      `UPDATE doubts 
+       SET status = 'Answered', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status IN ('Assigned', 'In Progress')`,
+      [doubtId]
+    );
 
     // Activity event
     await client.query(

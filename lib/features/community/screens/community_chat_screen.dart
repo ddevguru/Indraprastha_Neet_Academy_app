@@ -636,7 +636,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                         if (msg.attachments.isNotEmpty) ...[
                                           ...msg.attachments.map((att) {
                                             if (att.isImage) {
-                                              final link = att.driveViewLink.isNotEmpty ? att.driveViewLink : att.storageKey;
+                                              final link = att.directImageUrl;
                                               return GestureDetector(
                                                 onTap: () => _openMediaFullscreen(link, att.originalFilename),
                                                 child: ClipRRect(
@@ -665,9 +665,11 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                             } else {
                                               return InkWell(
                                                 onTap: () {
-                                                  final link = att.driveViewLink.isNotEmpty
-                                                      ? att.driveViewLink
-                                                      : (att.driveDownloadLink.isNotEmpty ? att.driveDownloadLink : att.storageKey);
+                                                  final link = att.isAudio
+                                                      ? att.directAudioUrl
+                                                      : (att.driveViewLink.isNotEmpty
+                                                          ? att.driveViewLink
+                                                          : (att.driveDownloadLink.isNotEmpty ? att.driveDownloadLink : att.storageKey));
                                                   if (link.isNotEmpty) {
                                                     launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
                                                   }

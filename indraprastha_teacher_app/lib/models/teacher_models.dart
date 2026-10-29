@@ -121,7 +121,13 @@ class TeacherDoubtItem {
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       attachments: atts,
       responses: resps,
-      whiteboard: json['whiteboard'] != null ? Map<String, dynamic>.from(json['whiteboard'] as Map) : null,
+      whiteboard: json['whiteboard'] != null
+          ? Map<String, dynamic>.from(json['whiteboard'] as Map)
+          : (json['solutionWhiteboard'] != null
+              ? Map<String, dynamic>.from(json['solutionWhiteboard'] as Map)
+              : (json['solution_whiteboard'] != null
+                  ? Map<String, dynamic>.from(json['solution_whiteboard'] as Map)
+                  : null)),
       publishedWhiteboard: json['published_whiteboard'] != null
           ? Map<String, dynamic>.from(json['published_whiteboard'] as Map)
           : (json['publishedSolutionWhiteboard'] != null
@@ -163,6 +169,54 @@ class DoubtMediaAttachment {
       driveViewLink: json['drive_view_link'] ?? json['driveViewLink'],
       fileUrl: json['file_url'] ?? json['fileUrl'],
     );
+  }
+
+  bool get isImage =>
+      mimeType.startsWith('image/') ||
+      originalFilename.toLowerCase().endsWith('.jpg') ||
+      originalFilename.toLowerCase().endsWith('.png') ||
+      originalFilename.toLowerCase().endsWith('.jpeg') ||
+      originalFilename.toLowerCase().endsWith('.webp');
+
+  bool get isAudio =>
+      mimeType.startsWith('audio/') ||
+      originalFilename.toLowerCase().endsWith('.mp3') ||
+      originalFilename.toLowerCase().endsWith('.m4a') ||
+      originalFilename.toLowerCase().endsWith('.wav') ||
+      originalFilename.toLowerCase().endsWith('.aac');
+
+  bool get isPdf =>
+      mimeType.contains('pdf') || originalFilename.toLowerCase().endsWith('.pdf');
+
+  String get directImageUrl {
+    String id = driveFileId?.trim() ?? '';
+    if (id.isEmpty && driveViewLink != null && driveViewLink!.isNotEmpty) {
+      final match = RegExp(r'/d/([a-zA-Z0-9_-]+)').firstMatch(driveViewLink!);
+      if (match != null) {
+        id = match.group(1) ?? '';
+      }
+    }
+    if (id.isNotEmpty) {
+      return 'https://drive.google.com/thumbnail?id=$id&sz=w1000';
+    }
+    if (driveViewLink != null && driveViewLink!.isNotEmpty && !driveViewLink!.contains('drive.google.com/file/d/')) {
+      return driveViewLink!;
+    }
+    return fileUrl ?? storageKey;
+  }
+
+  String get directAudioUrl {
+    String id = driveFileId?.trim() ?? '';
+    if (id.isEmpty && driveViewLink != null && driveViewLink!.isNotEmpty) {
+      final match = RegExp(r'/d/([a-zA-Z0-9_-]+)').firstMatch(driveViewLink!);
+      if (match != null) {
+        id = match.group(1) ?? '';
+      }
+    }
+    if (id.isNotEmpty) {
+      return 'https://docs.google.com/uc?export=download&id=$id';
+    }
+    return fileUrl ?? driveViewLink ?? storageKey;
   }
 
   Map<String, dynamic> toJson() => {

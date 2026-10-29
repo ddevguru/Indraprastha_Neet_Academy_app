@@ -25,31 +25,47 @@ class WhiteboardStroke {
       };
 
   factory WhiteboardStroke.fromJson(Map<String, dynamic> json) {
-    Color parseColor(String? hex) {
-      if (hex == null) return const Color(0xFF002350);
-      try {
-        return Color(int.parse('FF${hex.replaceAll('#', '')}', radix: 16));
-      } catch (_) {
-        return const Color(0xFF002350);
+    Color parseColor(dynamic c) {
+      if (c == null) return const Color(0xFF002350);
+      if (c is int) return Color(c);
+      if (c is num) return Color(c.toInt());
+      if (c is String) {
+        try {
+          final clean = c.replaceAll('#', '').trim();
+          if (clean.length == 6) return Color(int.parse('FF$clean', radix: 16));
+          if (clean.length == 8) return Color(int.parse(clean, radix: 16));
+          return Color(int.parse(clean));
+        } catch (_) {
+          return const Color(0xFF002350);
+        }
       }
+      return const Color(0xFF002350);
     }
 
     final rawPoints = json['points'] as List? ?? [];
     final points = <Offset>[];
     for (final p in rawPoints) {
-      if (p is List && p.length >= 2) {
-        points.add(Offset(
-          (p[0] as num).toDouble(),
-          (p[1] as num).toDouble(),
-        ));
+      if (p is Map) {
+        final x = (p['x'] as num?)?.toDouble() ?? (p['dx'] as num?)?.toDouble() ?? 0.0;
+        final y = (p['y'] as num?)?.toDouble() ?? (p['dy'] as num?)?.toDouble() ?? 0.0;
+        points.add(Offset(x, y));
+      } else if (p is List && p.length >= 2) {
+        final x = (p[0] as num?)?.toDouble() ?? 0.0;
+        final y = (p[1] as num?)?.toDouble() ?? 0.0;
+        points.add(Offset(x, y));
       }
     }
+
+    final sw = (json['strokeWidth'] as num?)?.toDouble() ??
+        (json['stroke_width'] as num?)?.toDouble() ??
+        3.0;
+    final isEraser = json['type'] == 'eraser' || json['isEraser'] == true;
 
     return WhiteboardStroke(
       points: points,
       color: parseColor(json['color']),
-      strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 3.0,
-      isEraser: json['type'] == 'eraser',
+      strokeWidth: sw,
+      isEraser: isEraser,
     );
   }
 }
