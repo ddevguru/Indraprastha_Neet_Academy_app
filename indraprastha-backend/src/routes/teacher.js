@@ -195,32 +195,37 @@ router.get('/dashboard', teacherAuth, async (req, res) => {
 
     const c = countsRes.rows[0];
 
-    // Recent doubts for teacher queue
+    // Recent doubts for teacher queue (Student anonymity guaranteed)
     const recentRes = await pool.query(
       `SELECT d.id, d.title, d.class_level, d.subject, d.status, d.created_at, d.updated_at,
               d.assigned_teacher_id, tp.display_name as assigned_teacher_name,
-              u.full_name as student_name
+              'Student' as student_name
        FROM doubts d
        LEFT JOIN teacher_profiles tp ON tp.id = d.assigned_teacher_id
-       LEFT JOIN users u ON u.id = d.student_id
        WHERE (${matchConditions})
        ORDER BY d.updated_at DESC LIMIT 10`,
       matchParams
     );
 
+    const metricsObj = {
+      totalEligible: parseInt(c.total_eligible || '0', 10),
+      pending: parseInt(c.pending || '0', 10),
+      assigned: parseInt(c.my_assigned || '0', 10),
+      inProgress: parseInt(c.my_in_progress || '0', 10),
+      answered: parseInt(c.my_answered || '0', 10),
+      resolved: parseInt(c.my_resolved || '0', 10),
+      reopened: parseInt(c.reopened || '0', 10),
+      // Snake_case aliases
+      total_eligible: parseInt(c.total_eligible || '0', 10),
+      in_progress: parseInt(c.my_in_progress || '0', 10),
+      avgResponseTimeMinutes: Math.round(parseFloat(c.avg_response_mins || '0')),
+      avgResolutionTimeMinutes: Math.round(parseFloat(c.avg_resolution_mins || '0')),
+    };
+
     res.json({
       success: true,
-      metrics: {
-        totalEligible: parseInt(c.total_eligible || '0', 10),
-        pending: parseInt(c.pending || '0', 10),
-        assigned: parseInt(c.my_assigned || '0', 10),
-        inProgress: parseInt(c.my_in_progress || '0', 10),
-        answered: parseInt(c.my_answered || '0', 10),
-        resolved: parseInt(c.my_resolved || '0', 10),
-        reopened: parseInt(c.reopened || '0', 10),
-        avgResponseTimeMinutes: Math.round(parseFloat(c.avg_response_mins || '0')),
-        avgResolutionTimeMinutes: Math.round(parseFloat(c.avg_resolution_mins || '0')),
-      },
+      metrics: metricsObj,
+      stats: metricsObj,
       recentDoubts: recentRes.rows,
     });
   } catch (err) {
@@ -258,12 +263,11 @@ router.get('/doubts', teacherAuth, async (req, res) => {
         d.id, d.title, d.description, d.class_level, d.subject, d.status,
         d.created_at, d.updated_at, d.first_opened_at, d.first_response_at, d.resolved_at,
         d.assigned_teacher_id, tp.display_name as assigned_teacher_name,
-        u.id as student_id, u.full_name as student_name,
+        0 as student_id, 'Student' as student_name,
         (SELECT COUNT(*) FROM doubt_attachments WHERE doubt_id = d.id) as attachment_count,
         (SELECT COUNT(*) FROM doubt_responses WHERE doubt_id = d.id) as response_count
       FROM doubts d
       LEFT JOIN teacher_profiles tp ON tp.id = d.assigned_teacher_id
-      LEFT JOIN users u ON u.id = d.student_id
       WHERE (${matchConditions})
     `;
 
@@ -281,7 +285,7 @@ router.get('/doubts', teacherAuth, async (req, res) => {
     }
     if (search) {
       params.push(`%${search.trim()}%`);
-      queryText += ` AND (d.title ILIKE $${params.length} OR d.description ILIKE $${params.length} OR u.full_name ILIKE $${params.length} OR CAST(d.id AS TEXT) = $${params.length - 1})`;
+      queryText += ` AND (d.title ILIKE $${params.length} OR d.description ILIKE $${params.length} OR CAST(d.id AS TEXT) = $${params.length - 1})`;
     }
 
     queryText += ` ORDER BY d.updated_at DESC, d.created_at DESC LIMIT 100`;
@@ -305,9 +309,11 @@ router.get('/doubts/:doubtId', teacherAuth, async (req, res) => {
     const doubtId = parseInt(req.params.doubtId, 10);
 
     const doubtRes = await pool.query(
-      `SELECT d.*, u.full_name as student_name, tp.display_name as assigned_teacher_name
+      `SELECT d.id, d.class_level, d.subject, d.title, d.description, d.status,
+              d.created_at, d.updated_at, d.first_opened_at, d.first_response_at, d.resolved_at,
+              d.assigned_teacher_id, tp.display_name as assigned_teacher_name,
+              0 as student_id, 'Student' as student_name
        FROM doubts d
-       LEFT JOIN users u ON u.id = d.student_id
        LEFT JOIN teacher_profiles tp ON tp.id = d.assigned_teacher_id
        WHERE d.id = $1`,
       [doubtId]

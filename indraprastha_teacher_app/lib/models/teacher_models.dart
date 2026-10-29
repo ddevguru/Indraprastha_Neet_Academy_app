@@ -1,3 +1,11 @@
+int _parseInt(dynamic val, [int fallback = 0]) {
+  if (val == null) return fallback;
+  if (val is int) return val;
+  if (val is num) return val.toInt();
+  return int.tryParse(val.toString()) ?? fallback;
+}
+
+
 class TeacherProfile {
   final int id;
   final int userId;
@@ -22,8 +30,8 @@ class TeacherProfile {
         .map((e) => TeacherSubjectAssignment.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
     return TeacherProfile(
-      id: json['id'] ?? 0,
-      userId: json['user_id'] ?? 0,
+      id: _parseInt(json['id']),
+      userId: _parseInt(json['user_id'] ?? json['userId']),
       teacherCode: json['teacher_code'] ?? '',
       displayName: json['display_name'] ?? 'Faculty Member',
       email: json['email'] ?? '',
@@ -46,8 +54,8 @@ class TeacherSubjectAssignment {
 
   factory TeacherSubjectAssignment.fromJson(Map<String, dynamic> json) {
     return TeacherSubjectAssignment(
-      id: json['id'] ?? 0,
-      classLevel: json['class_level'] ?? '',
+      id: _parseInt(json['id']),
+      classLevel: json['class_level'] ?? json['classLevel'] ?? '',
       subject: json['subject'] ?? '',
     );
   }
@@ -97,23 +105,28 @@ class TeacherDoubtItem {
         .toList();
 
     return TeacherDoubtItem(
-      id: json['id'] ?? 0,
-      studentId: json['student_id'] ?? 0,
-      studentName: json['student_name'] ?? 'Student',
-      classLevel: json['class_level'] ?? '',
+      id: _parseInt(json['id'] ?? json['doubt_id']),
+      studentId: _parseInt(json['student_id'] ?? json['studentId']),
+      // Full student anonymity: do not show student identities in teacher portal
+      studentName: 'Student',
+      classLevel: json['class_level'] ?? json['classLevel'] ?? '',
       subject: json['subject'] ?? '',
       title: json['title'] ?? 'Doubt',
       description: json['description'],
       status: json['status'] ?? 'pending',
-      assignedTeacherId: json['assigned_teacher_id'],
-      assignedTeacherName: json['assigned_teacher_name'],
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
+      assignedTeacherId: json['assigned_teacher_id'] != null
+          ? _parseInt(json['assigned_teacher_id'])
+          : (json['assignedTeacherId'] != null ? _parseInt(json['assignedTeacherId']) : null),
+      assignedTeacherName: json['assigned_teacher_name'] ?? json['assignedTeacherName'],
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       attachments: atts,
       responses: resps,
       whiteboard: json['whiteboard'] != null ? Map<String, dynamic>.from(json['whiteboard'] as Map) : null,
       publishedWhiteboard: json['published_whiteboard'] != null
           ? Map<String, dynamic>.from(json['published_whiteboard'] as Map)
-          : null,
+          : (json['publishedSolutionWhiteboard'] != null
+              ? Map<String, dynamic>.from(json['publishedSolutionWhiteboard'] as Map)
+              : null),
     );
   }
 }
@@ -141,14 +154,14 @@ class DoubtMediaAttachment {
 
   factory DoubtMediaAttachment.fromJson(Map<String, dynamic> json) {
     return DoubtMediaAttachment(
-      id: json['id'],
-      storageKey: json['storage_key'] ?? '',
-      originalFilename: json['original_filename'] ?? 'file',
-      mimeType: json['mime_type'] ?? 'application/octet-stream',
-      fileSize: json['file_size'] ?? 0,
-      driveFileId: json['drive_file_id'],
-      driveViewLink: json['drive_view_link'],
-      fileUrl: json['file_url'],
+      id: json['id'] != null ? _parseInt(json['id']) : null,
+      storageKey: json['storage_key'] ?? json['storageKey'] ?? '',
+      originalFilename: json['original_filename'] ?? json['originalFilename'] ?? 'file',
+      mimeType: json['mime_type'] ?? json['mimeType'] ?? 'application/octet-stream',
+      fileSize: _parseInt(json['file_size'] ?? json['fileSize']),
+      driveFileId: json['drive_file_id'] ?? json['driveFileId'],
+      driveViewLink: json['drive_view_link'] ?? json['driveViewLink'],
+      fileUrl: json['file_url'] ?? json['fileUrl'],
     );
   }
 
@@ -186,11 +199,11 @@ class TeacherDoubtResponseItem {
         .map((e) => DoubtMediaAttachment.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
     return TeacherDoubtResponseItem(
-      id: json['id'] ?? 0,
-      teacherId: json['teacher_id'] ?? 0,
-      teacherName: json['teacher_name'] ?? 'Faculty Member',
-      responseText: json['response_text'] ?? '',
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
+      id: _parseInt(json['id']),
+      teacherId: _parseInt(json['teacher_id'] ?? json['teacherId']),
+      teacherName: json['teacher_name'] ?? json['teacherName'] ?? 'Faculty Member',
+      responseText: json['response_text'] ?? json['responseText'] ?? '',
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       attachments: atts,
     );
   }

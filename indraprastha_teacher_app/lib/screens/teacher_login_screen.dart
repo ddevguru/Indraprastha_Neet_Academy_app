@@ -45,16 +45,25 @@ class _TeacherLoginScreenState extends State<TeacherLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E222D) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15);
+    final inputFill = isDark ? const Color(0xFF171A22) : Colors.white;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              elevation: isDark ? 0 : 4,
+              color: cardColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: borderColor),
+              ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
                 child: Column(
@@ -87,22 +96,22 @@ class _TeacherLoginScreenState extends State<TeacherLoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    const Text(
+                    Text(
                       'Indraprastha NEET Academy',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF002350),
+                        color: isDark ? Colors.white : const Color(0xFF002350),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       'Faculty & Teacher Portal',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
+                        color: isDark ? const Color(0xFFD2AE39) : Colors.grey.shade600,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 28),
@@ -133,12 +142,18 @@ class _TeacherLoginScreenState extends State<TeacherLoginScreen> {
                     TextField(
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                       decoration: InputDecoration(
                         labelText: 'Faculty Email / ID',
-                        prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF002350)),
+                        labelStyle: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
+                        prefixIcon: Icon(Icons.email_outlined, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: borderColor),
+                        ),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: inputFill,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -147,33 +162,42 @@ class _TeacherLoginScreenState extends State<TeacherLoginScreen> {
                       controller: _passwordCtrl,
                       obscureText: _obscurePassword,
                       onSubmitted: (_) => _handleLogin(),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF002350)),
+                        labelStyle: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
+                        prefixIcon: Icon(Icons.lock_outline, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: isDark ? Colors.grey : null),
                           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: borderColor),
+                        ),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: inputFill,
                       ),
                     ),
                     const SizedBox(height: 24),
 
                     FilledButton(
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF002350),
-                        foregroundColor: Colors.white,
+                        backgroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                        foregroundColor: isDark ? const Color(0xFF002350) : Colors.white,
                         minimumSize: const Size.fromHeight(50),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: _loading ? null : _handleLogin,
                       child: _loading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                color: isDark ? const Color(0xFF002350) : Colors.white,
+                                strokeWidth: 2,
+                              ),
                             )
                           : const Text(
                               'Sign In to Faculty Portal',
@@ -184,7 +208,7 @@ class _TeacherLoginScreenState extends State<TeacherLoginScreen> {
                     Text(
                       'Access is restricted to authorized faculty members created by Academy Admin.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                     ),
                   ],
                 ),

@@ -39,12 +39,15 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E222D) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15);
     final p = _profile ?? TeacherApiService.currentProfile;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF002350),
+        backgroundColor: isDark ? const Color(0xFF171A22) : const Color(0xFF002350),
         foregroundColor: Colors.white,
         title: const Text('Faculty Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
       ),
@@ -56,9 +59,10 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                 // Profile Card
                 Card(
                   elevation: 0,
+                  color: cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
+                    side: BorderSide(color: borderColor),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(20),
@@ -92,12 +96,16 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                         const SizedBox(height: 14),
                         Text(
                           p?.displayName ?? 'Faculty Member',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF002350)),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF002350),
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           p?.email ?? '',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                          style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                         ),
                         const SizedBox(height: 10),
                         Container(
@@ -125,39 +133,51 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                 // Assigned Subjects Card
                 Card(
                   elevation: 0,
+                  color: cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
+                    side: BorderSide(color: borderColor),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Assigned Academic Subjects',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF002350)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                          ),
                         ),
                         const SizedBox(height: 12),
                         if (p?.assignments.isEmpty == true || p?.assignments == null)
-                          const Text('No subjects currently assigned. Contact Academy Administrator.')
+                          Text(
+                            'No subjects currently assigned. Contact Academy Administrator.',
+                            style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                          )
                         else
                           ...p!.assignments.map((asgn) {
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF5F7FA),
+                                color: isDark ? const Color(0xFF171A22) : const Color(0xFFF5F7FA),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                                border: Border.all(color: borderColor),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.school_outlined, size: 20, color: Color(0xFF002350)),
+                                  Icon(Icons.school_outlined, size: 20, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
                                   const SizedBox(width: 10),
                                   Text(
                                     '${asgn.classLevel} — ${asgn.subject}',
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                      color: isDark ? Colors.white : Colors.black87,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -183,10 +203,17 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: const Text('Confirm Logout'),
-                        content: const Text('Are you sure you want to log out of the Faculty Portal?'),
+                        backgroundColor: cardColor,
+                        title: Text('Confirm Logout', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                        content: Text(
+                          'Are you sure you want to log out of the Faculty Portal?',
+                          style: TextStyle(color: isDark ? Colors.grey.shade300 : Colors.black87),
+                        ),
                         actions: [
-                          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: Text('Cancel', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey)),
+                          ),
                           FilledButton(
                             style: FilledButton.styleFrom(backgroundColor: Colors.red),
                             onPressed: () => Navigator.of(ctx).pop(true),

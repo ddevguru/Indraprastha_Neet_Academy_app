@@ -255,155 +255,193 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
           ],
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error.isNotEmpty || _doubt == null
-              ? Center(child: Text(_error.isNotEmpty ? _error : 'Doubt not found'))
-              : Column(
+      body: Builder(
+        builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+
+          if (_loading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (_error.isNotEmpty || _doubt == null) {
+            return Center(
+              child: Text(
+                _error.isNotEmpty ? _error : 'Doubt not found',
+                style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+              ),
+            );
+          }
+
+          return Column(
+            children: [
+              // Top Question Card
+              Container(
+                color: isDark ? const Color(0xFF171A22) : Colors.white,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top Question Card
-                    Container(
-                      color: Colors.white,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: (isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${_doubt!.classLevel} • ${_doubt!.subject}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(_doubt!.status).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _doubt!.status.toUpperCase(),
+                            style: TextStyle(
+                              color: _getStatusColor(_doubt!.status),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Doubt #${_doubt!.id}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _doubt!.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    if (_doubt!.description?.isNotEmpty == true) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _doubt!.description!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.grey.shade300 : Colors.grey.shade800,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+
+                    // Submitted Attachments Chips
+                    if (_doubt!.attachments.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: _doubt!.attachments.map((att) {
+                          final isImg = att.mimeType.startsWith('image/');
+                          final link = att.driveViewLink ?? att.fileUrl ?? '';
+                          return ActionChip(
+                            avatar: Icon(
+                              isImg ? Icons.image : Icons.attach_file,
+                              size: 16,
+                              color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                            ),
+                            label: Text(att.originalFilename, style: const TextStyle(fontSize: 12)),
+                            onPressed: () {
+                              if (link.isNotEmpty) {
+                                launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                              }
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // Tab bar
+              Container(
+                color: isDark ? const Color(0xFF171A22) : Colors.white,
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                  unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey,
+                  indicatorColor: const Color(0xFFD2AE39),
+                  indicatorWeight: 3,
+                  tabs: [
+                    const Tab(icon: Icon(Icons.edit_note), text: 'Answer'),
+                    const Tab(icon: Icon(Icons.draw), text: 'Whiteboard'),
+                    Tab(icon: const Icon(Icons.history), text: 'History (${_doubt!.responses.length})'),
+                  ],
+                ),
+              ),
+
+              // Tab Views
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // Tab 1: Written Answer Composer
+                    Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: ListView(
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF002350).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '${_doubt!.classLevel} • ${_doubt!.subject}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF002350),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: _getStatusColor(_doubt!.status).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  _doubt!.status.toUpperCase(),
-                                  style: TextStyle(
-                                    color: _getStatusColor(_doubt!.status),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                'By ${_doubt!.studentName}',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            _doubt!.title,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          if (_doubt!.description?.isNotEmpty == true) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              _doubt!.description!,
-                              style: TextStyle(fontSize: 13, color: Colors.grey.shade800, height: 1.4),
+                          Card(
+                            elevation: 0,
+                            color: isDark ? const Color(0xFF1E222D) : Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.2)),
                             ),
-                          ],
-
-                          // Submitted Attachments Chips
-                          if (_doubt!.attachments.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: _doubt!.attachments.map((att) {
-                                final isImg = att.mimeType.startsWith('image/');
-                                final link = att.driveViewLink ?? att.fileUrl ?? '';
-                                return ActionChip(
-                                  avatar: Icon(
-                                    isImg ? Icons.image : Icons.attach_file,
-                                    size: 16,
-                                    color: const Color(0xFF002350),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Faculty Solution Explanation',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: isDark ? Colors.white : Colors.black87,
+                                    ),
                                   ),
-                                  label: Text(att.originalFilename, style: const TextStyle(fontSize: 12)),
-                                  onPressed: () {
-                                    if (link.isNotEmpty) {
-                                      launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
-                                    }
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    // Tab bar
-                    Container(
-                      color: Colors.white,
-                      child: TabBar(
-                        controller: _tabController,
-                        labelColor: const Color(0xFF002350),
-                        unselectedLabelColor: Colors.grey,
-                        indicatorColor: const Color(0xFFD2AE39),
-                        indicatorWeight: 3,
-                        tabs: [
-                          const Tab(icon: Icon(Icons.edit_note), text: 'Answer'),
-                          const Tab(icon: Icon(Icons.draw), text: 'Whiteboard'),
-                          Tab(icon: const Icon(Icons.history), text: 'History (${_doubt!.responses.length})'),
-                        ],
-                      ),
-                    ),
-
-                    // Tab Views
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          // Tab 1: Written Answer Composer
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: ListView(
-                              children: [
-                                Card(
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _answerCtrl,
+                                    maxLines: 8,
+                                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter step-by-step solution...\n'
+                                          'End with: "Therefore, Option (A) is the correct answer."',
+                                      hintStyle: TextStyle(color: isDark ? Colors.white38 : null),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                      filled: true,
+                                      fillColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF9FAFC),
+                                    ),
                                   ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Teacher Solution Explanation',
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        TextField(
-                                          controller: _answerCtrl,
-                                          maxLines: 8,
-                                          decoration: InputDecoration(
-                                            hintText: 'Enter step-by-step physics/chemistry solution...\n'
-                                                'End with: "Therefore, Option (A) is the correct answer."',
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                            filled: true,
-                                            fillColor: const Color(0xFFF9FAFC),
-                                          ),
-                                        ),
                                         const SizedBox(height: 12),
 
                                         // Attachments
@@ -478,20 +516,24 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
                             padding: const EdgeInsets.all(16),
                             children: [
                               if (_doubt!.responses.isEmpty)
-                                const Center(
+                                Center(
                                   child: Padding(
-                                    padding: EdgeInsets.all(32),
-                                    child: Text('No responses submitted yet by faculty.', style: TextStyle(color: Colors.grey)),
+                                    padding: const EdgeInsets.all(32),
+                                    child: Text(
+                                      'No responses submitted yet by faculty.',
+                                      style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey),
+                                    ),
                                   ),
                                 )
                               else
                                 ..._doubt!.responses.map((resp) {
                                   return Card(
                                     elevation: 0,
+                                    color: isDark ? const Color(0xFF1E222D) : Colors.white,
                                     margin: const EdgeInsets.only(bottom: 12),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      side: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
+                                      side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15)),
                                     ),
                                     child: Padding(
                                       padding: const EdgeInsets.all(14),
@@ -503,20 +545,28 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
                                             children: [
                                               Text(
                                                 'Answer by ${resp.teacherName}',
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                                                ),
                                               ),
                                               Text(
                                                 resp.createdAt != null
                                                     ? resp.createdAt.toString().split('.').first
                                                     : '',
-                                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                                style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
                                               ),
                                             ],
                                           ),
                                           const SizedBox(height: 8),
                                           Text(
                                             resp.responseText,
-                                            style: const TextStyle(fontSize: 13, height: 1.4),
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              height: 1.4,
+                                              color: isDark ? Colors.grey.shade300 : Colors.black87,
+                                            ),
                                           ),
                                           if (resp.attachments.isNotEmpty) ...[
                                             const SizedBox(height: 10),
@@ -525,7 +575,7 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
                                               children: resp.attachments.map((att) {
                                                 final link = att.driveViewLink ?? att.fileUrl ?? '';
                                                 return ActionChip(
-                                                  avatar: const Icon(Icons.open_in_new, size: 14),
+                                                  avatar: Icon(Icons.open_in_new, size: 14, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
                                                   label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
                                                   onPressed: () {
                                                     if (link.isNotEmpty) {
@@ -547,7 +597,9 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
                       ),
                     ),
                   ],
-                ),
+                );
+        },
+      ),
     );
   }
 }

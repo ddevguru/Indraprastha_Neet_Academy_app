@@ -220,6 +220,48 @@ router.patch('/teachers/:id', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/teachers/:id/performance
+ * Detailed performance metrics for a specific teacher
+ */
+router.get('/teachers/:id/performance', async (req, res) => {
+  try {
+    const teacherId = parseInt(req.params.id, 10);
+
+    const counts = await pool.query(
+      `SELECT 
+         COUNT(*) as assigned_count,
+         COUNT(*) FILTER (WHERE status = 'Answered') as answered_count,
+         COUNT(*) FILTER (WHERE status = 'Resolved') as resolved_count,
+         COUNT(*) FILTER (WHERE status = 'Reopened') as reopened_count,
+         AVG(EXTRACT(EPOCH FROM (first_response_at - created_at)) / 60) FILTER (WHERE first_response_at IS NOT NULL) as avg_first_response_mins,
+         AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) FILTER (WHERE resolved_at IS NOT NULL) as avg_resolution_hours
+       FROM doubts
+       WHERE assigned_teacher_id = $1`,
+      [teacherId]
+    );
+
+    const r = counts.rows[0] || {};
+    const avgFirstResponse = r.avg_first_response_mins ? Math.round(parseFloat(r.avg_first_response_mins)) : null;
+    const avgResolution = r.avg_resolution_hours ? Math.round(parseFloat(r.avg_resolution_hours) * 10) / 10 : null;
+
+    res.json({
+      success: true,
+      performance: {
+        assignedCount: parseInt(r.assigned_count || '0', 10),
+        answeredCount: parseInt(r.answered_count || '0', 10),
+        resolvedCount: parseInt(r.resolved_count || '0', 10),
+        reopenedCount: parseInt(r.reopened_count || '0', 10),
+        avgFirstResponseMinutes: avgFirstResponse,
+        avgResolutionHours: avgResolution,
+      },
+    });
+  } catch (err) {
+    console.error('[ADMIN_GET_TEACHER_PERFORMANCE_ERROR]', err);
+    res.status(500).json({ error: 'Failed to fetch teacher performance' });
+  }
+});
+
+/**
  * POST /api/admin/teachers/:id/assignments
  */
 router.post('/teachers/:id/assignments', async (req, res) => {
@@ -290,6 +332,7 @@ router.get('/doubts', async (req, res) => {
 
     let queryText = `
       SELECT 
+        d.id,
         d.id as doubt_id,
         d.student_id,
         u.full_name as student_name,
@@ -513,24 +556,37 @@ router.get('/doubts-analytics', async (req, res) => {
     const resolutionRate = totalSubmitted > 0 ? Math.round((totalResolved / totalSubmitted) * 100) : 0;
     const reopenRate = totalSubmitted > 0 ? Math.round((totalReopened / totalSubmitted) * 100) : 0;
 
+    const avgResMinutes = Math.round(parseFloat(c.avg_resolution_mins || '0'));
+    const avgResHours = avgResMinutes > 0 ? Math.round((avgResMinutes / 60) * 10) / 10 : null;
+
+    const analyticsObj = {
+      totalSubmitted,
+      totalResolved,
+      pending: parseInt(c.pending || '0', 10),
+      inProgress: parseInt(c.in_progress || '0', 10),
+      assigned: parseInt(c.assigned || '0', 10),
+      answered: parseInt(c.answered || '0', 10),
+      reopened: totalReopened,
+      unassigned: parseInt(c.unassigned || '0', 10),
+      resolutionRate,
+      reopenRate,
+      avgFirstResponseMinutes: Math.round(parseFloat(c.avg_first_response_mins || '0')),
+      avgResolutionMinutes: avgResMinutes,
+      avgResolutionHours: avgResHours,
+      bySubject: bySubject.rows,
+      byStatus: byStatus.rows,
+      // Snake_case keys expected by flutter KPI cards
+      total_doubts: totalSubmitted,
+      pending_doubts: parseInt(c.pending || '0', 10),
+      resolved_doubts: totalResolved,
+      reopened_doubts: totalReopened,
+      avg_resolution_hours: avgResHours,
+    };
+
     res.json({
       success: true,
-      analytics: {
-        totalSubmitted,
-        totalResolved,
-        pending: parseInt(c.pending || '0', 10),
-        inProgress: parseInt(c.in_progress || '0', 10),
-        assigned: parseInt(c.assigned || '0', 10),
-        answered: parseInt(c.answered || '0', 10),
-        reopened: totalReopened,
-        unassigned: parseInt(c.unassigned || '0', 10),
-        resolutionRate,
-        reopenRate,
-        avgFirstResponseMinutes: Math.round(parseFloat(c.avg_first_response_mins || '0')),
-        avgResolutionMinutes: Math.round(parseFloat(c.avg_resolution_mins || '0')),
-        bySubject: bySubject.rows,
-        byStatus: byStatus.rows,
-      },
+      analytics: analyticsObj,
+      metrics: analyticsObj,
     });
   } catch (err) {
     console.error('[ADMIN_DOUBTS_ANALYTICS_ERROR]', err);

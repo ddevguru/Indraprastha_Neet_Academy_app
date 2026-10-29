@@ -564,7 +564,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
               if (_pendingAttachments.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  color: Colors.grey.shade200,
+                  color: isDark ? const Color(0xFF1E222D) : Colors.grey.shade200,
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -574,8 +574,12 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: Chip(
+                            backgroundColor: isDark ? const Color(0xFF2E3545) : Colors.white,
                             avatar: const Icon(Icons.check_circle, color: Color(0xFF2E8B57), size: 16),
-                            label: Text(att['originalFilename'] ?? 'File', style: const TextStyle(fontSize: 11)),
+                            label: Text(
+                              att['originalFilename'] ?? 'File',
+                              style: TextStyle(fontSize: 11, color: isDark ? Colors.white : Colors.black87),
+                            ),
                             onDeleted: () => setState(() => _pendingAttachments.removeAt(index)),
                           ),
                         );
@@ -679,14 +683,15 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                             : () {
                                 showModalBottomSheet(
                                   context: context,
+                                  backgroundColor: isDark ? const Color(0xFF1E222D) : Colors.white,
                                   shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
                                   builder: (ctx) => SafeArea(
                                     child: Wrap(
                                       children: [
                                         ListTile(
                                           leading: const Icon(Icons.draw, color: Color(0xFFD2AE39)),
-                                          title: const Text('Open Whiteboard / Canvas'),
-                                          subtitle: const Text('Draw equations, diagrams or mind maps'),
+                                          title: Text('Open Whiteboard / Canvas', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                                          subtitle: Text('Draw equations, diagrams or mind maps', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey)),
                                           onTap: () {
                                             Navigator.pop(ctx);
                                             _tabController.animateTo(1);
@@ -694,7 +699,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                                         ),
                                         ListTile(
                                           leading: const Icon(Icons.photo_library_outlined, color: Colors.blue),
-                                          title: const Text('Attach Image'),
+                                          title: Text('Attach Image', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
                                           onTap: () {
                                             Navigator.pop(ctx);
                                             _pickAttachment(FileType.image);
@@ -702,7 +707,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                                         ),
                                         ListTile(
                                           leading: const Icon(Icons.video_library_outlined, color: Colors.red),
-                                          title: const Text('Attach Video'),
+                                          title: Text('Attach Video', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
                                           onTap: () {
                                             Navigator.pop(ctx);
                                             _pickAttachment(FileType.video);
@@ -710,7 +715,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                                         ),
                                         ListTile(
                                           leading: const Icon(Icons.mic_none, color: Colors.amber),
-                                          title: const Text('Attach Audio Note'),
+                                          title: Text('Attach Audio Note', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
                                           onTap: () {
                                             Navigator.pop(ctx);
                                             _pickAttachment(FileType.audio);
@@ -718,7 +723,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> with SingleTi
                                         ),
                                         ListTile(
                                           leading: const Icon(Icons.picture_as_pdf_outlined, color: Colors.green),
-                                          title: const Text('Attach PDF Document'),
+                                          title: Text('Attach PDF Document', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
                                           onTap: () {
                                             Navigator.pop(ctx);
                                             _pickAttachment(FileType.custom);

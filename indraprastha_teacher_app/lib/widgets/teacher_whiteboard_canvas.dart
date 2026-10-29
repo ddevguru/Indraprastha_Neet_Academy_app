@@ -22,13 +22,44 @@ class WhiteboardStroke {
       };
 
   factory WhiteboardStroke.fromJson(Map<String, dynamic> json) {
-    final pts = (json['points'] as List? ?? [])
-        .map((p) => Offset((p['x'] as num).toDouble(), (p['y'] as num).toDouble()))
-        .toList();
+    Color parseColor(dynamic c) {
+      if (c == null) return const Color(0xFF002350);
+      if (c is int) return Color(c);
+      if (c is num) return Color(c.toInt());
+      if (c is String) {
+        try {
+          final clean = c.replaceAll('#', '').trim();
+          if (clean.length == 6) return Color(int.parse('FF$clean', radix: 16));
+          if (clean.length == 8) return Color(int.parse(clean, radix: 16));
+          return Color(int.parse(clean));
+        } catch (_) {
+          return const Color(0xFF002350);
+        }
+      }
+      return const Color(0xFF002350);
+    }
+
+    final rawPoints = json['points'] as List? ?? [];
+    final pts = <Offset>[];
+    for (final p in rawPoints) {
+      if (p is Map) {
+        final x = (p['x'] as num?)?.toDouble() ?? (p['dx'] as num?)?.toDouble() ?? 0.0;
+        final y = (p['y'] as num?)?.toDouble() ?? (p['dy'] as num?)?.toDouble() ?? 0.0;
+        pts.add(Offset(x, y));
+      } else if (p is List && p.length >= 2) {
+        final x = (p[0] as num?)?.toDouble() ?? 0.0;
+        final y = (p[1] as num?)?.toDouble() ?? 0.0;
+        pts.add(Offset(x, y));
+      }
+    }
+
+    final sw = (json['strokeWidth'] as num?)?.toDouble() ?? (json['stroke_width'] as num?)?.toDouble() ?? 3.0;
+    final isEraser = json['isEraser'] == true || json['type'] == 'eraser';
+
     return WhiteboardStroke(
-      color: Color(json['color'] as int? ?? 0xFF002350),
-      strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 3.0,
-      isEraser: json['isEraser'] == true,
+      color: parseColor(json['color']),
+      strokeWidth: sw,
+      isEraser: isEraser,
       points: pts,
     );
   }
@@ -238,10 +269,11 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
 
               // Stroke width picker
               DropdownButton<double>(
-                value: _strokeWidth,
+                value: const [2.0, 3.0, 4.0, 6.0, 10.0].contains(_strokeWidth) ? _strokeWidth : 3.0,
                 underline: const SizedBox(),
                 items: const [
                   DropdownMenuItem(value: 2.0, child: Text('Thin (2px)')),
+                  DropdownMenuItem(value: 3.0, child: Text('Normal (3px)')),
                   DropdownMenuItem(value: 4.0, child: Text('Medium (4px)')),
                   DropdownMenuItem(value: 6.0, child: Text('Thick (6px)')),
                   DropdownMenuItem(value: 10.0, child: Text('Broad (10px)')),

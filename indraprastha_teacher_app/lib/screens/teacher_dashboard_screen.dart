@@ -31,7 +31,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     });
     try {
       final data = await TeacherApiService.getDashboard();
-      final statsData = data['stats'] as Map<String, dynamic>? ?? {};
+      final statsData = (data['stats'] ?? data['metrics']) as Map<String, dynamic>? ?? {};
       final asgnsData = (data['assignments'] as List? ?? [])
           .map((e) => TeacherSubjectAssignment.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
@@ -55,12 +55,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     }
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(BuildContext context, String label, String value, IconData icon, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Card(
       elevation: 0,
+      color: isDark ? const Color(0xFF1E222D) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
+        side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -108,9 +111,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = TeacherApiService.currentProfile;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor: const Color(0xFF002350),
         foregroundColor: Colors.white,
@@ -228,9 +232,13 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     ),
 
                   // KPI Grid
-                  const Text(
+                  Text(
                     'Doubt Resolution Overview',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF002350)),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                    ),
                   ),
                   const SizedBox(height: 10),
                   GridView.count(
@@ -241,12 +249,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     mainAxisSpacing: 10,
                     childAspectRatio: 1.1,
                     children: [
-                      _buildStatCard('Pending', '${_stats['pending'] ?? 0}', Icons.hourglass_empty, const Color(0xFFD2AE39)),
-                      _buildStatCard('Assigned', '${_stats['assigned'] ?? 0}', Icons.assignment_ind_outlined, Colors.indigo),
-                      _buildStatCard('In Progress', '${_stats['in_progress'] ?? 0}', Icons.pending_actions_outlined, Colors.blue),
-                      _buildStatCard('Answered', '${_stats['answered'] ?? 0}', Icons.done, Colors.teal),
-                      _buildStatCard('Resolved', '${_stats['resolved'] ?? 0}', Icons.check_circle_outline, const Color(0xFF2E8B57)),
-                      _buildStatCard('Reopened', '${_stats['reopened'] ?? 0}', Icons.replay, const Color(0xFFD92D20)),
+                      _buildStatCard(context, 'Pending', '${_stats['pending'] ?? 0}', Icons.hourglass_empty, const Color(0xFFD2AE39)),
+                      _buildStatCard(context, 'Assigned', '${_stats['assigned'] ?? 0}', Icons.assignment_ind_outlined, Colors.indigo),
+                      _buildStatCard(context, 'In Progress', '${_stats['inProgress'] ?? _stats['in_progress'] ?? 0}', Icons.pending_actions_outlined, Colors.blue),
+                      _buildStatCard(context, 'Answered', '${_stats['answered'] ?? 0}', Icons.done, Colors.teal),
+                      _buildStatCard(context, 'Resolved', '${_stats['resolved'] ?? 0}', Icons.check_circle_outline, const Color(0xFF2E8B57)),
+                      _buildStatCard(context, 'Reopened', '${_stats['reopened'] ?? 0}', Icons.replay, const Color(0xFFD92D20)),
                     ],
                   ),
 
@@ -298,9 +306,13 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Recent Assigned Doubts',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF002350)),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                        ),
                       ),
                       TextButton(
                         onPressed: widget.onOpenQueue,
@@ -313,18 +325,22 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   if (_recentDoubts.isEmpty)
                     Card(
                       elevation: 0,
+                      color: isDark ? const Color(0xFF1E222D) : Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
+                        side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15)),
                       ),
-                      child: const Padding(
-                        padding: EdgeInsets.all(32),
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
                         child: Center(
                           child: Column(
                             children: [
-                              Icon(Icons.check_circle_outline, color: Color(0xFF2E8B57), size: 36),
-                              SizedBox(height: 8),
-                              Text('No pending doubts in your queue right now!'),
+                              const Icon(Icons.check_circle_outline, color: Color(0xFF2E8B57), size: 36),
+                              const SizedBox(height: 8),
+                              Text(
+                                'No pending doubts in your queue right now!',
+                                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.black87),
+                              ),
                             ],
                           ),
                         ),
@@ -334,10 +350,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     ..._recentDoubts.map((doubt) {
                       return Card(
                         elevation: 0,
+                        color: isDark ? const Color(0xFF1E222D) : Colors.white,
                         margin: const EdgeInsets.only(bottom: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
+                          side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15)),
                         ),
                         child: ListTile(
                           onTap: () async {
@@ -356,11 +373,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                             doubt.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
                           ),
                           subtitle: Text(
-                            '${doubt.classLevel} • ${doubt.subject} • By ${doubt.studentName}',
-                            style: const TextStyle(fontSize: 12),
+                            '${doubt.classLevel} • ${doubt.subject} • Doubt #${doubt.id}',
+                            style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                           ),
                           trailing: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

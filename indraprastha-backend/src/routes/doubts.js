@@ -148,7 +148,7 @@ router.get('/my', studentAuth, async (req, res) => {
     let queryText = `
       SELECT 
         d.*,
-        tp.display_name as assigned_teacher_name,
+        'Subject Faculty' as assigned_teacher_name,
         COALESCE(
           (
             SELECT json_agg(
@@ -170,7 +170,7 @@ router.get('/my', studentAuth, async (req, res) => {
               json_build_object(
                 'id', dr.id,
                 'responseText', dr.response_text,
-                'teacherName', tp2.display_name,
+                'teacherName', 'Subject Faculty',
                 'createdAt', dr.created_at,
                 'publishedAt', dr.published_at,
                 'attachments', (
@@ -248,9 +248,8 @@ router.get('/:doubtId', studentAuth, async (req, res) => {
     const doubtId = parseInt(req.params.doubtId, 10);
 
     const doubtRes = await pool.query(
-      `SELECT d.*, tp.display_name as assigned_teacher_name
+      `SELECT d.*, 'Subject Faculty' as assigned_teacher_name
        FROM doubts d
-       LEFT JOIN teacher_profiles tp ON tp.id = d.assigned_teacher_id
        WHERE d.id = $1 AND d.student_id = $2`,
       [doubtId, studentId]
     );
@@ -268,9 +267,8 @@ router.get('/:doubtId', studentAuth, async (req, res) => {
 
     // Responses (only published)
     const respRes = await pool.query(
-      `SELECT dr.*, tp.display_name as teacher_name
+      `SELECT dr.*, 'Subject Faculty' as teacher_name
        FROM doubt_responses dr
-       LEFT JOIN teacher_profiles tp ON tp.id = dr.teacher_id
        WHERE dr.doubt_id = $1
        ORDER BY dr.created_at ASC`,
       [doubtId]

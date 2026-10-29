@@ -291,22 +291,35 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
 
   void _reopenDialog() {
     final controller = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Ask for Clarification / Reopen'),
+        backgroundColor: isDark ? const Color(0xFF1E222D) : Colors.white,
+        title: Text(
+          'Ask for Clarification / Reopen',
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
+        ),
         content: TextField(
           controller: controller,
           maxLines: 3,
-          decoration: const InputDecoration(
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          decoration: InputDecoration(
             hintText: 'Explain which step or concept still needs clarification...',
-            border: OutlineInputBorder(),
+            hintStyle: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey),
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey)),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF002350), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+              foregroundColor: isDark ? const Color(0xFF002350) : Colors.white,
+            ),
             onPressed: () async {
               final text = controller.text.trim();
               if (text.isEmpty) return;
@@ -436,7 +449,14 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                           ),
                           if (d.attachments.isNotEmpty) ...[
                             const SizedBox(height: 14),
-                            const Text('Submitted Media (Stored in Google Drive):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            Text(
+                              'Submitted Media (Stored in Google Drive):',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.grey.shade300 : Colors.black87,
+                              ),
+                            ),
                             const SizedBox(height: 8),
                             Wrap(
                               spacing: 8,
@@ -536,11 +556,15 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
 
                   Row(
                     children: [
-                      const Icon(Icons.school, color: Color(0xFF002350), size: 20),
+                      Icon(Icons.school, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350), size: 20),
                       const SizedBox(width: 8),
                       Text(
                         'Teacher Answers (${d.responses.length})',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF002350)),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                        ),
                       ),
                     ],
                   ),
@@ -548,7 +572,14 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
 
                   if (d.responses.isEmpty)
                     Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      color: isDark ? const Color(0xFF1E222D) : Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(
+                          color: isDark ? const Color(0xFF2E3545) : Colors.black.withValues(alpha: 0.08),
+                        ),
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Center(
@@ -556,13 +587,22 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                             children: [
                               const Icon(Icons.hourglass_empty, color: Colors.orange, size: 36),
                               const SizedBox(height: 10),
-                              const Text('Teacher is reviewing your question...', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text(
+                                'Teacher is reviewing your question...',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 d.assignedTeacherName != null
-                                    ? 'Assigned to: ${d.assignedTeacherName}'
+                                    ? 'Assigned to Subject Faculty'
                                     : 'A subject specialist teacher will claim and answer shortly.',
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.grey.shade400 : Colors.grey,
+                                ),
                               ),
                             ],
                           ),
@@ -573,9 +613,15 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                     ...d.responses.map((resp) {
                       final respTime = DateFormat('dd MMM, hh:mm a').format(resp.createdAt.toLocal());
                       return Card(
+                        color: isDark ? const Color(0xFF1E222D) : Colors.white,
                         margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 1,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: isDark ? const Color(0xFF2E3545) : Colors.black.withValues(alpha: 0.08),
+                          ),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
@@ -586,25 +632,36 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      const CircleAvatar(
+                                      CircleAvatar(
                                         radius: 14,
-                                        backgroundColor: Color(0xFF002350),
-                                        child: Icon(Icons.person, size: 16, color: Colors.white),
+                                        backgroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                                        child: Icon(Icons.person, size: 16, color: isDark ? const Color(0xFF002350) : Colors.white),
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
-                                        resp.teacherName,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        'Subject Faculty',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  Text(respTime, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                  Text(
+                                    respTime,
+                                    style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
+                                  ),
                                 ],
                               ),
-                              const Divider(height: 20),
+                              Divider(height: 20, color: isDark ? const Color(0xFF2E3545) : Colors.black.withValues(alpha: 0.08)),
                               Text(
                                 resp.responseText,
-                                style: const TextStyle(fontSize: 14, height: 1.4),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  height: 1.4,
+                                  color: isDark ? Colors.grey.shade200 : Colors.black87,
+                                ),
                               ),
                             ],
                           ),
@@ -621,7 +678,8 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              side: const BorderSide(color: Color(0xFF002350)),
+                              side: BorderSide(color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
+                              foregroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: _reopenDialog,

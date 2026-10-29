@@ -111,8 +111,10 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor: const Color(0xFF002350),
         foregroundColor: Colors.white,
@@ -130,22 +132,29 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
           // Filter Header Card
           Container(
             padding: const EdgeInsets.all(12),
-            color: Colors.white,
+            color: isDark ? const Color(0xFF171A22) : Colors.white,
             child: Column(
               children: [
                 TextField(
                   controller: _searchCtrl,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                   onSubmitted: (_) => _fetchDoubts(),
                   decoration: InputDecoration(
-                    hintText: 'Search doubt title, ID, or student...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
+                    hintText: 'Search doubt title or ID...',
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
+                    prefixIcon: Icon(Icons.search, size: 20, color: isDark ? Colors.white54 : Colors.grey),
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.arrow_forward, size: 18),
+                      icon: Icon(Icons.arrow_forward, size: 18, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
                       onPressed: _fetchDoubts,
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     isDense: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    filled: isDark,
+                    fillColor: isDark ? const Color(0xFF1E222D) : Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade300),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -154,6 +163,8 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: _statusFilter,
+                        dropdownColor: isDark ? const Color(0xFF1E222D) : Colors.white,
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 12),
                         items: const [
                           DropdownMenuItem(value: '', child: Text('All Statuses')),
                           DropdownMenuItem(value: 'pending', child: Text('Pending')),
@@ -167,9 +178,10 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                           _statusFilter = v ?? '';
                           _fetchDoubts();
                         },
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Status',
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          labelStyle: TextStyle(color: isDark ? Colors.white70 : null),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           isDense: true,
                         ),
                       ),
@@ -178,6 +190,8 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: _classFilter,
+                        dropdownColor: isDark ? const Color(0xFF1E222D) : Colors.white,
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 12),
                         items: const [
                           DropdownMenuItem(value: '', child: Text('All Classes')),
                           DropdownMenuItem(value: 'Class 11', child: Text('Class 11')),
@@ -187,9 +201,10 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                           _classFilter = v ?? '';
                           _fetchDoubts();
                         },
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Class',
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          labelStyle: TextStyle(color: isDark ? Colors.white70 : null),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           isDense: true,
                         ),
                       ),
@@ -198,6 +213,8 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: _subjectFilter,
+                        dropdownColor: isDark ? const Color(0xFF1E222D) : Colors.white,
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 12),
                         items: const [
                           DropdownMenuItem(value: '', child: Text('All Subjects')),
                           DropdownMenuItem(value: 'Physics', child: Text('Physics')),
@@ -208,9 +225,10 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                           _subjectFilter = v ?? '';
                           _fetchDoubts();
                         },
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Subject',
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          labelStyle: TextStyle(color: isDark ? Colors.white70 : null),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           isDense: true,
                         ),
                       ),
@@ -249,8 +267,8 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'No student doubts match the current filters.',
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              'No doubts match the current filters.',
+                              style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                             ),
                           ],
                         ),
@@ -267,9 +285,10 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
 
                           return Card(
                             elevation: 0,
+                            color: isDark ? const Color(0xFF1E222D) : Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                              side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.2)),
                             ),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(12),
@@ -290,9 +309,9 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                                       children: [
                                         Text(
                                           '#${doubt.id}',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: Color(0xFF002350),
+                                            color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
                                             fontSize: 14,
                                           ),
                                         ),
@@ -300,15 +319,15 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF002350).withValues(alpha: 0.1),
+                                            color: (isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)).withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
                                             '${doubt.classLevel} • ${doubt.subject}',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w600,
-                                              color: Color(0xFF002350),
+                                              color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
                                             ),
                                           ),
                                         ),
@@ -335,7 +354,11 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                                       doubt.title,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: isDark ? Colors.white : Colors.black87,
+                                      ),
                                     ),
                                     if (doubt.description?.isNotEmpty == true) ...[
                                       const SizedBox(height: 4),
@@ -343,22 +366,32 @@ class _TeacherDoubtQueueScreenState extends State<TeacherDoubtQueueScreen> {
                                         doubt.description!,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                                        ),
                                       ),
                                     ],
                                     const SizedBox(height: 10),
                                     Row(
                                       children: [
-                                        Text(
-                                          'Student: ${doubt.studentName}',
-                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade100,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            'Doubt Query',
+                                            style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                          ),
                                         ),
                                         if (doubt.attachments.isNotEmpty) ...[
-                                          const SizedBox(width: 12),
-                                          Icon(Icons.attach_file, size: 14, color: Colors.grey.shade600),
+                                          const SizedBox(width: 8),
+                                          Icon(Icons.attach_file, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                                           Text(
                                             '${doubt.attachments.length}',
-                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                            style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                                           ),
                                         ],
                                         const Spacer(),

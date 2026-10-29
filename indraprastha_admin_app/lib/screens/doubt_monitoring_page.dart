@@ -49,7 +49,7 @@ class _DoubtMonitoringPageState extends State<DoubtMonitoringPage> {
       final list = doubtsData['doubts'] as List? ?? [];
       setState(() {
         _doubts = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        _analytics = analyticsData['metrics'] as Map<String, dynamic>? ?? {};
+        _analytics = (analyticsData['analytics'] ?? analyticsData['metrics']) as Map<String, dynamic>? ?? {};
         _loading = false;
       });
     } catch (e) {
@@ -193,18 +193,38 @@ class _DoubtMonitoringPageState extends State<DoubtMonitoringPage> {
             // Analytics KPI Bar
             Row(
               children: [
-                _buildMetricCard('Total Submitted', '${_analytics['total_doubts'] ?? 0}', Icons.quiz_outlined, Colors.blue),
+                _buildMetricCard(
+                  'Total Submitted',
+                  '${_analytics['total_doubts'] ?? _analytics['totalSubmitted'] ?? 0}',
+                  Icons.quiz_outlined,
+                  Colors.blue,
+                ),
                 const SizedBox(width: 10),
-                _buildMetricCard('Pending', '${_analytics['pending_doubts'] ?? 0}', Icons.hourglass_empty, Colors.amber.shade800),
+                _buildMetricCard(
+                  'Pending',
+                  '${_analytics['pending_doubts'] ?? _analytics['pending'] ?? 0}',
+                  Icons.hourglass_empty,
+                  Colors.amber.shade800,
+                ),
                 const SizedBox(width: 10),
-                _buildMetricCard('Resolved', '${_analytics['resolved_doubts'] ?? 0}', Icons.check_circle_outline, Colors.green),
+                _buildMetricCard(
+                  'Resolved',
+                  '${_analytics['resolved_doubts'] ?? _analytics['totalResolved'] ?? 0}',
+                  Icons.check_circle_outline,
+                  Colors.green,
+                ),
                 const SizedBox(width: 10),
-                _buildMetricCard('Reopened', '${_analytics['reopened_doubts'] ?? 0}', Icons.replay, Colors.deepOrange),
+                _buildMetricCard(
+                  'Reopened',
+                  '${_analytics['reopened_doubts'] ?? _analytics['reopened'] ?? 0}',
+                  Icons.replay,
+                  Colors.deepOrange,
+                ),
                 const SizedBox(width: 10),
                 _buildMetricCard(
                   'Avg Resolution',
-                  _analytics['avg_resolution_hours'] != null
-                      ? '${_analytics['avg_resolution_hours']}h'
+                  (_analytics['avg_resolution_hours'] ?? _analytics['avgResolutionHours']) != null
+                      ? '${_analytics['avg_resolution_hours'] ?? _analytics['avgResolutionHours']}h'
                       : 'N/A',
                   Icons.timer_outlined,
                   Colors.purple,
@@ -347,7 +367,7 @@ class _DoubtMonitoringPageState extends State<DoubtMonitoringPage> {
                               separatorBuilder: (_, index) => const Divider(height: 1),
                               itemBuilder: (ctx, i) {
                                 final d = _doubts[i];
-                                final id = d['id'] as int;
+                                final id = int.tryParse('${d['id'] ?? d['doubt_id']}') ?? 0;
                                 final title = d['title'] ?? 'Doubt';
                                 final studentName = d['student_name'] ?? 'Student';
                                 final cl = d['class_level'] ?? '';
@@ -355,8 +375,8 @@ class _DoubtMonitoringPageState extends State<DoubtMonitoringPage> {
                                 final status = d['status'] ?? 'pending';
                                 final teacherName = d['assigned_teacher_name'];
                                 final handlingTeacher = d['handling_teacher_name'] ?? teacherName;
-                                final reopenCount = d['reopen_count'] ?? 0;
-                                final createdAt = d['created_at'];
+                                final reopenCount = int.tryParse('${d['reopen_count']}') ?? 0;
+                                final createdAt = d['created_at'] ?? d['submission_time'];
 
                                 return ListTile(
                                   onTap: () => _showDoubtDetail(id),
