@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/teacher_api_service.dart';
+import '../theme/app_tokens.dart';
 
 class TeacherLoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -46,172 +47,161 @@ class _TeacherLoginScreenState extends State<TeacherLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1E222D) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15);
-    final inputFill = isDark ? const Color(0xFF171A22) : Colors.white;
+    final cardColor = isDark ? AppColors.darkSurface : AppColors.surface;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
-            child: Card(
-              elevation: isDark ? 0 : 4,
-              color: cardColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: borderColor),
+            child: Container(
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(AppRadii.lg),
+                border: Border.all(color: borderColor, width: 1.1),
+                boxShadow: isDark ? AppShadows.darkSoft : AppShadows.soft,
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Brand Logo circle
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Brand Logo circle
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      gradient: AppGradients.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.35),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'IN',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 30,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Indraprastha NEET Academy',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Faculty & Teacher Portal',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  if (_error.isNotEmpty)
                     Container(
-                      width: 72,
-                      height: 72,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF002350),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x33D2AE39),
-                            blurRadius: 16,
-                            spreadRadius: 2,
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _error,
+                              style: const TextStyle(color: AppColors.danger, fontSize: 12),
+                            ),
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Text(
-                          'IN',
-                          style: TextStyle(
-                            color: Color(0xFFD2AE39),
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
+                    ),
+
+                  TextField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
+                    decoration: const InputDecoration(
+                      labelText: 'Faculty Email / ID',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: _passwordCtrl,
+                    obscureText: _obscurePassword,
+                    onSubmitted: (_) => _handleLogin(),
+                    style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: isDark ? Colors.grey.shade400 : AppColors.textSecondary,
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  FilledButton(
+                    onPressed: _loading ? null : _handleLogin,
+                    child: _loading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Sign In to Faculty Portal',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                           ),
-                        ),
-                      ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Access is restricted to authorized faculty members created by Academy Admin.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? AppColors.darkTextMuted : AppColors.textSecondary,
                     ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Indraprastha NEET Academy',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF002350),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Faculty & Teacher Portal',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? const Color(0xFFD2AE39) : Colors.grey.shade600,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-
-                    if (_error.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _error,
-                                style: const TextStyle(color: Colors.red, fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    TextField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                      decoration: InputDecoration(
-                        labelText: 'Faculty Email / ID',
-                        labelStyle: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
-                        prefixIcon: Icon(Icons.email_outlined, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: borderColor),
-                        ),
-                        filled: true,
-                        fillColor: inputFill,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    TextField(
-                      controller: _passwordCtrl,
-                      obscureText: _obscurePassword,
-                      onSubmitted: (_) => _handleLogin(),
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        labelStyle: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
-                        prefixIcon: Icon(Icons.lock_outline, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: isDark ? Colors.grey : null),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                        ),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: borderColor),
-                        ),
-                        filled: true,
-                        fillColor: inputFill,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
-                        foregroundColor: isDark ? const Color(0xFF002350) : Colors.white,
-                        minimumSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: _loading ? null : _handleLogin,
-                      child: _loading
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: isDark ? const Color(0xFF002350) : Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              'Sign In to Faculty Portal',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                            ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Access is restricted to authorized faculty members created by Academy Admin.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

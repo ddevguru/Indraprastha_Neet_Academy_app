@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/teacher_api_service.dart';
+import '../theme/app_tokens.dart';
 
 class WhiteboardStroke {
   final List<Offset> points;
@@ -86,7 +87,7 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
   final List<WhiteboardStroke> _strokes = [];
   final List<WhiteboardStroke> _redoStack = [];
 
-  Color _selectedColor = const Color(0xFF002350);
+  Color _selectedColor = const Color(0xFFE85A1C);
   double _strokeWidth = 3.0;
   bool _isEraser = false;
   bool _isMove = false;
@@ -108,12 +109,12 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
   Offset _lastSingleFingerPos = Offset.zero;
 
   final List<Color> _palette = const [
-    Color(0xFF002350), // Navy
-    Color(0xFFD2AE39), // Gold
-    Color(0xFF2E8B57), // SeaGreen
-    Color(0xFFD92D20), // Crimson Red
-    Color(0xFF1E88E5), // Blue
-    Color(0xFF141414), // Dark
+    AppColors.primary,
+    Color(0xFF1F8A54),
+    Color(0xFFD92D20),
+    Color(0xFF0284C7),
+    Color(0xFF6366F1),
+    Color(0xFF141414),
   ];
 
   @override
@@ -362,21 +363,18 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
       children: [
         // Top Toolbar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            color: isDark ? AppColors.darkSurface : AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadii.md),
+            border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border, width: 1.1),
+            boxShadow: isDark ? AppShadows.darkSoft : AppShadows.soft,
           ),
           child: Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -386,7 +384,7 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
               // Pen tool
               IconButton(
                 icon: const Icon(Icons.edit),
-                color: (!_isEraser && !_isMove) ? const Color(0xFF002350) : Colors.grey,
+                color: (!_isEraser && !_isMove) ? AppColors.primary : (isDark ? Colors.grey.shade400 : Colors.grey),
                 tooltip: 'Pen (Draw)',
                 onPressed: () => setState(() {
                   _isEraser = false;
@@ -396,7 +394,7 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
               // Eraser tool
               IconButton(
                 icon: const Icon(Icons.cleaning_services_outlined),
-                color: _isEraser ? const Color(0xFFD92D20) : Colors.grey,
+                color: _isEraser ? AppColors.danger : (isDark ? Colors.grey.shade400 : Colors.grey),
                 tooltip: 'Eraser',
                 onPressed: () => setState(() {
                   _isEraser = true;
@@ -406,7 +404,7 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
               // Move / Pan Canvas tool
               IconButton(
                 icon: const Icon(Icons.pan_tool_outlined),
-                color: _isMove ? const Color(0xFF002350) : Colors.grey,
+                color: _isMove ? AppColors.primary : (isDark ? Colors.grey.shade400 : Colors.grey),
                 tooltip: 'Move Canvas (Drag to move, Pinch to zoom)',
                 onPressed: () => setState(() {
                   _isMove = true;
@@ -622,14 +620,14 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.center_focus_strong, size: 14, color: Color(0xFF002350)),
+                                    const Icon(Icons.center_focus_strong, size: 14, color: AppColors.primary),
                                     const SizedBox(width: 4),
                                     Text(
                                       '${(_zoomScale * 100).toInt()}% • Reset View',
                                       style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF002350),
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ],
@@ -698,9 +696,9 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
             ),
             const SizedBox(width: 12),
             FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2E8B57)),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.success),
               icon: _publishing
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.publish, size: 18),
               label: const Text('Publish Solution to Student'),
               onPressed: _savingDraft || _publishing ? null : _publishSolution,

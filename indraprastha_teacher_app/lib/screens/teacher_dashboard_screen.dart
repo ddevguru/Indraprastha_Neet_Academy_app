@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/teacher_models.dart';
 import '../services/teacher_api_service.dart';
+import '../theme/app_tokens.dart';
+import '../theme/theme_controller.dart';
 import 'teacher_doubt_detail_screen.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {
@@ -58,51 +60,71 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   Widget _buildStatCard(BuildContext context, String label, String value, IconData icon, Color color) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Card(
-      elevation: 0,
-      color: isDark ? const Color(0xFF1E222D) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15)),
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border, width: 1.1),
+        boxShadow: isDark ? AppShadows.darkSoft : AppShadows.soft,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
-                Icon(icon, size: 20, color: color),
-              ],
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(icon, size: 16, color: color),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
+    switch (status.toLowerCase().replaceAll(' ', '_')) {
       case 'pending':
-        return const Color(0xFFD2AE39);
+        return AppColors.warning;
       case 'assigned':
-        return Colors.indigo;
+        return const Color(0xFF6366F1);
       case 'in_progress':
-        return Colors.blue;
+        return const Color(0xFF0EA5E9);
       case 'answered':
-        return Colors.teal;
+        return const Color(0xFF10B981);
       case 'resolved':
-        return const Color(0xFF2E8B57);
+        return AppColors.success;
       case 'reopened':
-        return const Color(0xFFD92D20);
+        return AppColors.danger;
       default:
         return Colors.grey;
     }
@@ -114,12 +136,25 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF002350),
-        foregroundColor: Colors.white,
-        title: const Text('Faculty Dashboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(
+          'Faculty Dashboard',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: isDark ? Colors.white : AppColors.textPrimary,
+          ),
+        ),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+              color: isDark ? AppColors.accentLight : AppColors.primary,
+            ),
+            tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+            onPressed: () => ThemeController.toggleTheme(context),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
@@ -128,27 +163,24 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : RefreshIndicator(
+              color: AppColors.primary,
               onRefresh: _fetchDashboard,
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // Welcome Header Card
+                  // Welcome Header Card with Student-App Brand Gradient
                   Container(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF002350), Color(0xFF0A3772)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
+                      gradient: AppGradients.primary,
+                      borderRadius: BorderRadius.circular(AppRadii.lg),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF002350).withValues(alpha: 0.2),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
                         ),
                       ],
                     ),
@@ -158,15 +190,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         Row(
                           children: [
                             CircleAvatar(
-                              radius: 22,
-                              backgroundColor: const Color(0xFFD2AE39),
-                              foregroundColor: const Color(0xFF002350),
+                              radius: 24,
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppColors.primary,
                               child: Text(
                                 (profile?.displayName.isNotEmpty == true ? profile!.displayName[0] : 'T').toUpperCase(),
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,7 +214,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     'Code: ${profile?.teacherCode ?? '—'} • ${profile?.email ?? ''}',
-                                    style: const TextStyle(color: Color(0xFFD2AE39), fontSize: 12),
+                                    style: const TextStyle(color: Colors.white70, fontSize: 12),
                                   ),
                                 ],
                               ),
@@ -204,7 +236,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                             return Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
+                                color: Colors.white.withValues(alpha: 0.18),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -218,143 +250,190 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
                   if (_error.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.all(12),
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.danger.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
                       ),
-                      child: Text(_error, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                      child: Text(_error, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
                     ),
 
                   // KPI Grid
-                  Text(
-                    'Doubt Resolution Overview',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Doubt Resolution Overview',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   GridView.count(
                     crossAxisCount: 3,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
-                    childAspectRatio: 1.1,
+                    childAspectRatio: 1.15,
                     children: [
-                      _buildStatCard(context, 'Pending', '${_stats['pending'] ?? 0}', Icons.hourglass_empty, const Color(0xFFD2AE39)),
-                      _buildStatCard(context, 'Assigned', '${_stats['assigned'] ?? 0}', Icons.assignment_ind_outlined, Colors.indigo),
-                      _buildStatCard(context, 'In Progress', '${_stats['inProgress'] ?? _stats['in_progress'] ?? 0}', Icons.pending_actions_outlined, Colors.blue),
-                      _buildStatCard(context, 'Answered', '${_stats['answered'] ?? 0}', Icons.done, Colors.teal),
-                      _buildStatCard(context, 'Resolved', '${_stats['resolved'] ?? 0}', Icons.check_circle_outline, const Color(0xFF2E8B57)),
-                      _buildStatCard(context, 'Reopened', '${_stats['reopened'] ?? 0}', Icons.replay, const Color(0xFFD92D20)),
+                      _buildStatCard(context, 'Pending', '${_stats['pending'] ?? 0}', Icons.hourglass_empty, AppColors.warning),
+                      _buildStatCard(context, 'Assigned', '${_stats['assigned'] ?? 0}', Icons.assignment_ind_outlined, const Color(0xFF6366F1)),
+                      _buildStatCard(context, 'In Progress', '${_stats['inProgress'] ?? _stats['in_progress'] ?? 0}', Icons.pending_actions_outlined, const Color(0xFF0EA5E9)),
+                      _buildStatCard(context, 'Answered', '${_stats['answered'] ?? 0}', Icons.done, const Color(0xFF10B981)),
+                      _buildStatCard(context, 'Resolved', '${_stats['resolved'] ?? 0}', Icons.check_circle_outline, AppColors.success),
+                      _buildStatCard(context, 'Reopened', '${_stats['reopened'] ?? 0}', Icons.replay, AppColors.danger),
                     ],
                   ),
 
                   const SizedBox(height: 20),
 
-                  // Queue CTA
-                  Card(
-                    color: const Color(0xFF002350),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD2AE39).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.school, color: Color(0xFFD2AE39), size: 28),
+                  // Queue CTA Card
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurface : AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppRadii.lg),
+                      border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border, width: 1.1),
+                      boxShadow: isDark ? AppShadows.darkSoft : AppShadows.soft,
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(width: 14),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Subject Doubts Queue', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                                SizedBox(height: 2),
-                                Text('Claim & solve pending doubts for students', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                              ],
-                            ),
+                          child: const Icon(Icons.school_outlined, color: AppColors.primary, size: 26),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Subject Doubts Queue',
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Claim & solve pending doubts for students',
+                                style: TextStyle(
+                                  color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFFD2AE39),
-                              foregroundColor: const Color(0xFF002350),
-                            ),
-                            onPressed: widget.onOpenQueue,
-                            child: const Text('Open Queue', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            minimumSize: const Size(0, 42),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.sm)),
                           ),
-                        ],
-                      ),
+                          onPressed: widget.onOpenQueue,
+                          child: const Text('Open Queue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                      ],
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
                   // Recent doubts section
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Recent Assigned Doubts',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Recent Assigned Doubts',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                       TextButton(
                         onPressed: widget.onOpenQueue,
-                        child: const Text('View All →'),
+                        style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                        child: const Text('View All →', style: TextStyle(fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
 
                   if (_recentDoubts.isEmpty)
-                    Card(
-                      elevation: 0,
-                      color: isDark ? const Color(0xFF1E222D) : Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkSurface : AppColors.surface,
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border, width: 1.1),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              const Icon(Icons.check_circle_outline, color: Color(0xFF2E8B57), size: 36),
-                              const SizedBox(height: 8),
-                              Text(
-                                'No pending doubts in your queue right now!',
-                                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.black87),
+                      padding: const EdgeInsets.all(32),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            const Icon(Icons.check_circle_outline, color: AppColors.success, size: 36),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No pending doubts in your queue right now!',
+                              style: TextStyle(
+                                color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                                fontSize: 13,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     )
                   else
                     ..._recentDoubts.map((doubt) {
-                      return Card(
-                        elevation: 0,
-                        color: isDark ? const Color(0xFF1E222D) : Colors.white,
+                      final statusColor = _getStatusColor(doubt.status);
+
+                      return Container(
                         margin: const EdgeInsets.only(bottom: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: isDark ? const Color(0xFF2E3545) : Colors.grey.withValues(alpha: 0.15)),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.darkSurface : AppColors.surface,
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border, width: 1.1),
+                          boxShadow: isDark ? AppShadows.darkSoft : AppShadows.soft,
                         ),
                         child: ListTile(
                           onTap: () async {
@@ -366,8 +445,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                             _fetchDashboard();
                           },
                           leading: CircleAvatar(
-                            backgroundColor: _getStatusColor(doubt.status).withValues(alpha: 0.15),
-                            child: Icon(Icons.help_outline, color: _getStatusColor(doubt.status)),
+                            backgroundColor: statusColor.withValues(alpha: 0.15),
+                            child: Icon(Icons.quiz_outlined, color: statusColor, size: 20),
                           ),
                           title: Text(
                             doubt.title,
@@ -376,23 +455,30 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              color: isDark ? Colors.white : Colors.black87,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                             ),
                           ),
-                          subtitle: Text(
-                            '${doubt.classLevel} • ${doubt.subject} • Doubt #${doubt.id}',
-                            style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '${doubt.classLevel} • ${doubt.subject} • Doubt #${doubt.id}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppColors.darkTextMuted : AppColors.textSecondary,
+                              ),
+                            ),
                           ),
                           trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: _getStatusColor(doubt.status).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                             ),
                             child: Text(
-                              doubt.status.toUpperCase(),
+                              doubt.status.toUpperCase().replaceAll('_', ' '),
                               style: TextStyle(
-                                color: _getStatusColor(doubt.status),
+                                color: statusColor,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 10,
                               ),
