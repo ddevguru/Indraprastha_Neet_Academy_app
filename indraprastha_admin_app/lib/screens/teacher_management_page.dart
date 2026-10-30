@@ -58,8 +58,8 @@ class _TeacherManagementPageState extends State<TeacherManagementPage> {
             return AlertDialog(
               title: const Text('Add Faculty Teacher'),
               content: SingleChildScrollView(
-                child: SizedBox(
-                  width: 440,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -181,6 +181,14 @@ class _TeacherManagementPageState extends State<TeacherManagementPage> {
                             );
                             if (ctx.mounted) Navigator.of(ctx).pop();
                             _loadTeachers();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Faculty teacher "${nameCtrl.text.trim()}" created successfully!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
                           } catch (e) {
                             setDialogState(() {
                               busy = false;
@@ -310,8 +318,8 @@ class _TeacherManagementPageState extends State<TeacherManagementPage> {
                   Text('$teacherName Workload'),
                 ],
               ),
-              content: SizedBox(
-                width: 380,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -374,44 +382,102 @@ class _TeacherManagementPageState extends State<TeacherManagementPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showCreateTeacherDialog,
+        icon: const Icon(Icons.person_add_alt_1),
+        label: const Text('Add Teacher', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF002350),
+        foregroundColor: Colors.white,
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 650;
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Teacher & Faculty Management',
+                              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          IconButton.filledTonal(
+                            icon: const Icon(Icons.refresh),
+                            tooltip: 'Refresh',
+                            onPressed: _loadTeachers,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Manage subject teachers, assign classes, and monitor doubt workload',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          icon: const Icon(Icons.person_add_alt_1),
+                          label: const Text('Add Faculty Teacher'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF002350),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: _showCreateTeacherDialog,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Teacher & Faculty Management',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Teacher & Faculty Management',
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Manage subject teachers, assign classes, and monitor doubt workload',
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Manage subject teachers, assign classes, and monitor doubt workload',
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    const SizedBox(width: 12),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          tooltip: 'Refresh',
+                          onPressed: _loadTeachers,
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          icon: const Icon(Icons.person_add_alt_1),
+                          label: const Text('Add Faculty Teacher'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF002350),
+                          ),
+                          onPressed: _showCreateTeacherDialog,
+                        ),
+                      ],
                     ),
                   ],
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      tooltip: 'Refresh',
-                      onPressed: _loadTeachers,
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      icon: const Icon(Icons.person_add),
-                      label: const Text('Add Teacher'),
-                      onPressed: _showCreateTeacherDialog,
-                    ),
-                  ],
-                ),
-              ],
+                );
+              },
             ),
             const SizedBox(height: 16),
             if (_error.isNotEmpty)
@@ -435,18 +501,37 @@ class _TeacherManagementPageState extends State<TeacherManagementPage> {
                               const Icon(Icons.school_outlined, size: 48, color: Colors.grey),
                               const SizedBox(height: 12),
                               const Text('No teachers created yet'),
-                              const SizedBox(height: 8),
-                              FilledButton(
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                icon: const Icon(Icons.person_add_alt_1),
                                 onPressed: _showCreateTeacherDialog,
-                                child: const Text('Create First Teacher'),
+                                label: const Text('Create First Teacher'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF002350),
+                                ),
                               ),
                             ],
                           ),
                         )
                       : ListView.separated(
-                          itemCount: _teachers.length,
+                          itemCount: _teachers.length + 1,
                           separatorBuilder: (_, index) => const SizedBox(height: 12),
                           itemBuilder: (ctx, i) {
+                            if (i == _teachers.length) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8, bottom: 84),
+                                child: Center(
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                    ),
+                                    icon: const Icon(Icons.person_add_alt_1),
+                                    label: const Text('Add Another Faculty Teacher'),
+                                    onPressed: _showCreateTeacherDialog,
+                                  ),
+                                ),
+                              );
+                            }
                             final teacher = _teachers[i];
                             final id = teacher['id'] as int;
                             final name = teacher['display_name'] ?? 'Teacher';
