@@ -723,7 +723,7 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                                 Text(
                                   resp.responseText,
                                   maxLines: 3,
-                                  overflow: TextStream.ellipsis,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 14,
                                     height: 1.4,
@@ -770,7 +770,7 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                                               child: Text(
                                                 att.originalFilename,
                                                 maxLines: 1,
-                                                overflow: TextStream.ellipsis,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.bold,

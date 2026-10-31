@@ -71,7 +71,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
 
     setState(() => _isResolving = true);
     try {
-      await _service.markDoubtResolved(_doubt.id);
+      await _service.confirmResolution(_doubt.id);
       final updated = await _service.fetchDoubtDetail(_doubt.id);
       if (mounted) {
         setState(() {
@@ -132,7 +132,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
               if (reason.isEmpty) return;
               Navigator.pop(ctx);
               try {
-                await _service.reopenDoubt(_doubt.id, reason: reason);
+                await _service.reopenDoubt(_doubt.id, reason);
                 final updated = await _service.fetchDoubtDetail(_doubt.id);
                 if (mounted) {
                   setState(() => _doubt = updated);
@@ -197,7 +197,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                                 Text(
                                   att.originalFilename,
                                   maxLines: 1,
-                                  overflow: TextStream.ellipsis,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
@@ -443,7 +443,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                     Text(
                       _doubt.description,
                       maxLines: 2,
-                      overflow: TextStream.ellipsis,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
@@ -560,7 +560,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                                 child: Text(
                                   att.originalFilename,
                                   maxLines: 1,
-                                  overflow: TextStream.ellipsis,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
@@ -700,7 +700,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                               Text(
                                 att.originalFilename,
                                 maxLines: 1,
-                                overflow: TextStream.ellipsis,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
                               ),
                             ],
@@ -756,7 +756,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                               Text(
                                 att.originalFilename,
                                 maxLines: 1,
-                                overflow: TextStream.ellipsis,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
                               ),
                             ],
@@ -810,7 +810,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                             Text(
                               att.originalFilename,
                               maxLines: 1,
-                              overflow: TextStream.ellipsis,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                             ),
                             const SizedBox(height: 2),

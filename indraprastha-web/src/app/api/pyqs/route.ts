@@ -14,7 +14,7 @@ interface ChapterItem {
 }
 
 // In-memory cache initialized with compiled seed catalog for instant response
-let cachedChapters: ChapterItem[] = (seedChapters as ChapterItem[]) || [];
+let cachedChapters: ChapterItem[] = (seedChapters as unknown as ChapterItem[]) || [];
 let cacheTime = 0;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
