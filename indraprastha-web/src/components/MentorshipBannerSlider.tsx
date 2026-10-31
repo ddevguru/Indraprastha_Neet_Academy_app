@@ -11,6 +11,16 @@ interface SlideItem {
 
 const SLIDES: SlideItem[] = [
   {
+    src: "/one_to_one_mentorship_banner.png",
+    alt: "1-to-1 Mentorship By Dr Rahul Kumar – For Premium Users",
+    title: "1-to-1 Mentorship By Dr Rahul Kumar",
+  },
+  {
+    src: "/doubt_solving_community_banner.png",
+    alt: "Doubt Solving Community – Helping to overcome doubts while learning",
+    title: "Doubt Solving Community",
+  },
+  {
     src: "/cbt_mode_banner.png",
     alt: "Practice in CBT Mode – Experience CBT Mode every day on Indraprastha NEET Academy",
     title: "Practice in CBT Mode",
@@ -19,11 +29,6 @@ const SLIDES: SlideItem[] = [
     src: "/master_mistakes_banner.png",
     alt: "Don't Just Find Your Mistakes. Master Them – Solve Similar Questions after every attempt",
     title: "Master Your Mistakes with Similar Questions",
-  },
-  {
-    src: "/doubt_solving_banner.png",
-    alt: "24x7 Doubt Solving Telegram Channel – Ask doubts and get them solved immediately",
-    title: "24x7 Doubt Solving Channel",
   },
 ];
 
