@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../theme/app_tokens.dart';
 import '../models/community_models.dart';
 import '../services/community_service.dart';
 import 'community_chat_screen.dart';
@@ -19,8 +20,8 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
   bool _isLoading = true;
   int _doubtsKey = 0;
 
-  static const navyColor = Color(0xFF002350);
-  static const goldColor = Color(0xFFD2AE39);
+  static const brandColor = AppColors.primary;
+  static const brandAccent = AppColors.accentLight;
 
   @override
   void initState() {
@@ -152,11 +153,11 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headingColor = isDark ? Colors.white : navyColor;
-    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final headingColor = isDark ? Colors.white : AppColors.textPrimary;
+    final subtitleColor = isDark ? Colors.grey.shade400 : AppColors.textSecondary;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : AppColors.background,
       body: Column(
         children: [
           // Header
@@ -171,10 +172,10 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: (isDark ? goldColor : navyColor).withValues(alpha: 0.12),
+                        color: (isDark ? brandAccent : brandColor).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.forum, color: isDark ? goldColor : navyColor, size: 20),
+                      child: Icon(Icons.forum, color: isDark ? brandAccent : brandColor, size: 20),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -196,9 +197,9 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                 const SizedBox(height: 12),
                 TabBar(
                   controller: _tabController,
-                  indicatorColor: isDark ? goldColor : navyColor,
-                  labelColor: isDark ? goldColor : navyColor,
-                  unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey,
+                  indicatorColor: brandColor,
+                  labelColor: brandColor,
+                  unselectedLabelColor: isDark ? Colors.grey.shade400 : AppColors.textSecondary,
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   tabs: const [
                     Tab(
@@ -229,13 +230,13 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                               padding: const EdgeInsets.all(14),
                               margin: const EdgeInsets.only(bottom: 16),
                               decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEBF8FF),
+                                color: isDark ? const Color(0xFF2A1E17) : AppColors.primarySoft,
                                 borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBEE3F8)),
+                                border: Border.all(color: isDark ? const Color(0xFF4A3425) : AppColors.border),
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.shield_outlined, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF3182CE), size: 24),
+                                  Icon(Icons.shield_outlined, color: isDark ? brandAccent : brandColor, size: 24),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
@@ -246,7 +247,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13,
-                                            color: isDark ? const Color(0xFF93C5FD) : Colors.blue.shade900,
+                                            color: isDark ? brandAccent : AppColors.primaryDark,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
@@ -254,7 +255,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                                           'Each of the 6 workspaces below belongs only to your account. Open a subject to chat, draw on whiteboard, and ask doubts.',
                                           style: TextStyle(
                                             fontSize: 11,
-                                            color: isDark ? const Color(0xFFBFDBFE) : Colors.blue.shade800,
+                                            color: isDark ? Colors.white70 : AppColors.textSecondary,
                                           ),
                                         ),
                                       ],
@@ -334,7 +335,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: (isDark ? goldColor : navyColor).withValues(alpha: 0.12),
+                        color: (isDark ? brandAccent : brandColor).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -342,7 +343,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? goldColor : navyColor,
+                          color: isDark ? brandAccent : brandColor,
                         ),
                       ),
                     ),

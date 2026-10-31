@@ -226,24 +226,43 @@ class TeacherApiService {
 
   // Direct upload to Admin Google Drive via backend
   static Future<DoubtMediaAttachment> uploadFileToDrive(File file, {String subfolder = 'DoubtMedia'}) async {
-    final uri = Uri.parse('$baseUrl/community/upload');
-    final req = http.MultipartRequest('POST', uri);
-    if (_token != null && _token!.isNotEmpty) {
-      req.headers['Authorization'] = 'Bearer $_token';
+    // Try /teacher/upload first, fallback to /community/upload
+    final endpoints = [
+      '$baseUrl/teacher/upload',
+      '$baseUrl/community/upload',
+    ];
+
+    String lastError = '';
+    for (final ep in endpoints) {
+      try {
+        final uri = Uri.parse(ep);
+        final req = http.MultipartRequest('POST', uri);
+        if (_token != null && _token!.isNotEmpty) {
+          req.headers['Authorization'] = 'Bearer $_token';
+        }
+        req.fields['subfolder'] = subfolder;
+
+        final bytes = await file.readAsBytes();
+        final name = file.path.split(Platform.pathSeparator).last;
+        req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: name));
+
+        final streamed = await req.send();
+        final body = await streamed.stream.bytesToString();
+        if (streamed.statusCode >= 200 && streamed.statusCode < 300) {
+          final data = jsonDecode(body);
+          return DoubtMediaAttachment.fromJson(data['file']);
+        }
+        lastError = body;
+        // If 404 or route not found, try next endpoint
+        if (streamed.statusCode != 404) {
+          throw Exception('Failed to upload file to Google Drive: $body');
+        }
+      } catch (e) {
+        if (!e.toString().contains('404')) {
+          rethrow;
+        }
+      }
     }
-    req.fields['subfolder'] = subfolder;
-
-    final bytes = await file.readAsBytes();
-    final name = file.path.split(Platform.pathSeparator).last;
-    req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: name));
-
-    final streamed = await req.send();
-    final body = await streamed.stream.bytesToString();
-    if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
-      throw Exception('Failed to upload file to Google Drive: $body');
-    }
-
-    final data = jsonDecode(body);
-    return DoubtMediaAttachment.fromJson(data['file']);
+    throw Exception('Failed to upload file to Google Drive: $lastError');
   }
 }

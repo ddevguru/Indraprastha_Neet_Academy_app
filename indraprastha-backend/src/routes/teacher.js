@@ -2,7 +2,14 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
 const { pool } = require('../db');
+const { uploadMediaToAdminDrive } = require('../services/communityDriveService');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max
+});
 
 // Teacher Auth Middleware
 async function teacherAuth(req, res, next) {
@@ -875,6 +882,43 @@ router.post('/doubts/:doubtId/resolve', teacherAuth, async (req, res) => {
     res.status(500).json({ error: 'Failed to resolve doubt' });
   } finally {
     client.release();
+  }
+});
+
+/**
+ * POST /api/teacher/upload
+ * Direct file upload to Google Drive for teachers
+ */
+router.post('/upload', teacherAuth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const { subfolder = 'TeacherAnswers' } = req.body;
+    const uploadResult = await uploadMediaToAdminDrive({
+      fileBuffer: req.file.buffer,
+      fileName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      subfolder,
+    });
+
+    res.json({
+      success: true,
+      file: {
+        originalFilename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+        driveFileId: uploadResult.driveFileId,
+        viewLink: uploadResult.viewLink,
+        downloadLink: uploadResult.downloadLink,
+        imageLink: uploadResult.imageLink,
+        storageKey: uploadResult.storageKey,
+      },
+    });
+  } catch (err) {
+    console.error('[TEACHER_UPLOAD_ERROR]', err);
+    res.status(500).json({ error: 'Failed to upload media to Google Drive' });
   }
 });
 

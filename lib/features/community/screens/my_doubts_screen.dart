@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../theme/app_tokens.dart';
 import '../models/community_models.dart';
 import '../services/community_service.dart';
 import 'teacher_solution_whiteboard_screen.dart';
@@ -56,13 +57,13 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
       case 'Pending':
         return Colors.orange;
       case 'Assigned':
-        return Colors.blue;
+        return AppColors.primary;
       case 'In Progress':
-        return const Color(0xFFD2AE39);
+        return const Color(0xFFD97706);
       case 'Answered':
-        return const Color(0xFF2E8B57);
+        return AppColors.success;
       case 'Resolved':
-        return const Color(0xFF002350);
+        return AppColors.primaryDark;
       case 'Reopened':
         return Colors.deepPurple;
       default:
@@ -84,7 +85,7 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : AppColors.background,
       body: Column(
         children: [
           // Filter Chips
@@ -101,7 +102,7 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
                     child: ChoiceChip(
                       label: Text(f),
                       selected: isSelected,
-                      selectedColor: const Color(0xFF002350),
+                      selectedColor: AppColors.primary,
                       labelStyle: TextStyle(
                         color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -177,7 +178,7 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
-                                              color: (isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)).withValues(alpha: 0.12),
+                                              color: (isDark ? AppColors.accentLight : AppColors.primary).withValues(alpha: 0.12),
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             child: Text(
@@ -185,7 +186,7 @@ class _MyDoubtsScreenState extends State<MyDoubtsScreen> {
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
-                                                color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                                                color: isDark ? AppColors.accentLight : AppColors.primary,
                                               ),
                                             ),
                                           ),
@@ -318,8 +319,8 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
-              foregroundColor: isDark ? const Color(0xFF002350) : Colors.white,
+              backgroundColor: isDark ? AppColors.accentLight : AppColors.primary,
+              foregroundColor: isDark ? AppColors.primaryDark : Colors.white,
             ),
             onPressed: () async {
               final text = controller.text.trim();
@@ -386,7 +387,7 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF002350),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         title: Text('Doubt #${d.id}'),
         actions: [
@@ -395,10 +396,10 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
               padding: const EdgeInsets.only(right: 8),
               child: TextButton.icon(
                 onPressed: _reopenDialog,
-                icon: const Icon(Icons.replay_rounded, color: Color(0xFFD2AE39), size: 18),
-                label: const Text(
+                icon: Icon(Icons.replay_rounded, color: AppColors.accentLight, size: 18),
+                label: Text(
                   'Reopen',
-                  style: TextStyle(color: Color(0xFFD2AE39), fontWeight: FontWeight.bold),
+                  style: TextStyle(color: AppColors.accentLight, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -429,7 +430,7 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: (isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)).withValues(alpha: 0.12),
+                                  color: (isDark ? AppColors.accentLight : AppColors.primary).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -437,7 +438,7 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
-                                    color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                                    color: isDark ? AppColors.accentLight : AppColors.primary,
                                   ),
                                 ),
                               ),
@@ -530,7 +531,7 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
 
                   if (d.publishedSolutionWhiteboard != null)
                     Card(
-                      color: const Color(0xFF002350),
+                      color: isDark ? const Color(0xFF1E222D) : AppColors.primary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -539,10 +540,10 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFD2AE39).withValues(alpha: 0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.draw, color: Color(0xFFD2AE39), size: 28),
+                              child: const Icon(Icons.draw, color: Colors.white, size: 28),
                             ),
                             const SizedBox(width: 14),
                             const Expanded(
@@ -563,8 +564,8 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                             ),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFD2AE39),
-                                foregroundColor: const Color(0xFF002350),
+                                backgroundColor: Colors.white,
+                                foregroundColor: AppColors.primary,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
                               onPressed: () {
@@ -591,14 +592,14 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
 
                   Row(
                     children: [
-                      Icon(Icons.school, color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350), size: 20),
+                      Icon(Icons.school, color: isDark ? AppColors.accentLight : AppColors.primary, size: 20),
                       const SizedBox(width: 8),
                       Text(
                         'Teacher Answers (${d.responses.length})',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                          color: isDark ? AppColors.accentLight : AppColors.primary,
                         ),
                       ),
                     ],
@@ -669,8 +670,8 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                                     children: [
                                       CircleAvatar(
                                         radius: 14,
-                                        backgroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
-                                        child: Icon(Icons.person, size: 16, color: isDark ? const Color(0xFF002350) : Colors.white),
+                                        backgroundColor: isDark ? AppColors.primaryDark : AppColors.primarySoft,
+                                        child: Icon(Icons.person, size: 16, color: isDark ? Colors.white : AppColors.primary),
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
@@ -727,8 +728,18 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                                         ),
                                       );
                                     }
+                                    if (att.isVideo) {
+                                      return ActionChip(
+                                        avatar: const Icon(Icons.play_circle_fill, size: 15, color: Color(0xFF805AD5)),
+                                        label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
+                                        onPressed: () {
+                                          final link = att.driveViewLink.isNotEmpty ? att.driveViewLink : att.storageKey;
+                                          if (link.isNotEmpty) launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                        },
+                                      );
+                                    }
                                     return ActionChip(
-                                      avatar: Icon(att.isAudio ? Icons.audiotrack : Icons.attachment, size: 15, color: const Color(0xFFD2AE39)),
+                                      avatar: Icon(att.isAudio ? Icons.audiotrack : Icons.attachment, size: 15, color: att.isAudio ? const Color(0xFFDD6B20) : AppColors.primary),
                                       label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
                                       onPressed: () {
                                         final link = att.isAudio ? att.directAudioUrl : (att.driveViewLink.isNotEmpty ? att.driveViewLink : att.storageKey);
@@ -753,8 +764,8 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              side: BorderSide(color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)),
-                              foregroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                              side: BorderSide(color: isDark ? AppColors.accentLight : AppColors.primary),
+                              foregroundColor: isDark ? AppColors.accentLight : AppColors.primary,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: _reopenDialog,
@@ -807,10 +818,10 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 13),
                               side: BorderSide(
-                                color: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                                color: isDark ? AppColors.accentLight : AppColors.primary,
                                 width: 1.5,
                               ),
-                              foregroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
+                              foregroundColor: isDark ? AppColors.accentLight : AppColors.primary,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: _reopenDialog,

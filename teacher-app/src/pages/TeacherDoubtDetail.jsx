@@ -366,56 +366,124 @@ export default function TeacherDoubtDetail({ doubtId, onBack }) {
                 {/* Upload to Google Drive */}
                 <div className="form-group" style={{ marginTop: '14px' }}>
                   <label>Solution Attachments (Saved directly to Admin Google Drive)</label>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileUpload}
-                      style={{ display: 'none' }}
-                      accept="image/*,video/*,audio/*,.pdf"
-                    />
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    style={{ display: 'none' }}
+                    accept="image/*,video/*,audio/*,.pdf"
+                  />
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="btn btn-outline"
                       disabled={isUploading}
-                      onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.accept = 'image/*';
+                          fileInputRef.current.click();
+                        }
+                      }}
                     >
-                      {isUploading ? 'Uploading to Drive...' : '📎 Upload File to Drive'}
+                      📷 Add Photo
                     </button>
-                    <span style={{ fontSize: '12px', color: 'var(--color-muted)' }}>
-                      Supports Images, Videos, Voice notes, and PDF
-                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={isUploading}
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.accept = 'video/*';
+                          fileInputRef.current.click();
+                        }
+                      }}
+                      style={{ color: '#6366F1', borderColor: '#C7D2FE' }}
+                    >
+                      🎥 Add Video
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={isUploading}
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.accept = 'audio/*';
+                          fileInputRef.current.click();
+                        }
+                      }}
+                      style={{ color: '#D97706', borderColor: '#FDE68A' }}
+                    >
+                      🎙️ Add Audio
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={isUploading}
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.accept = '.pdf,application/pdf';
+                          fileInputRef.current.click();
+                        }
+                      }}
+                      style={{ color: '#16A34A', borderColor: '#BBF7D0' }}
+                    >
+                      📄 Add PDF
+                    </button>
                   </div>
+                  {isUploading && (
+                    <div style={{ fontSize: '12px', color: 'var(--color-navy)', marginTop: '6px', fontStyle: 'italic' }}>
+                      ⏳ Uploading media to Admin Google Drive...
+                    </div>
+                  )}
                   {uploadError && <div className="alert-error" style={{ marginTop: '8px' }}>{uploadError}</div>}
                 </div>
 
                 {/* List of attached files */}
                 {attachments.length > 0 && (
-                  <div style={{ marginTop: '12px', background: '#F8F9FC', padding: '10px', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>Attached Files:</div>
-                    {attachments.map((att, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '4px 0',
-                          fontSize: '12px',
-                          borderBottom: '1px solid #ECECEC'
-                        }}
-                      >
-                        <span>📎 {att.original_filename}</span>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline"
-                          onClick={() => removeAttachment(idx)}
-                          style={{ color: '#D92D20' }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
+                  <div style={{ marginTop: '12px', background: '#F8F9FC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Attached Files ({attachments.length}):</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {attachments.map((att, idx) => {
+                        const isImg = att.mime_type?.startsWith('image/') || att.original_filename?.match(/\.(jpg|jpeg|png|webp)$/i);
+                        const isVid = att.mime_type?.startsWith('video/') || att.original_filename?.match(/\.(mp4|mov|mkv|webm)$/i);
+                        const isAud = att.mime_type?.startsWith('audio/') || att.original_filename?.match(/\.(mp3|m4a|wav|aac)$/i);
+                        const isPdf = att.mime_type?.includes('pdf') || att.original_filename?.endsWith('.pdf');
+
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '6px 10px',
+                              fontSize: '12px',
+                              background: '#FFF',
+                              borderRadius: '6px',
+                              border: '1px solid #E2E8F0',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                              <span>{isImg ? '🖼️' : isVid ? '🎥' : isAud ? '🎵' : isPdf ? '📄' : '📎'}</span>
+                              <span style={{ fontWeight: 600, color: '#334155' }} className="truncate">
+                                {att.original_filename}
+                              </span>
+                              <span style={{ fontSize: '10px', color: '#94A3B8', marginLeft: '4px' }}>
+                                ({isImg ? 'PHOTO' : isVid ? 'VIDEO' : isAud ? 'AUDIO' : isPdf ? 'PDF' : 'FILE'})
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline"
+                              onClick={() => removeAttachment(idx)}
+                              style={{ color: '#D92D20', padding: '2px 8px', fontSize: '11px' }}
+                            >
+                              ✕ Remove
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 

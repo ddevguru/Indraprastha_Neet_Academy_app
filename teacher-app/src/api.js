@@ -182,11 +182,20 @@ export async function uploadMediaFile(file, subfolder = 'DoubtMedia') {
   const headers = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}/community/upload`, {
+  let res = await fetch(`${API_BASE}/teacher/upload`, {
     method: 'POST',
     headers,
     body: formData,
   });
+
+  if (res.status === 404) {
+    res = await fetch(`${API_BASE}/community/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+  }
+
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Upload to Google Drive failed');
   return data.file;

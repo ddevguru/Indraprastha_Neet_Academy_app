@@ -44,6 +44,66 @@ async function studentAuth(req, res, next) {
   }
 }
 
+// Media Upload Authentication Middleware (permits Students, Teachers, and Admins)
+async function uploadAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    const token = header.slice(7).trim();
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+
+    // 1. Teacher authentication
+    if (payload.role === 'teacher' && payload.teacherId) {
+      const teacherRes = await pool.query(
+        'SELECT id, teacher_code, display_name, email, is_active FROM teacher_profiles WHERE id = $1',
+        [payload.teacherId]
+      );
+      if (teacherRes.rows.length === 0) {
+        return res.status(401).json({ error: 'Teacher profile not found' });
+      }
+      const teacher = teacherRes.rows[0];
+      if (!teacher.is_active) {
+        return res.status(403).json({ error: 'Teacher account is deactivated' });
+      }
+      req.teacher = teacher;
+      req.userRole = 'teacher';
+      return next();
+    }
+
+    // 2. Admin authentication
+    if (payload.role === 'admin') {
+      req.admin = payload;
+      req.userRole = 'admin';
+      return next();
+    }
+
+    // 3. Student authentication (payload.id)
+    if (payload.id) {
+      const userRes = await pool.query(
+        'SELECT id, phone, is_blocked, active_session_id FROM users WHERE id = $1',
+        [payload.id]
+      );
+      if (userRes.rows.length === 0) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      const user = userRes.rows[0];
+      if (user.is_blocked) {
+        return res.status(403).json({ error: 'Account has been suspended' });
+      }
+      req.user = { id: user.id, phone: user.phone };
+      req.userRole = 'student';
+      return next();
+    }
+
+    return res.status(401).json({ error: 'Invalid authentication payload' });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
 const SIX_SUBJECTS = [
   { classLevel: 'Class 11', subject: 'Chemistry', icon: '🧪', color: '#D2AE39' },
   { classLevel: 'Class 11', subject: 'Biology', icon: '🧬', color: '#2E8B57' },
@@ -209,7 +269,7 @@ router.get('/:communityId/messages', studentAuth, async (req, res) => {
  * POST /api/community/upload
  * Direct file upload to Admin's Google Drive
  */
-router.post('/upload', studentAuth, upload.single('file'), async (req, res) => {
+router.post('/upload', uploadAuth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file provided' });

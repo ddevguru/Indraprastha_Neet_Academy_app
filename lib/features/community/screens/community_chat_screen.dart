@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../theme/app_tokens.dart';
 import '../models/community_models.dart';
 import '../services/community_service.dart';
 import 'my_doubts_screen.dart';
@@ -492,15 +493,15 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const themeNavy = Color(0xFF002350);
-    const themeGold = Color(0xFFD2AE39);
+    const themePrimary = AppColors.primary;
+    const themeAccent = AppColors.accentLight;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF11131A) : AppColors.background,
       appBar: AppBar(
-        backgroundColor: themeNavy,
+        backgroundColor: themePrimary,
         foregroundColor: Colors.white,
         elevation: 1,
         title: Row(
@@ -536,17 +537,17 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEBF8FF),
+            color: isDark ? const Color(0xFF2A1E17) : AppColors.primarySoft,
             child: Row(
               children: [
-                Icon(Icons.info_outline, size: 15, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF3182CE)),
+                Icon(Icons.info_outline, size: 15, color: isDark ? themeAccent : themePrimary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Directly type your doubts, questions, or notes below. Teachers can review and assist you right here.',
                     style: TextStyle(
                       fontSize: 11,
-                      color: isDark ? const Color(0xFFBFDBFE) : Colors.blue.shade900,
+                      color: isDark ? Colors.white70 : AppColors.primaryDark,
                     ),
                   ),
                 ),
@@ -595,7 +596,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                     constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: themeNavy,
+                                      color: themePrimary,
                                       borderRadius: const BorderRadius.only(
                                         topLeft: Radius.circular(16),
                                         topRight: Radius.circular(16),
@@ -614,18 +615,18 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                             margin: const EdgeInsets.only(bottom: 6),
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                             decoration: BoxDecoration(
-                                              color: themeGold.withValues(alpha: 0.25),
+                                              color: themeAccent.withValues(alpha: 0.25),
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                const Icon(Icons.help_outline, size: 12, color: themeGold),
+                                                Icon(Icons.help_outline, size: 12, color: themeAccent),
                                                 const SizedBox(width: 4),
                                                 Text(
                                                   'Doubt #${msg.doubtId}',
-                                                  style: const TextStyle(
-                                                    color: themeGold,
+                                                  style: TextStyle(
+                                                    color: themeAccent,
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -687,7 +688,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                                     children: [
                                                       Icon(
                                                         att.isVideo ? Icons.videocam : (att.isAudio ? Icons.audiotrack : Icons.insert_drive_file),
-                                                        color: themeGold,
+                                                        color: themeAccent,
                                                         size: 20,
                                                       ),
                                                       const SizedBox(width: 8),
@@ -725,12 +726,9 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                             ),
                                             if (msg.doubtId != null) ...[
                                               const SizedBox(width: 6),
-                                              const Icon(Icons.check_circle_outline, color: themeGold, size: 11),
+                                              Icon(Icons.check_circle_outline, color: themeAccent, size: 11),
                                               const SizedBox(width: 2),
-                                              const Text(
-                                                'Active Doubt',
-                                                style: TextStyle(color: themeGold, fontSize: 10, fontWeight: FontWeight.bold),
-                                              ),
+                                              Text('Active Doubt', style: TextStyle(color: themeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                                             ],
                                           ],
                                         ),
@@ -796,7 +794,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: Icon(Icons.add_circle_outline, color: isDark ? themeGold : themeNavy),
+                        icon: Icon(Icons.add_circle_outline, color: isDark ? themeAccent : themePrimary),
                         onPressed: _isUploading
                             ? null
                             : () {
@@ -808,7 +806,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                                     child: Wrap(
                                       children: [
                                         ListTile(
-                                          leading: const Icon(Icons.photo_library_outlined, color: Colors.blue),
+                                          leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
                                           title: Text('Attach Image', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
                                           onTap: () {
                                             Navigator.pop(ctx);
@@ -913,14 +911,14 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                         const SizedBox(width: 4),
                         IconButton(
                           tooltip: 'Record Voice Note',
-                          icon: Icon(Icons.mic, color: isDark ? themeGold : themeNavy),
+                          icon: Icon(Icons.mic, color: isDark ? themeAccent : themePrimary),
                           onPressed: _isUploading || _isSending ? null : _startRecording,
                         ),
                         IconButton(
                           tooltip: 'Send',
                           icon: _isSending
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                              : Icon(Icons.send, color: isDark ? themeGold : themeNavy),
+                              : Icon(Icons.send, color: isDark ? themeAccent : themePrimary),
                           onPressed: _isSending ? null : _sendMessage,
                         ),
                       ],

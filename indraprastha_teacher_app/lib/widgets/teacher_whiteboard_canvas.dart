@@ -70,13 +70,17 @@ class WhiteboardStroke {
 class TeacherWhiteboardCanvas extends StatefulWidget {
   final int doubtId;
   final Map<String, dynamic>? initialDocument;
+  final List<WhiteboardStroke>? initialStrokes;
   final VoidCallback? onPublished;
+  final bool isFullScreen;
 
   const TeacherWhiteboardCanvas({
     super.key,
     required this.doubtId,
     this.initialDocument,
+    this.initialStrokes,
     this.onPublished,
+    this.isFullScreen = false,
   });
 
   @override
@@ -124,6 +128,10 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
   }
 
   void _loadInitialStrokes() {
+    if (widget.initialStrokes != null) {
+      _strokes.addAll(widget.initialStrokes!);
+      return;
+    }
     if (widget.initialDocument == null) return;
     try {
       dynamic doc = widget.initialDocument!['document_json'] ??
@@ -361,6 +369,56 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
     }
   }
 
+  Future<void> _openFullScreen(BuildContext context) async {
+    final result = await Navigator.push<List<WhiteboardStroke>>(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 1,
+            title: Row(
+              children: [
+                const Icon(Icons.draw, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Doubt #${widget.doubtId} — Whiteboard Solution (Full Screen)',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.fullscreen_exit),
+                tooltip: 'Exit Full Screen',
+                onPressed: () => Navigator.pop(ctx, _strokes),
+              ),
+            ],
+          ),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TeacherWhiteboardCanvas(
+                doubtId: widget.doubtId,
+                initialStrokes: _strokes,
+                onPublished: widget.onPublished,
+                isFullScreen: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _strokes.clear();
+        _strokes.addAll(result);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -545,9 +603,54 @@ class _TeacherWhiteboardCanvasState extends State<TeacherWhiteboardCanvas> {
                 tooltip: 'Recenter View (100%)',
                 onPressed: _resetZoomAndPan,
               ),
+
+              // Full Screen / Exit Full Screen
+              IconButton(
+                icon: Icon(
+                  widget.isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  size: 22,
+                  color: AppColors.primary,
+                ),
+                tooltip: widget.isFullScreen ? 'Exit Full Screen' : 'Full Screen Canvas (Large Screen)',
+                onPressed: widget.isFullScreen
+                    ? () => Navigator.of(context).pop(_strokes)
+                    : () => _openFullScreen(context),
+              ),
             ],
           ),
         ),
+
+        if (!widget.isFullScreen)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 2),
+            child: InkWell(
+              onTap: () => _openFullScreen(context),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.open_in_full, size: 14, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Text(
+                      'Tap to Open Canvas in Large Full Screen Mode (Write / Draw Comfortably)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
         const SizedBox(height: 8),
 

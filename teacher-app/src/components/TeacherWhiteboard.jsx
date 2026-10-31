@@ -23,6 +23,7 @@ export default function TeacherWhiteboard({ doubtId, initialWhiteboard, onPublis
 
   const [isSaving, setIsSaving] = useState(false);
   const [isPublished, setIsPublished] = useState(initialWhiteboard?.is_published || false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const [message, setMessage] = useState('');
 
   const colors = ['#002350', '#D2AE39', '#2E8B57', '#E53E3E', '#3182CE', '#1A202C'];
@@ -377,7 +378,32 @@ export default function TeacherWhiteboard({ doubtId, initialWhiteboard, onPublis
   };
 
   return (
-    <div className="whiteboard-container" ref={containerRef} style={{ touchAction: 'none', userSelect: 'none' }}>
+    <div
+      className="whiteboard-container"
+      ref={containerRef}
+      style={{
+        touchAction: 'none',
+        userSelect: 'none',
+        ...(isFullScreen
+          ? {
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100vw',
+              height: '100vh',
+              zIndex: 99999,
+              background: '#F8FAFC',
+              display: 'flex',
+              flexDirection: 'column',
+              margin: 0,
+              borderRadius: 0,
+              boxSizing: 'border-box',
+            }
+          : {}),
+      }}
+    >
       {/* Header bar */}
       <div style={{ padding: '12px 16px', background: '#002350', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -491,6 +517,14 @@ export default function TeacherWhiteboard({ doubtId, initialWhiteboard, onPublis
 
         {/* Actions */}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className={`btn ${isFullScreen ? 'btn-gold' : 'btn-outline'}`}
+            onClick={() => setIsFullScreen(!isFullScreen)}
+            title={isFullScreen ? 'Exit Full Screen' : 'Full Screen Canvas (Large Screen)'}
+          >
+            {isFullScreen ? '✕ Exit Fullscreen' : '⛶ Full Screen'}
+          </button>
           <button type="button" className="btn btn-outline" onClick={handleSaveDraft} disabled={isSaving}>
             💾 Save Draft
           </button>
@@ -500,8 +534,37 @@ export default function TeacherWhiteboard({ doubtId, initialWhiteboard, onPublis
         </div>
       </div>
 
+      {!isFullScreen && (
+        <div
+          onClick={() => setIsFullScreen(true)}
+          style={{
+            padding: '8px 14px',
+            background: '#EFF6FF',
+            borderBottom: '1px solid #BFDBFE',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            fontSize: '12px',
+            fontWeight: 700,
+            color: '#1D4ED8',
+          }}
+        >
+          <span>⛶ Click to Open Canvas in Large Full Screen Mode (Write / Draw Comfortably)</span>
+        </div>
+      )}
+
       {/* Canvas Element with touchAction none */}
-      <div style={{ position: 'relative', overflow: 'hidden', background: '#e2e8f0' }}>
+      <div
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          background: '#e2e8f0',
+          flex: isFullScreen ? 1 : 'none',
+          height: isFullScreen ? 'calc(100vh - 120px)' : 'auto',
+        }}
+      >
         <canvas
           ref={canvasRef}
           width={960}
@@ -512,7 +575,7 @@ export default function TeacherWhiteboard({ doubtId, initialWhiteboard, onPublis
             cursor: tool === 'move' ? (isPanning ? 'grabbing' : 'grab') : (tool === 'eraser' ? 'crosshair' : 'crosshair'),
             display: 'block',
             width: '100%',
-            height: 'auto',
+            height: isFullScreen ? '100%' : 'auto',
             background: '#FFFFFF',
           }}
           onMouseDown={handlePointerDown}

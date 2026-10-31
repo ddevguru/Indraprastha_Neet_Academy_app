@@ -26,7 +26,7 @@ class WhiteboardStroke {
 
   factory WhiteboardStroke.fromJson(Map<String, dynamic> json) {
     Color parseColor(dynamic c) {
-      if (c == null) return const Color(0xFF002350);
+      if (c == null) return const Color(0xFF1E293B);
       if (c is int) return Color(c);
       if (c is num) return Color(c.toInt());
       if (c is String) {
@@ -36,10 +36,10 @@ class WhiteboardStroke {
           if (clean.length == 8) return Color(int.parse(clean, radix: 16));
           return Color(int.parse(clean));
         } catch (_) {
-          return const Color(0xFF002350);
+          return const Color(0xFF1E293B);
         }
       }
-      return const Color(0xFF002350);
+      return const Color(0xFF1E293B);
     }
 
     final rawPoints = json['points'] as List? ?? [];

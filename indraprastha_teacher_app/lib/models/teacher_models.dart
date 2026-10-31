@@ -178,12 +178,23 @@ class DoubtMediaAttachment {
       originalFilename.toLowerCase().endsWith('.jpeg') ||
       originalFilename.toLowerCase().endsWith('.webp');
 
+  bool get isVideo =>
+      mimeType.startsWith('video/') ||
+      originalFilename.toLowerCase().endsWith('.mp4') ||
+      originalFilename.toLowerCase().endsWith('.mov') ||
+      originalFilename.toLowerCase().endsWith('.mkv') ||
+      originalFilename.toLowerCase().endsWith('.webm') ||
+      originalFilename.toLowerCase().endsWith('.avi') ||
+      originalFilename.toLowerCase().endsWith('.3gp') ||
+      originalFilename.toLowerCase().endsWith('.m4v');
+
   bool get isAudio =>
       mimeType.startsWith('audio/') ||
       originalFilename.toLowerCase().endsWith('.mp3') ||
       originalFilename.toLowerCase().endsWith('.m4a') ||
       originalFilename.toLowerCase().endsWith('.wav') ||
-      originalFilename.toLowerCase().endsWith('.aac');
+      originalFilename.toLowerCase().endsWith('.aac') ||
+      originalFilename.toLowerCase().endsWith('.ogg');
 
   bool get isPdf =>
       mimeType.contains('pdf') || originalFilename.toLowerCase().endsWith('.pdf');

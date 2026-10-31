@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import '../../../theme/app_tokens.dart';
 import '../services/community_service.dart';
 
 class SubmitDoubtDialog extends StatefulWidget {
@@ -352,7 +353,7 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350);
+    final primaryColor = isDark ? AppColors.accentLight : AppColors.primary;
 
     return Container(
       padding: EdgeInsets.only(
@@ -378,7 +379,7 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: (isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350)).withValues(alpha: 0.15),
+                        color: (isDark ? AppColors.accentLight : AppColors.primary).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(Icons.help_outline, color: primaryColor, size: 22),
@@ -389,7 +390,7 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : const Color(0xFF002350),
+                        color: isDark ? Colors.white : AppColors.primaryDark,
                       ),
                     ),
                   ],
@@ -491,7 +492,7 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                   icon: const Icon(Icons.photo_outlined, size: 16),
                   label: const Text('Image', style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                    foregroundColor: isDark ? Colors.white : AppColors.primary,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   ),
                 ),
@@ -500,7 +501,7 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                   icon: const Icon(Icons.videocam_outlined, size: 16),
                   label: const Text('Video', style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                    foregroundColor: isDark ? Colors.white : const Color(0xFF805AD5),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   ),
                 ),
@@ -531,7 +532,7 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                     icon: const Icon(Icons.mic, size: 16, color: Colors.redAccent),
                     label: const Text('Record Voice', style: TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                      foregroundColor: isDark ? Colors.white : AppColors.primary,
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     ),
                   ),
@@ -540,7 +541,7 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                     icon: const Icon(Icons.audio_file_outlined, size: 16, color: Colors.amber),
                     label: const Text('Pick Audio', style: TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                      foregroundColor: isDark ? Colors.white : const Color(0xFFDD6B20),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     ),
                   ),
@@ -550,7 +551,7 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
                   icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
                   label: const Text('PDF / Doc', style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? Colors.white : const Color(0xFF002350),
+                    foregroundColor: isDark ? Colors.white : AppColors.success,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   ),
                 ),
@@ -605,13 +606,13 @@ class _SubmitDoubtDialogState extends State<SubmitDoubtDialog> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? const Color(0xFFD2AE39) : const Color(0xFF002350),
-                  foregroundColor: isDark ? const Color(0xFF002350) : Colors.white,
+                  backgroundColor: isDark ? AppColors.accentLight : AppColors.primary,
+                  foregroundColor: isDark ? AppColors.primaryDark : Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: _isSubmitting || _isUploading ? null : _submitDoubt,
                 child: _isSubmitting
-                    ? CircularProgressIndicator(color: isDark ? const Color(0xFF002350) : Colors.white)
+                    ? CircularProgressIndicator(color: isDark ? AppColors.primaryDark : Colors.white)
                     : const Text(
                         'Submit Doubt to Teachers',
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../theme/app_tokens.dart';
 import '../widgets/whiteboard_canvas.dart';
 
 class TeacherSolutionWhiteboardScreen extends StatefulWidget {
@@ -114,17 +115,17 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF002350),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.lock_outline, size: 16, color: Color(0xFFD2AE39)),
-                SizedBox(width: 6),
-                Text(
+                Icon(Icons.lock_outline, size: 16, color: AppColors.accentLight),
+                const SizedBox(width: 6),
+                const Text(
                   'Teacher Solution — Read Only',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
@@ -142,17 +143,17 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
           // Banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: isDark ? const Color(0xFF1E222D) : const Color(0xFFFFFBEB),
+            color: isDark ? const Color(0xFF1E222D) : AppColors.primarySoft,
             child: Row(
               children: [
-                const Icon(Icons.visibility, color: Color(0xFFD2AE39), size: 18),
+                Icon(Icons.visibility, color: isDark ? AppColors.accentLight : AppColors.primary, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'This solution canvas was drawn and published by your teacher. You can pan and zoom to inspect steps.',
                     style: TextStyle(
                       fontSize: 11,
-                      color: isDark ? Colors.white70 : Colors.brown.shade900,
+                      color: isDark ? Colors.white70 : AppColors.primaryDark,
                     ),
                   ),
                 ),

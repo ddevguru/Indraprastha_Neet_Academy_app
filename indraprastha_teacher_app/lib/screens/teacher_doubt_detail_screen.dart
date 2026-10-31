@@ -135,12 +135,30 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
     }
   }
 
-  Future<void> _pickAndUploadAttachment() async {
+  Future<void> _pickAndUploadAttachment(String mediaType) async {
     try {
-      final res = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'mp3', 'm4a', 'wav'],
-      );
+      FilePickerResult? res;
+      if (mediaType == 'image') {
+        res = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'],
+        );
+      } else if (mediaType == 'video') {
+        res = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['mp4', 'mov', 'mkv', 'webm', 'avi', '3gp', 'm4v'],
+        );
+      } else if (mediaType == 'audio') {
+        res = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['mp3', 'm4a', 'wav', 'aac', 'ogg', 'opus', 'flac'],
+        );
+      } else if (mediaType == 'pdf') {
+        res = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf'],
+        );
+      }
       if (res == null || res.files.isEmpty) return;
 
       final file = res.files.first;
@@ -158,7 +176,10 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✓ "${file.name}" uploaded to Google Drive')),
+          SnackBar(
+            content: Text('✓ ${uploaded.originalFilename} uploaded to Google Drive'),
+            backgroundColor: AppColors.success,
+          ),
         );
       }
     } catch (e) {
@@ -525,38 +546,138 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
                                 ),
                                 const SizedBox(height: 14),
 
-                                // Attachments
-                                Row(
+                                // Attachments Section
+                                Text(
+                                  'Attach Solution Media (Saved directly to Google Drive):',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? AppColors.darkTextSecondary : AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
                                   children: [
                                     OutlinedButton.icon(
-                                      icon: _uploadingFile
-                                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                          : const Icon(Icons.upload_file, size: 18),
-                                      label: const Text('Add File to Drive'),
-                                      onPressed: _uploadingFile ? null : _pickAndUploadAttachment,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'Saved to Admin Drive',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark ? AppColors.darkTextMuted : AppColors.textSecondary,
+                                      icon: const Icon(Icons.photo_camera_back_outlined, size: 16),
+                                      label: const Text('Add Photo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.primary,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       ),
+                                      onPressed: _uploadingFile ? null : () => _pickAndUploadAttachment('image'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.videocam_outlined, size: 16),
+                                      label: const Text('Add Video', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFF805AD5),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      ),
+                                      onPressed: _uploadingFile ? null : () => _pickAndUploadAttachment('video'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.audiotrack_outlined, size: 16),
+                                      label: const Text('Add Audio', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFFDD6B20),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      ),
+                                      onPressed: _uploadingFile ? null : () => _pickAndUploadAttachment('audio'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                                      label: const Text('Add PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.success,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      ),
+                                      onPressed: _uploadingFile ? null : () => _pickAndUploadAttachment('pdf'),
                                     ),
                                   ],
                                 ),
 
-                                if (_answerAttachments.isNotEmpty) ...[
+                                if (_uploadingFile) ...[
                                   const SizedBox(height: 10),
+                                  const Row(
+                                    children: [
+                                      SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                                      SizedBox(width: 8),
+                                      Text('Uploading media to Google Drive...', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic)),
+                                    ],
+                                  ),
+                                ],
+
+                                if (_answerAttachments.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
                                   Wrap(
-                                    spacing: 6,
+                                    spacing: 8,
+                                    runSpacing: 8,
                                     children: _answerAttachments.asMap().entries.map((entry) {
                                       final idx = entry.key;
                                       final att = entry.value;
-                                      return Chip(
-                                        label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
-                                        deleteIcon: const Icon(Icons.close, size: 14),
-                                        onDeleted: () => setState(() => _answerAttachments.removeAt(idx)),
+
+                                      IconData iconData = Icons.insert_drive_file_outlined;
+                                      Color badgeColor = Colors.grey;
+                                      String badgeText = 'FILE';
+
+                                      if (att.isImage) {
+                                        iconData = Icons.image;
+                                        badgeColor = AppColors.primary;
+                                        badgeText = 'PHOTO';
+                                      } else if (att.isVideo) {
+                                        iconData = Icons.videocam;
+                                        badgeColor = const Color(0xFF805AD5);
+                                        badgeText = 'VIDEO';
+                                      } else if (att.isAudio) {
+                                        iconData = Icons.audiotrack;
+                                        badgeColor = const Color(0xFFDD6B20);
+                                        badgeText = 'AUDIO';
+                                      } else if (att.isPdf) {
+                                        iconData = Icons.picture_as_pdf;
+                                        badgeColor = AppColors.success;
+                                        badgeText = 'PDF';
+                                      }
+
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? AppColors.darkSurface : Colors.white,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                             Icon(iconData, size: 16, color: badgeColor),
+                                             const SizedBox(width: 6),
+                                             Container(
+                                               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                               decoration: BoxDecoration(
+                                                 color: badgeColor.withValues(alpha: 0.15),
+                                                 borderRadius: BorderRadius.circular(4),
+                                               ),
+                                               child: Text(badgeText, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: badgeColor)),
+                                             ),
+                                             const SizedBox(width: 6),
+                                             ConstrainedBox(
+                                               constraints: const BoxConstraints(maxWidth: 160),
+                                               child: Text(
+                                                 att.originalFilename,
+                                                 overflow: TextOverflow.ellipsis,
+                                                 style: TextStyle(fontSize: 11, color: isDark ? Colors.white : AppColors.textPrimary),
+                                               ),
+                                             ),
+                                             const SizedBox(width: 6),
+                                             GestureDetector(
+                                               onTap: () => setState(() => _answerAttachments.removeAt(idx)),
+                                               child: const Icon(Icons.close, size: 15, color: Colors.red),
+                                             ),
+                                          ],
+                                        ),
                                       );
                                     }).toList(),
                                   ),

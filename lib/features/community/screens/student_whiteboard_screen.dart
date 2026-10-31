@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/community_service.dart';
 import '../widgets/whiteboard_canvas.dart';
 import 'submit_doubt_dialog.dart';
+import '../../../theme/app_tokens.dart';
 
 class StudentWhiteboardScreen extends StatefulWidget {
   final int communityId;
@@ -31,7 +32,7 @@ class _StudentWhiteboardScreenState extends State<StudentWhiteboardScreen> {
   final List<WhiteboardStroke> _strokes = [];
   final List<WhiteboardStroke> _redoStack = [];
 
-  Color _selectedColor = const Color(0xFF002350);
+  Color _selectedColor = const Color(0xFF1E293B);
   double _strokeWidth = 3.0;
   WhiteboardTool _activeTool = WhiteboardTool.pen;
   bool _isLoading = true;
@@ -51,8 +52,8 @@ class _StudentWhiteboardScreenState extends State<StudentWhiteboardScreen> {
   Offset _lastSingleFingerPos = Offset.zero;
 
   final List<Color> _palette = const [
-    Color(0xFF002350), // Navy
-    Color(0xFFD2AE39), // Gold
+    Color(0xFF1E293B), // Charcoal
+    Color(0xFFE85A1C), // Brand Orange
     Color(0xFFE53E3E), // Red
     Color(0xFF2E8B57), // Green
     Color(0xFF3182CE), // Blue
@@ -322,8 +323,8 @@ class _StudentWhiteboardScreenState extends State<StudentWhiteboardScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const navyColor = Color(0xFF002350);
-    const goldColor = Color(0xFFD2AE39);
+    final navyColor = AppColors.primary;
+    final goldColor = AppColors.accentLight;
 
     final content = _isLoading
         ? const Center(child: CircularProgressIndicator())
@@ -470,7 +471,7 @@ class _StudentWhiteboardScreenState extends State<StudentWhiteboardScreen> {
                       FilledButton.icon(
                         style: FilledButton.styleFrom(
                           backgroundColor: goldColor,
-                          foregroundColor: navyColor,
+                          foregroundColor: AppColors.primaryDark,
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -690,11 +691,11 @@ class _StudentWhiteboardScreenState extends State<StudentWhiteboardScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Icon(Icons.edit_note, size: 18, color: goldColor),
-                SizedBox(width: 6),
-                Text(
+                const SizedBox(width: 6),
+                const Text(
                   'My Whiteboard',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
@@ -717,7 +718,7 @@ class _StudentWhiteboardScreenState extends State<StudentWhiteboardScreen> {
           FilledButton.icon(
             style: FilledButton.styleFrom(
               backgroundColor: goldColor,
-              foregroundColor: navyColor,
+              foregroundColor: AppColors.primaryDark,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               visualDensity: VisualDensity.compact,
             ),

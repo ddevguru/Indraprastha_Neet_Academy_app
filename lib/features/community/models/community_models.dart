@@ -25,12 +25,12 @@ class CommunitySubject {
 
   factory CommunitySubject.fromJson(Map<String, dynamic> json) {
     Color parseColor(String? hex) {
-      if (hex == null || hex.isEmpty) return const Color(0xFF002350);
+      if (hex == null || hex.isEmpty) return const Color(0xFFE85A1C);
       try {
         final clean = hex.replaceAll('#', '');
         return Color(int.parse('FF$clean', radix: 16));
       } catch (_) {
-        return const Color(0xFF002350);
+        return const Color(0xFFE85A1C);
       }
     }
 
