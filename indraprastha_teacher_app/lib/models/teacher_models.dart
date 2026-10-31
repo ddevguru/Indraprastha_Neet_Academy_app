@@ -166,8 +166,8 @@ class DoubtMediaAttachment {
       mimeType: json['mime_type'] ?? json['mimeType'] ?? 'application/octet-stream',
       fileSize: _parseInt(json['file_size'] ?? json['fileSize']),
       driveFileId: json['drive_file_id'] ?? json['driveFileId'],
-      driveViewLink: json['drive_view_link'] ?? json['driveViewLink'],
-      fileUrl: json['file_url'] ?? json['fileUrl'],
+      driveViewLink: json['drive_view_link'] ?? json['driveViewLink'] ?? json['viewLink'] ?? json['view_link'],
+      fileUrl: json['file_url'] ?? json['fileUrl'] ?? json['imageLink'] ?? json['downloadLink'],
     );
   }
 
@@ -233,11 +233,17 @@ class DoubtMediaAttachment {
   Map<String, dynamic> toJson() => {
         if (id != null) 'id': id,
         'storage_key': storageKey,
+        'storageKey': storageKey,
         'original_filename': originalFilename,
+        'originalFilename': originalFilename,
         'mime_type': mimeType,
+        'mimeType': mimeType,
         'file_size': fileSize,
+        'fileSize': fileSize,
         if (driveFileId != null) 'drive_file_id': driveFileId,
+        if (driveFileId != null) 'driveFileId': driveFileId,
         if (driveViewLink != null) 'drive_view_link': driveViewLink,
+        if (driveViewLink != null) 'driveViewLink': driveViewLink,
         if (fileUrl != null) 'file_url': fileUrl,
       };
 }

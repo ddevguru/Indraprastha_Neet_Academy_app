@@ -86,27 +86,36 @@ class CommunityAttachment {
     );
   }
 
-  bool get isImage =>
-      mimeType.startsWith('image/') ||
-      originalFilename.toLowerCase().endsWith('.jpg') ||
-      originalFilename.toLowerCase().endsWith('.png') ||
-      originalFilename.toLowerCase().endsWith('.jpeg') ||
-      originalFilename.toLowerCase().endsWith('.webp');
-
   bool get isVideo =>
       mimeType.startsWith('video/') ||
       originalFilename.toLowerCase().endsWith('.mp4') ||
-      originalFilename.toLowerCase().endsWith('.mov');
+      originalFilename.toLowerCase().endsWith('.mov') ||
+      originalFilename.toLowerCase().endsWith('.mkv') ||
+      originalFilename.toLowerCase().endsWith('.webm') ||
+      originalFilename.toLowerCase().endsWith('.3gp') ||
+      originalFilename.toLowerCase().endsWith('.avi');
 
   bool get isAudio =>
       mimeType.startsWith('audio/') ||
       originalFilename.toLowerCase().endsWith('.mp3') ||
       originalFilename.toLowerCase().endsWith('.m4a') ||
       originalFilename.toLowerCase().endsWith('.wav') ||
-      originalFilename.toLowerCase().endsWith('.aac');
+      originalFilename.toLowerCase().endsWith('.aac') ||
+      originalFilename.toLowerCase().endsWith('.ogg') ||
+      originalFilename.toLowerCase().endsWith('.opus') ||
+      originalFilename.toLowerCase().endsWith('.flac');
 
   bool get isPdf =>
       mimeType.contains('pdf') || originalFilename.toLowerCase().endsWith('.pdf');
+
+  bool get isImage =>
+      mimeType.startsWith('image/') ||
+      originalFilename.toLowerCase().endsWith('.jpg') ||
+      originalFilename.toLowerCase().endsWith('.png') ||
+      originalFilename.toLowerCase().endsWith('.jpeg') ||
+      originalFilename.toLowerCase().endsWith('.webp') ||
+      originalFilename.toLowerCase().endsWith('.gif') ||
+      (!isVideo && !isAudio && !isPdf && (driveFileId.isNotEmpty || driveViewLink.isNotEmpty || storageKey.isNotEmpty));
 
   String get directImageUrl {
     String id = driveFileId.trim();
@@ -139,6 +148,19 @@ class CommunityAttachment {
     return driveDownloadLink.isNotEmpty
         ? driveDownloadLink
         : (driveViewLink.isNotEmpty ? driveViewLink : storageKey);
+  }
+
+  String get resolvedViewUrl {
+    if (driveViewLink.isNotEmpty) return driveViewLink;
+    if (driveFileId.isNotEmpty) return 'https://drive.google.com/file/d/$driveFileId/view';
+    if (storageKey.startsWith('http')) return storageKey;
+    return '';
+  }
+
+  String get resolvedDownloadUrl {
+    if (driveDownloadLink.isNotEmpty) return driveDownloadLink;
+    if (driveFileId.isNotEmpty) return 'https://drive.google.com/uc?export=download&id=$driveFileId';
+    return resolvedViewUrl;
   }
 }
 

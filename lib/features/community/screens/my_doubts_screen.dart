@@ -6,6 +6,7 @@ import '../../../theme/app_tokens.dart';
 import '../models/community_models.dart';
 import '../services/community_service.dart';
 import 'teacher_solution_whiteboard_screen.dart';
+import 'teacher_response_detail_screen.dart';
 
 class MyDoubtsScreen extends StatefulWidget {
   final String? initialStatus;
@@ -648,6 +649,7 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                   else
                     ...d.responses.map((resp) {
                       final respTime = DateFormat('dd MMM, hh:mm a').format(resp.createdAt.toLocal());
+                      final hasAtts = resp.attachments.isNotEmpty;
                       return Card(
                         color: isDark ? const Color(0xFF1E222D) : Colors.white,
                         margin: const EdgeInsets.only(bottom: 12),
@@ -658,98 +660,152 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                             color: isDark ? const Color(0xFF2E3545) : Colors.black.withValues(alpha: 0.08),
                           ),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 14,
-                                        backgroundColor: isDark ? AppColors.primaryDark : AppColors.primarySoft,
-                                        child: Icon(Icons.person, size: 16, color: isDark ? Colors.white : AppColors.primary),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Subject Faculty',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                          color: isDark ? Colors.white : Colors.black87,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    respTime,
-                                    style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
-                                  ),
-                                ],
-                              ),
-                              Divider(height: 20, color: isDark ? const Color(0xFF2E3545) : Colors.black.withValues(alpha: 0.08)),
-                              Text(
-                                resp.responseText,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  height: 1.4,
-                                  color: isDark ? Colors.grey.shade200 : Colors.black87,
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => TeacherResponseDetailScreen(
+                                  doubt: d,
+                                  response: resp,
+                                  onStatusChanged: () {
+                                    _refreshDetail();
+                                    widget.onStatusChanged();
+                                  },
                                 ),
                               ),
-                              if (resp.attachments.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: resp.attachments.map((att) {
-                                    if (att.isImage) {
-                                      return GestureDetector(
-                                        onTap: () {
-                                          final link = att.driveViewLink.isNotEmpty ? att.driveViewLink : att.directImageUrl;
-                                          if (link.isNotEmpty) launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
-                                        },
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: CachedNetworkImage(
-                                            imageUrl: att.directImageUrl,
-                                            width: 90,
-                                            height: 90,
-                                            fit: BoxFit.cover,
-                                            errorWidget: (_, __, ___) => Container(
-                                              width: 90,
-                                              height: 90,
-                                              color: Colors.grey.shade200,
-                                              child: const Icon(Icons.image),
-                                            ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 14,
+                                          backgroundColor: isDark ? AppColors.primaryDark : AppColors.primarySoft,
+                                          child: Icon(Icons.person, size: 16, color: isDark ? Colors.white : AppColors.primary),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          resp.teacherName.isNotEmpty ? resp.teacherName : 'Subject Faculty',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: isDark ? Colors.white : Colors.black87,
                                           ),
                                         ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          respTime,
+                                          style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 13,
+                                          color: isDark ? AppColors.accentLight : AppColors.primary,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                Divider(height: 20, color: isDark ? const Color(0xFF2E3545) : Colors.black.withValues(alpha: 0.08)),
+                                Text(
+                                  resp.responseText,
+                                  maxLines: 3,
+                                  overflow: TextStream.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    height: 1.4,
+                                    color: isDark ? Colors.grey.shade200 : Colors.black87,
+                                  ),
+                                ),
+                                if (hasAtts) ...[
+                                  const SizedBox(height: 12),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: resp.attachments.map((att) {
+                                      final isImg = att.isImage;
+                                      final isVid = att.isVideo;
+                                      final isAud = att.isAudio;
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF141721) : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: isDark ? const Color(0xFF2E3545) : Colors.grey.shade300,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isImg
+                                                  ? Icons.image
+                                                  : (isVid
+                                                      ? Icons.play_circle_fill
+                                                      : (isAud ? Icons.mic : Icons.attach_file)),
+                                              size: 14,
+                                              color: isImg
+                                                  ? Colors.blueAccent
+                                                  : (isVid
+                                                      ? const Color(0xFF805AD5)
+                                                      : (isAud ? const Color(0xFFDD6B20) : AppColors.primary)),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            ConstrainedBox(
+                                              constraints: const BoxConstraints(maxWidth: 160),
+                                              child: Text(
+                                                att.originalFilename,
+                                                maxLines: 1,
+                                                overflow: TextStream.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isDark ? Colors.grey.shade300 : Colors.black87,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       );
-                                    }
-                                    if (att.isVideo) {
-                                      return ActionChip(
-                                        avatar: const Icon(Icons.play_circle_fill, size: 15, color: Color(0xFF805AD5)),
-                                        label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
-                                        onPressed: () {
-                                          final link = att.driveViewLink.isNotEmpty ? att.driveViewLink : att.storageKey;
-                                          if (link.isNotEmpty) launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
-                                        },
-                                      );
-                                    }
-                                    return ActionChip(
-                                      avatar: Icon(att.isAudio ? Icons.audiotrack : Icons.attachment, size: 15, color: att.isAudio ? const Color(0xFFDD6B20) : AppColors.primary),
-                                      label: Text(att.originalFilename, style: const TextStyle(fontSize: 11)),
-                                      onPressed: () {
-                                        final link = att.isAudio ? att.directAudioUrl : (att.driveViewLink.isNotEmpty ? att.driveViewLink : att.storageKey);
-                                        if (link.isNotEmpty) launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
-                                      },
-                                    );
-                                  }).toList(),
+                                    }).toList(),
+                                  ),
+                                ],
+                                const SizedBox(height: 12),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'View detailed solution & media',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? AppColors.accentLight : AppColors.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.arrow_forward,
+                                      size: 13,
+                                      color: isDark ? AppColors.accentLight : AppColors.primary,
+                                    ),
+                                  ],
                                 ),
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       );

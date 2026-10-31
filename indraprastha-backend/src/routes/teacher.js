@@ -557,13 +557,13 @@ router.post('/doubts/:doubtId/responses', teacherAuth, async (req, res) => {
          RETURNING *`,
         [
           response.id,
-          att.storageKey || `gdrive://${att.driveFileId || Date.now()}`,
-          att.originalFilename || 'attachment',
-          att.mimeType || 'application/octet-stream',
-          att.fileSize || 0,
-          att.driveFileId || '',
-          att.driveViewLink || att.viewLink || '',
-          att.driveDownloadLink || att.downloadLink || '',
+          att.storageKey || att.storage_key || `gdrive://${att.driveFileId || att.drive_file_id || Date.now()}`,
+          att.originalFilename || att.original_filename || 'attachment',
+          att.mimeType || att.mime_type || 'application/octet-stream',
+          att.fileSize || att.file_size || 0,
+          att.driveFileId || att.drive_file_id || '',
+          att.driveViewLink || att.drive_view_link || att.viewLink || att.view_link || att.fileUrl || att.file_url || '',
+          att.driveDownloadLink || att.drive_download_link || att.downloadLink || att.download_link || '',
         ]
       );
       savedAtts.push(attRes.rows[0]);
