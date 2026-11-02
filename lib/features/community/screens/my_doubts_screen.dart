@@ -385,12 +385,29 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
     final d = _currentDoubt;
     final timeStr = DateFormat('dd MMM yyyy, hh:mm a').format(d.createdAt.toLocal());
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        title: Text('Doubt #${d.id}'),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
+          ),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          title: Text('Doubt #${d.id}'),
         actions: [
           if (d.status == 'Resolved')
             Padding(
@@ -893,6 +910,7 @@ class _DoubtDetailScreenState extends State<DoubtDetailScreen> {
                 ],
               ),
             ),
+    ),
     );
   }
 }

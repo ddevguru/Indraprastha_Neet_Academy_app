@@ -498,12 +498,29 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF11131A) : AppColors.background,
-      appBar: AppBar(
-        backgroundColor: themePrimary,
-        foregroundColor: Colors.white,
-        elevation: 1,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF11131A) : AppColors.background,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
+          ),
+          backgroundColor: themePrimary,
+          foregroundColor: Colors.white,
+          elevation: 1,
         title: Row(
           children: [
             Container(
@@ -928,6 +945,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
               ),
             ],
           ),
-    );
+        ),
+      );
   }
 }

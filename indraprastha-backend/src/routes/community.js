@@ -107,10 +107,10 @@ async function uploadAuth(req, res, next) {
 const SIX_SUBJECTS = [
   { classLevel: 'Class 11', subject: 'Chemistry', icon: '🧪', color: '#D2AE39' },
   { classLevel: 'Class 11', subject: 'Biology', icon: '🧬', color: '#2E8B57' },
-  { classLevel: 'Class 11', subject: 'Physics', icon: '⚛️', color: '#002350' },
+  { classLevel: 'Class 11', subject: 'Physics', icon: '⚛️', color: '#3B82F6' },
   { classLevel: 'Class 12', subject: 'Chemistry', icon: '⚗️', color: '#D2AE39' },
   { classLevel: 'Class 12', subject: 'Biology', icon: '🌿', color: '#2E8B57' },
-  { classLevel: 'Class 12', subject: 'Physics', icon: '🧲', color: '#002350' },
+  { classLevel: 'Class 12', subject: 'Physics', icon: '🧲', color: '#3B82F6' },
 ];
 
 /**
@@ -167,7 +167,7 @@ router.get('/subjects', studentAuth, async (req, res) => {
     const result = rows.map((r) => {
       const meta = SIX_SUBJECTS.find(
         (s) => s.classLevel === r.class_level && s.subject === r.subject
-      ) || { icon: '📚', color: '#002350' };
+      ) || { icon: '📚', color: '#3B82F6' };
 
       return {
         communityId: r.community_id,

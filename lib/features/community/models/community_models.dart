@@ -28,7 +28,11 @@ class CommunitySubject {
       if (hex == null || hex.isEmpty) return const Color(0xFFE85A1C);
       try {
         final clean = hex.replaceAll('#', '');
-        return Color(int.parse('FF$clean', radix: 16));
+        final col = Color(int.parse('FF$clean', radix: 16));
+        if (col.value == 0xFF002350) {
+          return const Color(0xFF3B82F6);
+        }
+        return col;
       } catch (_) {
         return const Color(0xFFE85A1C);
       }

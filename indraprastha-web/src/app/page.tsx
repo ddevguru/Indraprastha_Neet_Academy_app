@@ -241,7 +241,7 @@ export default function Page() {
             </div>
 
             <h1 className="hero-title" style={{ marginBottom: "12px" }}>
-              NEET Preparation Through <span className="highlight-underline">Smart Question Practice</span>
+              NEET Preparation Through <span className="highlight-underline">Neet 2027 Test Series</span>
             </h1>
 
             <div

@@ -112,32 +112,49 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final strokes = _parseStrokes();
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.lock_outline, size: 16, color: AppColors.accentLight),
-                const SizedBox(width: 6),
-                const Text(
-                  'Teacher Solution — Read Only',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            Text(
-              'Doubt #${widget.doubtId} • ${widget.classLevel} ${widget.subject}',
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
-            ),
-          ],
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF11131A) : const Color(0xFFF5F7FA),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
+          ),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.lock_outline, size: 16, color: AppColors.accentLight),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Teacher Solution — Read Only',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Text(
+                'Doubt #${widget.doubtId} • ${widget.classLevel} ${widget.subject}',
+                style: const TextStyle(fontSize: 11, color: Colors.white70),
+              ),
+            ],
+          ),
         ),
-      ),
       body: Column(
         children: [
           // Banner
@@ -227,10 +244,10 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
                         ? CachedNetworkImage(
                             imageUrl: _getSnapshotDirectUrl(),
                             fit: BoxFit.contain,
-                            placeholder: (_, __) => const Center(
+                            placeholder: (context, url) => const Center(
                               child: CircularProgressIndicator(),
                             ),
-                            errorWidget: (_, __, ___) => CustomPaint(
+                            errorWidget: (context, url, error) => CustomPaint(
                               painter: WhiteboardPainter(strokes: strokes),
                               size: Size.infinite,
                             ),
@@ -246,6 +263,7 @@ class _TeacherSolutionWhiteboardScreenState extends State<TeacherSolutionWhitebo
           ),
         ],
       ),
+    ),
     );
   }
 }

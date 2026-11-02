@@ -56,7 +56,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2E8B57),
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.pop(ctx, true),
@@ -240,10 +240,10 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                             child: CachedNetworkImage(
                               imageUrl: att.directImageUrl,
                               fit: BoxFit.contain,
-                              placeholder: (_, __) => const Center(
+                              placeholder: (context, url) => const Center(
                                 child: CircularProgressIndicator(),
                               ),
-                              errorWidget: (_, __, ___) => Center(
+                              errorWidget: (context, url, error) => Center(
                                 child: Padding(
                                   padding: const EdgeInsets.all(24),
                                   child: Column(
@@ -286,27 +286,36 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
     final respTime = DateFormat('dd MMM yyyy, hh:mm a').format(widget.response.createdAt.toLocal());
     final attachments = widget.response.attachments;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F1117) : const Color(0xFFF7F8FA),
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Teacher Solution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            Text(
-              'Doubt #${_doubt.id} • ${_doubt.classLevel} - ${_doubt.subject}',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? Colors.grey.shade400 : Colors.white70,
-                fontWeight: FontWeight.normal,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) Navigator.of(context).maybePop();
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF0F1117) : const Color(0xFFF7F8FA),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Teacher Solution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              Text(
+                'Doubt #${_doubt.id} • ${_doubt.classLevel} - ${_doubt.subject}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.grey.shade400 : Colors.white70,
+                  fontWeight: FontWeight.normal,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: isDark ? const Color(0xFF161922) : AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
         ),
-        backgroundColor: isDark ? const Color(0xFF161922) : AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Column(
@@ -590,11 +599,11 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                                   imageUrl: att.directImageUrl,
                                   width: double.infinity,
                                   fit: BoxFit.contain,
-                                  placeholder: (_, __) => const SizedBox(
+                                  placeholder: (context, url) => const SizedBox(
                                     height: 180,
                                     child: Center(child: CircularProgressIndicator()),
                                   ),
-                                  errorWidget: (_, __, ___) => Container(
+                                  errorWidget: (context, url, error) => Container(
                                     height: 140,
                                     color: isDark ? const Color(0xFF181C26) : Colors.grey.shade100,
                                     child: Center(
@@ -850,22 +859,26 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: isDark
-                        ? [const Color(0xFF1E222D), const Color(0xFF0F172A)]
-                        : [const Color(0xFFF0FDF4), const Color(0xFFE2E8F0)],
+                        ? [const Color(0xFF1E222D), const Color(0xFF261D18)]
+                        : [const Color(0xFFFFF7ED), const Color(0xFFFFEDD5)],
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF2E8B57).withValues(alpha: 0.3)),
+                  border: Border.all(color: (isDark ? AppColors.accentLight : AppColors.primary).withValues(alpha: 0.35)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.draw, color: Color(0xFF2E8B57), size: 22),
-                        SizedBox(width: 8),
+                        Icon(Icons.draw, color: isDark ? AppColors.accentLight : AppColors.primary, size: 22),
+                        const SizedBox(width: 8),
                         Text(
                           'Interactive Solution Canvas Available',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2E8B57)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: isDark ? AppColors.accentLight : AppColors.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -879,10 +892,11 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E8B57),
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 2,
                         ),
                         onPressed: () {
                           Navigator.push(
@@ -929,7 +943,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
                   Expanded(
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E8B57),
+                        backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -947,18 +961,18 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2E8B57).withValues(alpha: 0.1),
+                  color: (isDark ? AppColors.accentLight : AppColors.primary).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF2E8B57).withValues(alpha: 0.3)),
+                  border: Border.all(color: (isDark ? AppColors.accentLight : AppColors.primary).withValues(alpha: 0.3)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle, color: Color(0xFF2E8B57)),
-                    SizedBox(width: 8),
+                    Icon(Icons.check_circle, color: isDark ? AppColors.accentLight : AppColors.primary),
+                    const SizedBox(width: 8),
                     Text(
                       'This doubt has been resolved successfully.',
-                      style: TextStyle(color: Color(0xFF2E8B57), fontWeight: FontWeight.bold),
+                      style: TextStyle(color: isDark ? AppColors.accentLight : AppColors.primary, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -990,6 +1004,7 @@ class _TeacherResponseDetailScreenState extends State<TeacherResponseDetailScree
           ],
         ),
       ),
+    ),
     );
   }
 }

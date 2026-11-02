@@ -300,6 +300,18 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final timeStr = DateFormat('dd MMM').format(sub.lastActivityAt.toLocal());
 
+    // Ensure high contrast and readability in dark theme
+    Color subjectDisplayColor = sub.color;
+    if (isDark) {
+      if (sub.color.computeLuminance() < 0.28 || sub.color.value == 0xFF002350) {
+        subjectDisplayColor = const Color(0xFF60A5FA); // Vivid sky blue for dark theme
+      }
+    } else {
+      if (sub.color.value == 0xFF002350) {
+        subjectDisplayColor = const Color(0xFF1D4ED8);
+      }
+    }
+
     return Card(
       elevation: 0,
       color: isDark ? const Color(0xFF1E222D) : Colors.white,
@@ -325,7 +337,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: sub.color.withValues(alpha: 0.12),
+                      color: subjectDisplayColor.withValues(alpha: isDark ? 0.20 : 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,
@@ -355,7 +367,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: sub.color.withValues(alpha: 0.12),
+                      color: subjectDisplayColor.withValues(alpha: isDark ? 0.22 : 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -363,7 +375,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w800,
-                        color: sub.color,
+                        color: subjectDisplayColor,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -390,9 +402,9 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> with SingleTi
                     children: [
                       Text(
                         'Open',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: sub.color),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: subjectDisplayColor),
                       ),
-                      Icon(Icons.arrow_forward_ios, size: 10, color: sub.color),
+                      Icon(Icons.arrow_forward_ios, size: 10, color: subjectDisplayColor),
                     ],
                   ),
                 ],
