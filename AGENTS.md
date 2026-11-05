@@ -163,9 +163,37 @@
 
 **ALL SHORT BIOLOGY PRACTICE CHAPTERS COMPLETED: 90 / 90 (100% COMPLETE & LIVE)**
 
+### G. Class 12 Biology PYQs (Chapter-wise PYQs Section):
+| Chapter ID | Book Title | Chapter Label | Total PYQs in PDF | Added Live | Status |
+| :---: | :--- | :---: | :---: | :---: | :---: |
+| **87** | **Evolution** | **Chapter 66** | 42 | 42 | **100% COMPLETE & VERIFIED** |
+
+*(All 42 PYQs are strictly aligned 1-to-1 with the PDF Answer Key from Q1 to Q42. Each question includes complete text, options, verified answer key, detailed step-by-step NCERT explanation, and a high-quality similar conceptual question with 4 options and complete explanation).*
+
 ---
 
-## 4. Next In Queue When Resuming
+## 4. Dual eBook & Interactive Highlight Feature
+- **Dual eBook Upload (Admin):**
+  - Regular eBook PDF (`material_drive_link`) via `POST /admin/chapters/:chapterId/regular-pdf`
+  - Highlighted eBook PDF (`highlight_drive_link`) via `POST /admin/chapters/:chapterId/highlight-pdf`
+  - Table `book_chapters` updated with `highlight_drive_link`, `highlight_drive_file_id`, `highlight_drive_folder_id`.
+- **Interactive Highlight Questions (Admin & Student):**
+  - Table: `chapter_highlight_questions` (columns: `id, chapter_id, highlight_text, page_number, question, option_a, option_b, option_c, option_d, correct_option, explanation, created_at`).
+  - Admin Endpoints:
+    - `GET /admin/chapters/:chapterId/highlight-questions`
+    - `POST /admin/chapters/:chapterId/highlight-questions`
+    - `PUT /admin/highlight-questions/:id`
+    - `DELETE /admin/highlight-questions/:id`
+  - Student Endpoints:
+    - `GET /content/chapters/:chapterId/highlight-questions`
+  - Student App Experience:
+    - Tab 1 ("Book & Notes"): Displays regular eBook PDF / notes.
+    - Tab 2 ("Highlights"): Displays highlighted eBook PDF with an interactive strip and bottom drawer of highlighted quotes.
+    - Tapping any highlighted text excerpt triggers `_HighlightQuestionSolvePopup`: student solves the related MCQ on the spot with instant visual feedback (green/red) and step-by-step NCERT explanation.
+
+---
+
+## 5. Next In Queue When Resuming
 - **Class 11 Biology Remaining Chapters:**
   - Set 32: Biological Classification (151 Qs)
   - Set 33: Plant Kingdom (140 Qs)

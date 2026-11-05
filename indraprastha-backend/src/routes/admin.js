@@ -264,15 +264,17 @@ function sanitizeForPostgresText(value) {
 function mapChapterLinks(chapter) {
   const fileId = chapter.material_drive_file_id || extractDriveFileId(chapter.material_drive_link);
   const links = buildDrivePublicLinks(fileId);
+  const highlightFileId =
+    chapter.highlight_drive_file_id || extractDriveFileId(chapter.highlight_drive_link);
+  const highlightLinks = buildDrivePublicLinks(highlightFileId);
   return {
     ...chapter,
     material_drive_file_id: fileId || '',
-    // Return downloadLink so the Flutter app can wrap it inside the
-    // Google viewerng embedded viewer, which works reliably in Android
-    // WebView. The old previewLink (/file/d/{id}/preview) is blocked
-    // by X-Frame-Options on most Android WebView builds.
     material_drive_link:
       links.downloadLink || normalizeDriveLink(chapter.material_drive_link, 'download'),
+    highlight_drive_file_id: highlightFileId || '',
+    highlight_drive_link:
+      highlightLinks.downloadLink || normalizeDriveLink(chapter.highlight_drive_link, 'download'),
   };
 }
 
@@ -705,8 +707,11 @@ router.get('/books', adminAuth, async (_req, res) => {
 
 router.get('/books/:bookId/chapters', adminAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, book_id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id,
-        (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = book_chapters.id) AS linked_pyq_count
+    `SELECT id, book_id, title, overview, note_summary, highlight, material_type,
+        material_drive_link, material_drive_file_id, material_drive_folder_id,
+        highlight_drive_link, highlight_drive_file_id, highlight_drive_folder_id,
+        (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = book_chapters.id) AS linked_pyq_count,
+        (SELECT COUNT(*)::int FROM chapter_highlight_questions hq WHERE hq.chapter_id = book_chapters.id) AS linked_highlight_questions_count
      FROM book_chapters
      WHERE book_id = $1
      ORDER BY id ASC`,
@@ -1124,6 +1129,279 @@ router.post(
     }
   }
 );
+
+router.post(
+  '/chapters/:chapterId/highlight-pdf',
+  adminAuth,
+  upload.single('pdf'),
+  async (req, res) => {
+    try {
+      const { chapterId } = req.params;
+      if (!req.file) {
+        return res.status(400).json({ error: 'PDF file is required' });
+      }
+
+      const chapterRes = await pool.query(
+        `SELECT ch.id, ch.title, ch.book_id, b.batch_id, b.class_label, b.subject, bt.name AS batch_name
+         FROM book_chapters ch
+         JOIN books b ON b.id = ch.book_id
+         JOIN batches bt ON bt.id = b.batch_id
+         WHERE ch.id = $1
+         LIMIT 1`,
+        [chapterId]
+      );
+      if (chapterRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Chapter not found' });
+      }
+
+      const meta = chapterRes.rows[0];
+      const resolvedFolderId = await ensureDriveFolderPath({
+        rootFolderId: process.env.GDRIVE_FOLDER_ID,
+        segments: [
+          meta.batch_name || `Batch-${meta.batch_id}`,
+          meta.class_label || 'General',
+          meta.subject || 'General',
+          meta.title || `Chapter-${chapterId}`,
+          'Highlights',
+        ],
+      });
+
+      const uploaded = await uploadBufferToDrive({
+        fileBuffer: req.file.buffer,
+        fileName: req.file.originalname,
+        mimeType: req.file.mimetype || 'application/pdf',
+        folderId: resolvedFolderId,
+      });
+
+      const updated = await pool.query(
+        `UPDATE book_chapters
+         SET highlight_drive_link = $1,
+             highlight_drive_file_id = $2,
+             highlight_drive_folder_id = $3
+         WHERE id = $4
+         RETURNING *`,
+        [
+          uploaded.downloadLink || normalizeDriveLink(uploaded.webViewLink, 'download'),
+          uploaded.fileId || '',
+          resolvedFolderId,
+          chapterId,
+        ]
+      );
+
+      return res.json({
+        success: true,
+        chapter: mapChapterLinks(updated.rows[0]),
+        drive: uploaded,
+      });
+    } catch (error) {
+      logAdminRouteError('/chapters/:chapterId/highlight-pdf', error, { chapterId: req.params?.chapterId });
+      return res.status(500).json({ error: error.message || 'Highlight PDF upload failed' });
+    }
+  }
+);
+
+router.post(
+  '/chapters/:chapterId/regular-pdf',
+  adminAuth,
+  upload.single('pdf'),
+  async (req, res) => {
+    try {
+      const { chapterId } = req.params;
+      if (!req.file) {
+        return res.status(400).json({ error: 'PDF file is required' });
+      }
+
+      const chapterRes = await pool.query(
+        `SELECT ch.id, ch.title, ch.book_id, b.batch_id, b.class_label, b.subject, bt.name AS batch_name
+         FROM book_chapters ch
+         JOIN books b ON b.id = ch.book_id
+         JOIN batches bt ON bt.id = b.batch_id
+         WHERE ch.id = $1
+         LIMIT 1`,
+        [chapterId]
+      );
+      if (chapterRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Chapter not found' });
+      }
+
+      const meta = chapterRes.rows[0];
+      const resolvedFolderId = await ensureDriveFolderPath({
+        rootFolderId: process.env.GDRIVE_FOLDER_ID,
+        segments: [
+          meta.batch_name || `Batch-${meta.batch_id}`,
+          meta.class_label || 'General',
+          meta.subject || 'General',
+          meta.title || `Chapter-${chapterId}`,
+        ],
+      });
+
+      const uploaded = await uploadBufferToDrive({
+        fileBuffer: req.file.buffer,
+        fileName: req.file.originalname,
+        mimeType: req.file.mimetype || 'application/pdf',
+        folderId: resolvedFolderId,
+      });
+
+      const updated = await pool.query(
+        `UPDATE book_chapters
+         SET material_type = 'pdf',
+             material_drive_link = $1,
+             material_drive_file_id = $2,
+             material_drive_folder_id = $3
+         WHERE id = $4
+         RETURNING *`,
+        [
+          uploaded.downloadLink || normalizeDriveLink(uploaded.webViewLink, 'download'),
+          uploaded.fileId || '',
+          resolvedFolderId,
+          chapterId,
+        ]
+      );
+
+      return res.json({
+        success: true,
+        chapter: mapChapterLinks(updated.rows[0]),
+        drive: uploaded,
+      });
+    } catch (error) {
+      logAdminRouteError('/chapters/:chapterId/regular-pdf', error, { chapterId: req.params?.chapterId });
+      return res.status(500).json({ error: error.message || 'Regular PDF upload failed' });
+    }
+  }
+);
+
+router.get('/chapters/:chapterId/highlight-questions', adminAuth, async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const result = await pool.query(
+      `SELECT id, chapter_id, highlight_text, page_number, question,
+              option_a, option_b, option_c, option_d, correct_option, explanation, created_at
+       FROM chapter_highlight_questions
+       WHERE chapter_id = $1
+       ORDER BY page_number ASC, id ASC`,
+      [chapterId]
+    );
+    res.json({ success: true, highlightQuestions: result.rows });
+  } catch (e) {
+    logAdminRouteError('/chapters/:chapterId/highlight-questions GET', e);
+    res.status(500).json({ error: e.message || 'Failed to fetch highlight questions' });
+  }
+});
+
+router.post('/chapters/:chapterId/highlight-questions', adminAuth, async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const {
+      highlightText,
+      pageNumber = 1,
+      question,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
+      correctOption = 'A',
+      explanation = '',
+    } = req.body;
+
+    if (!question || !optionA || !optionB || !optionC || !optionD) {
+      return res.status(400).json({ error: 'Question and 4 options are required' });
+    }
+
+    const chapterCheck = await pool.query(`SELECT id FROM book_chapters WHERE id = $1 LIMIT 1`, [chapterId]);
+    if (chapterCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Chapter does not exist' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO chapter_highlight_questions (
+         chapter_id, highlight_text, page_number, question,
+         option_a, option_b, option_c, option_d, correct_option, explanation
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        chapterId,
+        highlightText || '',
+        parseInt(pageNumber, 10) || 1,
+        question,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        (correctOption || 'A').toUpperCase(),
+        explanation || '',
+      ]
+    );
+
+    res.json({ success: true, highlightQuestion: result.rows[0] });
+  } catch (e) {
+    logAdminRouteError('/chapters/:chapterId/highlight-questions POST', e);
+    res.status(500).json({ error: e.message || 'Failed to add highlight question' });
+  }
+});
+
+router.put('/highlight-questions/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      highlightText,
+      pageNumber,
+      question,
+      optionA,
+      optionB,
+      optionC,
+      optionD,
+      correctOption,
+      explanation,
+    } = req.body;
+
+    const result = await pool.query(
+      `UPDATE chapter_highlight_questions
+       SET highlight_text = COALESCE($2, highlight_text),
+           page_number = COALESCE($3, page_number),
+           question = COALESCE($4, question),
+           option_a = COALESCE($5, option_a),
+           option_b = COALESCE($6, option_b),
+           option_c = COALESCE($7, option_c),
+           option_d = COALESCE($8, option_d),
+           correct_option = COALESCE($9, correct_option),
+           explanation = COALESCE($10, explanation)
+       WHERE id = $1
+       RETURNING *`,
+      [
+        id,
+        highlightText,
+        pageNumber !== undefined ? parseInt(pageNumber, 10) : null,
+        question,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption ? correctOption.toUpperCase() : null,
+        explanation,
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Highlight question not found' });
+    }
+
+    res.json({ success: true, highlightQuestion: result.rows[0] });
+  } catch (e) {
+    logAdminRouteError('/highlight-questions/:id PUT', e);
+    res.status(500).json({ error: e.message || 'Failed to update highlight question' });
+  }
+});
+
+router.delete('/highlight-questions/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM chapter_highlight_questions WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (e) {
+    logAdminRouteError('/highlight-questions/:id DELETE', e);
+    res.status(500).json({ error: e.message || 'Failed to delete highlight question' });
+  }
+});
 
 router.post('/chapters/:chapterId/pyqs/with-media', adminAuth, questionMediaUpload, async (req, res) => {
   try {

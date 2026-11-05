@@ -240,6 +240,15 @@ class ContentRepository {
   Future<Map<String, dynamic>> fetchChapterDetail(int chapterId) =>
       _get('/content/chapters/$chapterId');
 
+  Future<List<Map<String, dynamic>>> fetchHighlightQuestions(int chapterId) async {
+    try {
+      final data = await _get('/content/chapters/$chapterId/highlight-questions', bypassCache: true);
+      return _mapsFromListKey(data, 'highlightQuestions');
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Future<Map<String, dynamic>> fetchPracticeAttemptData(int setId) =>
       _get('/content/practice-sets/$setId/questions', bypassCache: true);
 

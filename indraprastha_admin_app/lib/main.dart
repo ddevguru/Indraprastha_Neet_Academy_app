@@ -1568,6 +1568,40 @@ class _BooksPageState extends State<BooksPage> {
   double _pdfProgress = 0.0;
   bool _pdfUploading = false;
 
+  // Chapter eBooks (Regular & Highlighted)
+  File? _chapterRegularPdf;
+  bool _uploadingRegularPdf = false;
+  File? _chapterHighlightPdf;
+  bool _uploadingHighlightPdf = false;
+
+  // Chapter Highlight Questions (Interactive Tap & Solve)
+  final _hlText = TextEditingController();
+  final _hlPageNumber = TextEditingController(text: '1');
+  final _hlQuestion = TextEditingController();
+  final _hlOptA = TextEditingController();
+  final _hlOptB = TextEditingController();
+  final _hlOptC = TextEditingController();
+  final _hlOptD = TextEditingController();
+  final _hlExplanation = TextEditingController();
+  String _hlCorrect = 'A';
+  int? _editingHlQuestionId;
+  bool _savingHlQuestion = false;
+
+  void _resetHlQuestionForm() {
+    setState(() {
+      _editingHlQuestionId = null;
+      _hlText.clear();
+      _hlPageNumber.text = '1';
+      _hlQuestion.clear();
+      _hlOptA.clear();
+      _hlOptB.clear();
+      _hlOptC.clear();
+      _hlOptD.clear();
+      _hlExplanation.clear();
+      _hlCorrect = 'A';
+    });
+  }
+
   void _resetBookForm() {
     _editingId = null;
     _bookTitle.clear();
@@ -1640,6 +1674,14 @@ class _BooksPageState extends State<BooksPage> {
     _pyqSimilarOptionC.dispose();
     _pyqSimilarOptionD.dispose();
     _pyqSimilarExplanation.dispose();
+    _hlText.dispose();
+    _hlPageNumber.dispose();
+    _hlQuestion.dispose();
+    _hlOptA.dispose();
+    _hlOptB.dispose();
+    _hlOptC.dispose();
+    _hlOptD.dispose();
+    _hlExplanation.dispose();
     super.dispose();
   }
 
@@ -2026,10 +2068,626 @@ class _BooksPageState extends State<BooksPage> {
                       .toList(),
                   onChanged: (v) => setState(() => _selectedChapterId = v),
                   decoration: InputDecoration(
-                    labelText: 'Select chapter for PYQ',
+                    labelText: 'Select chapter',
                     helperText: _chapters.isEmpty
                         ? 'No chapters found for this book. Add a chapter above.'
                         : null,
+                  ),
+                ),
+                if (_selectedChapterId != null) ...[
+                  Builder(
+                    builder: (context) {
+                      final selectedChapterMap = _chapters.firstWhere(
+                        (c) => (c as Map<String, dynamic>)['id'] == _selectedChapterId,
+                        orElse: () => null,
+                      ) as Map<String, dynamic>?;
+                      final hasRegularPdf = selectedChapterMap?['material_drive_link']?.toString().isNotEmpty ?? false;
+                      final hasHighlightPdf = selectedChapterMap?['highlight_drive_link']?.toString().isNotEmpty ?? false;
+                      final hlCount = selectedChapterMap?['linked_highlight_questions_count'] ?? 0;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 12),
+                          // ── DUAL eBOOK SECTION (Regular & Highlighted) ────────────
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.menu_book_rounded, color: Colors.indigo, size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Chapter eBooks: ${selectedChapterMap?['title'] ?? 'Chapter'}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Upload regular eBook PDF and highlighted eBook PDF. Both cover this chapter, with highlights marked in the highlight version.',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                                ),
+                                const SizedBox(height: 10),
+
+                                // 1. Regular eBook (PDF)
+                                Card(
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    side: BorderSide(
+                                      color: hasRegularPdf ? Colors.green.shade400 : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.picture_as_pdf_outlined, size: 18, color: Colors.indigo),
+                                            const SizedBox(width: 6),
+                                            const Expanded(
+                                              child: Text(
+                                                'Regular eBook (PDF)',
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                              ),
+                                            ),
+                                            if (hasRegularPdf)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green.withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.check_circle_rounded, size: 12, color: Colors.green),
+                                                    SizedBox(width: 4),
+                                                    Text('Uploaded', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                              )
+                                            else
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange.withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text('Not Uploaded', style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                _chapterRegularPdf == null
+                                                    ? 'No new PDF picked'
+                                                    : _chapterRegularPdf!.path.split(Platform.pathSeparator).last,
+                                                style: const TextStyle(fontSize: 12),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            TextButton(
+                                              onPressed: () async {
+                                                final result = await FilePicker.platform.pickFiles(
+                                                  type: FileType.custom,
+                                                  allowedExtensions: ['pdf'],
+                                                );
+                                                if (result?.files.single.path != null) {
+                                                  setState(() => _chapterRegularPdf = File(result!.files.single.path!));
+                                                }
+                                              },
+                                              child: const Text('Pick PDF'),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            FilledButton.tonal(
+                                              onPressed: (_chapterRegularPdf == null || _uploadingRegularPdf)
+                                                  ? null
+                                                  : () async {
+                                                      setState(() => _uploadingRegularPdf = true);
+                                                      try {
+                                                        await widget.api.uploadChapterRegularPdf(
+                                                          chapterId: _selectedChapterId!,
+                                                          pdfFile: _chapterRegularPdf!,
+                                                        );
+                                                        setState(() => _chapterRegularPdf = null);
+                                                        await _loadChaptersForSelectedBook();
+                                                        if (context.mounted) {
+                                                          _showActionSnackBar(context, 'Regular eBook PDF uploaded successfully');
+                                                        }
+                                                      } catch (e) {
+                                                        if (context.mounted) {
+                                                          _showActionSnackBar(context, 'Upload failed: $e', isError: true);
+                                                        }
+                                                      } finally {
+                                                        if (mounted) setState(() => _uploadingRegularPdf = false);
+                                                      }
+                                                    },
+                                              child: _uploadingRegularPdf
+                                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                                  : const Text('Upload'),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+
+                                // 2. Highlighted eBook (PDF)
+                                Card(
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    side: BorderSide(
+                                      color: hasHighlightPdf ? Colors.amber.shade600 : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.highlight_rounded, size: 18, color: Colors.amber),
+                                            const SizedBox(width: 6),
+                                            const Expanded(
+                                              child: Text(
+                                                'Highlighted eBook (PDF)',
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                              ),
+                                            ),
+                                            if (hasHighlightPdf)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.amber.withValues(alpha: 0.18),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.check_circle_rounded, size: 12, color: Colors.amber),
+                                                    SizedBox(width: 4),
+                                                    Text('Uploaded', style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                  ],
+                                                ),
+                                              )
+                                            else
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange.withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text('Not Uploaded', style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                _chapterHighlightPdf == null
+                                                    ? 'No new PDF picked'
+                                                    : _chapterHighlightPdf!.path.split(Platform.pathSeparator).last,
+                                                style: const TextStyle(fontSize: 12),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            TextButton(
+                                              onPressed: () async {
+                                                final result = await FilePicker.platform.pickFiles(
+                                                  type: FileType.custom,
+                                                  allowedExtensions: ['pdf'],
+                                                );
+                                                if (result?.files.single.path != null) {
+                                                  setState(() => _chapterHighlightPdf = File(result!.files.single.path!));
+                                                }
+                                              },
+                                              child: const Text('Pick PDF'),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            FilledButton.tonal(
+                                              onPressed: (_chapterHighlightPdf == null || _uploadingHighlightPdf)
+                                                  ? null
+                                                  : () async {
+                                                      setState(() => _uploadingHighlightPdf = true);
+                                                      try {
+                                                        await widget.api.uploadChapterHighlightPdf(
+                                                          chapterId: _selectedChapterId!,
+                                                          pdfFile: _chapterHighlightPdf!,
+                                                        );
+                                                        setState(() => _chapterHighlightPdf = null);
+                                                        await _loadChaptersForSelectedBook();
+                                                        if (context.mounted) {
+                                                          _showActionSnackBar(context, 'Highlighted eBook PDF uploaded successfully');
+                                                        }
+                                                      } catch (e) {
+                                                        if (context.mounted) {
+                                                          _showActionSnackBar(context, 'Upload failed: $e', isError: true);
+                                                        }
+                                                      } finally {
+                                                        if (mounted) setState(() => _uploadingHighlightPdf = false);
+                                                      }
+                                                    },
+                                              child: _uploadingHighlightPdf
+                                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                                  : const Text('Upload'),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // ── HIGHLIGHT QUESTIONS (Interactive Tap & Solve) ──────────
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).cardColor,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _editingHlQuestionId != null
+                                    ? Colors.amber.shade700
+                                    : Theme.of(context).colorScheme.outlineVariant,
+                              ),
+                            ),
+                            child: ExpansionTile(
+                              initiallyExpanded: _editingHlQuestionId != null,
+                              leading: const Icon(Icons.touch_app_rounded, color: Colors.amber),
+                              title: Row(
+                                children: [
+                                  const Text(
+                                    'Highlight Questions (Interactive)',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withValues(alpha: 0.18),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '$hlCount Added',
+                                      style: const TextStyle(color: Color(0xFFB45309), fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              subtitle: const Text(
+                                'Student taps highlighted text in eBook to solve these MCQs in a popup dialog.',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      TextField(
+                                        controller: _hlText,
+                                        minLines: 2,
+                                        maxLines: 3,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Highlighted Text from eBook *',
+                                          hintText: 'Paste exact sentence/quote highlighted in eBook',
+                                          prefixIcon: Icon(Icons.format_quote_rounded),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 2,
+                                            child: TextField(
+                                              controller: _hlPageNumber,
+                                              keyboardType: TextInputType.number,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Page Number in PDF',
+                                                hintText: 'e.g. 1',
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            flex: 3,
+                                            child: DropdownButtonFormField<String>(
+                                              value: const ['A', 'B', 'C', 'D'].contains(_hlCorrect) ? _hlCorrect : 'A',
+                                              items: const [
+                                                DropdownMenuItem(value: 'A', child: Text('Correct: A')),
+                                                DropdownMenuItem(value: 'B', child: Text('Correct: B')),
+                                                DropdownMenuItem(value: 'C', child: Text('Correct: C')),
+                                                DropdownMenuItem(value: 'D', child: Text('Correct: D')),
+                                              ],
+                                              onChanged: (v) => setState(() => _hlCorrect = v ?? 'A'),
+                                              decoration: const InputDecoration(labelText: 'Correct Option *'),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextField(
+                                        controller: _hlQuestion,
+                                        minLines: 2,
+                                        maxLines: 3,
+                                        decoration: const InputDecoration(
+                                          labelText: 'MCQ Question *',
+                                          hintText: 'Concept question based on the highlighted line',
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextField(
+                                        controller: _hlOptA,
+                                        decoration: const InputDecoration(labelText: 'Option A *'),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextField(
+                                        controller: _hlOptB,
+                                        decoration: const InputDecoration(labelText: 'Option B *'),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextField(
+                                        controller: _hlOptC,
+                                        decoration: const InputDecoration(labelText: 'Option C *'),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextField(
+                                        controller: _hlOptD,
+                                        decoration: const InputDecoration(labelText: 'Option D *'),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextField(
+                                        controller: _hlExplanation,
+                                        minLines: 2,
+                                        maxLines: 4,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Explanation (NCERT Step-by-Step)',
+                                          hintText: 'Detailed explanation for the student',
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          FilledButton.tonal(
+                                            onPressed: _savingHlQuestion
+                                                ? null
+                                                : () async {
+                                                    final hl = _hlText.text.trim();
+                                                    final q = _hlQuestion.text.trim();
+                                                    final a = _hlOptA.text.trim();
+                                                    final b = _hlOptB.text.trim();
+                                                    final c = _hlOptC.text.trim();
+                                                    final d = _hlOptD.text.trim();
+                                                    if (q.isEmpty || a.isEmpty || b.isEmpty || c.isEmpty || d.isEmpty) {
+                                                      _showActionSnackBar(context, 'Question aur 4 options required hain.', isError: true);
+                                                      return;
+                                                    }
+                                                    setState(() => _savingHlQuestion = true);
+                                                    try {
+                                                      final page = int.tryParse(_hlPageNumber.text.trim()) ?? 1;
+                                                      if (_editingHlQuestionId != null) {
+                                                        await widget.api.updateHighlightQuestion(
+                                                          id: _editingHlQuestionId!,
+                                                          highlightText: hl,
+                                                          pageNumber: page,
+                                                          question: q,
+                                                          optionA: a,
+                                                          optionB: b,
+                                                          optionC: c,
+                                                          optionD: d,
+                                                          correctOption: _hlCorrect,
+                                                          explanation: _hlExplanation.text.trim(),
+                                                        );
+                                                      } else {
+                                                        await widget.api.addHighlightQuestion(
+                                                          chapterId: _selectedChapterId!,
+                                                          highlightText: hl,
+                                                          pageNumber: page,
+                                                          question: q,
+                                                          optionA: a,
+                                                          optionB: b,
+                                                          optionC: c,
+                                                          optionD: d,
+                                                          correctOption: _hlCorrect,
+                                                          explanation: _hlExplanation.text.trim(),
+                                                        );
+                                                      }
+                                                      _resetHlQuestionForm();
+                                                      await _loadChaptersForSelectedBook();
+                                                      if (context.mounted) {
+                                                        _showActionSnackBar(context, 'Highlight question saved successfully');
+                                                      }
+                                                    } catch (e) {
+                                                      if (context.mounted) {
+                                                        _showActionSnackBar(context, 'Save failed: $e', isError: true);
+                                                      }
+                                                    } finally {
+                                                      if (mounted) setState(() => _savingHlQuestion = false);
+                                                    }
+                                                  },
+                                            child: _savingHlQuestion
+                                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                                : Text(_editingHlQuestionId == null ? 'Add Highlight Question' : 'Update Highlight Question'),
+                                          ),
+                                          if (_editingHlQuestionId != null)
+                                            OutlinedButton(
+                                              onPressed: _resetHlQuestionForm,
+                                              child: const Text('Cancel Edit'),
+                                            ),
+                                          OutlinedButton.icon(
+                                            icon: const Icon(Icons.manage_search_rounded, size: 16),
+                                            label: const Text('Manage Highlight Questions'),
+                                            onPressed: () async {
+                                              final hlList = await widget.api.highlightQuestions(_selectedChapterId!);
+                                              if (!context.mounted) return;
+                                              showModalBottomSheet(
+                                                context: context,
+                                                showDragHandle: true,
+                                                isScrollControlled: true,
+                                                builder: (ctx) => SafeArea(
+                                                  child: FractionallySizedBox(
+                                                    heightFactor: 0.75,
+                                                    child: ListView(
+                                                      padding: const EdgeInsets.all(16),
+                                                      children: [
+                                                        Text(
+                                                          'Manage Highlight Questions (${hlList.length})',
+                                                          style: Theme.of(ctx).textTheme.titleLarge,
+                                                        ),
+                                                        const SizedBox(height: 8),
+                                                        if (hlList.isEmpty)
+                                                          const Text('No highlight questions added for this chapter yet.')
+                                                        else
+                                                          ...hlList.map((item) {
+                                                            final qMap = item as Map<String, dynamic>;
+                                                            final qId = qMap['id'] as int;
+                                                            return Card(
+                                                              margin: const EdgeInsets.only(bottom: 10),
+                                                              child: Padding(
+                                                                padding: const EdgeInsets.all(12),
+                                                                child: Column(
+                                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                                  children: [
+                                                                    if ((qMap['highlight_text']?.toString().isNotEmpty ?? false)) ...[
+                                                                      Container(
+                                                                        width: double.infinity,
+                                                                        padding: const EdgeInsets.all(8),
+                                                                        decoration: BoxDecoration(
+                                                                          color: Colors.amber.withValues(alpha: 0.15),
+                                                                          borderRadius: BorderRadius.circular(6),
+                                                                          border: Border.all(color: Colors.amber.shade300),
+                                                                        ),
+                                                                        child: Text(
+                                                                          '📌 Page ${qMap['page_number'] ?? 1}: "${qMap['highlight_text']}"',
+                                                                          style: const TextStyle(
+                                                                            fontSize: 12,
+                                                                            fontWeight: FontWeight.w600,
+                                                                            fontStyle: FontStyle.italic,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                      const SizedBox(height: 6),
+                                                                    ],
+                                                                    Text(
+                                                                      qMap['question']?.toString() ?? '',
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                    const SizedBox(height: 4),
+                                                                    Text('A: ${qMap['option_a'] ?? ''}'),
+                                                                    Text('B: ${qMap['option_b'] ?? ''}'),
+                                                                    Text('C: ${qMap['option_c'] ?? ''}'),
+                                                                    Text('D: ${qMap['option_d'] ?? ''}'),
+                                                                    const SizedBox(height: 4),
+                                                                    Text(
+                                                                      'Correct: Option (${qMap['correct_option'] ?? 'A'})',
+                                                                      style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                                                                    ),
+                                                                    if ((qMap['explanation']?.toString().isNotEmpty ?? false)) ...[
+                                                                      const SizedBox(height: 4),
+                                                                      Text(
+                                                                        'Exp: ${qMap['explanation']}',
+                                                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                                                      ),
+                                                                    ],
+                                                                    const SizedBox(height: 8),
+                                                                    Row(
+                                                                      mainAxisAlignment: MainAxisAlignment.end,
+                                                                      children: [
+                                                                        OutlinedButton.icon(
+                                                                          icon: const Icon(Icons.edit_outlined, size: 16),
+                                                                          label: const Text('Edit'),
+                                                                          onPressed: () {
+                                                                            Navigator.of(ctx).pop();
+                                                                            setState(() {
+                                                                              _editingHlQuestionId = qId;
+                                                                              _hlText.text = qMap['highlight_text']?.toString() ?? '';
+                                                                              _hlPageNumber.text = (qMap['page_number'] ?? 1).toString();
+                                                                              _hlQuestion.text = qMap['question']?.toString() ?? '';
+                                                                              _hlOptA.text = qMap['option_a']?.toString() ?? '';
+                                                                              _hlOptB.text = qMap['option_b']?.toString() ?? '';
+                                                                              _hlOptC.text = qMap['option_c']?.toString() ?? '';
+                                                                              _hlOptD.text = qMap['option_d']?.toString() ?? '';
+                                                                              _hlCorrect = (qMap['correct_option']?.toString() ?? 'A').toUpperCase();
+                                                                              _hlExplanation.text = qMap['explanation']?.toString() ?? '';
+                                                                            });
+                                                                          },
+                                                                        ),
+                                                                        const SizedBox(width: 8),
+                                                                        OutlinedButton.icon(
+                                                                          icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                                                          label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                                          onPressed: () async {
+                                                                            await widget.api.deleteHighlightQuestion(qId);
+                                                                            Navigator.of(ctx).pop();
+                                                                            await _loadChaptersForSelectedBook();
+                                                                            if (context.mounted) {
+                                                                              _showActionSnackBar(context, 'Highlight question deleted');
+                                                                            }
+                                                                          },
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            );
+                                                          }),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+                const SizedBox(height: 16),
+                const Divider(),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Chapter PYQs (Previous Years Questions)',
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -12228,6 +12886,122 @@ class AdminApi {
       'highlight': highlight,
     });
   }
+
+  Future<Map<String, dynamic>> uploadChapterHighlightPdf({
+    required int chapterId,
+    required File pdfFile,
+  }) async {
+    final path = '/admin/chapters/$chapterId/highlight-pdf';
+    if (token == null) throw Exception('Login first');
+    try {
+      final req = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
+      req.headers['Authorization'] = 'Bearer $token';
+      final bytes = await pdfFile.readAsBytes();
+      final name = pdfFile.path.split(Platform.pathSeparator).last;
+      req.files.add(http.MultipartFile.fromBytes('pdf', bytes, filename: name));
+      final streamed = await req.send();
+      final bodyText = await streamed.stream.bytesToString();
+      final json = _decodeApiJson(
+        bodyText,
+        statusCode: streamed.statusCode,
+        method: 'POST',
+        path: path,
+      );
+      if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+        throw Exception(json['error'] ?? 'Highlight PDF upload failed');
+      }
+      return json;
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log('POST $path', e, stackTrace: st);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadChapterRegularPdf({
+    required int chapterId,
+    required File pdfFile,
+  }) async {
+    final path = '/admin/chapters/$chapterId/regular-pdf';
+    if (token == null) throw Exception('Login first');
+    try {
+      final req = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
+      req.headers['Authorization'] = 'Bearer $token';
+      final bytes = await pdfFile.readAsBytes();
+      final name = pdfFile.path.split(Platform.pathSeparator).last;
+      req.files.add(http.MultipartFile.fromBytes('pdf', bytes, filename: name));
+      final streamed = await req.send();
+      final bodyText = await streamed.stream.bytesToString();
+      final json = _decodeApiJson(
+        bodyText,
+        statusCode: streamed.statusCode,
+        method: 'POST',
+        path: path,
+      );
+      if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
+        throw Exception(json['error'] ?? 'Regular PDF upload failed');
+      }
+      return json;
+    } catch (e, st) {
+      await AdminErrorLogger.instance.log('POST $path', e, stackTrace: st);
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> highlightQuestions(int chapterId) async =>
+      (await _get('/admin/chapters/$chapterId/highlight-questions'))['highlightQuestions'] as List<dynamic>;
+
+  Future<void> addHighlightQuestion({
+    required int chapterId,
+    required String highlightText,
+    int pageNumber = 1,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    String explanation = '',
+  }) async {
+    await _post('/admin/chapters/$chapterId/highlight-questions', {
+      'highlightText': highlightText,
+      'pageNumber': pageNumber,
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+    });
+  }
+
+  Future<void> updateHighlightQuestion({
+    required int id,
+    required String highlightText,
+    int pageNumber = 1,
+    required String question,
+    required String optionA,
+    required String optionB,
+    required String optionC,
+    required String optionD,
+    required String correctOption,
+    String explanation = '',
+  }) async {
+    await _put('/admin/highlight-questions/$id', {
+      'highlightText': highlightText,
+      'pageNumber': pageNumber,
+      'question': question,
+      'optionA': optionA,
+      'optionB': optionB,
+      'optionC': optionC,
+      'optionD': optionD,
+      'correctOption': correctOption,
+      'explanation': explanation,
+    });
+  }
+
+  Future<void> deleteHighlightQuestion(int id) =>
+      _delete('/admin/highlight-questions/$id');
 
   Future<void> updateBook({
     required int id,

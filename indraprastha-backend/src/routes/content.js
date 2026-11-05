@@ -118,15 +118,17 @@ async function userAuth(req, res, next) {
 function mapChapterLinks(chapter) {
   const fileId = chapter.material_drive_file_id || extractDriveFileId(chapter.material_drive_link);
   const links = buildDrivePublicLinks(fileId);
+  const highlightFileId =
+    chapter.highlight_drive_file_id || extractDriveFileId(chapter.highlight_drive_link);
+  const highlightLinks = buildDrivePublicLinks(highlightFileId);
   return {
     ...chapter,
     material_drive_file_id: fileId || '',
-    // Return downloadLink so the Flutter app can wrap it inside the
-    // Google viewerng embedded viewer, which works reliably in Android
-    // WebView. The old previewLink (/file/d/{id}/preview) is blocked
-    // by X-Frame-Options on most Android WebView builds.
     material_drive_link:
       links.downloadLink || normalizeDriveLink(chapter.material_drive_link, 'download'),
+    highlight_drive_file_id: highlightFileId || '',
+    highlight_drive_link:
+      highlightLinks.downloadLink || normalizeDriveLink(chapter.highlight_drive_link, 'download'),
   };
 }
 
@@ -374,8 +376,11 @@ router.get('/books', userAuth, async (req, res) => {
 
 router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
   const chapters = await pool.query(
-    `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type, ch.material_drive_link, ch.material_drive_file_id, ch.material_drive_folder_id,
-        (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS linked_pyq_count
+    `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type,
+        ch.material_drive_link, ch.material_drive_file_id, ch.material_drive_folder_id,
+        ch.highlight_drive_link, ch.highlight_drive_file_id, ch.highlight_drive_folder_id,
+        (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS linked_pyq_count,
+        (SELECT COUNT(*)::int FROM chapter_highlight_questions hq WHERE hq.chapter_id = ch.id) AS linked_highlight_questions_count
      FROM book_chapters ch
      WHERE ch.book_id = $1
      ORDER BY ch.id ASC`,
@@ -408,21 +413,26 @@ router.get('/books/:bookId/chapters', userAuth, async (req, res) => {
   const created = await pool.query(
     `INSERT INTO book_chapters (book_id, title, overview, note_summary, highlight, material_type)
      VALUES ($1, $2, '', '', '', 'text')
-     RETURNING id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id`,
+     RETURNING id, title, overview, note_summary, highlight, material_type, material_drive_link, material_drive_file_id, material_drive_folder_id,
+               highlight_drive_link, highlight_drive_file_id, highlight_drive_folder_id`,
     [book.id, defaultChapterTitle]
   );
 
   const chapter = {
     ...mapChapterLinks(created.rows[0]),
     linked_pyq_count: 0,
+    linked_highlight_questions_count: 0,
   };
   return res.json({ success: true, chapters: [chapter] });
 });
 
 router.get('/chapters/:chapterId', userAuth, async (req, res) => {
   const chapter = await pool.query(
-    `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type, ch.material_drive_link, ch.material_drive_file_id, ch.material_drive_folder_id,
-        (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS linked_pyq_count
+    `SELECT ch.id, ch.title, ch.overview, ch.note_summary, ch.highlight, ch.material_type,
+        ch.material_drive_link, ch.material_drive_file_id, ch.material_drive_folder_id,
+        ch.highlight_drive_link, ch.highlight_drive_file_id, ch.highlight_drive_folder_id,
+        (SELECT COUNT(*)::int FROM pyqs p WHERE p.chapter_id = ch.id) AS linked_pyq_count,
+        (SELECT COUNT(*)::int FROM chapter_highlight_questions hq WHERE hq.chapter_id = ch.id) AS linked_highlight_questions_count
      FROM book_chapters ch
      WHERE ch.id = $1
      LIMIT 1`,
@@ -432,6 +442,24 @@ router.get('/chapters/:chapterId', userAuth, async (req, res) => {
     return res.status(404).json({ error: 'Chapter not found' });
   }
   res.json({ success: true, chapter: await ensureChapterExtracted(chapter.rows[0]) });
+});
+
+router.get('/chapters/:chapterId/highlight-questions', userAuth, async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const result = await pool.query(
+      `SELECT id, chapter_id, highlight_text, page_number, question,
+              option_a, option_b, option_c, option_d, correct_option, explanation, created_at
+       FROM chapter_highlight_questions
+       WHERE chapter_id = $1
+       ORDER BY page_number ASC, id ASC`,
+      [chapterId]
+    );
+    res.json({ success: true, highlightQuestions: result.rows });
+  } catch (err) {
+    console.error('[HIGHLIGHT_QUESTIONS_FETCH_ERROR]', err);
+    res.status(500).json({ error: 'Failed to fetch highlight questions' });
+  }
 });
 
 router.get('/chapters/:chapterId/pyqs', userAuth, async (req, res) => {

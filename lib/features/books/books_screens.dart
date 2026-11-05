@@ -396,10 +396,12 @@ class ChapterDetailScreen extends ConsumerWidget {
     final repo = ref.read(contentRepositoryProvider);
     final chapterFuture = repo.fetchChapterDetail(chapterId);
     final pyqFuture = repo.fetchPyqs(chapterId);
+    final highlightQuestionsFuture = repo.fetchHighlightQuestions(chapterId);
     return FutureBuilder<Map<String, dynamic>>(
-      future: Future.wait([chapterFuture, pyqFuture]).then((v) => {
+      future: Future.wait([chapterFuture, pyqFuture, highlightQuestionsFuture]).then((v) => {
         'chapter': (v[0] as Map<String, dynamic>)['chapter'],
         'pyqs': v[1] as List<Map<String, dynamic>>,
+        'highlightQuestions': v[2] as List<Map<String, dynamic>>,
       }),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -410,6 +412,9 @@ class ChapterDetailScreen extends ConsumerWidget {
         );
         final pyqs = List<Map<String, dynamic>>.from(
           snapshot.data?['pyqs'] as List<dynamic>? ?? const [],
+        );
+        final highlightQuestions = List<Map<String, dynamic>>.from(
+          snapshot.data?['highlightQuestions'] as List<dynamic>? ?? const [],
         );
         final chapterIdString = chapter['id']?.toString() ?? '$chapterId';
         final isSaved =
@@ -538,15 +543,9 @@ class ChapterDetailScreen extends ConsumerWidget {
                   child: TabBarView(
                     children: [
                       _PdfOrNotesPanel(chapter: chapter),
-                      _DetailPanel(
-                        title: 'Important lines',
-                        content: chapter['highlight']?.toString() ?? '',
-                        bullets: const [
-                          'Highlighted lines for revision',
-                          'One-tap bookmark',
-                          'Inline note highlight style',
-                        ],
-                        highlight: true,
+                      _HighlightEbookPanel(
+                        chapter: chapter,
+                        highlightQuestions: highlightQuestions,
                       ),
                     ],
                   ),
@@ -1259,21 +1258,105 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
     );
   }
 
-  String _resolveMaterialLink(Map<String, dynamic> chapter) {
-    const candidateKeys = [
-      'material_drive_link',
-      'material_link',
-      'pdf_link',
-      'drive_link',
-      'url',
-    ];
-    for (final key in candidateKeys) {
-      final value = chapter[key]?.toString().trim() ?? '';
-      if (value.isNotEmpty) {
-        return value;
-      }
+  void _ensurePreviewController(String? previewUrl) {
+    if (previewUrl == null) return;
+    if (_webViewController != null && _loadedPreviewUrl == previewUrl) return;
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.transparent)
+      ..loadRequest(Uri.parse(previewUrl));
+    _loadedPreviewUrl = previewUrl;
+  }
+}
+
+String _resolveMaterialLink(Map<String, dynamic> chapter) {
+  const candidateKeys = [
+    'material_drive_link',
+    'material_link',
+    'pdf_link',
+    'drive_link',
+    'url',
+  ];
+  for (final key in candidateKeys) {
+    final value = chapter[key]?.toString().trim() ?? '';
+    if (value.isNotEmpty) {
+      return value;
     }
-    return '';
+  }
+  return '';
+}
+
+String? _toDrivePreviewUrl(String raw) {
+  if (raw.trim().isEmpty) return null;
+  final uri = Uri.tryParse(raw);
+  if (uri == null) return null;
+
+  final id = _extractGoogleDriveFileId(uri);
+  if (id != null && id.isNotEmpty) {
+    return 'https://drive.google.com/file/d/$id/preview';
+  }
+
+  // Fallback: just open the given URL in webview.
+  return raw;
+}
+
+String? _extractGoogleDriveFileId(Uri uri) {
+  final idFromQuery = uri.queryParameters['id'];
+  if (idFromQuery != null && idFromQuery.isNotEmpty) return idFromQuery;
+
+  final s = uri.toString();
+  final m1 = RegExp(r'/file/d/([^/]+)').firstMatch(s);
+  if (m1 != null) return m1.group(1);
+
+  final m2 = RegExp(r'drive\.google\.com\/open\?id=([^&]+)').firstMatch(s);
+  if (m2 != null) return m2.group(1);
+
+  final m3 = RegExp(r'[?&]id=([^&]+)').firstMatch(s);
+  if (m3 != null) return m3.group(1);
+
+  return null;
+}
+
+String _normalizeExtractedText(String raw) {
+  var s = raw.replaceAll('\u0000', '').trim();
+  if (s.isEmpty) return '';
+  // If the text is char-per-line (vertical), join it.
+  final lines = s.split('\n');
+  final shortLines = lines.where((l) => l.trim().isNotEmpty && l.trim().length <= 3).length;
+  if (lines.length > 30 && (shortLines / lines.length) > 0.8) {
+    s = lines.map((l) => l.trim()).where((l) => l.isNotEmpty).join(' ');
+  }
+  // Light cleanup: normalize whitespace but preserve paragraphs.
+  s = s.replaceAll(RegExp(r'\r'), '\n');
+  s = s.replaceAll(RegExp(r'[ \t]+'), ' ');
+  s = s.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+  return s.trim();
+}
+
+// ── Highlighted eBook Panel with Interactive MCQ Solving ─────────────────────
+
+class _HighlightEbookPanel extends StatefulWidget {
+  const _HighlightEbookPanel({
+    required this.chapter,
+    required this.highlightQuestions,
+  });
+
+  final Map<String, dynamic> chapter;
+  final List<Map<String, dynamic>> highlightQuestions;
+
+  @override
+  State<_HighlightEbookPanel> createState() => _HighlightEbookPanelState();
+}
+
+class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
+  int _previewKey = 0;
+  WebViewController? _webViewController;
+  String? _loadedPreviewUrl;
+
+  String _resolveHighlightPdfLink() {
+    final hl = widget.chapter['highlight_drive_link']?.toString().trim() ?? '';
+    if (hl.isNotEmpty) return hl;
+    return _resolveMaterialLink(widget.chapter);
   }
 
   void _ensurePreviewController(String? previewUrl) {
@@ -1286,51 +1369,724 @@ class _PdfOrNotesPanelState extends State<_PdfOrNotesPanel> {
     _loadedPreviewUrl = previewUrl;
   }
 
-  String? _toDrivePreviewUrl(String raw) {
-    if (raw.trim().isEmpty) return null;
-    final uri = Uri.tryParse(raw);
-    if (uri == null) return null;
-
-    final id = _extractGoogleDriveFileId(uri);
-    if (id != null && id.isNotEmpty) {
-      return 'https://drive.google.com/file/d/$id/preview';
-    }
-
-    // Fallback: just open the given URL in webview.
-    return raw;
+  void _openQuestionPopup(BuildContext context, Map<String, dynamic> question) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _HighlightQuestionSolvePopup(question: question),
+    );
   }
 
-  String? _extractGoogleDriveFileId(Uri uri) {
-    final idFromQuery = uri.queryParameters['id'];
-    if (idFromQuery != null && idFromQuery.isNotEmpty) return idFromQuery;
-
-    final s = uri.toString();
-    final m1 = RegExp(r'/file/d/([^/]+)').firstMatch(s);
-    if (m1 != null) return m1.group(1);
-
-    final m2 = RegExp(r'drive\.google\.com\/open\?id=([^&]+)').firstMatch(s);
-    if (m2 != null) return m2.group(1);
-
-    final m3 = RegExp(r'[?&]id=([^&]+)').firstMatch(s);
-    if (m3 != null) return m3.group(1);
-
-    return null;
+  void _showAllQuestionsSheet(BuildContext context) {
+    final questions = widget.highlightQuestions;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        builder: (ctx, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(ctx).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.xl)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Row(
+                  children: [
+                    const Icon(Icons.highlight_rounded, color: Colors.amber),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      'All Highlight Questions (${questions.length})',
+                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  itemCount: questions.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (c, idx) {
+                    final q = questions[idx];
+                    final page = q['page_number']?.toString() ?? '1';
+                    final hlText = q['highlight_text']?.toString() ?? '';
+                    final questionText = q['question']?.toString() ?? '';
+                    return Card(
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        side: BorderSide(color: Colors.amber.shade300),
+                      ),
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(ctx).pop();
+                          _openQuestionPopup(context, q);
+                        },
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade700,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Page $page',
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      '"$hlText"',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                questionText,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: const [
+                                  Text(
+                                    'Tap to solve',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFFD97706),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFFD97706)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  String _normalizeExtractedText(String raw) {
-    var s = raw.replaceAll('\u0000', '').trim();
-    if (s.isEmpty) return '';
-    // If the text is char-per-line (vertical), join it.
-    final lines = s.split('\n');
-    final shortLines = lines.where((l) => l.trim().isNotEmpty && l.trim().length <= 3).length;
-    if (lines.length > 30 && (shortLines / lines.length) > 0.8) {
-      s = lines.map((l) => l.trim()).where((l) => l.isNotEmpty).join(' ');
-    }
-    // Light cleanup: normalize whitespace but preserve paragraphs.
-    s = s.replaceAll(RegExp(r'\r'), '\n');
-    s = s.replaceAll(RegExp(r'[ \t]+'), ' ');
-    s = s.replaceAll(RegExp(r'\n{3,}'), '\n\n');
-    return s.trim();
+  @override
+  Widget build(BuildContext context) {
+    final pdfLink = _resolveHighlightPdfLink();
+    final previewUrl = _toDrivePreviewUrl(pdfLink);
+    final hasHighlightedPdf = (widget.chapter['highlight_drive_link']?.toString().trim() ?? '').isNotEmpty;
+    _ensurePreviewController(previewUrl);
+
+    final questions = widget.highlightQuestions;
+
+    return SizedBox.expand(
+      child: SurfaceCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with Highlighted status & actions
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, AppSpacing.md, AppSpacing.md, 0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm + 2),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFD97706), Color(0xFFF59E0B)],
+                      ),
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.highlight_rounded, color: Colors.white, size: 20),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                hasHighlightedPdf ? 'Highlighted eBook' : 'Chapter Highlights',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                '${questions.length} interactive question${questions.length == 1 ? '' : 's'} linked',
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (questions.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: FilledButton.tonal(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.white.withValues(alpha: 0.25),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () => _showAllQuestionsSheet(context),
+                              child: const Text('View All', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        if (previewUrl != null)
+                          FilledButton.tonal(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFFB45309),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () async {
+                              final uri = Uri.tryParse(previewUrl);
+                              if (uri == null) return;
+                              await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+                            },
+                            child: const Text('Open PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+
+                  // Horizontal Highlight Questions Strip (Click to Solve)
+                  if (questions.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        const Icon(Icons.touch_app_rounded, size: 16, color: Color(0xFFD97706)),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'Tap highlighted line to solve related question:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 54,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: questions.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, idx) {
+                          final q = questions[idx];
+                          final page = q['page_number']?.toString() ?? '1';
+                          final hlText = q['highlight_text']?.toString() ?? '';
+                          return InkWell(
+                            onTap: () => _openQuestionPopup(context, q),
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              constraints: const BoxConstraints(maxWidth: 250),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                border: Border.all(color: Colors.amber.shade400),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFD97706),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'P$page',
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      hlText.isEmpty ? 'Question #${idx + 1}' : hlText,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Color(0xFFD97706)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ] else ...[
+                    // Empty questions notice
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.info_outline_rounded, size: 16, color: Colors.amber),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Highlighted eBook reader active. Questions linked to highlighted text will appear here.',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                ],
+              ),
+            ),
+
+            // Embedded PDF Viewer or Notes fallback
+            if (previewUrl != null)
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(AppRadii.md),
+                    bottomRight: Radius.circular(AppRadii.md),
+                  ),
+                  child: WebViewWidget(
+                    key: ValueKey('highlight-pdf-preview-$_previewKey'),
+                    controller: _webViewController!,
+                    gestureRecognizers: {
+                      Factory<EagerGestureRecognizer>(
+                        EagerGestureRecognizer.new,
+                      ),
+                    },
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: _DetailPanel(
+                  title: 'Important highlights',
+                  content: widget.chapter['highlight']?.toString() ?? '',
+                  bullets: const [
+                    'Highlighted concepts & high-yield revision',
+                    'Interactive questions on tap',
+                  ],
+                  highlight: true,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Interactive Question Solve Dialog / Popup ────────────────────────────────
+
+class _HighlightQuestionSolvePopup extends StatefulWidget {
+  const _HighlightQuestionSolvePopup({required this.question});
+
+  final Map<String, dynamic> question;
+
+  @override
+  State<_HighlightQuestionSolvePopup> createState() => _HighlightQuestionSolvePopupState();
+}
+
+class _HighlightQuestionSolvePopupState extends State<_HighlightQuestionSolvePopup> {
+  String? _selectedOption;
+  bool _submitted = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final q = widget.question;
+    final highlightText = q['highlight_text']?.toString() ?? '';
+    final pageNumber = q['page_number']?.toString() ?? '1';
+    final questionText = q['question']?.toString() ?? '';
+    final optA = q['option_a']?.toString() ?? '';
+    final optB = q['option_b']?.toString() ?? '';
+    final optC = q['option_c']?.toString() ?? '';
+    final optD = q['option_d']?.toString() ?? '';
+    final correctOpt = (q['correct_option']?.toString() ?? 'A').toUpperCase().trim();
+    final explanation = q['explanation']?.toString() ?? '';
+
+    final isCorrect = _submitted && _selectedOption == correctOpt;
+    final isIncorrect = _submitted && _selectedOption != correctOpt;
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.xl)),
+      ),
+      padding: EdgeInsets.only(
+        top: AppSpacing.md,
+        left: AppSpacing.md,
+        right: AppSpacing.md,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.xl,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle & Header
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.highlight_rounded, color: Colors.amber, size: 20),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Highlighted Concept MCQ',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        'Page $pageNumber • Practice from highlighted text',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Highlighted Quote Card
+            if (highlightText.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.amber.shade900.withValues(alpha: 0.25)
+                      : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  border: Border.all(
+                    color: isDark ? Colors.amber.shade700 : const Color(0xFFFCD34D),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.menu_book_rounded, size: 14, color: Color(0xFFB45309)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'HIGHLIGHTED TEXT (Page $pageNumber)',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                            color: Color(0xFFB45309),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '"$highlightText"',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: isDark ? Colors.amber.shade100 : const Color(0xFF78350F),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Question Text
+            Text(
+              questionText,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Options A, B, C, D
+            ...['A', 'B', 'C', 'D'].map((optKey) {
+              final optText = optKey == 'A'
+                  ? optA
+                  : optKey == 'B'
+                      ? optB
+                      : optKey == 'C'
+                          ? optC
+                          : optD;
+              if (optText.isEmpty) return const SizedBox.shrink();
+
+              final isSelected = _selectedOption == optKey;
+              final isCorrectOpt = optKey == correctOpt;
+
+              Color? bgColor;
+              Color borderColor = theme.colorScheme.outlineVariant;
+              Color textColor = theme.textTheme.bodyMedium?.color ?? Colors.black;
+
+              if (_submitted) {
+                if (isCorrectOpt) {
+                  bgColor = Colors.green.withValues(alpha: 0.15);
+                  borderColor = Colors.green;
+                  textColor = Colors.green.shade800;
+                } else if (isSelected && !isCorrectOpt) {
+                  bgColor = Colors.red.withValues(alpha: 0.15);
+                  borderColor = Colors.red;
+                  textColor = Colors.red.shade800;
+                }
+              } else if (isSelected) {
+                bgColor = theme.colorScheme.primary.withValues(alpha: 0.1);
+                borderColor = theme.colorScheme.primary;
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: InkWell(
+                  onTap: _submitted
+                      ? null
+                      : () => setState(() => _selectedOption = optKey),
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      border: Border.all(
+                        color: borderColor,
+                        width: isSelected || (_submitted && isCorrectOpt) ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _submitted && isCorrectOpt
+                                ? Colors.green
+                                : (_submitted && isSelected && !isCorrectOpt)
+                                    ? Colors.red
+                                    : (isSelected
+                                        ? theme.colorScheme.primary
+                                        : Colors.grey.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            optKey,
+                            style: TextStyle(
+                              color: isSelected || (_submitted && isCorrectOpt) ? Colors.white : null,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            optText,
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              color: textColor,
+                            ),
+                          ),
+                        ),
+                        if (_submitted && isCorrectOpt)
+                          const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20)
+                        else if (_submitted && isSelected && !isCorrectOpt)
+                          const Icon(Icons.cancel_rounded, color: Colors.red, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+
+            const SizedBox(height: AppSpacing.sm),
+
+            // Action / Status / Explanation
+            if (!_submitted)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Submit Answer'),
+                  onPressed: _selectedOption == null
+                      ? null
+                      : () => setState(() => _submitted = true),
+                ),
+              )
+            else ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: isCorrect
+                      ? Colors.green.withValues(alpha: 0.12)
+                      : Colors.red.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  border: Border.all(
+                    color: isCorrect ? Colors.green.shade400 : Colors.red.shade400,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isCorrect ? Icons.check_circle_rounded : Icons.info_rounded,
+                      color: isCorrect ? Colors.green : Colors.red,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        isCorrect
+                            ? 'Correct Answer! Great comprehension!'
+                            : 'Incorrect. The correct option is ($correctOpt).',
+                        style: TextStyle(
+                          color: isCorrect ? Colors.green.shade800 : Colors.red.shade800,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (explanation.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Explanation:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(explanation),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  if (isIncorrect)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Try Again'),
+                        onPressed: () => setState(() {
+                          _submitted = false;
+                          _selectedOption = null;
+                        }),
+                      ),
+                    ),
+                  if (isIncorrect) const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Done'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 
