@@ -534,13 +534,13 @@ function PracticeSolveComponent() {
                 style={{
                   padding: "9px 18px",
                   borderRadius: "10px",
-                  backgroundColor: "#10B981",
+                  backgroundColor: "#E55200",
                   color: "#FFFFFF",
                   border: "none",
                   fontWeight: 800,
                   fontSize: "13px",
                   cursor: "pointer",
-                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                  boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
                 }}
               >
                 Finish Practice & Review

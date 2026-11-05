@@ -470,13 +470,13 @@ function TestPlayerComponent() {
                 style={{
                   padding: "9px 20px",
                   borderRadius: "10px",
-                  backgroundColor: "#10B981",
+                  backgroundColor: "#E55200",
                   color: "#FFFFFF",
                   fontWeight: 800,
                   fontSize: "13px",
                   border: "none",
                   cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+                  boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
                 }}
               >
                 Submit Exam
@@ -1376,13 +1376,13 @@ function TestPlayerComponent() {
                 style={{
                   padding: "10px 22px",
                   borderRadius: "10px",
-                  backgroundColor: "#10B981",
+                  backgroundColor: "#E55200",
                   color: "#FFFFFF",
                   fontWeight: 900,
                   fontSize: "13px",
                   border: "none",
                   cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(16, 185, 129, 0.35)",
+                  boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
                 }}
               >
                 Yes, Submit Exam ✓

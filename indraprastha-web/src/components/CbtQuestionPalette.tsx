@@ -547,7 +547,7 @@ export default function CbtQuestionPalette({
               height: "36px",
               padding: "0 16px",
               borderRadius: "8px",
-              backgroundColor: isPractice ? "#E55200" : "#10B981",
+              backgroundColor: "#E55200",
               color: "#FFFFFF",
               fontWeight: 800,
               fontSize: "13px",
@@ -556,7 +556,7 @@ export default function CbtQuestionPalette({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: isPractice ? "0 2px 8px rgba(229, 82, 0, 0.25)" : "0 2px 8px rgba(16, 185, 129, 0.25)",
+              boxShadow: "0 2px 8px rgba(229, 82, 0, 0.25)",
               transition: "transform 0.15s ease",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
