@@ -1529,20 +1529,24 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
     .textLayer span.clickable-highlight {
       pointer-events: auto !important;
       cursor: pointer !important;
-      background-color: rgba(34, 197, 94, 0.28) !important;
-      border-bottom: 2.5px solid #16a34a !important;
-      border-radius: 2px;
+      background-color: rgba(34, 197, 94, 0.35) !important;
+      border-bottom: 3px solid #16a34a !important;
+      border-radius: 3px;
+      box-shadow: 0 1px 4px rgba(22, 163, 74, 0.4);
+      z-index: 100 !important;
+      -webkit-tap-highlight-color: rgba(34, 197, 94, 0.5);
       transition: background-color 0.15s ease;
     }
     .textLayer span.clickable-highlight:active {
-      background-color: rgba(34, 197, 94, 0.6) !important;
+      background-color: rgba(34, 197, 94, 0.65) !important;
     }
     .textLayer span.clickable-highlight-solved {
       pointer-events: auto !important;
       cursor: pointer !important;
-      background-color: rgba(59, 130, 246, 0.22) !important;
+      background-color: rgba(59, 130, 246, 0.25) !important;
       border-bottom: 2.5px solid #2563eb !important;
-      border-radius: 2px;
+      border-radius: 3px;
+      z-index: 100 !important;
     }
     #loading-overlay {
       position: fixed;
@@ -1682,6 +1686,7 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
       textLayerDiv.className = 'textLayer';
       textLayerDiv.style.width = Math.floor(viewport.width) + 'px';
       textLayerDiv.style.height = Math.floor(viewport.height) + 'px';
+      pageWrapper.style.setProperty('--scale-factor', viewport.scale);
       textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
       pageWrapper.appendChild(textLayerDiv);
 
@@ -1711,6 +1716,12 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
       bindHighlightsForPage(pageNum, textLayerDiv);
     }
 
+    function triggerQuestion(qid) {
+      if (window.HighlightChannel && window.HighlightChannel.postMessage) {
+        window.HighlightChannel.postMessage(JSON.stringify({ questionId: qid }));
+      }
+    }
+
     function bindHighlightsForPage(pageNum, textLayerDiv) {
       const pageQuestions = questionsData.filter(q => {
         const p = parseInt(q.page_number);
@@ -1729,91 +1740,99 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
           charToSpan.push(i);
           fullText += s[j];
         }
-        charToSpan.push(i);
-        fullText += ' ';
       }
 
-      function cleanStr(str) {
-        return (str || '')
-          .toLowerCase()
-          .replace(/[\\r\\n\\t]+/g, ' ')
-          .replace(/\\s+/g, ' ')
-          .replace(/[^\\w\\s]/g, '')
-          .trim();
+      // Map each alphanumeric character in fullText to its original charToSpan index
+      let alphaOnly = '';
+      let alphaToCharIdx = [];
+      for (let k = 0; k < fullText.length; k++) {
+        const ch = fullText[k].toLowerCase();
+        if (/[a-z0-9]/.test(ch)) {
+          alphaOnly += ch;
+          alphaToCharIdx.push(k);
+        }
       }
-
-      const docClean = cleanStr(fullText);
 
       pageQuestions.forEach(q => {
         const rawTarget = q.highlight_text || '';
-        const targetClean = cleanStr(rawTarget);
-        if (targetClean.length < 3) return;
+        let targetAlpha = '';
+        for (let k = 0; k < rawTarget.length; k++) {
+          const ch = rawTarget[k].toLowerCase();
+          if (/[a-z0-9]/.test(ch)) {
+            targetAlpha += ch;
+          }
+        }
+        if (targetAlpha.length < 3) return;
 
-        let matchIdx = docClean.indexOf(targetClean);
-        let matchLen = targetClean.length;
+        let matchStart = alphaOnly.indexOf(targetAlpha);
+        let matchEnd = -1;
 
-        // If exact full sentence match wasn't found, try searching for significant sub-phrases
-        if (matchIdx === -1 && targetClean.length > 20) {
-          const words = targetClean.split(' ').filter(w => w.length > 2);
-          if (words.length >= 3) {
-            const phrase = words.slice(0, Math.min(5, words.length)).join(' ');
-            matchIdx = docClean.indexOf(phrase);
-            if (matchIdx !== -1) {
-              matchLen = Math.min(targetClean.length, docClean.length - matchIdx);
-            }
+        if (matchStart !== -1) {
+          matchEnd = matchStart + targetAlpha.length;
+        } else if (targetAlpha.length > 25) {
+          // Try matching significant sub-phrases (first 25 alphanumeric chars)
+          const subTarget = targetAlpha.substring(0, 25);
+          matchStart = alphaOnly.indexOf(subTarget);
+          if (matchStart !== -1) {
+            matchEnd = matchStart + Math.min(targetAlpha.length, alphaOnly.length - matchStart);
           }
         }
 
-        if (matchIdx !== -1) {
-          const endIdx = matchIdx + matchLen;
-          const matchedSpanIndices = new Set();
+        if (matchStart === -1) return;
 
-          let cleanCount = 0;
-          let origStart = -1;
-          let origEnd = -1;
+        // Map alpha indices back to spans
+        const origCharStart = alphaToCharIdx[matchStart];
+        const origCharEnd = alphaToCharIdx[Math.min(matchEnd - 1, alphaToCharIdx.length - 1)] + 1;
 
-          for (let k = 0; k < fullText.length; k++) {
-            const ch = fullText[k].toLowerCase();
-            if (/[\\w]/.test(ch)) {
-              if (cleanCount === matchIdx && origStart === -1) origStart = k;
-              if (cleanCount === endIdx && origEnd === -1) origEnd = k;
-              cleanCount++;
-            } else if (/\\s/.test(ch)) {
-              if (k > 0 && /\\s/.test(fullText[k - 1])) {
-                // duplicate space, skip
-              } else {
-                if (cleanCount === matchIdx && origStart === -1) origStart = k;
-                if (cleanCount === endIdx && origEnd === -1) origEnd = k;
-                cleanCount++;
-              }
-            }
+        const matchedSpanIndices = new Set();
+        for (let c = origCharStart; c < origCharEnd && c < charToSpan.length; c++) {
+          matchedSpanIndices.add(charToSpan[c]);
+        }
+
+        const isSolved = solvedIds.has(q.id);
+
+        matchedSpanIndices.forEach(spanIdx => {
+          const spanEl = spans[spanIdx];
+          if (!spanEl) return;
+
+          spanEl.classList.add(isSolved ? 'clickable-highlight-solved' : 'clickable-highlight');
+          spanEl.setAttribute('data-qid', q.id);
+          spanEl.setAttribute('title', 'Tap to solve: ' + (q.question || ''));
+
+          spanEl.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            triggerQuestion(q.id);
+          };
+          spanEl.ontouchend = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            triggerQuestion(q.id);
+          };
+        });
+      });
+
+      // Delegated event listener on textLayerDiv for seamless mobile touch responsiveness
+      textLayerDiv.addEventListener('click', function(e) {
+        const target = e.target.closest('[data-qid]');
+        if (target) {
+          const qid = parseInt(target.getAttribute('data-qid'));
+          if (!isNaN(qid)) {
+            e.preventDefault();
+            e.stopPropagation();
+            triggerQuestion(qid);
           }
-
-          if (origStart === -1) origStart = Math.min(matchIdx, charToSpan.length - 1);
-          if (origEnd === -1) origEnd = Math.min(matchIdx + matchLen, charToSpan.length);
-
-          for (let c = origStart; c < origEnd && c < charToSpan.length; c++) {
-            matchedSpanIndices.add(charToSpan[c]);
+        }
+      });
+      textLayerDiv.addEventListener('touchend', function(e) {
+        const target = e.target.closest('[data-qid]');
+        if (target) {
+          const qid = parseInt(target.getAttribute('data-qid'));
+          if (!isNaN(qid)) {
+            e.preventDefault();
+            e.stopPropagation();
+            triggerQuestion(qid);
           }
-
-          const isSolved = solvedIds.has(q.id);
-
-          matchedSpanIndices.forEach(spanIdx => {
-            const spanEl = spans[spanIdx];
-            if (!spanEl) return;
-
-            spanEl.classList.add(isSolved ? 'clickable-highlight-solved' : 'clickable-highlight');
-            spanEl.setAttribute('data-qid', q.id);
-            spanEl.setAttribute('title', 'Tap to solve question: ' + (q.question || ''));
-
-            spanEl.onclick = function(e) {
-              e.preventDefault();
-              e.stopPropagation();
-              if (window.HighlightChannel) {
-                window.HighlightChannel.postMessage(JSON.stringify({ questionId: q.id }));
-              }
-            };
-          });
         }
       });
     }
