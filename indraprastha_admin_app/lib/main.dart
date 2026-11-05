@@ -1568,10 +1568,19 @@ class _BooksPageState extends State<BooksPage> {
   double _pdfProgress = 0.0;
   bool _pdfUploading = false;
 
+  // Search/Filter for Books/Chapters
+  final _bookFilterController = TextEditingController();
+  String _bookFilterQuery = '';
+
   // Chapter eBooks (Regular & Highlighted)
   File? _chapterRegularPdf;
+  String? _pickedRegularFileName;
+  int? _pickedRegularFileSize;
   bool _uploadingRegularPdf = false;
+
   File? _chapterHighlightPdf;
+  String? _pickedHighlightFileName;
+  int? _pickedHighlightFileSize;
   bool _uploadingHighlightPdf = false;
 
   // Chapter Highlight Questions (Interactive Tap & Solve)
@@ -1600,6 +1609,68 @@ class _BooksPageState extends State<BooksPage> {
       _hlExplanation.clear();
       _hlCorrect = 'A';
     });
+  }
+
+  Future<void> _pickRegularPdf() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+      if (result == null || result.files.isEmpty) {
+        if (mounted) _showActionSnackBar(context, 'PDF selection cancelled');
+        return;
+      }
+      final pf = result.files.first;
+      if (pf.path != null && pf.path!.isNotEmpty) {
+        setState(() {
+          _chapterRegularPdf = File(pf.path!);
+          _pickedRegularFileName = pf.name;
+          _pickedRegularFileSize = pf.size;
+        });
+        if (mounted) {
+          _showActionSnackBar(
+            context,
+            'Selected "${pf.name}". Now click "Upload Regular eBook Now" below.',
+          );
+        }
+      } else {
+        if (mounted) _showActionSnackBar(context, 'Could not access file path', isError: true);
+      }
+    } catch (e) {
+      if (mounted) _showActionSnackBar(context, 'File picker error: $e', isError: true);
+    }
+  }
+
+  Future<void> _pickHighlightPdf() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+      if (result == null || result.files.isEmpty) {
+        if (mounted) _showActionSnackBar(context, 'PDF selection cancelled');
+        return;
+      }
+      final pf = result.files.first;
+      if (pf.path != null && pf.path!.isNotEmpty) {
+        setState(() {
+          _chapterHighlightPdf = File(pf.path!);
+          _pickedHighlightFileName = pf.name;
+          _pickedHighlightFileSize = pf.size;
+        });
+        if (mounted) {
+          _showActionSnackBar(
+            context,
+            'Selected "${pf.name}". Now click "Upload Highlighted eBook Now" below.',
+          );
+        }
+      } else {
+        if (mounted) _showActionSnackBar(context, 'Could not access file path', isError: true);
+      }
+    } catch (e) {
+      if (mounted) _showActionSnackBar(context, 'File picker error: $e', isError: true);
+    }
   }
 
   void _resetBookForm() {
@@ -1682,6 +1753,7 @@ class _BooksPageState extends State<BooksPage> {
     _hlOptC.dispose();
     _hlOptD.dispose();
     _hlExplanation.dispose();
+    _bookFilterController.dispose();
     super.dispose();
   }
 
@@ -1750,6 +1822,18 @@ class _BooksPageState extends State<BooksPage> {
 
   @override
   Widget build(BuildContext context) {
+    final filterQ = _bookFilterQuery.trim().toLowerCase();
+    final filteredBooks = filterQ.isEmpty
+        ? _books
+        : _books.where((b) {
+            final title = (b['title']?.toString() ?? '').toLowerCase();
+            final topic = (b['topic']?.toString() ?? '').toLowerCase();
+            final subject = (b['subject']?.toString() ?? '').toLowerCase();
+            return title.contains(filterQ) ||
+                topic.contains(filterQ) ||
+                subject.contains(filterQ);
+          }).toList();
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1942,17 +2026,48 @@ class _BooksPageState extends State<BooksPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                TextField(
+                  controller: _bookFilterController,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    hintText: 'Search chapters by name or number (e.g. 115, Nuclei, Physics)...',
+                    labelText: 'Search / Filter Chapters (${_books.length} total)',
+                    suffixIcon: _bookFilterQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded),
+                            onPressed: () {
+                              _bookFilterController.clear();
+                              setState(() => _bookFilterQuery = '');
+                            },
+                          )
+                        : null,
+                  ),
+                  onChanged: (val) => setState(() => _bookFilterQuery = val),
+                ),
+                const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
-                  key: ValueKey('book_dropdown_$_selectedBookId'),
-                  initialValue: _books.any(
-                          (b) => (b as Map<String, dynamic>)['id'] == _selectedBookId)
+                  key: ValueKey('book_dropdown_${_selectedBookId}_${_books.length}_${_bookFilterQuery}'),
+                  value: _books.any((b) => (b as Map<String, dynamic>)['id'] == _selectedBookId)
                       ? _selectedBookId
                       : null,
-                  items: _books
+                  isExpanded: true,
+                  items: (filteredBooks.any((b) => (b as Map<String, dynamic>)['id'] == _selectedBookId)
+                          ? filteredBooks
+                          : [
+                              ...filteredBooks,
+                              if (_selectedBookId != null &&
+                                  _books.any((b) => (b as Map<String, dynamic>)['id'] == _selectedBookId))
+                                _books.firstWhere(
+                                    (b) => (b as Map<String, dynamic>)['id'] == _selectedBookId),
+                            ])
                       .map(
                         (b) => DropdownMenuItem<int>(
                           value: (b as Map<String, dynamic>)['id'] as int,
-                          child: Text('${b['title']} (${b['subject'] ?? ''})'),
+                          child: Text(
+                            '${b['title']}${(b['topic']?.toString().isNotEmpty ?? false) ? ' • ${b['topic']}' : ''} (${b['subject'] ?? ''})',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                       )
                       .toList(),
@@ -1964,7 +2079,10 @@ class _BooksPageState extends State<BooksPage> {
                     });
                     await _loadChaptersForSelectedBook();
                   },
-                  decoration: const InputDecoration(labelText: 'Select book'),
+                  decoration: InputDecoration(
+                    labelText: '1. Select Main Chapter / Book (${filteredBooks.length}/${_books.length} Available)',
+                    helperText: 'Select which of the ${_books.length} chapters to manage.',
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -2058,6 +2176,7 @@ class _BooksPageState extends State<BooksPage> {
                           (c) => (c as Map<String, dynamic>)['id'] == _selectedChapterId)
                       ? _selectedChapterId
                       : null,
+                  isExpanded: true,
                   items: _chapters
                       .map(
                         (c) => DropdownMenuItem<int>(
@@ -2068,10 +2187,12 @@ class _BooksPageState extends State<BooksPage> {
                       .toList(),
                   onChanged: (v) => setState(() => _selectedChapterId = v),
                   decoration: InputDecoration(
-                    labelText: 'Select chapter',
+                    labelText: '2. Sub-chapter / Part inside this book (${_chapters.length})',
                     helperText: _chapters.isEmpty
                         ? 'No chapters found for this book. Add a chapter above.'
-                        : null,
+                        : (_chapters.length == 1
+                            ? 'Main chapter auto-selected.'
+                            : 'Select sub-chapter of the book chosen above.'),
                   ),
                 ),
                 if (_selectedChapterId != null) ...[
@@ -2123,108 +2244,206 @@ class _BooksPageState extends State<BooksPage> {
                                 Card(
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(10),
                                     side: BorderSide(
-                                      color: hasRegularPdf ? Colors.green.shade400 : Colors.grey.shade400,
+                                      color: hasRegularPdf ? Colors.green.shade400 : Colors.indigo.shade300,
+                                      width: hasRegularPdf ? 1.5 : 1.0,
                                     ),
                                   ),
                                   child: Padding(
-                                    padding: const EdgeInsets.all(10),
+                                    padding: const EdgeInsets.all(12),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
-                                            const Icon(Icons.picture_as_pdf_outlined, size: 18, color: Colors.indigo),
-                                            const SizedBox(width: 6),
+                                            const Icon(Icons.picture_as_pdf_rounded, size: 20, color: Colors.indigo),
+                                            const SizedBox(width: 8),
                                             const Expanded(
                                               child: Text(
                                                 'Regular eBook (PDF)',
-                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                               ),
                                             ),
                                             if (hasRegularPdf)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                 decoration: BoxDecoration(
                                                   color: Colors.green.withValues(alpha: 0.15),
-                                                  borderRadius: BorderRadius.circular(4),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: Colors.green.shade400),
                                                 ),
                                                 child: const Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.check_circle_rounded, size: 12, color: Colors.green),
+                                                    Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
                                                     SizedBox(width: 4),
-                                                    Text('Uploaded', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    Text('Active on Drive', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
                                                   ],
                                                 ),
                                               )
                                             else
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                 decoration: BoxDecoration(
                                                   color: Colors.orange.withValues(alpha: 0.15),
-                                                  borderRadius: BorderRadius.circular(4),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: Colors.orange.shade400),
                                                 ),
-                                                child: const Text('Not Uploaded', style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                child: const Text('Not Uploaded Yet', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
                                               ),
                                           ],
                                         ),
                                         const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                _chapterRegularPdf == null
-                                                    ? 'No new PDF picked'
-                                                    : _chapterRegularPdf!.path.split(Platform.pathSeparator).last,
-                                                style: const TextStyle(fontSize: 12),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
+
+                                        // If file is already uploaded, show open link option
+                                        if (hasRegularPdf) ...[
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.withValues(alpha: 0.08),
+                                              borderRadius: BorderRadius.circular(6),
                                             ),
-                                            TextButton(
-                                              onPressed: () async {
-                                                final result = await FilePicker.platform.pickFiles(
-                                                  type: FileType.custom,
-                                                  allowedExtensions: ['pdf'],
-                                                );
-                                                if (result?.files.single.path != null) {
-                                                  setState(() => _chapterRegularPdf = File(result!.files.single.path!));
-                                                }
-                                              },
-                                              child: const Text('Pick PDF'),
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.link_rounded, size: 16, color: Colors.green),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Text(
+                                                    selectedChapterMap?['material_drive_link']?.toString() ?? '',
+                                                    style: const TextStyle(fontSize: 11, color: Colors.green),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                TextButton(
+                                                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                                                  onPressed: () async {
+                                                    final link = selectedChapterMap?['material_drive_link']?.toString();
+                                                    if (link != null && link.isNotEmpty) {
+                                                      await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                                    }
+                                                  },
+                                                  child: const Text('Open PDF', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ],
                                             ),
-                                            const SizedBox(width: 4),
-                                            FilledButton.tonal(
-                                              onPressed: (_chapterRegularPdf == null || _uploadingRegularPdf)
-                                                  ? null
-                                                  : () async {
-                                                      setState(() => _uploadingRegularPdf = true);
-                                                      try {
-                                                        await widget.api.uploadChapterRegularPdf(
-                                                          chapterId: _selectedChapterId!,
-                                                          pdfFile: _chapterRegularPdf!,
-                                                        );
-                                                        setState(() => _chapterRegularPdf = null);
-                                                        await _loadChaptersForSelectedBook();
-                                                        if (context.mounted) {
-                                                          _showActionSnackBar(context, 'Regular eBook PDF uploaded successfully');
-                                                        }
-                                                      } catch (e) {
-                                                        if (context.mounted) {
-                                                          _showActionSnackBar(context, 'Upload failed: $e', isError: true);
-                                                        }
-                                                      } finally {
-                                                        if (mounted) setState(() => _uploadingRegularPdf = false);
-                                                      }
-                                                    },
-                                              child: _uploadingRegularPdf
-                                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                                  : const Text('Upload'),
+                                          ),
+                                          const SizedBox(height: 8),
+                                        ],
+
+                                        // Selected File Preview & Upload Card
+                                        if (_chapterRegularPdf != null) ...[
+                                          Container(
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                              color: Colors.indigo.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: Colors.indigo, width: 1.5),
                                             ),
-                                          ],
-                                        ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 26),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            _pickedRegularFileName ?? _chapterRegularPdf!.path.split(Platform.pathSeparator).last,
+                                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                            maxLines: 2,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            _pickedRegularFileSize != null
+                                                                ? '${(_pickedRegularFileSize! / (1024 * 1024)).toStringAsFixed(2)} MB • Ready to upload'
+                                                                : 'Ready to upload',
+                                                            style: const TextStyle(fontSize: 11, color: Colors.greenAccent, fontWeight: FontWeight.w600),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    IconButton(
+                                                      icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
+                                                      tooltip: 'Clear selection',
+                                                      onPressed: () => setState(() {
+                                                        _chapterRegularPdf = null;
+                                                        _pickedRegularFileName = null;
+                                                        _pickedRegularFileSize = null;
+                                                      }),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 10),
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  height: 42,
+                                                  child: ElevatedButton.icon(
+                                                    icon: _uploadingRegularPdf
+                                                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                                        : const Icon(Icons.cloud_upload_rounded, size: 20),
+                                                    label: Text(
+                                                      _uploadingRegularPdf ? 'Uploading to Google Drive...' : 'Upload Regular eBook Now',
+                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                    ),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: Colors.indigo,
+                                                      foregroundColor: Colors.white,
+                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                    ),
+                                                    onPressed: _uploadingRegularPdf
+                                                        ? null
+                                                        : () async {
+                                                            setState(() => _uploadingRegularPdf = true);
+                                                            try {
+                                                              await widget.api.uploadChapterRegularPdf(
+                                                                chapterId: _selectedChapterId!,
+                                                                pdfFile: _chapterRegularPdf!,
+                                                              );
+                                                              setState(() {
+                                                                _chapterRegularPdf = null;
+                                                                _pickedRegularFileName = null;
+                                                                _pickedRegularFileSize = null;
+                                                              });
+                                                              await _loadChaptersForSelectedBook();
+                                                              if (context.mounted) {
+                                                                _showActionSnackBar(context, 'Regular eBook PDF uploaded successfully to Google Drive!');
+                                                              }
+                                                            } catch (e) {
+                                                              if (context.mounted) {
+                                                                _showActionSnackBar(context, 'Upload failed: $e', isError: true);
+                                                              }
+                                                            } finally {
+                                                              if (mounted) setState(() => _uploadingRegularPdf = false);
+                                                            }
+                                                          },
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ] else ...[
+                                          // Pick Button when no file selected
+                                          OutlinedButton.icon(
+                                            icon: const Icon(Icons.upload_file_rounded, size: 18, color: Colors.indigo),
+                                            label: Text(
+                                              hasRegularPdf ? 'Replace Regular eBook PDF' : 'Select Regular eBook PDF (Pick PDF)',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: Colors.indigo,
+                                              side: BorderSide(color: Colors.indigo.shade300),
+                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            onPressed: _pickRegularPdf,
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
@@ -2235,108 +2454,206 @@ class _BooksPageState extends State<BooksPage> {
                                 Card(
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(10),
                                     side: BorderSide(
-                                      color: hasHighlightPdf ? Colors.amber.shade600 : Colors.grey.shade400,
+                                      color: hasHighlightPdf ? Colors.amber.shade600 : Colors.amber.shade300,
+                                      width: hasHighlightPdf ? 1.5 : 1.0,
                                     ),
                                   ),
                                   child: Padding(
-                                    padding: const EdgeInsets.all(10),
+                                    padding: const EdgeInsets.all(12),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
-                                            const Icon(Icons.highlight_rounded, size: 18, color: Colors.amber),
-                                            const SizedBox(width: 6),
+                                            const Icon(Icons.highlight_rounded, size: 20, color: Colors.amber),
+                                            const SizedBox(width: 8),
                                             const Expanded(
                                               child: Text(
                                                 'Highlighted eBook (PDF)',
-                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                               ),
                                             ),
                                             if (hasHighlightPdf)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                 decoration: BoxDecoration(
                                                   color: Colors.amber.withValues(alpha: 0.18),
-                                                  borderRadius: BorderRadius.circular(4),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: Colors.amber.shade600),
                                                 ),
                                                 child: const Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.check_circle_rounded, size: 12, color: Colors.amber),
+                                                    Icon(Icons.check_circle_rounded, size: 14, color: Colors.amber),
                                                     SizedBox(width: 4),
-                                                    Text('Uploaded', style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    Text('Active on Drive', style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold)),
                                                   ],
                                                 ),
                                               )
                                             else
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                 decoration: BoxDecoration(
                                                   color: Colors.orange.withValues(alpha: 0.15),
-                                                  borderRadius: BorderRadius.circular(4),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: Colors.orange.shade400),
                                                 ),
-                                                child: const Text('Not Uploaded', style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                child: const Text('Not Uploaded Yet', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
                                               ),
                                           ],
                                         ),
                                         const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                _chapterHighlightPdf == null
-                                                    ? 'No new PDF picked'
-                                                    : _chapterHighlightPdf!.path.split(Platform.pathSeparator).last,
-                                                style: const TextStyle(fontSize: 12),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
+
+                                        // If file is already uploaded, show open link option
+                                        if (hasHighlightPdf) ...[
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.amber.withValues(alpha: 0.08),
+                                              borderRadius: BorderRadius.circular(6),
                                             ),
-                                            TextButton(
-                                              onPressed: () async {
-                                                final result = await FilePicker.platform.pickFiles(
-                                                  type: FileType.custom,
-                                                  allowedExtensions: ['pdf'],
-                                                );
-                                                if (result?.files.single.path != null) {
-                                                  setState(() => _chapterHighlightPdf = File(result!.files.single.path!));
-                                                }
-                                              },
-                                              child: const Text('Pick PDF'),
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.link_rounded, size: 16, color: Colors.amber),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Text(
+                                                    selectedChapterMap?['highlight_drive_link']?.toString() ?? '',
+                                                    style: const TextStyle(fontSize: 11, color: Colors.amber),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                TextButton(
+                                                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                                                  onPressed: () async {
+                                                    final link = selectedChapterMap?['highlight_drive_link']?.toString();
+                                                    if (link != null && link.isNotEmpty) {
+                                                      await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+                                                    }
+                                                  },
+                                                  child: const Text('Open PDF', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ],
                                             ),
-                                            const SizedBox(width: 4),
-                                            FilledButton.tonal(
-                                              onPressed: (_chapterHighlightPdf == null || _uploadingHighlightPdf)
-                                                  ? null
-                                                  : () async {
-                                                      setState(() => _uploadingHighlightPdf = true);
-                                                      try {
-                                                        await widget.api.uploadChapterHighlightPdf(
-                                                          chapterId: _selectedChapterId!,
-                                                          pdfFile: _chapterHighlightPdf!,
-                                                        );
-                                                        setState(() => _chapterHighlightPdf = null);
-                                                        await _loadChaptersForSelectedBook();
-                                                        if (context.mounted) {
-                                                          _showActionSnackBar(context, 'Highlighted eBook PDF uploaded successfully');
-                                                        }
-                                                      } catch (e) {
-                                                        if (context.mounted) {
-                                                          _showActionSnackBar(context, 'Upload failed: $e', isError: true);
-                                                        }
-                                                      } finally {
-                                                        if (mounted) setState(() => _uploadingHighlightPdf = false);
-                                                      }
-                                                    },
-                                              child: _uploadingHighlightPdf
-                                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                                  : const Text('Upload'),
+                                          ),
+                                          const SizedBox(height: 8),
+                                        ],
+
+                                        // Selected File Preview & Upload Card
+                                        if (_chapterHighlightPdf != null) ...[
+                                          Container(
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                              color: Colors.amber.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: Colors.amber.shade700, width: 1.5),
                                             ),
-                                          ],
-                                        ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.picture_as_pdf, color: Colors.orangeAccent, size: 26),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            _pickedHighlightFileName ?? _chapterHighlightPdf!.path.split(Platform.pathSeparator).last,
+                                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                            maxLines: 2,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            _pickedHighlightFileSize != null
+                                                                ? '${(_pickedHighlightFileSize! / (1024 * 1024)).toStringAsFixed(2)} MB • Ready to upload'
+                                                                : 'Ready to upload',
+                                                            style: const TextStyle(fontSize: 11, color: Colors.greenAccent, fontWeight: FontWeight.w600),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    IconButton(
+                                                      icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
+                                                      tooltip: 'Clear selection',
+                                                      onPressed: () => setState(() {
+                                                        _chapterHighlightPdf = null;
+                                                        _pickedHighlightFileName = null;
+                                                        _pickedHighlightFileSize = null;
+                                                      }),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 10),
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  height: 42,
+                                                  child: ElevatedButton.icon(
+                                                    icon: _uploadingHighlightPdf
+                                                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                                        : const Icon(Icons.cloud_upload_rounded, size: 20),
+                                                    label: Text(
+                                                      _uploadingHighlightPdf ? 'Uploading to Google Drive...' : 'Upload Highlighted eBook Now',
+                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                    ),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: Colors.amber.shade700,
+                                                      foregroundColor: Colors.white,
+                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                    ),
+                                                    onPressed: _uploadingHighlightPdf
+                                                        ? null
+                                                        : () async {
+                                                            setState(() => _uploadingHighlightPdf = true);
+                                                            try {
+                                                              await widget.api.uploadChapterHighlightPdf(
+                                                                chapterId: _selectedChapterId!,
+                                                                pdfFile: _chapterHighlightPdf!,
+                                                              );
+                                                              setState(() {
+                                                                _chapterHighlightPdf = null;
+                                                                _pickedHighlightFileName = null;
+                                                                _pickedHighlightFileSize = null;
+                                                              });
+                                                              await _loadChaptersForSelectedBook();
+                                                              if (context.mounted) {
+                                                                _showActionSnackBar(context, 'Highlighted eBook PDF uploaded successfully to Google Drive!');
+                                                              }
+                                                            } catch (e) {
+                                                              if (context.mounted) {
+                                                                _showActionSnackBar(context, 'Upload failed: $e', isError: true);
+                                                              }
+                                                            } finally {
+                                                              if (mounted) setState(() => _uploadingHighlightPdf = false);
+                                                            }
+                                                          },
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ] else ...[
+                                          // Pick Button when no file selected
+                                          OutlinedButton.icon(
+                                            icon: const Icon(Icons.upload_file_rounded, size: 18, color: Colors.amber),
+                                            label: Text(
+                                              hasHighlightPdf ? 'Replace Highlighted eBook PDF' : 'Select Highlighted eBook PDF (Pick PDF)',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: Colors.amber.shade700,
+                                              side: BorderSide(color: Colors.amber.shade400),
+                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            onPressed: _pickHighlightPdf,
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
@@ -3718,101 +4035,170 @@ class _BooksPageState extends State<BooksPage> {
         ..._books.map((book) {
           final b = book as Map<String, dynamic>;
           final category = b['category']?.toString() ?? '';
+          final isSelected = b['id'] == _selectedBookId;
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardTheme.color,
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.25)
+                  : Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                  color: Theme.of(context).colorScheme.outlineVariant),
+                color: isSelected
+                    ? Colors.green
+                    : Theme.of(context).colorScheme.outlineVariant,
+                width: isSelected ? 2.0 : 1.0,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 8, 0),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF7B1FA2).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () async {
+                setState(() {
+                  _selectedBookId = b['id'] as int;
+                  _selectedChapterId = null;
+                  _chapters = const [];
+                });
+                await _loadChaptersForSelectedBook();
+                if (context.mounted) {
+                  _showActionSnackBar(
+                    context,
+                    'Selected: ${b['title']} • ${b['topic']}. Scroll up to manage eBooks & questions.',
+                  );
+                }
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 8, 0),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : const Color(0xFF7B1FA2).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            isSelected ? Icons.check_circle_rounded : Icons.upload_file_rounded,
+                            color: isSelected ? Colors.green : const Color(0xFF7B1FA2),
+                            size: 18,
+                          ),
                         ),
-                        child: const Icon(Icons.upload_file_rounded,
-                            color: Color(0xFF7B1FA2), size: 18),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(b['title']?.toString() ?? '',
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(b['title']?.toString() ?? '',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700, fontSize: 14)),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${b['subject'] ?? ''} • ${b['topic'] ?? ''}',
                                 style: const TextStyle(
-                                    fontWeight: FontWeight.w700, fontSize: 14)),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${b['subject'] ?? ''} • ${b['topic'] ?? ''}',
-                              style: const TextStyle(
-                                  fontSize: 12, color: Color(0xFF757575)),
-                            ),
-                          ],
+                                    fontSize: 12, color: Color(0xFF757575)),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 20),
-                          onPressed: () {
-                            setState(() {
-                              _editingId = b['id'] as int;
-                              _bookTitle.text = b['title']?.toString() ?? '';
-                              _classLabel.text =
-                                  b['class_label']?.toString() ?? '';
-                              _subject.text = b['subject']?.toString() ?? '';
-                              _chapter.text = b['topic']?.toString() ?? '';
-                            });
-                          }),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline,
-                            size: 20, color: Color(0xFFD92D20)),
-                        onPressed: () async {
-                          final ok = await _confirmDeleteDialog(context,
-                              title: 'Delete Book?',
-                              body: 'This will permanently remove this book.');
-                          if (!ok) return;
-                          try {
-                            await widget.api.deleteBook(b['id'] as int);
-                            await _loadBatches();
-                            if (context.mounted) {
-                              _showActionSnackBar(
-                                  context, 'Book deleted successfully');
+                        IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 20),
+                            onPressed: () {
+                              setState(() {
+                                _editingId = b['id'] as int;
+                                _bookTitle.text = b['title']?.toString() ?? '';
+                                _classLabel.text =
+                                    b['class_label']?.toString() ?? '';
+                                _subject.text = b['subject']?.toString() ?? '';
+                                _chapter.text = b['topic']?.toString() ?? '';
+                              });
+                            }),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              size: 20, color: Color(0xFFD92D20)),
+                          onPressed: () async {
+                            final ok = await _confirmDeleteDialog(context,
+                                title: 'Delete Book?',
+                                body: 'This will permanently remove this book.');
+                            if (!ok) return;
+                            try {
+                              await widget.api.deleteBook(b['id'] as int);
+                              await _loadBatches();
+                              if (context.mounted) {
+                                _showActionSnackBar(
+                                    context, 'Book deleted successfully');
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                _showActionSnackBar(context, 'Book delete failed',
+                                    isError: true);
+                              }
                             }
-                          } catch (e) {
-                            if (context.mounted) {
-                              _showActionSnackBar(context, 'Book delete failed',
-                                  isError: true);
-                            }
-                          }
-                        },
-                      ),
-                    ],
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
-                  child: Wrap(spacing: 6, runSpacing: 4, children: [
-                    _ChipBadge(
-                        label: b['batch_name']?.toString() ?? '',
-                        color: const Color(0xFF1976D2)),
-                    _ChipBadge(
-                        label: b['class_label']?.toString() ?? '',
-                        color: const Color(0xFF7B1FA2)),
-                    if (category.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+                    child: Wrap(spacing: 6, runSpacing: 4, children: [
                       _ChipBadge(
-                          label: category, color: const Color(0xFF2E7D32)),
-                  ]),
-                ),
-              ],
+                          label: b['batch_name']?.toString() ?? '',
+                          color: const Color(0xFF1976D2)),
+                      _ChipBadge(
+                          label: b['class_label']?.toString() ?? '',
+                          color: const Color(0xFF7B1FA2)),
+                      if (category.isNotEmpty)
+                        _ChipBadge(
+                            label: category, color: const Color(0xFF2E7D32)),
+                    ]),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: Icon(
+                              isSelected ? Icons.check_circle_rounded : Icons.tune_rounded,
+                              size: 16,
+                            ),
+                            label: Text(
+                              isSelected
+                                  ? 'Selected (Managing Above)'
+                                  : 'Select & Manage eBooks / Questions',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: isSelected ? Colors.green : Colors.indigo,
+                              side: BorderSide(
+                                color: isSelected ? Colors.green : Colors.indigo.shade200,
+                              ),
+                            ),
+                            onPressed: () async {
+                              setState(() {
+                                _selectedBookId = b['id'] as int;
+                                _selectedChapterId = null;
+                                _chapters = const [];
+                              });
+                              await _loadChaptersForSelectedBook();
+                              if (context.mounted) {
+                                _showActionSnackBar(
+                                  context,
+                                  'Selected: ${b['title']} • ${b['topic']}. Scroll up to upload eBooks & manage questions.',
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }),
