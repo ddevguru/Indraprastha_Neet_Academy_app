@@ -1296,17 +1296,15 @@ class _HighlightEbookPanel extends StatefulWidget {
 class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
   int _previewKey = 0;
   WebViewController? _webViewController;
-  HttpServer? _localServer;
-  int? _localServerPort;
-  bool _isLoadingPdf = false;
-  String? _pdfLoadError;
   final Set<int> _solvedQuestionIds = {};
-  String? _loadedPdfSource;
+  String? _loadedFileId;
+  bool _isLoading = false;
+  bool _useDriveFallback = false;
 
   @override
   void initState() {
     super.initState();
-    _prepareAndLoadPdf();
+    _loadPdf();
   }
 
   @override
@@ -1315,139 +1313,125 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
     if (oldWidget.chapter['id'] != widget.chapter['id'] ||
         oldWidget.chapter['highlight_drive_link'] != widget.chapter['highlight_drive_link'] ||
         oldWidget.chapter['material_drive_link'] != widget.chapter['material_drive_link']) {
-      _prepareAndLoadPdf();
+      _loadPdf();
     }
   }
 
-  @override
-  void dispose() {
-    _localServer?.close(force: true);
-    super.dispose();
-  }
-
-  String _resolveHighlightPdfDownloadUrl() {
+  String _extractFileId() {
     final hlFileId = widget.chapter['highlight_drive_file_id']?.toString().trim() ?? '';
-    if (hlFileId.isNotEmpty) {
-      return 'https://drive.google.com/uc?export=download&id=$hlFileId';
-    }
+    if (hlFileId.isNotEmpty) return hlFileId;
+
     final hlLink = widget.chapter['highlight_drive_link']?.toString().trim() ?? '';
     if (hlLink.isNotEmpty) {
       final uri = Uri.tryParse(hlLink);
-      final extractedId = uri != null ? _extractGoogleDriveFileId(uri) : null;
-      if (extractedId != null && extractedId.isNotEmpty) {
-        return 'https://drive.google.com/uc?export=download&id=$extractedId';
-      }
-      return hlLink;
+      final id = uri != null ? _extractGoogleDriveFileId(uri) : null;
+      if (id != null && id.isNotEmpty) return id;
     }
+
     final matFileId = widget.chapter['material_drive_file_id']?.toString().trim() ?? '';
-    if (matFileId.isNotEmpty) {
-      return 'https://drive.google.com/uc?export=download&id=$matFileId';
-    }
+    if (matFileId.isNotEmpty) return matFileId;
+
     final matLink = widget.chapter['material_drive_link']?.toString().trim() ?? '';
     if (matLink.isNotEmpty) {
       final uri = Uri.tryParse(matLink);
-      final extractedId = uri != null ? _extractGoogleDriveFileId(uri) : null;
-      if (extractedId != null && extractedId.isNotEmpty) {
-        return 'https://drive.google.com/uc?export=download&id=$extractedId';
-      }
-      return matLink;
+      final id = uri != null ? _extractGoogleDriveFileId(uri) : null;
+      if (id != null && id.isNotEmpty) return id;
     }
+
     return '';
   }
 
-  Future<void> _prepareAndLoadPdf() async {
-    final downloadUrl = _resolveHighlightPdfDownloadUrl();
-    if (downloadUrl.isEmpty) {
+  Future<void> _loadPdf() async {
+    final fileId = _extractFileId();
+    if (fileId.isEmpty) {
       if (mounted) {
         setState(() {
-          _isLoadingPdf = false;
-          _pdfLoadError = 'No highlighted eBook PDF available for this chapter.';
+          _isLoading = false;
+          _loadedFileId = '';
+          _webViewController = null;
         });
       }
       return;
     }
 
-    if (_loadedPdfSource == downloadUrl && _localServerPort != null && _webViewController != null) {
-      return;
-    }
+    if (_loadedFileId == fileId && _webViewController != null) return;
+    _loadedFileId = fileId;
 
     if (mounted) {
       setState(() {
-        _isLoadingPdf = true;
-        _pdfLoadError = null;
+        _isLoading = true;
+        _useDriveFallback = false;
       });
     }
 
-    try {
-      Uint8List? bytes;
-      final chId = widget.chapter['id']?.toString() ?? 'temp';
+    Uint8List? bytes;
 
-      // 1. Check local device cache
+    // 1. Try local cache
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final cacheFile = File('${tempDir.path}/hl_ebook_$fileId.pdf');
+      if (await cacheFile.exists() && (await cacheFile.length()) > 5000) {
+        bytes = await cacheFile.readAsBytes();
+      }
+    } catch (_) {}
+
+    // 2. Download from Google Drive if not cached
+    if (bytes == null || bytes.isEmpty) {
+      final directDownloadUrl = 'https://drive.usercontent.google.com/download?id=$fileId&export=download';
+      final ucDownloadUrl = 'https://drive.google.com/uc?export=download&id=$fileId';
+
       try {
-        final tempDir = await getTemporaryDirectory();
-        final cacheFile = File('${tempDir.path}/highlight_ebook_$chId.pdf');
-        if (await cacheFile.exists() && (await cacheFile.length()) > 5000) {
-          bytes = await cacheFile.readAsBytes();
+        final res = await http.get(Uri.parse(directDownloadUrl)).timeout(const Duration(seconds: 8));
+        if (res.statusCode == 200 && res.bodyBytes.length > 5000) {
+          bytes = res.bodyBytes;
         }
       } catch (_) {}
 
-      // 2. Download if not cached
       if (bytes == null || bytes.isEmpty) {
-        final res = await http.get(Uri.parse(downloadUrl));
-        if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
-          bytes = res.bodyBytes;
-          try {
-            final tempDir = await getTemporaryDirectory();
-            final cacheFile = File('${tempDir.path}/highlight_ebook_$chId.pdf');
-            await cacheFile.writeAsBytes(bytes);
-          } catch (_) {}
-        } else {
-          throw Exception('Download returned HTTP status ${res.statusCode}');
-        }
+        try {
+          final res = await http.get(Uri.parse(ucDownloadUrl)).timeout(const Duration(seconds: 8));
+          if (res.statusCode == 200 && res.bodyBytes.length > 5000) {
+            bytes = res.bodyBytes;
+          }
+        } catch (_) {}
       }
 
-      // 3. Start local loopback HTTP server with CORS headers
-      await _localServer?.close(force: true);
-      _localServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      _localServerPort = _localServer!.port;
-      _localServer!.listen((HttpRequest request) {
-        request.response.headers.add('Access-Control-Allow-Origin', '*');
-        request.response.headers.add('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-        request.response.headers.add('Access-Control-Allow-Headers', '*');
-        if (request.method == 'OPTIONS') {
-          request.response.statusCode = HttpStatus.ok;
-          request.response.close();
-          return;
-        }
-        request.response.headers.contentType = ContentType('application', 'pdf');
-        request.response.headers.contentLength = bytes!.length;
-        request.response.add(bytes);
-        request.response.close();
+      if (bytes != null && bytes.isNotEmpty) {
+        try {
+          final tempDir = await getTemporaryDirectory();
+          final cacheFile = File('${tempDir.path}/hl_ebook_$fileId.pdf');
+          await cacheFile.writeAsBytes(bytes);
+        } catch (_) {}
+      }
+    }
+
+    if (bytes != null && bytes.isNotEmpty && mounted) {
+      final b64 = base64Encode(bytes);
+      _setupInteractivePdf(fileId: fileId, base64Data: b64);
+      setState(() {
+        _isLoading = false;
+        _useDriveFallback = false;
       });
+      return;
+    }
 
-      _loadedPdfSource = downloadUrl;
-
-      // 4. Build and load interactive PDF.js HTML in WebView
-      final localPdfUrl = 'http://127.0.0.1:$_localServerPort/document.pdf';
-      _initWebViewController(localPdfUrl);
-
-      if (mounted) {
-        setState(() {
-          _isLoadingPdf = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingPdf = false;
-          _pdfLoadError = 'Failed to load Highlighted eBook: $e';
-        });
-      }
+    // 3. Fallback to Google Drive native preview
+    if (mounted) {
+      _setupDriveFallback(fileId: fileId);
+      setState(() {
+        _isLoading = false;
+        _useDriveFallback = true;
+      });
     }
   }
 
-  void _initWebViewController(String localPdfUrl) {
-    final html = _buildInteractivePdfHtml(localPdfUrl);
+  void _setupInteractivePdf({required String fileId, required String base64Data}) {
+    final fallbackPreviewUrl = 'https://drive.google.com/file/d/$fileId/preview';
+    final html = _buildInteractivePdfHtml(
+      base64Pdf: base64Data,
+      fallbackPreviewUrl: fallbackPreviewUrl,
+    );
+
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
@@ -1472,10 +1456,21 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
           } catch (_) {}
         },
       )
-      ..loadHtmlString(html, baseUrl: 'https://cdnjs.cloudflare.com/');
+      ..loadHtmlString(html, baseUrl: 'https://indraprasthaneetacademy.com');
   }
 
-  String _buildInteractivePdfHtml(String pdfUrl) {
+  void _setupDriveFallback({required String fileId}) {
+    final previewUrl = 'https://drive.google.com/file/d/$fileId/preview';
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.transparent)
+      ..loadRequest(Uri.parse(previewUrl));
+  }
+
+  String _buildInteractivePdfHtml({
+    required String base64Pdf,
+    required String fallbackPreviewUrl,
+  }) {
     final questionsJson = jsonEncode(widget.highlightQuestions);
     final solvedIdsJson = jsonEncode(_solvedQuestionIds.toList());
 
@@ -1485,6 +1480,7 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
   <title>Highlighted eBook Reader</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1499,7 +1495,7 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 10px 0 60px 0;
+      padding: 8px 0 40px 0;
       gap: 12px;
     }
     .page-wrapper {
@@ -1533,19 +1529,20 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
     .textLayer span.clickable-highlight {
       pointer-events: auto !important;
       cursor: pointer !important;
-      background-color: rgba(34, 197, 94, 0.22) !important;
+      background-color: rgba(34, 197, 94, 0.28) !important;
       border-bottom: 2.5px solid #16a34a !important;
       border-radius: 2px;
       transition: background-color 0.15s ease;
     }
     .textLayer span.clickable-highlight:active {
-      background-color: rgba(34, 197, 94, 0.5) !important;
+      background-color: rgba(34, 197, 94, 0.6) !important;
     }
     .textLayer span.clickable-highlight-solved {
       pointer-events: auto !important;
       cursor: pointer !important;
-      background-color: rgba(59, 130, 246, 0.18) !important;
-      border-bottom: 2px solid #2563eb !important;
+      background-color: rgba(59, 130, 246, 0.22) !important;
+      border-bottom: 2.5px solid #2563eb !important;
+      border-radius: 2px;
     }
     #loading-overlay {
       position: fixed;
@@ -1575,17 +1572,24 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
 <body>
   <div id="loading-overlay">
     <div class="spinner"></div>
-    <div id="loading-text">Preparing Highlighted Pages...</div>
+    <div id="loading-text">Rendering eBook Pages...</div>
   </div>
 
   <div id="viewer-container"></div>
 
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
     const questionsData = $questionsJson;
     const solvedIds = new Set($solvedIdsJson);
     let pdfDoc = null;
+    let switchedToFallback = false;
+
+    // Failover safety timer: if PDF.js takes more than 7s, switch to Drive viewer automatically
+    const failoverTimer = setTimeout(function() {
+      if (!pdfDoc && !switchedToFallback) {
+        switchedToFallback = true;
+        window.location.replace('$fallbackPreviewUrl');
+      }
+    }, 7000);
 
     window.notifySolved = function(qid) {
       solvedIds.add(qid);
@@ -1604,21 +1608,47 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
 
     async function initPdf() {
       try {
-        const loadingTask = pdfjsLib.getDocument('$pdfUrl');
+        if (!window.pdfjsLib) {
+          throw new Error('PDF.js library not loaded');
+        }
+        // Disable external worker to avoid Cross-Origin Worker SOP errors on Android WebView
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+
+        const b64Data = "$base64Pdf";
+        const binStr = atob(b64Data);
+        const len = binStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binStr.charCodeAt(i);
+        }
+
+        const loadingTask = pdfjsLib.getDocument({
+          data: bytes,
+          cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+          cMapPacked: true,
+        });
         pdfDoc = await loadingTask.promise;
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay) overlay.style.display = 'none';
+        clearTimeout(failoverTimer);
 
         const container = document.getElementById('viewer-container');
         container.innerHTML = '';
 
         for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
           await renderPage(pageNum, container);
+          if (pageNum === 1) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.style.display = 'none';
+          }
         }
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.style.display = 'none';
       } catch (err) {
-        console.error('Error loading PDF:', err);
-        const lt = document.getElementById('loading-text');
-        if (lt) lt.innerText = 'Failed to load PDF: ' + err.message;
+        console.warn('Interactive PDF.js viewer failed, falling back to Google Drive viewer:', err);
+        clearTimeout(failoverTimer);
+        if (!switchedToFallback) {
+          switchedToFallback = true;
+          window.location.replace('$fallbackPreviewUrl');
+        }
       }
     }
 
@@ -1638,7 +1668,7 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
 
       const canvas = document.createElement('canvas');
       canvas.className = 'page-canvas';
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1.5, 2.0);
       canvas.width = Math.floor(viewport.width * dpr);
       canvas.height = Math.floor(viewport.height * dpr);
       canvas.style.width = Math.floor(viewport.width) + 'px';
@@ -1652,6 +1682,7 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
       textLayerDiv.className = 'textLayer';
       textLayerDiv.style.width = Math.floor(viewport.width) + 'px';
       textLayerDiv.style.height = Math.floor(viewport.height) + 'px';
+      textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
       pageWrapper.appendChild(textLayerDiv);
 
       container.appendChild(pageWrapper);
@@ -1663,13 +1694,18 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
       }).promise;
 
       // Render text layer
-      const textContent = await page.getTextContent();
-      await pdfjsLib.renderTextLayer({
-        textContentSource: textContent,
-        container: textLayerDiv,
-        viewport: viewport,
-        textDivs: []
-      }).promise;
+      try {
+        const textContent = await page.getTextContent();
+        const textTask = pdfjsLib.renderTextLayer({
+          textContent: textContent,
+          textContentSource: textContent,
+          container: textLayerDiv,
+          viewport: viewport
+        });
+        await (textTask.promise || textTask);
+      } catch (e) {
+        console.warn('Text layer render error on page ' + pageNum, e);
+      }
 
       // Bind highlight clicks
       bindHighlightsForPage(pageNum, textLayerDiv);
@@ -1698,7 +1734,12 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
       }
 
       function cleanStr(str) {
-        return (str || '').toLowerCase().replace(/[\\r\\n\\t]+/g, ' ').replace(/\\s+/g, ' ').trim();
+        return (str || '')
+          .toLowerCase()
+          .replace(/[\\r\\n\\t]+/g, ' ')
+          .replace(/\\s+/g, ' ')
+          .replace(/[^\\w\\s]/g, '')
+          .trim();
       }
 
       const docClean = cleanStr(fullText);
@@ -1711,11 +1752,15 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
         let matchIdx = docClean.indexOf(targetClean);
         let matchLen = targetClean.length;
 
-        if (matchIdx === -1 && targetClean.length > 25) {
-          const subTarget = targetClean.substring(0, 25);
-          matchIdx = docClean.indexOf(subTarget);
-          if (matchIdx !== -1) {
-            matchLen = Math.min(targetClean.length, docClean.length - matchIdx);
+        // If exact full sentence match wasn't found, try searching for significant sub-phrases
+        if (matchIdx === -1 && targetClean.length > 20) {
+          const words = targetClean.split(' ').filter(w => w.length > 2);
+          if (words.length >= 3) {
+            const phrase = words.slice(0, Math.min(5, words.length)).join(' ');
+            matchIdx = docClean.indexOf(phrase);
+            if (matchIdx !== -1) {
+              matchLen = Math.min(targetClean.length, docClean.length - matchIdx);
+            }
           }
         }
 
@@ -1729,14 +1774,18 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
 
           for (let k = 0; k < fullText.length; k++) {
             const ch = fullText[k].toLowerCase();
-            if (/\\s/.test(ch)) {
-              if (k > 0 && !/\\s/.test(fullText[k - 1])) {
-                cleanCount++;
-              }
-            } else {
+            if (/[\\w]/.test(ch)) {
               if (cleanCount === matchIdx && origStart === -1) origStart = k;
               if (cleanCount === endIdx && origEnd === -1) origEnd = k;
               cleanCount++;
+            } else if (/\\s/.test(ch)) {
+              if (k > 0 && /\\s/.test(fullText[k - 1])) {
+                // duplicate space, skip
+              } else {
+                if (cleanCount === matchIdx && origStart === -1) origStart = k;
+                if (cleanCount === endIdx && origEnd === -1) origEnd = k;
+                cleanCount++;
+              }
             }
           }
 
@@ -1952,6 +2001,7 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
     final questions = widget.highlightQuestions;
     final theme = Theme.of(context);
     final chapterTitle = widget.chapter['title']?.toString() ?? 'Chapter eBook';
+    final fileId = _extractFileId();
 
     return SizedBox.expand(
       child: SurfaceCard(
@@ -2019,7 +2069,8 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
                     tooltip: 'Reload Highlighted PDF',
                     visualDensity: VisualDensity.compact,
                     onPressed: () {
-                      _prepareAndLoadPdf();
+                      _loadedFileId = null;
+                      _loadPdf();
                       setState(() => _previewKey++);
                     },
                   ),
@@ -2029,60 +2080,106 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
 
             // ── Main Content Area: PDF View with On-Page Clickable Highlights ─────
             Expanded(
-              child: _isLoadingPdf
-                  ? const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(color: Color(0xFFD97706)),
-                          SizedBox(height: 16),
-                          Text(
-                            'Loading Highlighted eBook...',
-                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Preparing interactive on-page questions...',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
+              child: fileId.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.picture_as_pdf_rounded, size: 52, color: Colors.orange),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              'Highlighted eBook PDF Not Uploaded Yet',
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            const Text(
+                              'The highlighted eBook PDF for this chapter has not been uploaded yet. '
+                              'Please upload the highlighted eBook PDF from the admin panel.',
+                              textAlign: TextAlign.center,
+                            ),
+                            if (questions.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              FilledButton.icon(
+                                icon: const Icon(Icons.highlight_rounded),
+                                label: Text('View ${questions.length} Highlight Questions'),
+                                onPressed: () => _showAllQuestionsSheet(context),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     )
-                  : _pdfLoadError != null
+                  : _isLoading
                       ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.xl),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.picture_as_pdf_rounded, size: 52, color: Colors.orange),
-                                const SizedBox(height: AppSpacing.md),
-                                Text(
-                                  _pdfLoadError!,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                                const SizedBox(height: AppSpacing.md),
-                                FilledButton.icon(
-                                  icon: const Icon(Icons.refresh_rounded),
-                                  label: const Text('Retry Loading'),
-                                  onPressed: _prepareAndLoadPdf,
-                                ),
-                              ],
-                            ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const CircularProgressIndicator(color: Color(0xFFD97706)),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Loading Highlighted eBook...',
+                                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Preparing interactive on-page questions...',
+                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                              ),
+                            ],
                           ),
                         )
                       : (_webViewController != null
-                          ? ClipRRect(
-                              child: WebViewWidget(
-                                key: ValueKey('highlight-pdfjs-preview-$_previewKey-$_localServerPort'),
-                                controller: _webViewController!,
-                                gestureRecognizers: {
-                                  Factory<EagerGestureRecognizer>(
-                                    EagerGestureRecognizer.new,
+                          ? Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: ClipRRect(
+                                    child: WebViewWidget(
+                                      key: ValueKey('highlight-pdfjs-preview-$_previewKey-$fileId'),
+                                      controller: _webViewController!,
+                                      gestureRecognizers: {
+                                        Factory<EagerGestureRecognizer>(
+                                          EagerGestureRecognizer.new,
+                                        ),
+                                      },
+                                    ),
                                   ),
-                                },
-                              ),
+                                ),
+                                if (_useDriveFallback && questions.isNotEmpty)
+                                  Positioned(
+                                    bottom: AppSpacing.md,
+                                    left: AppSpacing.lg,
+                                    right: AppSpacing.lg,
+                                    child: Material(
+                                      elevation: 6,
+                                      borderRadius: BorderRadius.circular(30),
+                                      color: const Color(0xFFD97706),
+                                      child: InkWell(
+                                        onTap: () => _showAllQuestionsSheet(context),
+                                        borderRadius: BorderRadius.circular(30),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              const Icon(Icons.highlight_rounded, color: Colors.white, size: 20),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '${questions.length} Highlight Questions • Tap to Solve',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             )
                           : const SizedBox.shrink()),
             ),
