@@ -59,7 +59,7 @@ export default function MethodologyPage() {
             <div className="meth-stat-label">NEET PYQ Repository Indexed</div>
           </div>
           <div className="meth-stat-card">
-            <div className="meth-stat-val">&lt;7 Mins</div>
+            <div className="meth-stat-val">&lt;10 Mins</div>
             <div className="meth-stat-label">Expert Doubt Resolution</div>
           </div>
           <div className="meth-stat-card">
@@ -213,7 +213,7 @@ export default function MethodologyPage() {
               <span className="pillar-num-badge">02</span>
               <span className="pillar-category-tag">Exam Pattern Blueprint</span>
             </div>
-            <h3 className="pillar-title">15+ Years Chapter-Wise PYQ Mastery</h3>
+            <h3 className="pillar-title">Pratice Neet Chapterwise PYQ</h3>
             <p className="pillar-desc">
               Solving random past papers without structure wastes hundreds of hours. We dissect 15+ years into precise micro-topics, uncovering NEET question-framing patterns and recurring numerical shortcuts.
             </p>
@@ -336,7 +336,7 @@ export default function MethodologyPage() {
 
               <div className="chat-bubble-faculty">
                 <div className="chat-sender-name" style={{ color: "var(--meth-accent)" }}>
-                  Dr. Ramanand Verma (Ex-AIIMS Faculty)
+                  Dr. Rahul Kumar (Chief Mentor)
                 </div>
                 <p className="chat-msg-text">
                   &ldquo;Excellent question! Temperature affects kinetic energy, but colligative properties depend on the relative number of solute vs solvent particles at constant T...&rdquo;
@@ -411,9 +411,9 @@ export default function MethodologyPage() {
       <section className="meth-habits-section">
         <div className="meth-section-header" style={{ textAlign: "center" }}>
           <div className="meth-tagline-capsule">THE CULTURE OF EXCELLENCE</div>
-          <h2 className="meth-section-title">Daily Micro-Habit Loop: From Drills to AIR</h2>
+          <h2 className="meth-section-title">Quality Content With Personalised Mentorship</h2>
           <p className="meth-section-subtitle" style={{ margin: "0 auto" }}>
-            Caliber is common; rigorous daily discipline is rare. Our structured habit engine cultivates an intuitive test-day environment that guarantees peak performance on exam day.
+            Ask any doubts from Our experts Any time one doesn't only practice but we help in Building concepts.
           </p>
         </div>
 
@@ -437,7 +437,7 @@ export default function MethodologyPage() {
               <div className="habit-num">02</div>
               <div className="habit-time-tag">Post-Test Protocol • Daily</div>
             </div>
-            <h4 className="habit-title">Mistake Book Digital Logging</h4>
+            <h4 className="habit-title">Pratice in CBT Mode</h4>
             <p className="habit-desc">
               Every incorrect solution is categorized: &apos;Calculation Error&apos;, &apos;Conceptual Blindspot&apos;, or &apos;Careless Reading&apos;. Zero repeated mistakes.
             </p>
@@ -462,18 +462,18 @@ export default function MethodologyPage() {
         </div>
       </section>
 
-      {/* ════════ FACULTY & ADVISORY BOARD SECTION ════════ */}
+      {/* ════════ CHIEF MENTOR & GUIDANCE SECTION ════════ */}
       <section className="meth-faculty-section">
         <div className="meth-section-header">
-          <div className="meth-tagline-capsule">WORLD-CLASS MENTORS</div>
-          <h2 className="meth-section-title">Academic Faculty & Medical Advisory Board</h2>
+          <div className="meth-tagline-capsule">CHIEF MENTOR SPOTLIGHT</div>
+          <h2 className="meth-section-title">Personalised Mentorship by Dr Rahul Kumar</h2>
           <p className="meth-section-subtitle">
-            Learn directly from top practicing doctors, AIIMS alumni, and author faculty who have mentored hundreds of AIR Top 100 rankers.
+            Get direct 1-on-1 strategic guidance, personalised roadmap planning, and dedicated doubt resolution tailored for your NEET preparation.
           </p>
         </div>
 
         {/* Personalised Mentorship Spotlight by Dr. Rahul Kumar in Methodology */}
-        <div style={{ maxWidth: "1280px", margin: "0 auto 40px", padding: "0 20px" }}>
+        <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 20px" }}>
           <div className="mentorship-banner-card" style={{ padding: "18px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -489,59 +489,6 @@ export default function MethodologyPage() {
               </a>
             </div>
             <MentorshipBannerSlider />
-          </div>
-        </div>
-
-        <div className="faculty-grid">
-          {/* Faculty 1 */}
-          <div className="faculty-card">
-            <div className="faculty-avatar-box">
-              <span className="faculty-avatar-icon">👨‍⚕️</span>
-              <div className="faculty-badge-overlay">Top 1% Rated</div>
-            </div>
-            <h4 className="faculty-name">Dr. Ramanand Verma</h4>
-            <div className="faculty-creds">MBBS (AIIMS New Delhi), Ex-AIIMS Senior Resident</div>
-            <p className="faculty-bio">
-              Head of Medical Pedagogy. Over 15+ years mentoring Top 50 AIR rankers. Specializes in Human Physiology, Genetics, and High-Yield NCERT Audio Decoding.
-            </p>
-            <div className="faculty-stat-tags">
-              <span>🏆 AIR 1 Produced (2021)</span>
-              <span>4,800+ Doctors Guided</span>
-            </div>
-          </div>
-
-          {/* Faculty 2 */}
-          <div className="faculty-card">
-            <div className="faculty-avatar-box">
-              <span className="faculty-avatar-icon">👨‍🏫</span>
-              <div className="faculty-badge-overlay">Author & Mentor</div>
-            </div>
-            <h4 className="faculty-name">Prof. K. S. Tyagi</h4>
-            <div className="faculty-creds">M.Sc (IIT Roorkee), Author of Modern Mechanics</div>
-            <p className="faculty-bio">
-              Renowned for simplifying mechanics, electrodynamics, and modern physics through visual analogies, real-world simulations, and formulaic shortcuts.
-            </p>
-            <div className="faculty-stat-tags">
-              <span>📚 22+ Yrs Teaching</span>
-              <span>99.8% Physics Record</span>
-            </div>
-          </div>
-
-          {/* Faculty 3 */}
-          <div className="faculty-card">
-            <div className="faculty-avatar-box">
-              <span className="faculty-avatar-icon">👩‍⚕️</span>
-              <div className="faculty-badge-overlay">Gold Medalist</div>
-            </div>
-            <h4 className="faculty-name">Dr. Shweta Mukherjee</h4>
-            <div className="faculty-creds">MD (Biochemistry), Gold Medalist (KGMU Lucknow)</div>
-            <p className="faculty-bio">
-              Architect of the NCERT Line-by-Line Question Bank. Creator of the famous &apos;Reaction Flow Map&apos; that transformed organic chemistry recall for 10k+ aspirants.
-            </p>
-            <div className="faculty-stat-tags">
-              <span>🧬 Organic Specialist</span>
-              <span>10k+ MCQs Authored</span>
-            </div>
           </div>
         </div>
       </section>

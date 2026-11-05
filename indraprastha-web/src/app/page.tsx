@@ -26,7 +26,7 @@ const quizOptions = [
 
 const statsBar = [
   { icon: "📚", val: "10,000+", label: "NCERT Line-by-Line MCQs" },
-  { icon: "🏛️", val: "15+ Years", label: "Chapter-Wise PYQs & Audited Solutions" },
+  { icon: "🏛️", val: "15+ Years", label: "Chapter-Wise PYQs & Detailed Solutions" },
   { icon: "🎓", val: "99.8%", label: "NEET Exam Pattern Alignment" },
   { icon: "📞", val: "24/7 Helpline", label: "+91 77030 33682" },
 ];
@@ -52,7 +52,7 @@ const batches = [
       "Experince CBT Mode On our website Any time on all the questions",
       "Pratice anywhere anytime On our application",
       "Mentorship By Dr Rahul Kumar ( only for paid subscribers )",
-      "24*7 Doubt solving faculty in our exclusive telegram channel ( only for paid Subscribers )",
+      "24*7 Doubt solving with experienced faculty in dedicated community section ( only for paid Subscribers )",
     ],
     cta: "Enroll for Target NEET 2027 • ₹2,999",
     secondary: "Request Mobile Brochure (PDF)",
@@ -77,7 +77,7 @@ const batches = [
       "Experince CBT Mode On our website Any time on all the questions",
       "Pratice anywhere anytime On our application",
       "Mentorship By Dr Rahul Kumar ( only for paid subscribers )",
-      "24*7 Doubt solving faculty in our exclusive telegram channel ( only for paid Subscribers )",
+      "24*7 Doubt solving with experienced faculty in dedicated community section ( only for paid Subscribers )",
     ],
     cta: "Enroll for Target NEET 2028 • ₹5,500",
     secondary: "Request Mobile Brochure (PDF)",
@@ -102,7 +102,7 @@ const methodologyCards = [
   },
   {
     num: "04",
-    title: "24/7 Faculty Doubt Desk",
+    title: "Community Doubt",
     desc: "Stuck on a Physics numerical or organic mechanism? Upload a photo and receive audio-visual step-by-step solutions from senior faculty.",
   },
 ];
@@ -316,7 +316,7 @@ export default function Page() {
               </div>
               <div className="rating-text">
                 <span className="stars">★★★★★</span>
-                <strong>4.9/5.0</strong> · 18.5k+ Active Aspirants in 2025/2026
+                <strong>4.9/5.0</strong> · Trusted & Tested  By Student's
               </div>
             </div>
           </div>
@@ -628,10 +628,10 @@ export default function Page() {
                 }}
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3.6 1.8C3.3 2.1 3.1 2.6 3.1 3.2V20.8C3.1 21.4 3.3 21.9 3.6 22.2L3.7 22.3L13.8 12.2V11.8L3.7 1.7L3.6 1.8Z" fill="#00D2FF"/>
-                  <path d="M17.2 15.6L13.8 12.2V11.8L17.2 8.4L17.3 8.5L21.3 10.8C22.4 11.4 22.4 12.6 21.3 13.2L17.3 15.5L17.2 15.6Z" fill="#FFD400"/>
-                  <path d="M17.3 15.5L13.8 12L3.6 22.2C4 22.6 4.7 22.7 5.5 22.2L17.3 15.5Z" fill="#FF3333"/>
-                  <path d="M17.3 8.5L5.5 1.8C4.7 1.3 4 1.4 3.6 1.8L13.8 12L17.3 8.5Z" fill="#00E676"/>
+                  <path d="M3.6 1.8C3.3 2.1 3.1 2.6 3.1 3.2V20.8C3.1 21.4 3.3 21.9 3.6 22.2L3.7 22.3L13.8 12.2V11.8L3.7 1.7L3.6 1.8Z" fill="#00D2FF" />
+                  <path d="M17.2 15.6L13.8 12.2V11.8L17.2 8.4L17.3 8.5L21.3 10.8C22.4 11.4 22.4 12.6 21.3 13.2L17.3 15.5L17.2 15.6Z" fill="#FFD400" />
+                  <path d="M17.3 15.5L13.8 12L3.6 22.2C4 22.6 4.7 22.7 5.5 22.2L17.3 15.5Z" fill="#FF3333" />
+                  <path d="M17.3 8.5L5.5 1.8C4.7 1.3 4 1.4 3.6 1.8L13.8 12L17.3 8.5Z" fill="#00E676" />
                 </svg>
                 <div style={{ textAlign: "left" }}>
                   <span style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.8px", textTransform: "uppercase", display: "block", opacity: 0.9 }}>
