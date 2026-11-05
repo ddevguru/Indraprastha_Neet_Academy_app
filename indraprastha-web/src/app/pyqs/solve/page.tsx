@@ -866,9 +866,21 @@ function PyqsSolveComponent() {
                       height: "36px",
                       padding: "0 12px",
                       borderRadius: "8px",
-                      border: markedForReview[currentQ?.id] ? "1.5px solid #7C3AED" : "1px solid var(--border-light, #EDE3DA)",
-                      backgroundColor: markedForReview[currentQ?.id] ? "rgba(124, 58, 237, 0.12)" : "transparent",
-                      color: markedForReview[currentQ?.id] ? "#7C3AED" : "var(--text-muted)",
+                      border: markedForReview[currentQ?.id]
+                        ? selectedAnswers[currentQ?.id]
+                          ? "1.5px solid #8B5CF6"
+                          : "1.5px solid #2563EB"
+                        : "1px solid var(--border-light, #EDE3DA)",
+                      backgroundColor: markedForReview[currentQ?.id]
+                        ? selectedAnswers[currentQ?.id]
+                          ? "rgba(139, 92, 246, 0.15)"
+                          : "rgba(37, 99, 235, 0.15)"
+                        : "transparent",
+                      color: markedForReview[currentQ?.id]
+                        ? selectedAnswers[currentQ?.id]
+                          ? "#A78BFA"
+                          : "#3B82F6"
+                        : "var(--text-muted)",
                       fontSize: "12px",
                       fontWeight: 800,
                       cursor: "pointer",
@@ -876,7 +888,11 @@ function PyqsSolveComponent() {
                       alignItems: "center",
                     }}
                   >
-                    {markedForReview[currentQ?.id] ? "★ Marked for Review" : "Mark for Review"}
+                    {markedForReview[currentQ?.id]
+                      ? selectedAnswers[currentQ?.id]
+                        ? "★ Ans & Marked for Review"
+                        : "★ Marked for Review"
+                      : "Mark for Review"}
                   </button>
                 </div>
 
