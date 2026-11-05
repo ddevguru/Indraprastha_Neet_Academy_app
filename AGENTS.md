@@ -177,6 +177,11 @@
   - Regular eBook PDF (`material_drive_link`) via `POST /admin/chapters/:chapterId/regular-pdf`
   - Highlighted eBook PDF (`highlight_drive_link`) via `POST /admin/chapters/:chapterId/highlight-pdf`
   - Table `book_chapters` updated with `highlight_drive_link`, `highlight_drive_file_id`, `highlight_drive_folder_id`.
+  - **Enhanced Admin UI:**
+    - Prominent outlined "Select PDF (Pick PDF)" action buttons for both Regular and Highlighted eBooks.
+    - Selected File Preview card with PDF icon, bold filename, file size in MB, and immediate instant feedback SnackBar.
+    - Full-width, high-contrast "Upload eBook Now" primary buttons with clear progress spinners and Google Drive upload state.
+    - Active status badges with clickable "Open PDF" direct drive preview links when already uploaded.
 - **Interactive Highlight Questions (Admin & Student):**
   - Table: `chapter_highlight_questions` (columns: `id, chapter_id, highlight_text, page_number, question, option_a, option_b, option_c, option_d, correct_option, explanation, created_at`).
   - Admin Endpoints:
