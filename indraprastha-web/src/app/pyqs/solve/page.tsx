@@ -868,18 +868,18 @@ function PyqsSolveComponent() {
                       borderRadius: "8px",
                       border: markedForReview[currentQ?.id]
                         ? selectedAnswers[currentQ?.id]
-                          ? "1.5px solid #8B5CF6"
-                          : "1.5px solid #2563EB"
+                          ? "1.5px solid #0D9488"
+                          : "1.5px solid #06B6D4"
                         : "1px solid var(--border-light, #EDE3DA)",
                       backgroundColor: markedForReview[currentQ?.id]
                         ? selectedAnswers[currentQ?.id]
-                          ? "rgba(139, 92, 246, 0.15)"
-                          : "rgba(37, 99, 235, 0.15)"
+                          ? "rgba(13, 148, 136, 0.15)"
+                          : "rgba(6, 182, 212, 0.15)"
                         : "transparent",
                       color: markedForReview[currentQ?.id]
                         ? selectedAnswers[currentQ?.id]
-                          ? "#A78BFA"
-                          : "#3B82F6"
+                          ? "#2DD4BF"
+                          : "#22D3EE"
                         : "var(--text-muted)",
                       fontSize: "12px",
                       fontWeight: 800,

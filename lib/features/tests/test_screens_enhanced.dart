@@ -383,7 +383,7 @@ class _EnhancedTestScreenState extends State<EnhancedTestScreen> {
                 children: [
                   _buildProgressLegend('Answered', Colors.green),
                   const SizedBox(width: 16),
-                  _buildProgressLegend('Marked', Colors.orange),
+                  _buildProgressLegend('Marked', const Color(0xFF06B6D4)),
                   const SizedBox(width: 16),
                   _buildProgressLegend('Not Attempted', Colors.grey),
                 ],
@@ -399,7 +399,7 @@ class _EnhancedTestScreenState extends State<EnhancedTestScreen> {
               (index) {
                 Color dotColor;
                 if (markedForReview.contains(index)) {
-                  dotColor = Colors.orange;
+                  dotColor = const Color(0xFF06B6D4);
                 } else if (answeredQuestions.contains(index)) {
                   dotColor = Colors.green;
                 } else {

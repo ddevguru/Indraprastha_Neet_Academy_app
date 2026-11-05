@@ -260,7 +260,7 @@ export default function CbtQuestionPalette({
               style={{
                 width: "18px",
                 height: "18px",
-                backgroundColor: "#2563EB",
+                backgroundColor: "#06B6D4",
                 borderRadius: "50%",
                 display: "inline-flex",
                 alignItems: "center",
@@ -281,7 +281,7 @@ export default function CbtQuestionPalette({
                 style={{
                   width: "18px",
                   height: "18px",
-                  backgroundColor: "#8B5CF6",
+                  backgroundColor: "#0D9488",
                   borderRadius: "50%",
                   display: "inline-flex",
                   alignItems: "center",
@@ -357,10 +357,10 @@ export default function CbtQuestionPalette({
               borderRadius = "2px";
               paddingRight = "4px";
             } else if (status === "marked_for_review") {
-              bg = "#2563EB"; // Royal Blue circle
+              bg = "#06B6D4"; // Sky Cyan circle
               borderRadius = "50%";
             } else if (status === "answered_and_marked") {
-              bg = "#8B5CF6"; // Vibrant Violet circle with green badge
+              bg = "#0D9488"; // Deep Teal circle with green badge
               borderRadius = "50%";
               hasGreenBadge = true;
             }
@@ -486,7 +486,7 @@ export default function CbtQuestionPalette({
                 style={{
                   width: "15px",
                   height: "15px",
-                  backgroundColor: "#2563EB",
+                  backgroundColor: "#06B6D4",
                   borderRadius: "50%",
                   display: "inline-block",
                   flexShrink: 0,
@@ -502,7 +502,7 @@ export default function CbtQuestionPalette({
                 style={{
                   width: "15px",
                   height: "15px",
-                  backgroundColor: "#8B5CF6",
+                  backgroundColor: "#0D9488",
                   borderRadius: "50%",
                   display: "block",
                 }}
