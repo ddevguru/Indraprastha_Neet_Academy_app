@@ -2084,64 +2084,62 @@ class _BooksPageState extends State<BooksPage> {
                     helperText: 'Select which of the ${_books.length} chapters to manage.',
                   ),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _manualChapterTitle,
-                  decoration: const InputDecoration(
-                    labelText: 'Chapter title / name',
-                    hintText: 'e.g. Anatomy of Flowering Plants',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _chapterOverview,
-                  minLines: 2,
-                  maxLines: 3,
-                  decoration:
-                      const InputDecoration(labelText: 'Chapter overview'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _chapterHighlight,
-                  decoration:
-                      const InputDecoration(labelText: 'Highlight (manual)'),
-                ),
-                const SizedBox(height: 8),
-                FilledButton.tonal(
-                  onPressed: _selectedBookId == null
-                      ? null
-                      : () async {
-                          final title = _manualChapterTitle.text.trim().isNotEmpty
-                              ? _manualChapterTitle.text.trim()
-                              : (_chapter.text.trim().isNotEmpty
-                                  ? _chapter.text.trim()
-                                  : 'Chapter ${_chapters.length + 1}');
-                          await widget.api.createBookChapter(
-                            bookId: _selectedBookId!,
-                            title: title,
-                            overview: _chapterOverview.text.trim(),
-                            noteSummary: '',
-                            highlight: _chapterHighlight.text.trim(),
-                          );
-                          _manualChapterTitle.clear();
-                          _chapterOverview.clear();
-                          _chapterHighlight.clear();
-                          await _loadChaptersForSelectedBook();
-                          setState(
-                              () => _status = 'Manual chapter/highlight added');
-                          if (context.mounted) {
-                            _showActionSnackBar(
-                                context, 'Chapter added successfully');
-                          }
-                        },
-                  child: const Text('Add Chapter + Highlight'),
-                ),
-                if (_chapters.isNotEmpty) ...[
+                if (_selectedBookId != null) ...[
                   const SizedBox(height: 10),
+                  Builder(
+                    builder: (context) {
+                      final selBook = _books.firstWhere(
+                        (b) => (b as Map<String, dynamic>)['id'] == _selectedBookId,
+                        orElse: () => null,
+                      ) as Map<String, dynamic>?;
+                      if (selBook == null) return const SizedBox.shrink();
+                      final bookTitle = selBook['title'] ?? 'Chapter';
+                      final bookTopic = selBook['topic'] ?? '';
+                      final bookSubject = selBook['subject'] ?? '';
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.bookmark_added_rounded, color: Theme.of(context).colorScheme.primary, size: 24),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Active Chapter: $bookTitle${bookTopic.isNotEmpty ? ' • $bookTopic' : ''}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Subject: $bookSubject • ${_chapters.length} sub-part${_chapters.length == 1 ? '' : 's'} inside this chapter (${_books.length} total chapters in system)',
+                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+                const SizedBox(height: 8),
+                if (_chapters.isNotEmpty) ...[
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Chapters in selected book (${_chapters.length}):',
+                      'Sub-parts inside selected chapter (${_chapters.length}):',
                       style: const TextStyle(
                           fontWeight: FontWeight.w600, fontSize: 13),
                     ),
@@ -2189,10 +2187,75 @@ class _BooksPageState extends State<BooksPage> {
                   decoration: InputDecoration(
                     labelText: '2. Sub-chapter / Part inside this book (${_chapters.length})',
                     helperText: _chapters.isEmpty
-                        ? 'No chapters found for this book. Add a chapter above.'
+                        ? 'No sub-chapters found for this book. Expand below to add one.'
                         : (_chapters.length == 1
                             ? 'Main chapter auto-selected.'
                             : 'Select sub-chapter of the book chosen above.'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Theme(
+                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: const Text(
+                      '➕ Add New Sub-chapter / Section (Optional)',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    children: [
+                      TextField(
+                        controller: _manualChapterTitle,
+                        decoration: const InputDecoration(
+                          labelText: 'Sub-chapter title / name',
+                          hintText: 'e.g. Part 1 / Overview',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _chapterOverview,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration:
+                            const InputDecoration(labelText: 'Chapter overview'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _chapterHighlight,
+                        decoration:
+                            const InputDecoration(labelText: 'Highlight (manual)'),
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.tonal(
+                        onPressed: _selectedBookId == null
+                            ? null
+                            : () async {
+                                final title = _manualChapterTitle.text.trim().isNotEmpty
+                                    ? _manualChapterTitle.text.trim()
+                                    : (_chapter.text.trim().isNotEmpty
+                                        ? _chapter.text.trim()
+                                        : 'Chapter ${_chapters.length + 1}');
+                                await widget.api.createBookChapter(
+                                  bookId: _selectedBookId!,
+                                  title: title,
+                                  overview: _chapterOverview.text.trim(),
+                                  noteSummary: '',
+                                  highlight: _chapterHighlight.text.trim(),
+                                );
+                                _manualChapterTitle.clear();
+                                _chapterOverview.clear();
+                                _chapterHighlight.clear();
+                                await _loadChaptersForSelectedBook();
+                                setState(
+                                    () => _status = 'Manual chapter/highlight added');
+                                if (context.mounted) {
+                                  _showActionSnackBar(
+                                      context, 'Chapter added successfully');
+                                }
+                              },
+                        child: const Text('Add Sub-chapter + Highlight'),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                   ),
                 ),
                 if (_selectedChapterId != null) ...[
