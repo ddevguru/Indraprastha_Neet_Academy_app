@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/access/content_access.dart';
@@ -1293,24 +1296,483 @@ class _HighlightEbookPanel extends StatefulWidget {
 class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
   int _previewKey = 0;
   WebViewController? _webViewController;
-  String? _loadedPreviewUrl;
-  int _currentHighlightIndex = 0;
+  HttpServer? _localServer;
+  int? _localServerPort;
+  bool _isLoadingPdf = false;
+  String? _pdfLoadError;
   final Set<int> _solvedQuestionIds = {};
+  String? _loadedPdfSource;
 
-  String _resolveHighlightPdfLink() {
-    final hl = widget.chapter['highlight_drive_link']?.toString().trim() ?? '';
-    if (hl.isNotEmpty) return hl;
-    return _resolveMaterialLink(widget.chapter);
+  @override
+  void initState() {
+    super.initState();
+    _prepareAndLoadPdf();
   }
 
-  void _ensurePreviewController(String? previewUrl) {
-    if (previewUrl == null) return;
-    if (_webViewController != null && _loadedPreviewUrl == previewUrl) return;
+  @override
+  void didUpdateWidget(covariant _HighlightEbookPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chapter['id'] != widget.chapter['id'] ||
+        oldWidget.chapter['highlight_drive_link'] != widget.chapter['highlight_drive_link'] ||
+        oldWidget.chapter['material_drive_link'] != widget.chapter['material_drive_link']) {
+      _prepareAndLoadPdf();
+    }
+  }
+
+  @override
+  void dispose() {
+    _localServer?.close(force: true);
+    super.dispose();
+  }
+
+  String _resolveHighlightPdfDownloadUrl() {
+    final hlFileId = widget.chapter['highlight_drive_file_id']?.toString().trim() ?? '';
+    if (hlFileId.isNotEmpty) {
+      return 'https://drive.google.com/uc?export=download&id=$hlFileId';
+    }
+    final hlLink = widget.chapter['highlight_drive_link']?.toString().trim() ?? '';
+    if (hlLink.isNotEmpty) {
+      final uri = Uri.tryParse(hlLink);
+      final extractedId = uri != null ? _extractGoogleDriveFileId(uri) : null;
+      if (extractedId != null && extractedId.isNotEmpty) {
+        return 'https://drive.google.com/uc?export=download&id=$extractedId';
+      }
+      return hlLink;
+    }
+    final matFileId = widget.chapter['material_drive_file_id']?.toString().trim() ?? '';
+    if (matFileId.isNotEmpty) {
+      return 'https://drive.google.com/uc?export=download&id=$matFileId';
+    }
+    final matLink = widget.chapter['material_drive_link']?.toString().trim() ?? '';
+    if (matLink.isNotEmpty) {
+      final uri = Uri.tryParse(matLink);
+      final extractedId = uri != null ? _extractGoogleDriveFileId(uri) : null;
+      if (extractedId != null && extractedId.isNotEmpty) {
+        return 'https://drive.google.com/uc?export=download&id=$extractedId';
+      }
+      return matLink;
+    }
+    return '';
+  }
+
+  Future<void> _prepareAndLoadPdf() async {
+    final downloadUrl = _resolveHighlightPdfDownloadUrl();
+    if (downloadUrl.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isLoadingPdf = false;
+          _pdfLoadError = 'No highlighted eBook PDF available for this chapter.';
+        });
+      }
+      return;
+    }
+
+    if (_loadedPdfSource == downloadUrl && _localServerPort != null && _webViewController != null) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingPdf = true;
+        _pdfLoadError = null;
+      });
+    }
+
+    try {
+      Uint8List? bytes;
+      final chId = widget.chapter['id']?.toString() ?? 'temp';
+
+      // 1. Check local device cache
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final cacheFile = File('${tempDir.path}/highlight_ebook_$chId.pdf');
+        if (await cacheFile.exists() && (await cacheFile.length()) > 5000) {
+          bytes = await cacheFile.readAsBytes();
+        }
+      } catch (_) {}
+
+      // 2. Download if not cached
+      if (bytes == null || bytes.isEmpty) {
+        final res = await http.get(Uri.parse(downloadUrl));
+        if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+          bytes = res.bodyBytes;
+          try {
+            final tempDir = await getTemporaryDirectory();
+            final cacheFile = File('${tempDir.path}/highlight_ebook_$chId.pdf');
+            await cacheFile.writeAsBytes(bytes);
+          } catch (_) {}
+        } else {
+          throw Exception('Download returned HTTP status ${res.statusCode}');
+        }
+      }
+
+      // 3. Start local loopback HTTP server with CORS headers
+      await _localServer?.close(force: true);
+      _localServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      _localServerPort = _localServer!.port;
+      _localServer!.listen((HttpRequest request) {
+        request.response.headers.add('Access-Control-Allow-Origin', '*');
+        request.response.headers.add('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        request.response.headers.add('Access-Control-Allow-Headers', '*');
+        if (request.method == 'OPTIONS') {
+          request.response.statusCode = HttpStatus.ok;
+          request.response.close();
+          return;
+        }
+        request.response.headers.contentType = ContentType('application', 'pdf');
+        request.response.headers.contentLength = bytes!.length;
+        request.response.add(bytes);
+        request.response.close();
+      });
+
+      _loadedPdfSource = downloadUrl;
+
+      // 4. Build and load interactive PDF.js HTML in WebView
+      final localPdfUrl = 'http://127.0.0.1:$_localServerPort/document.pdf';
+      _initWebViewController(localPdfUrl);
+
+      if (mounted) {
+        setState(() {
+          _isLoadingPdf = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingPdf = false;
+          _pdfLoadError = 'Failed to load Highlighted eBook: $e';
+        });
+      }
+    }
+  }
+
+  void _initWebViewController(String localPdfUrl) {
+    final html = _buildInteractivePdfHtml(localPdfUrl);
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.transparent)
-      ..loadRequest(Uri.parse(previewUrl));
-    _loadedPreviewUrl = previewUrl;
+      ..setBackgroundColor(Colors.white)
+      ..addJavaScriptChannel(
+        'HighlightChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          try {
+            final data = jsonDecode(message.message) as Map<String, dynamic>;
+            final qId = data['questionId'];
+            if (qId != null) {
+              Map<String, dynamic>? targetQ;
+              for (final q in widget.highlightQuestions) {
+                if (q['id'] == qId || q['id']?.toString() == qId.toString()) {
+                  targetQ = q;
+                  break;
+                }
+              }
+              if (targetQ != null && mounted) {
+                _openQuestionPopup(context, targetQ);
+              }
+            }
+          } catch (_) {}
+        },
+      )
+      ..loadHtmlString(html, baseUrl: 'https://cdnjs.cloudflare.com/');
+  }
+
+  String _buildInteractivePdfHtml(String pdfUrl) {
+    final questionsJson = jsonEncode(widget.highlightQuestions);
+    final solvedIdsJson = jsonEncode(_solvedQuestionIds.toList());
+
+    return '''<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+  <title>Highlighted eBook Reader</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background-color: #525659;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: rgba(0,0,0,0);
+    }
+    #viewer-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 0 60px 0;
+      gap: 12px;
+    }
+    .page-wrapper {
+      position: relative;
+      background: #ffffff;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .page-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .textLayer {
+      position: absolute;
+      left: 0; top: 0; right: 0; bottom: 0;
+      overflow: hidden;
+      opacity: 1;
+      line-height: 1.0;
+      pointer-events: none;
+    }
+    .textLayer span {
+      color: transparent;
+      position: absolute;
+      white-space: pre;
+      cursor: default;
+      transform-origin: 0% 0%;
+      pointer-events: none;
+    }
+    .textLayer span.clickable-highlight {
+      pointer-events: auto !important;
+      cursor: pointer !important;
+      background-color: rgba(34, 197, 94, 0.22) !important;
+      border-bottom: 2.5px solid #16a34a !important;
+      border-radius: 2px;
+      transition: background-color 0.15s ease;
+    }
+    .textLayer span.clickable-highlight:active {
+      background-color: rgba(34, 197, 94, 0.5) !important;
+    }
+    .textLayer span.clickable-highlight-solved {
+      pointer-events: auto !important;
+      cursor: pointer !important;
+      background-color: rgba(59, 130, 246, 0.18) !important;
+      border-bottom: 2px solid #2563eb !important;
+    }
+    #loading-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      color: #333333;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3.5px solid #e2e8f0;
+      border-top-color: #d97706;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text">Preparing Highlighted Pages...</div>
+  </div>
+
+  <div id="viewer-container"></div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const questionsData = $questionsJson;
+    const solvedIds = new Set($solvedIdsJson);
+    let pdfDoc = null;
+
+    window.notifySolved = function(qid) {
+      solvedIds.add(qid);
+      document.querySelectorAll('[data-qid="' + qid + '"]').forEach(el => {
+        el.classList.remove('clickable-highlight');
+        el.classList.add('clickable-highlight-solved');
+      });
+    };
+
+    window.scrollToPage = function(pageNum) {
+      const el = document.getElementById('page-wrapper-' + pageNum);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    async function initPdf() {
+      try {
+        const loadingTask = pdfjsLib.getDocument('$pdfUrl');
+        pdfDoc = await loadingTask.promise;
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.style.display = 'none';
+
+        const container = document.getElementById('viewer-container');
+        container.innerHTML = '';
+
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+          await renderPage(pageNum, container);
+        }
+      } catch (err) {
+        console.error('Error loading PDF:', err);
+        const lt = document.getElementById('loading-text');
+        if (lt) lt.innerText = 'Failed to load PDF: ' + err.message;
+      }
+    }
+
+    async function renderPage(pageNum, container) {
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport1 = page.getViewport({ scale: 1.0 });
+      const screenWidth = window.innerWidth || document.documentElement.clientWidth || 360;
+      const targetWidth = Math.min(screenWidth - 16, 850);
+      const scale = targetWidth / viewport1.width;
+      const viewport = page.getViewport({ scale: scale });
+
+      const pageWrapper = document.createElement('div');
+      pageWrapper.className = 'page-wrapper';
+      pageWrapper.id = 'page-wrapper-' + pageNum;
+      pageWrapper.style.width = Math.floor(viewport.width) + 'px';
+      pageWrapper.style.height = Math.floor(viewport.height) + 'px';
+
+      const canvas = document.createElement('canvas');
+      canvas.className = 'page-canvas';
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(viewport.width * dpr);
+      canvas.height = Math.floor(viewport.height * dpr);
+      canvas.style.width = Math.floor(viewport.width) + 'px';
+      canvas.style.height = Math.floor(viewport.height) + 'px';
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      pageWrapper.appendChild(canvas);
+
+      const textLayerDiv = document.createElement('div');
+      textLayerDiv.className = 'textLayer';
+      textLayerDiv.style.width = Math.floor(viewport.width) + 'px';
+      textLayerDiv.style.height = Math.floor(viewport.height) + 'px';
+      pageWrapper.appendChild(textLayerDiv);
+
+      container.appendChild(pageWrapper);
+
+      // Render canvas
+      await page.render({
+        canvasContext: ctx,
+        viewport: viewport
+      }).promise;
+
+      // Render text layer
+      const textContent = await page.getTextContent();
+      await pdfjsLib.renderTextLayer({
+        textContentSource: textContent,
+        container: textLayerDiv,
+        viewport: viewport,
+        textDivs: []
+      }).promise;
+
+      // Bind highlight clicks
+      bindHighlightsForPage(pageNum, textLayerDiv);
+    }
+
+    function bindHighlightsForPage(pageNum, textLayerDiv) {
+      const pageQuestions = questionsData.filter(q => {
+        const p = parseInt(q.page_number);
+        return isNaN(p) || p === pageNum || p === 0;
+      });
+      if (pageQuestions.length === 0) return;
+
+      const spans = Array.from(textLayerDiv.querySelectorAll('span'));
+      if (spans.length === 0) return;
+
+      let charToSpan = [];
+      let fullText = '';
+      for (let i = 0; i < spans.length; i++) {
+        const s = spans[i].textContent || '';
+        for (let j = 0; j < s.length; j++) {
+          charToSpan.push(i);
+          fullText += s[j];
+        }
+        charToSpan.push(i);
+        fullText += ' ';
+      }
+
+      function cleanStr(str) {
+        return (str || '').toLowerCase().replace(/[\\r\\n\\t]+/g, ' ').replace(/\\s+/g, ' ').trim();
+      }
+
+      const docClean = cleanStr(fullText);
+
+      pageQuestions.forEach(q => {
+        const rawTarget = q.highlight_text || '';
+        const targetClean = cleanStr(rawTarget);
+        if (targetClean.length < 3) return;
+
+        let matchIdx = docClean.indexOf(targetClean);
+        let matchLen = targetClean.length;
+
+        if (matchIdx === -1 && targetClean.length > 25) {
+          const subTarget = targetClean.substring(0, 25);
+          matchIdx = docClean.indexOf(subTarget);
+          if (matchIdx !== -1) {
+            matchLen = Math.min(targetClean.length, docClean.length - matchIdx);
+          }
+        }
+
+        if (matchIdx !== -1) {
+          const endIdx = matchIdx + matchLen;
+          const matchedSpanIndices = new Set();
+
+          let cleanCount = 0;
+          let origStart = -1;
+          let origEnd = -1;
+
+          for (let k = 0; k < fullText.length; k++) {
+            const ch = fullText[k].toLowerCase();
+            if (/\\s/.test(ch)) {
+              if (k > 0 && !/\\s/.test(fullText[k - 1])) {
+                cleanCount++;
+              }
+            } else {
+              if (cleanCount === matchIdx && origStart === -1) origStart = k;
+              if (cleanCount === endIdx && origEnd === -1) origEnd = k;
+              cleanCount++;
+            }
+          }
+
+          if (origStart === -1) origStart = Math.min(matchIdx, charToSpan.length - 1);
+          if (origEnd === -1) origEnd = Math.min(matchIdx + matchLen, charToSpan.length);
+
+          for (let c = origStart; c < origEnd && c < charToSpan.length; c++) {
+            matchedSpanIndices.add(charToSpan[c]);
+          }
+
+          const isSolved = solvedIds.has(q.id);
+
+          matchedSpanIndices.forEach(spanIdx => {
+            const spanEl = spans[spanIdx];
+            if (!spanEl) return;
+
+            spanEl.classList.add(isSolved ? 'clickable-highlight-solved' : 'clickable-highlight');
+            spanEl.setAttribute('data-qid', q.id);
+            spanEl.setAttribute('title', 'Tap to solve question: ' + (q.question || ''));
+
+            spanEl.onclick = function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              if (window.HighlightChannel) {
+                window.HighlightChannel.postMessage(JSON.stringify({ questionId: q.id }));
+              }
+            };
+          });
+        }
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', initPdf);
+  </script>
+</body>
+</html>''';
   }
 
   void _openQuestionPopup(BuildContext context, Map<String, dynamic> question) {
@@ -1324,6 +1786,7 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
         onSolved: () {
           if (qId != null) {
             setState(() => _solvedQuestionIds.add(qId));
+            _webViewController?.runJavaScript('if (window.notifySolved) { window.notifySolved($qId); }');
           }
         },
       ),
@@ -1400,6 +1863,10 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
                       child: InkWell(
                         onTap: () {
                           Navigator.of(ctx).pop();
+                          final p = int.tryParse(page);
+                          if (p != null) {
+                            _webViewController?.runJavaScript('if (window.scrollToPage) { window.scrollToPage($p); }');
+                          }
                           _openQuestionPopup(context, q);
                         },
                         borderRadius: BorderRadius.circular(AppRadii.md),
@@ -1482,26 +1949,9 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final pdfLink = _resolveHighlightPdfLink();
-    final previewUrl = _toDrivePreviewUrl(pdfLink);
-    _ensurePreviewController(previewUrl);
-
     final questions = widget.highlightQuestions;
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final chapterTitle = widget.chapter['title']?.toString() ?? 'Chapter eBook';
-
-    // Clamp current highlight index if needed
-    final currentIdx = (questions.isNotEmpty &&
-            _currentHighlightIndex >= 0 &&
-            _currentHighlightIndex < questions.length)
-        ? _currentHighlightIndex
-        : 0;
-    final currentQ = questions.isNotEmpty ? questions[currentIdx] : null;
-    final currentQId = currentQ != null ? int.tryParse(currentQ['id']?.toString() ?? '') : null;
-    final isCurrentSolved = currentQId != null && _solvedQuestionIds.contains(currentQId);
-    final currentHighlightText = currentQ?['highlight_text']?.toString() ?? '';
-    final currentPageNumber = currentQ?['page_number']?.toString() ?? '1';
 
     return SizedBox.expand(
       child: SurfaceCard(
@@ -1539,8 +1989,8 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
                         ),
                         Text(
                           questions.isEmpty
-                              ? 'Highlighted eBook Reader'
-                              : '${questions.length} Highlight Question${questions.length == 1 ? '' : 's'} • Tap highlighted text to solve',
+                              ? 'Tap highlighted text in PDF to solve related questions'
+                              : '${questions.length} Highlight Questions • Tap text on page to solve',
                           style: const TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                       ],
@@ -1564,244 +2014,77 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
                         ),
                       ),
                     ),
-                  if (previewUrl != null)
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-                      tooltip: 'Reload eBook',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () {
-                        _webViewController?.loadRequest(Uri.parse(previewUrl));
-                        setState(() => _previewKey++);
-                      },
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
+                    tooltip: 'Reload Highlighted PDF',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      _prepareAndLoadPdf();
+                      setState(() => _previewKey++);
+                    },
+                  ),
                 ],
               ),
             ),
 
-            // ── Main Content Area: PDF eBook Viewer with Interactive Highlight Dock ─────
+            // ── Main Content Area: PDF View with On-Page Clickable Highlights ─────
             Expanded(
-              child: previewUrl != null
-                  ? Column(
-                      children: [
-                        // 1. Full PDF Document Viewer (Authentic uploaded PDF)
-                        Expanded(
-                          child: ClipRRect(
-                            child: WebViewWidget(
-                              key: ValueKey('highlight-pdf-preview-$_previewKey'),
-                              controller: _webViewController!,
-                              gestureRecognizers: {
-                                Factory<EagerGestureRecognizer>(
-                                  EagerGestureRecognizer.new,
-                                ),
-                              },
-                            ),
+              child: _isLoadingPdf
+                  ? const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(color: Color(0xFFD97706)),
+                          SizedBox(height: 16),
+                          Text(
+                            'Loading Highlighted eBook...',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                           ),
-                        ),
-
-                        // 2. Interactive Highlight Dock (Tap highlighted text to solve)
-                        if (questions.isNotEmpty && currentQ != null)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, -2),
+                          SizedBox(height: 4),
+                          Text(
+                            'Preparing interactive on-page questions...',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _pdfLoadError != null
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.xl),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.picture_as_pdf_rounded, size: 52, color: Colors.orange),
+                                const SizedBox(height: AppSpacing.md),
+                                Text(
+                                  _pdfLoadError!,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                FilledButton.icon(
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text('Retry Loading'),
+                                  onPressed: _prepareAndLoadPdf,
                                 ),
                               ],
-                              border: Border(
-                                top: BorderSide(
-                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFFDE68A),
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                            child: SafeArea(
-                              top: false,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Navigation & Status strip
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(14, 6, 14, 2),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: isCurrentSolved ? Colors.green : const Color(0xFFD97706),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            'Page $currentPageNumber • Highlight ${currentIdx + 1} of ${questions.length}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        if (isCurrentSolved)
-                                          const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
-                                              SizedBox(width: 4),
-                                              Text(
-                                                'Solved ✓',
-                                                style: TextStyle(
-                                                  color: Colors.green,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        const Spacer(),
-                                        IconButton(
-                                          icon: const Icon(Icons.arrow_back_ios_rounded, size: 14),
-                                          visualDensity: VisualDensity.compact,
-                                          tooltip: 'Previous highlight',
-                                          onPressed: currentIdx > 0
-                                              ? () => setState(() => _currentHighlightIndex = currentIdx - 1)
-                                              : null,
-                                        ),
-                                        Text(
-                                          '${currentIdx + 1}/${questions.length}',
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-                                          visualDensity: VisualDensity.compact,
-                                          tooltip: 'Next highlight',
-                                          onPressed: currentIdx < questions.length - 1
-                                              ? () => setState(() => _currentHighlightIndex = currentIdx + 1)
-                                              : null,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Highlighted Text Card - Clickable
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
-                                    child: Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        onTap: () => _openQuestionPopup(context, currentQ),
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: Container(
-                                          width: double.infinity,
-                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: isDark ? const Color(0xFF2C2213) : const Color(0xFFFEF9C3),
-                                            borderRadius: BorderRadius.circular(10),
-                                            border: Border.all(
-                                              color: isCurrentSolved ? Colors.green.shade400 : const Color(0xFFFBBF24),
-                                              width: 1.5,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Row(
-                                                      children: [
-                                                        const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFFD97706)),
-                                                        const SizedBox(width: 4),
-                                                        Text(
-                                                          isCurrentSolved
-                                                              ? 'Click highlighted text to review solution'
-                                                              : 'Click highlighted text to solve question',
-                                                          style: TextStyle(
-                                                            fontSize: 10,
-                                                            fontWeight: FontWeight.bold,
-                                                            color: isCurrentSolved ? Colors.green : const Color(0xFFD97706),
-                                                            letterSpacing: 0.3,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    const SizedBox(height: 5),
-                                                    Text(
-                                                      '"$currentHighlightText"',
-                                                      maxLines: 2,
-                                                      overflow: TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight: FontWeight.w600,
-                                                        fontStyle: FontStyle.italic,
-                                                        color: isDark ? Colors.amber.shade100 : const Color(0xFF78350F),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              FilledButton.icon(
-                                                style: FilledButton.styleFrom(
-                                                  backgroundColor: isCurrentSolved ? Colors.green : const Color(0xFFD97706),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                                  minimumSize: Size.zero,
-                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                ),
-                                                onPressed: () => _openQuestionPopup(context, currentQ),
-                                                icon: Icon(
-                                                  isCurrentSolved ? Icons.check_circle_rounded : Icons.quiz_rounded,
-                                                  size: 16,
-                                                ),
-                                                label: Text(
-                                                  isCurrentSolved ? 'Solved' : 'Solve',
-                                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ),
                           ),
-                      ],
-                    )
-                  : Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.xl),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.picture_as_pdf_rounded, size: 52, color: Colors.orange),
-                            const SizedBox(height: AppSpacing.md),
-                            Text(
-                              'Highlighted eBook PDF Not Uploaded Yet',
-                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                            const Text(
-                              'The highlighted eBook PDF for this chapter has not been uploaded yet. '
-                              'Please upload the highlighted eBook PDF from the admin panel.',
-                              textAlign: TextAlign.center,
-                            ),
-                            if (questions.isNotEmpty) ...[
-                              const SizedBox(height: AppSpacing.lg),
-                              FilledButton.icon(
-                                icon: const Icon(Icons.highlight_rounded),
-                                label: Text('View ${questions.length} Highlight Questions'),
-                                onPressed: () => _showAllQuestionsSheet(context),
+                        )
+                      : (_webViewController != null
+                          ? ClipRRect(
+                              child: WebViewWidget(
+                                key: ValueKey('highlight-pdfjs-preview-$_previewKey-$_localServerPort'),
+                                controller: _webViewController!,
+                                gestureRecognizers: {
+                                  Factory<EagerGestureRecognizer>(
+                                    EagerGestureRecognizer.new,
+                                  ),
+                                },
                               ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
+                            )
+                          : const SizedBox.shrink()),
             ),
           ],
         ),
