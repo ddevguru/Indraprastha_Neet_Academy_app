@@ -71,6 +71,8 @@ function LoginComponent() {
   const [email, setEmail] = useState<string>("");
   const [signupPassword, setSignupPassword] = useState<string>("");
   const [showSignupPassword, setShowSignupPassword] = useState<boolean>(false);
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const [studyYear, setStudyYear] = useState<string>("Class 12th (NEET 2026)");
   const [signupPhone, setSignupPhone] = useState<string>("");
   const [signupOtp, setSignupOtp] = useState<string>("");
@@ -409,6 +411,10 @@ function LoginComponent() {
       setSignupError("Please create a password with at least 6 characters.");
       return;
     }
+    if (!isGoogleSignup && signupPassword !== confirmPassword) {
+      setSignupError("Passwords do not match. Please verify both password fields.");
+      return;
+    }
 
     setSignupLoading(true);
     try {
@@ -433,6 +439,18 @@ function LoginComponent() {
   const handleSignupStep2Next = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignupError("");
+
+    if (isGoogleSignup) {
+      if (!signupPassword || signupPassword.length < 6) {
+        setSignupError("Please create a password (at least 6 characters) so you can log in with your mobile number.");
+        return;
+      }
+      if (signupPassword !== confirmPassword) {
+        setSignupError("Passwords do not match. Please verify both password fields.");
+        return;
+      }
+    }
+
     const clean = signupPhone.replace(/\D/g, "");
     if (clean.length !== 10) {
       setSignupError("Please enter your 10-digit mobile number for OTP verification.");
@@ -1293,7 +1311,7 @@ function LoginComponent() {
                         </div>
 
                         {/* Password */}
-                        <div style={{ marginBottom: "18px" }}>
+                        <div style={{ marginBottom: "14px" }}>
                           <label
                             htmlFor="reg-password"
                             style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "6px" }}
@@ -1336,6 +1354,56 @@ function LoginComponent() {
                             >
                               {showSignupPassword ? "👁️" : "🙈"}
                             </button>
+                          </div>
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div style={{ marginBottom: "18px" }}>
+                          <label
+                            htmlFor="reg-confirm-password"
+                            style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "6px" }}
+                          >
+                            Confirm Password <span style={{ color: "var(--orange)" }}>*</span>
+                          </label>
+                          <div style={{ position: "relative" }}>
+                            <input
+                              id="reg-confirm-password"
+                              type={showConfirmPassword ? "text" : "password"}
+                              placeholder="Re-enter your password"
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              style={{
+                                width: "100%",
+                                padding: "11px 42px 11px 14px",
+                                borderRadius: "10px",
+                                border: "1px solid var(--border-light)",
+                                backgroundColor: "rgba(0, 0, 0, 0.2)",
+                                color: "var(--text-main)",
+                                fontSize: "14px",
+                                outline: "none",
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              style={{
+                                position: "absolute",
+                                right: "12px",
+                                top: "50%",
+                                transform: "translateY(-50%)",
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: "14px",
+                                color: "var(--text-muted)",
+                              }}
+                              aria-label="Toggle confirm password visibility"
+                            >
+                              {showConfirmPassword ? "👁️" : "🙈"}
+                            </button>
+                          </div>
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px" }}>
+                            🔒 Password will be used to log in across the website and mobile app.
                           </div>
                         </div>
 
@@ -1447,6 +1515,120 @@ function LoginComponent() {
                           </option>
                         </select>
                       </div>
+
+                      {/* Password Collection for Google Sign-Up */}
+                      {isGoogleSignup && (
+                        <div
+                          style={{
+                            marginBottom: "16px",
+                            padding: "14px",
+                            borderRadius: "10px",
+                            background: "rgba(229, 82, 0, 0.06)",
+                            border: "1px solid rgba(229, 82, 0, 0.25)",
+                          }}
+                        >
+                          <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--orange)", marginBottom: "4px" }}>
+                            🔑 Set Account Password
+                          </div>
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "12px", lineHeight: 1.5 }}>
+                            Create a password to access your account seamlessly across both the mobile app and website using your phone number.
+                          </div>
+
+                          {/* Create Password */}
+                          <div style={{ marginBottom: "12px" }}>
+                            <label
+                              htmlFor="google-password"
+                              style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "6px" }}
+                            >
+                              Create Password <span style={{ color: "var(--orange)" }}>*</span>
+                            </label>
+                            <div style={{ position: "relative" }}>
+                              <input
+                                id="google-password"
+                                type={showSignupPassword ? "text" : "password"}
+                                placeholder="Minimum 6 characters"
+                                value={signupPassword}
+                                onChange={(e) => setSignupPassword(e.target.value)}
+                                style={{
+                                  width: "100%",
+                                  padding: "11px 42px 11px 14px",
+                                  borderRadius: "10px",
+                                  border: "1px solid var(--border-light)",
+                                  backgroundColor: "rgba(0, 0, 0, 0.2)",
+                                  color: "var(--text-main)",
+                                  fontSize: "14px",
+                                  outline: "none",
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowSignupPassword(!showSignupPassword)}
+                                style={{
+                                  position: "absolute",
+                                  right: "12px",
+                                  top: "50%",
+                                  transform: "translateY(-50%)",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "14px",
+                                  color: "var(--text-muted)",
+                                }}
+                                aria-label="Toggle password visibility"
+                              >
+                                {showSignupPassword ? "👁️" : "🙈"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Confirm Password */}
+                          <div>
+                            <label
+                              htmlFor="google-confirm-password"
+                              style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "6px" }}
+                            >
+                              Confirm Password <span style={{ color: "var(--orange)" }}>*</span>
+                            </label>
+                            <div style={{ position: "relative" }}>
+                              <input
+                                id="google-confirm-password"
+                                type={showConfirmPassword ? "text" : "password"}
+                                placeholder="Re-enter your password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                style={{
+                                  width: "100%",
+                                  padding: "11px 42px 11px 14px",
+                                  borderRadius: "10px",
+                                  border: "1px solid var(--border-light)",
+                                  backgroundColor: "rgba(0, 0, 0, 0.2)",
+                                  color: "var(--text-main)",
+                                  fontSize: "14px",
+                                  outline: "none",
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                style={{
+                                  position: "absolute",
+                                  right: "12px",
+                                  top: "50%",
+                                  transform: "translateY(-50%)",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: "14px",
+                                  color: "var(--text-muted)",
+                                }}
+                                aria-label="Toggle confirm password visibility"
+                              >
+                                {showConfirmPassword ? "👁️" : "🙈"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Mobile Number for OTP Verification */}
                       <div style={{ marginBottom: "16px" }}>

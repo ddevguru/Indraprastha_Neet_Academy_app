@@ -12,6 +12,26 @@ function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '').slice(-10);
 }
 
+async function resolveBatchIdFromYear(studyYear) {
+  try {
+    let search = 'Class 12';
+    if (studyYear) {
+      if (studyYear.includes('11')) search = 'Class 11';
+      else if (studyYear.includes('Dropper') || studyYear.includes('Repeater')) search = 'Dropper';
+      else if (studyYear.includes('10')) search = 'Foundation';
+    }
+    const res = await pool.query(
+      `SELECT id FROM batches WHERE name ILIKE $1 OR description ILIKE $1 ORDER BY id ASC LIMIT 1`,
+      [`%${search}%`]
+    );
+    if (res.rows.length > 0) return res.rows[0].id;
+    const fallback = await pool.query(`SELECT id FROM batches ORDER BY id ASC LIMIT 1`);
+    return fallback.rows.length > 0 ? fallback.rows[0].id : null;
+  } catch {
+    return null;
+  }
+}
+
 async function issueUserSession(user) {
   const sessionId = crypto.randomUUID();
   await pool.query(
@@ -157,6 +177,174 @@ router.post('/complete-signup', async (req, res) => {
       return res.status(401).json({ error: 'Firebase token expired. Please verify OTP again.' });
     }
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ══════════════════════════════════════════════
+// WEB SIGNUP ADAPTER ROUTES (POSTGRESQL & BCRYPT)
+// ══════════════════════════════════════════════
+
+// Web Signup - Check Identity (Name, Email, Password)
+router.post('/signup/check-identity', async (req, res) => {
+  try {
+    const { fullName, email, password } = req.body;
+    if (!fullName || String(fullName).trim().length < 2) {
+      return res.status(400).json({ success: false, error: 'Please enter your full student name.' });
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(String(email).trim())) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid email address.' });
+    }
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters long.' });
+    }
+    const existingEmail = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [String(email).trim()]);
+    if (existingEmail.rows.length > 0) {
+      return res.status(409).json({ success: false, error: 'An account with this email address already exists. Please log in.' });
+    }
+    return res.json({ success: true, message: 'Identity validated successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// Web Signup - Firebase Complete Signup (Saves password_hash in PostgreSQL)
+router.post('/firebase/complete-signup', async (req, res) => {
+  const {
+    idToken,
+    fullName,
+    email,
+    password,
+    studyYear,
+    phone: rawPhone,
+  } = req.body;
+
+  if (!fullName || String(fullName).trim().length < 2) {
+    return res.status(400).json({ success: false, error: 'Full student name is required.' });
+  }
+  if (!password || String(password).length < 6) {
+    return res.status(400).json({ success: false, error: 'Password must be at least 6 characters.' });
+  }
+
+  try {
+    let phone = normalizePhone(rawPhone);
+    let firebaseUid = null;
+
+    if (idToken) {
+      try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        firebaseUid = decoded.uid;
+        if (decoded.phone_number) {
+          phone = normalizePhone(decoded.phone_number);
+        }
+      } catch (tokenErr) {
+        console.warn('Firebase token verification notice:', tokenErr.message);
+      }
+    }
+
+    if (!phone || phone.length < 10) {
+      return res.status(400).json({ success: false, error: 'Valid 10-digit phone number is required.' });
+    }
+
+    const batchId = await resolveBatchIdFromYear(studyYear);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const existing = await pool.query('SELECT id, is_blocked FROM users WHERE phone = $1', [phone]);
+    let result;
+
+    if (existing.rows.length > 0) {
+      if (existing.rows[0].is_blocked) {
+        return res.status(403).json({ success: false, error: 'Your account has been blocked by the admin.' });
+      }
+      result = await pool.query(
+        `UPDATE users
+         SET full_name = COALESCE($2, full_name),
+             email = COALESCE($3, email),
+             password_hash = $4,
+             batch_id = COALESCE($5, batch_id),
+             firebase_uid = COALESCE($6, firebase_uid),
+             is_profile_complete = TRUE
+         WHERE phone = $1
+         RETURNING *`,
+        [phone, fullName.trim(), email ? String(email).trim().toLowerCase() : null, passwordHash, batchId, firebaseUid]
+      );
+    } else {
+      result = await pool.query(
+        `INSERT INTO users (phone, full_name, email, password_hash, batch_id, firebase_uid, preferred_language, course_category, is_profile_complete)
+         VALUES ($1, $2, $3, $4, $5, $6, 'English', $7, TRUE)
+         RETURNING *`,
+        [phone, fullName.trim(), email ? String(email).trim().toLowerCase() : null, passwordHash, batchId, firebaseUid, studyYear || 'Class 12th (NEET 2026)']
+      );
+    }
+
+    const user = result.rows[0];
+    const { token } = await issueUserSession(user);
+    const { password_hash: _, ...sanitizedUser } = user;
+    return res.status(201).json({ success: true, token, user: sanitizedUser });
+  } catch (err) {
+    console.error('Web firebase/complete-signup error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to complete signup.' });
+  }
+});
+
+// Web Signup - Verify and Complete with OTP (Saves password_hash in PostgreSQL)
+router.post('/signup/verify-and-complete', async (req, res) => {
+  const {
+    fullName,
+    email,
+    password,
+    studyYear,
+    phone: rawPhone,
+  } = req.body;
+
+  if (!fullName || String(fullName).trim().length < 2) {
+    return res.status(400).json({ success: false, error: 'Full student name is required.' });
+  }
+  if (!password || String(password).length < 6) {
+    return res.status(400).json({ success: false, error: 'Password must be at least 6 characters.' });
+  }
+
+  const phone = normalizePhone(rawPhone);
+  if (!phone || phone.length < 10) {
+    return res.status(400).json({ success: false, error: 'Valid 10-digit phone number is required.' });
+  }
+
+  try {
+    const batchId = await resolveBatchIdFromYear(studyYear);
+    const passwordHash = await bcrypt.hash(password, 10);
+    const existing = await pool.query('SELECT id, is_blocked FROM users WHERE phone = $1', [phone]);
+    let result;
+
+    if (existing.rows.length > 0) {
+      if (existing.rows[0].is_blocked) {
+        return res.status(403).json({ success: false, error: 'Your account has been blocked by the admin.' });
+      }
+      result = await pool.query(
+        `UPDATE users
+         SET full_name = COALESCE($2, full_name),
+             email = COALESCE($3, email),
+             password_hash = $4,
+             batch_id = COALESCE($5, batch_id),
+             is_profile_complete = TRUE
+         WHERE phone = $1
+         RETURNING *`,
+        [phone, fullName.trim(), email ? String(email).trim().toLowerCase() : null, passwordHash, batchId]
+      );
+    } else {
+      result = await pool.query(
+        `INSERT INTO users (phone, full_name, email, password_hash, batch_id, preferred_language, course_category, is_profile_complete)
+         VALUES ($1, $2, $3, $4, $5, 'English', $6, TRUE)
+         RETURNING *`,
+        [phone, fullName.trim(), email ? String(email).trim().toLowerCase() : null, passwordHash, batchId, studyYear || 'Class 12th (NEET 2026)']
+      );
+    }
+
+    const user = result.rows[0];
+    const { token } = await issueUserSession(user);
+    const { password_hash: _, ...sanitizedUser } = user;
+    return res.status(201).json({ success: true, token, user: sanitizedUser });
+  } catch (err) {
+    console.error('Web verify-and-complete error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to complete signup.' });
   }
 });
 

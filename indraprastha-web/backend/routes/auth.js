@@ -362,6 +362,9 @@ router.post('/firebase/complete-signup', async (req, res) => {
   if (!fullName || String(fullName).trim().length < 2) {
     return res.status(400).json({ success: false, error: 'Full student name is required' });
   }
+  if (!password || String(password).trim().length < 6) {
+    return res.status(400).json({ success: false, error: 'Password is required and must be at least 6 characters long.' });
+  }
 
   try {
     const decoded = await verifyFirebaseIdToken(idToken);
@@ -383,7 +386,7 @@ router.post('/firebase/complete-signup', async (req, res) => {
       fullName: fullName.trim(),
       email: email ? String(email).trim().toLowerCase() : '',
       phone,
-      password: isGoogleSignup ? null : password,
+      password: password ? String(password).trim() : null,
       studyYear: studyYear || 'Class 12th (NEET 2026)',
       isGoogleUser: Boolean(isGoogleSignup),
       googleId: googleId || decoded.uid || null,
@@ -554,6 +557,13 @@ router.post('/signup/verify-and-complete', async (req, res) => {
       });
     }
 
+    if (!password || String(password).trim().length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password is required and must be at least 6 characters long.',
+      });
+    }
+
     if (!otp || String(otp).trim().length < 4) {
       return res.status(400).json({
         success: false,
@@ -584,7 +594,7 @@ router.post('/signup/verify-and-complete', async (req, res) => {
       fullName: fullName || 'Indraprastha Student',
       email: email || '',
       phone: cleanPhone,
-      password: isGoogleSignup ? null : password,
+      password: password ? String(password).trim() : null,
       studyYear: studyYear || 'Class 12th (NEET 2026)',
       isGoogleUser: Boolean(isGoogleSignup),
       googleId: googleId || null,
