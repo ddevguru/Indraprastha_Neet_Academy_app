@@ -2608,19 +2608,53 @@ class _BooksPageState extends State<BooksPage> {
                                           ),
                                         ] else ...[
                                           // Pick Button when no file selected
-                                          OutlinedButton.icon(
-                                            icon: const Icon(Icons.upload_file_rounded, size: 18, color: Colors.indigo),
-                                            label: Text(
-                                              hasRegularPdf ? 'Replace Regular eBook PDF' : 'Select Regular eBook PDF (Pick PDF)',
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                            ),
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: Colors.indigo,
-                                              side: BorderSide(color: Colors.indigo.shade300),
-                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            ),
-                                            onPressed: _pickRegularPdf,
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: [
+                                              OutlinedButton.icon(
+                                                icon: const Icon(Icons.upload_file_rounded, size: 18, color: Colors.indigo),
+                                                label: Text(
+                                                  hasRegularPdf ? 'Replace Regular eBook PDF' : 'Select Regular eBook PDF (Pick PDF)',
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                ),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: Colors.indigo,
+                                                  side: BorderSide(color: Colors.indigo.shade300),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                ),
+                                                onPressed: _pickRegularPdf,
+                                              ),
+                                              if (hasRegularPdf)
+                                                OutlinedButton.icon(
+                                                  icon: const Icon(Icons.bolt_rounded, size: 18, color: Colors.indigo),
+                                                  label: const Text(
+                                                    '⚡ Re-extract Diagrams & Clean Text',
+                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                  ),
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: Colors.indigo,
+                                                    side: const BorderSide(color: Colors.indigo),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  onPressed: () async {
+                                                    try {
+                                                      _showActionSnackBar(context, 'Re-extracting diagrams and text from PDF...');
+                                                      final res = await widget.api.reExtractChapterPdf(_selectedChapterId!);
+                                                      await _loadChaptersForSelectedBook();
+                                                      if (context.mounted) {
+                                                        _showActionSnackBar(context, 'Extraction complete! Extracted ${res['imagesCount'] ?? 0} diagrams.');
+                                                      }
+                                                    } catch (err) {
+                                                      if (context.mounted) {
+                                                        _showActionSnackBar(context, 'Extraction error: $err', isError: true);
+                                                      }
+                                                    }
+                                                  },
+                                                ),
+                                            ],
                                           ),
                                         ],
                                       ],
