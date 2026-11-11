@@ -2818,19 +2818,53 @@ class _BooksPageState extends State<BooksPage> {
                                           ),
                                         ] else ...[
                                           // Pick Button when no file selected
-                                          OutlinedButton.icon(
-                                            icon: const Icon(Icons.upload_file_rounded, size: 18, color: Colors.amber),
-                                            label: Text(
-                                              hasHighlightPdf ? 'Replace Highlighted eBook PDF' : 'Select Highlighted eBook PDF (Pick PDF)',
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                            ),
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: Colors.amber.shade700,
-                                              side: BorderSide(color: Colors.amber.shade400),
-                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            ),
-                                            onPressed: _pickHighlightPdf,
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: [
+                                              OutlinedButton.icon(
+                                                icon: const Icon(Icons.upload_file_rounded, size: 18, color: Colors.amber),
+                                                label: Text(
+                                                  hasHighlightPdf ? 'Replace Highlighted eBook PDF' : 'Select Highlighted eBook PDF (Pick PDF)',
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                ),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: Colors.amber.shade700,
+                                                  side: BorderSide(color: Colors.amber.shade400),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                ),
+                                                onPressed: _pickHighlightPdf,
+                                              ),
+                                              if (hasHighlightPdf)
+                                                OutlinedButton.icon(
+                                                  icon: const Icon(Icons.bolt_rounded, size: 18, color: Colors.indigo),
+                                                  label: const Text(
+                                                    '⚡ Re-extract Diagrams & Clean Text',
+                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                  ),
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: Colors.indigo,
+                                                    side: const BorderSide(color: Colors.indigo),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                  ),
+                                                  onPressed: () async {
+                                                    try {
+                                                      _showActionSnackBar(context, 'Re-extracting diagrams and text from PDF...');
+                                                      final res = await widget.api.reExtractChapterPdf(_selectedChapterId!);
+                                                      await _loadChaptersForSelectedBook();
+                                                      if (context.mounted) {
+                                                        _showActionSnackBar(context, 'Extraction complete! Extracted ${res['imagesCount'] ?? 0} diagrams.');
+                                                      }
+                                                    } catch (err) {
+                                                      if (context.mounted) {
+                                                        _showActionSnackBar(context, 'Extraction error: $err', isError: true);
+                                                      }
+                                                    }
+                                                  },
+                                                ),
+                                            ],
                                           ),
                                         ],
                                       ],
@@ -13542,6 +13576,9 @@ class AdminApi {
 
   Future<Map<String, dynamic>> autoMatchPyqs(int chapterId) async =>
       await _postMap('/admin/chapters/$chapterId/auto-link-pyqs', {});
+
+  Future<Map<String, dynamic>> reExtractChapterPdf(int chapterId) async =>
+      await _postMap('/admin/chapters/$chapterId/re-extract-pdf', {});
 
   Future<Map<String, dynamic>> updateChapterNotesText({
     required int chapterId,

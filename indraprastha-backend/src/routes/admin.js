@@ -209,13 +209,92 @@ function hierarchyFromBody(body = {}) {
   };
 }
 
-async function extractPdfBasics(fileBuffer, fileName = 'document.pdf') {
+function extractImagesFromPdf(pdfBuffer) {
+  const str = pdfBuffer.toString('latin1');
+  const images = [];
+  const regex = /<<([^>]*\/Subtype\s*\/Image[^>]*)>>\s*stream\r?\n/g;
+  let match;
+
+  while ((match = regex.exec(str)) !== null) {
+    const dict = match[1];
+    const streamStart = match.index + match[0].length;
+
+    const lenMatch = dict.match(/\/Length\s+(\d+)/);
+    const widthMatch = dict.match(/\/Width\s+(\d+)/);
+    const heightMatch = dict.match(/\/Height\s+(\d+)/);
+    const filterMatch = dict.match(/\/Filter\s*\/([A-Za-z0-9]+)/);
+
+    const width = widthMatch ? parseInt(widthMatch[1], 10) : 0;
+    const height = heightMatch ? parseInt(heightMatch[1], 10) : 0;
+    const filter = filterMatch ? filterMatch[1] : '';
+
+    // Ignore tiny icons / masks (< 60px)
+    if (width < 60 || height < 60) continue;
+
+    let length = lenMatch ? parseInt(lenMatch[1], 10) : 0;
+    if (!length) {
+      const endStreamIdx = str.indexOf('endstream', streamStart);
+      if (endStreamIdx !== -1) {
+        length = endStreamIdx - streamStart;
+      }
+    }
+
+    if (length <= 0) continue;
+
+    const rawData = pdfBuffer.subarray(streamStart, streamStart + length);
+
+    if (filter === 'DCTDecode' || filter === 'JBIG2Decode') {
+      images.push({
+        type: 'jpg',
+        mimeType: 'image/jpeg',
+        width,
+        height,
+        buffer: rawData,
+      });
+    }
+  }
+
+  return images;
+}
+
+function cleanPdfText(rawText) {
+  if (!rawText) return '';
+  const lines = rawText
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\u0000/g, '')
+    .split('\n');
+
+  const cleanedLines = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) {
+      cleanedLines.push('');
+      continue;
+    }
+
+    // Filter out standalone page numbers (e.g. "37", "38", "120")
+    if (/^\d{1,4}$/.test(line)) continue;
+
+    // Filter out standalone chapter numbers (e.g. "CHAPTER 4", "Chapter 6", "Unit 1")
+    if (/^(chapter|unit)\s+\d+$/i.test(line)) continue;
+
+    // Filter out reprint footers (e.g. "Reprint 2025-26")
+    if (/^reprint\s*\d{4}-\d{2}$/i.test(line)) continue;
+
+    // Filter out standard textbook headers when alone on a line
+    if (/^(biology|physics|chemistry)$/i.test(line)) continue;
+
+    cleanedLines.push(line);
+  }
+
+  return cleanedLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+async function extractPdfBasics(fileBuffer, fileName = 'document.pdf', chapterId = null, folderId = null) {
   try {
     const parsed = await pdfParse(Buffer.from(fileBuffer));
-    let rawText = (parsed.text || '')
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      .replace(/\u0000/g, '');
+    let rawText = (parsed.text || '');
 
     // For scanned/image PDFs, pdf-parse often returns little/no text.
     // Fallback to Drive OCR extraction.
@@ -233,23 +312,70 @@ async function extractPdfBasics(fileBuffer, fileName = 'document.pdf') {
       return {
         noteSummary: '',
         highlight: '',
+        imagesCount: 0,
       };
     }
-    // Keep extraction as-is so student app can render original PDF text flow.
-    const noteSummary = rawText.slice(0, 120000).trim();
-    const firstSentence = rawText
+
+    // Clean text: strip page numbers, chapter numbers, footers
+    let cleanedText = cleanPdfText(rawText);
+
+    // Extract embedded images from the PDF
+    const images = extractImagesFromPdf(Buffer.from(fileBuffer));
+    let imagesCount = 0;
+
+    if (chapterId && images.length > 0) {
+      try {
+        await pool.query('DELETE FROM chapter_images WHERE chapter_id = $1', [chapterId]);
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+          await pool.query(
+            `INSERT INTO chapter_images (chapter_id, image_index, figure_label, mime_type, image_data)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [chapterId, i + 1, `Figure ${i + 1}`, img.mimeType, img.buffer]
+          );
+        }
+        imagesCount = images.length;
+
+        // In cleanedText, find figure captions and insert [IMAGE: ...] tags
+        const lines = cleanedText.split('\n');
+        const newLines = [];
+        let imgIdx = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const trimmed = line.trim();
+
+          // Check if this line is a Figure caption (e.g. "Figure 4.1 ...", "Fig. 4.2 ...")
+          if (/^(figure|fig\.)\s*\d+/i.test(trimmed) && imgIdx < images.length) {
+            imgIdx++;
+            newLines.push(`[IMAGE: /content/chapters/${chapterId}/images/${imgIdx} | Caption: ${trimmed}]`);
+            newLines.push(line);
+          } else {
+            newLines.push(line);
+          }
+        }
+        cleanedText = newLines.join('\n');
+      } catch (imgErr) {
+        console.warn('Error storing chapter images:', imgErr.message);
+      }
+    }
+
+    const noteSummary = cleanedText.slice(0, 150000).trim();
+    const firstSentence = cleanedText
       .replace(/\n+/g, ' ')
       .split(/[.?!]/)
-      .find((s) => s.trim().length > 20) || rawText;
+      .find((s) => s.trim().length > 20) || cleanedText;
     const highlight = firstSentence.trim().slice(0, 220);
     return {
       noteSummary,
       highlight,
+      imagesCount,
     };
   } catch (_) {
     return {
       noteSummary: '',
       highlight: '',
+      imagesCount: 0,
     };
   }
 }
@@ -1300,9 +1426,9 @@ router.post(
         folderId: resolvedFolderId,
       });
 
-      let extracted = { noteSummary: '', highlight: '' };
+      let extracted = { noteSummary: '', highlight: '', imagesCount: 0 };
       try {
-        extracted = await extractPdfBasics(req.file.buffer, req.file.originalname);
+        extracted = await extractPdfBasics(req.file.buffer, req.file.originalname, chapterId, resolvedFolderId);
       } catch (exErr) {
         console.warn('PDF text extraction notice:', exErr.message);
       }
@@ -1381,9 +1507,9 @@ router.post(
         folderId: resolvedFolderId,
       });
 
-      let extracted = { noteSummary: '', highlight: '' };
+      let extracted = { noteSummary: '', highlight: '', imagesCount: 0 };
       try {
-        extracted = await extractPdfBasics(req.file.buffer, req.file.originalname);
+        extracted = await extractPdfBasics(req.file.buffer, req.file.originalname, chapterId, resolvedFolderId);
       } catch (exErr) {
         console.warn('PDF text extraction notice:', exErr.message);
       }
@@ -1413,6 +1539,7 @@ router.post(
         chapter: mapChapterLinks(updated.rows[0]),
         drive: uploaded,
         extractedTextLength: (extracted.noteSummary || '').length,
+        imagesCount: extracted.imagesCount || 0,
       });
     } catch (error) {
       logAdminRouteError('/chapters/:chapterId/regular-pdf', error, { chapterId: req.params?.chapterId });
@@ -1420,6 +1547,57 @@ router.post(
     }
   }
 );
+
+// Re-extract diagrams and clean text from uploaded chapter PDF
+router.post('/chapters/:chapterId/re-extract-pdf', adminAuth, async (req, res) => {
+  try {
+    const chapterId = parseInt(req.params.chapterId, 10);
+    const chapterRes = await pool.query(
+      'SELECT id, title, highlight_drive_file_id, material_drive_file_id, highlight_drive_link, material_drive_link, highlight_drive_folder_id FROM book_chapters WHERE id = $1',
+      [chapterId]
+    );
+    if (chapterRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Chapter not found' });
+    }
+
+    const ch = chapterRes.rows[0];
+    const fileId =
+      ch.highlight_drive_file_id ||
+      ch.material_drive_file_id ||
+      extractDriveFileId(ch.highlight_drive_link) ||
+      extractDriveFileId(ch.material_drive_link);
+
+    if (!fileId) {
+      return res.status(400).json({ error: 'No PDF file on Drive for this chapter' });
+    }
+
+    const buffer = await downloadDriveFileBuffer({ fileId });
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'Failed to download PDF from Drive' });
+    }
+
+    const extracted = await extractPdfBasics(
+      buffer,
+      `${ch.title || 'Chapter'}.pdf`,
+      chapterId,
+      ch.highlight_drive_folder_id
+    );
+
+    await pool.query(
+      'UPDATE book_chapters SET note_summary = $1 WHERE id = $2',
+      [extracted.noteSummary, chapterId]
+    );
+
+    return res.json({
+      success: true,
+      chapterId,
+      imagesCount: extracted.imagesCount || 0,
+      noteSummaryLength: (extracted.noteSummary || '').length,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Re-extraction failed' });
+  }
+});
 
 // Auto-match PYQs to chapter text
 router.post('/chapters/:chapterId/auto-link-pyqs', adminAuth, async (req, res) => {

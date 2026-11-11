@@ -26,7 +26,10 @@ String? extractDriveFileId(String raw) {
   return id;
 }
 
-bool isApiImageUrl(String raw) => raw.trim().contains('/content/images/');
+bool isApiImageUrl(String raw) {
+  final v = raw.trim();
+  return v.contains('/content/images/') || v.contains('/content/chapters/');
+}
 
 String buildApiImageUrl(String fileId, {int thumbWidth = 900}) {
   final w = thumbWidth.clamp(200, 1600);
@@ -46,6 +49,9 @@ String buildDriveViewUrl(String fileId) =>
 String resolveDriveImageUrl(String raw, {int thumbWidth = 900}) {
   final value = raw.trim();
   if (value.isEmpty) return value;
+  if (value.startsWith('/')) {
+    return '$baseUrl$value';
+  }
   final id = extractDriveFileId(value);
   if (id != null && id.isNotEmpty) {
     return buildApiImageUrl(id, thumbWidth: thumbWidth);

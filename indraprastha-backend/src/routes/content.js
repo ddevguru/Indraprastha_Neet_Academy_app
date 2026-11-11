@@ -243,6 +243,31 @@ async function ensureChapterExtracted(chapter) {
   }
 }
 
+router.get('/chapters/:chapterId/images/:imageIndex', async (req, res) => {
+  try {
+    const chapterId = parseInt(req.params.chapterId, 10);
+    const imageIndex = parseInt(req.params.imageIndex, 10) || 1;
+    if (!chapterId) {
+      return res.status(400).send('Invalid chapter id');
+    }
+
+    const result = await pool.query(
+      'SELECT image_data, mime_type FROM chapter_images WHERE chapter_id = $1 AND image_index = $2 LIMIT 1',
+      [chapterId, imageIndex]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].image_data) {
+      return res.status(404).send('Chapter diagram not found');
+    }
+
+    res.setHeader('Content-Type', result.rows[0].mime_type || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.send(result.rows[0].image_data);
+  } catch (err) {
+    return res.status(500).send('Failed to serve chapter image');
+  }
+});
+
 router.get('/images/:fileId', userAuth, async (req, res) => {
   try {
     const fileId =

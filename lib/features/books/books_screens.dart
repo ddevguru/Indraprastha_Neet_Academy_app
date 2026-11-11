@@ -25,6 +25,24 @@ import '../../widgets/ai_similar_questions_dialog.dart';
 import '../../widgets/fast_network_image.dart';
 import '../../core/utils/drive_image_url.dart';
 import '../../core/utils/question_fields.dart';
+import '../../core/constants/api_constants.dart';
+
+String cleanChapterTitle(String? rawTitle, [String? topic]) {
+  final t = (topic ?? '').trim();
+  final r = (rawTitle ?? '').trim();
+  if (t.isNotEmpty && !RegExp(r'^(Chapter|Unit)\s*\d+$', caseSensitive: false).hasMatch(t)) {
+    var cleanedTopic = t.replaceFirst(RegExp(r'^(Chapter|Unit)\s*\d+\s*[:\-•]?\s*', caseSensitive: false), '').trim();
+    cleanedTopic = cleanedTopic.replaceFirst(RegExp(r'^\d+[\.:\-•]\s*'), '').trim();
+    if (cleanedTopic.isNotEmpty) return cleanedTopic;
+    return t;
+  }
+  var cleaned = r.replaceFirst(RegExp(r'^(Chapter|Unit)\s*\d+\s*[:\-•]?\s*', caseSensitive: false), '').trim();
+  cleaned = cleaned.replaceFirst(RegExp(r'^\d+[\.:\-•]\s*'), '').trim();
+  if (cleaned.isNotEmpty && !RegExp(r'^\d+$').hasMatch(cleaned)) {
+    return cleaned;
+  }
+  return t.isNotEmpty ? t : (cleaned.isNotEmpty ? cleaned : r);
+}
 
 Widget _buildQuestionImage(String rawUrl) {
   return FastNetworkImage(
@@ -222,9 +240,12 @@ class _BooksScreenState extends ConsumerState<BooksScreen> {
                                           : Icons.bookmark_rounded,
                                       color: locked ? AppColors.gold : null,
                                     ),
-                                    title: Text(book['title']?.toString() ?? ''),
+                                    title: Text(cleanChapterTitle(book['title']?.toString(), book['topic']?.toString())),
                                     subtitle: Text(
-                                      '${book['subject'] ?? ''} • ${book['topic'] ?? ''}',
+                                      [
+                                        if ((book['standard']?.toString() ?? '').isNotEmpty) book['standard'].toString(),
+                                        if ((book['subject']?.toString() ?? '').isNotEmpty) book['subject'].toString(),
+                                      ].join(' • '),
                                     ),
                                     trailing: buildContentTrailing(locked: locked),
                                     onTap: () => ContentAccess.handleTap(
@@ -366,8 +387,13 @@ class _SubjectBooksSectionState extends State<_SubjectBooksSection> {
                               : Icons.auto_stories_rounded,
                           color: locked ? AppColors.gold : null,
                         ),
-                        title: Text(book['title']?.toString() ?? ''),
-                        subtitle: Text(book['topic']?.toString() ?? ''),
+                        title: Text(cleanChapterTitle(book['title']?.toString(), book['topic']?.toString())),
+                        subtitle: Text(
+                          [
+                            if ((book['standard']?.toString() ?? '').isNotEmpty) book['standard'].toString(),
+                            if ((book['subject']?.toString() ?? '').isNotEmpty) book['subject'].toString(),
+                          ].join(' • '),
+                        ),
                         trailing: buildContentTrailing(locked: locked),
                         onTap: () => widget.onBookTap(book, locked),
                       );
@@ -423,7 +449,7 @@ class ChapterDetailScreen extends ConsumerWidget {
           length: 2,
           child: Scaffold(
             appBar: AppBar(
-              title: Text(chapter['title']?.toString() ?? 'Chapter'),
+              title: Text(cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString())),
               actions: [
                 IconButton(
                   onPressed: () => ref
@@ -453,7 +479,7 @@ class ChapterDetailScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        chapter['title']?.toString() ?? '',
+                        cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString()),
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       if ((chapter['overview']?.toString() ?? '').isNotEmpty) ...[
@@ -474,7 +500,7 @@ class ChapterDetailScreen extends ConsumerWidget {
                                 MaterialPageRoute(
                                   builder: (_) => PracticeAttemptScreen(
                                     setId: 0,
-                                    chapterName: chapter['title']?.toString() ?? 'Chapter PYQs',
+                                    chapterName: cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString()),
                                     chapterQuestions: pyqs,
                                   ),
                                 ),
@@ -1464,7 +1490,7 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
   @override
   Widget build(BuildContext context) {
     final questions = widget.highlightQuestions;
-    final chapterTitle = widget.chapter['title']?.toString() ?? 'Chapter eBook';
+    final chapterTitle = cleanChapterTitle(widget.chapter['title']?.toString(), widget.chapter['topic']?.toString());
     final noteSummary = _normalizeExtractedText(widget.chapter['note_summary']?.toString() ?? '');
 
     return SizedBox.expand(
@@ -1492,12 +1518,21 @@ enum _ReaderBlockType {
   callout,
   bullet,
   paragraph,
+  image,
+  figureCaption,
 }
 
 class _ReaderBlock {
-  const _ReaderBlock({required this.type, required this.text});
+  const _ReaderBlock({
+    required this.type,
+    required this.text,
+    this.imageUrl,
+    this.caption,
+  });
   final _ReaderBlockType type;
   final String text;
+  final String? imageUrl;
+  final String? caption;
 }
 
 class InteractiveHighlightReader extends StatefulWidget {
@@ -1529,23 +1564,43 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     final trimmed = line.trim();
     if (trimmed.isEmpty) return false;
     if (trimmed.startsWith('#')) return true;
-    if (RegExp(r'^(Chapter|Unit|Section|Topic)\s+\d+', caseSensitive: false).hasMatch(trimmed)) return true;
+    if (trimmed.startsWith('[IMAGE:')) return true;
+    if (RegExp(r'^(Figure|Fig\.)\s*\d+', caseSensitive: false).hasMatch(trimmed)) return true;
+    if (RegExp(r'^(Section|Topic)\s+\d+', caseSensitive: false).hasMatch(trimmed)) return true;
     if (RegExp(r'^\d+(\.\d+){1,2}\s+[A-Za-z]').hasMatch(trimmed)) return true;
     if (RegExp(r'^(NOTE|IMPORTANT|KEY CONCEPT|DEFINITION|FORMULA|TIP|REMEMBER|SUMMARY|POINTS TO PONDER|NCERT HIGHLIGHT)[\s:]', caseSensitive: false).hasMatch(trimmed)) return true;
     if (trimmed.startsWith('•') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) return true;
     if (RegExp(r'^\([a-z0-9]\)\s+').hasMatch(trimmed)) return true;
     if (trimmed.length >= 3 && trimmed.length <= 70 && !trimmed.endsWith('.') && RegExp(r'^[A-Z0-9\s:,\-\–\(\)]+$').hasMatch(trimmed) && trimmed.contains(RegExp(r'[A-Z]'))) {
-      return true;
+      if (!RegExp(r'^(Chapter|Unit)\s*\d+$', caseSensitive: false).hasMatch(trimmed)) {
+        return true;
+      }
     }
     if (trimmed.length <= 50 && !trimmed.endsWith('.') && !trimmed.endsWith(',') && !trimmed.contains(';') && RegExp(r'^[A-Z][a-zA-Z0-9\s\-\–:]+$').hasMatch(trimmed)) {
       final words = trimmed.split(RegExp(r'\s+'));
-      if (words.length <= 6) return true;
+      if (words.length <= 6 && !RegExp(r'^(Chapter|Unit)\s*\d+$', caseSensitive: false).hasMatch(trimmed)) {
+        return true;
+      }
     }
     return false;
   }
 
   _ReaderBlock _classifyBlock(String text) {
     final t = text.trim();
+    if (t.startsWith('[IMAGE:')) {
+      final match = RegExp(r'^\[IMAGE:\s*([^|\]]+)(?:\s*\|\s*Caption:\s*([^\]]*))?\]', caseSensitive: false).firstMatch(t);
+      final url = match?.group(1)?.trim() ?? '';
+      final cap = match?.group(2)?.trim() ?? '';
+      return _ReaderBlock(
+        type: _ReaderBlockType.image,
+        text: cap.isNotEmpty ? cap : 'Figure Diagram',
+        imageUrl: url,
+        caption: cap,
+      );
+    }
+    if (RegExp(r'^(Figure|Fig\.)\s*\d+', caseSensitive: false).hasMatch(t)) {
+      return _ReaderBlock(type: _ReaderBlockType.figureCaption, text: t);
+    }
     if (t.startsWith('### ')) {
       return _ReaderBlock(type: _ReaderBlockType.h3, text: t.substring(4).trim());
     }
@@ -1564,7 +1619,7 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     if (RegExp(r'^\([a-z0-9]\)\s+').hasMatch(t)) {
       return _ReaderBlock(type: _ReaderBlockType.bullet, text: t);
     }
-    if (RegExp(r'^(Chapter|Unit|Section|Topic)\s+\d+', caseSensitive: false).hasMatch(t)) {
+    if (RegExp(r'^(Section|Topic)\s+\d+', caseSensitive: false).hasMatch(t)) {
       return _ReaderBlock(type: _ReaderBlockType.h1, text: t);
     }
     if (RegExp(r'^\d+\.\d+\.\d+\s+').hasMatch(t)) {
@@ -1574,11 +1629,13 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
       return _ReaderBlock(type: _ReaderBlockType.h2, text: t);
     }
     if (t.length >= 3 && t.length <= 70 && !t.endsWith('.') && RegExp(r'^[A-Z0-9\s:,\-\–\(\)]+$').hasMatch(t) && t.contains(RegExp(r'[A-Z]'))) {
-      return _ReaderBlock(type: _ReaderBlockType.h1, text: t);
+      if (!RegExp(r'^(Chapter|Unit)\s*\d+$', caseSensitive: false).hasMatch(t)) {
+        return _ReaderBlock(type: _ReaderBlockType.h1, text: t);
+      }
     }
     if (t.length <= 50 && !t.endsWith('.') && !t.endsWith(',') && !t.contains(';') && RegExp(r'^[A-Z][a-zA-Z0-9\s\-\–:]+$').hasMatch(t)) {
       final words = t.split(RegExp(r'\s+'));
-      if (words.length <= 6) {
+      if (words.length <= 6 && !RegExp(r'^(Chapter|Unit)\s*\d+$', caseSensitive: false).hasMatch(t)) {
         return _ReaderBlock(type: _ReaderBlockType.h2, text: t);
       }
     }
@@ -1608,10 +1665,52 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
         continue;
       }
 
+      // Filter out standalone chapter numbers (e.g. "CHAPTER 4", "Chapter 6", "Unit 2")
+      if (RegExp(r'^(chapter|unit)\s+\d+$', caseSensitive: false).hasMatch(line)) {
+        continue;
+      }
+
+      // Filter out standalone page numbers (e.g. "37", "38", "124")
+      if (RegExp(r'^\d{1,4}$').hasMatch(line)) {
+        continue;
+      }
+
+      // Filter out reprint footers (e.g. "Reprint 2025-26")
+      if (RegExp(r'^reprint\s*\d{4}-\d{2}$', caseSensitive: false).hasMatch(line)) {
+        continue;
+      }
+
+      // Filter out standalone subject headers (e.g. "BIOLOGY", "PHYSICS", "CHEMISTRY")
+      if (RegExp(r'^(biology|physics|chemistry)$', caseSensitive: false).hasMatch(line)) {
+        continue;
+      }
+
+      // Handle standalone image tag
+      if (line.startsWith('[IMAGE:')) {
+        flushParagraph();
+        blocks.add(_classifyBlock(line));
+        continue;
+      }
+
+      // Handle orphaned sub-labels like "(a)", "(b)", "(c)", "(d)"
+      if (RegExp(r'^\([a-d]\)$', caseSensitive: false).hasMatch(line)) {
+        continue;
+      }
+
       if (_isBlockHeadingOrSpecial(line)) {
         flushParagraph();
         blocks.add(_classifyBlock(line));
       } else {
+        if (buffer.isNotEmpty) {
+          buffer.write(' ');
+        }
+        buffer.write(line);
+      }
+    }
+    flushParagraph();
+
+    return blocks;
+  }
         if (buffer.isNotEmpty) {
           buffer.write(' ');
         }
@@ -1856,6 +1955,122 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     );
   }
 
+  Widget _buildImageBlock(BuildContext context, _ReaderBlock block, bool isDark) {
+    var rawUrl = block.imageUrl?.trim() ?? '';
+    if (rawUrl.isEmpty) return const SizedBox.shrink();
+    if (rawUrl.startsWith('/')) {
+      rawUrl = '$baseUrl$rawUrl';
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2D) : Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E3E) : AppColors.border,
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+            child: InteractiveViewer(
+              minScale: 1.0,
+              maxScale: 3.5,
+              child: FastNetworkImage(
+                url: rawUrl,
+                width: double.infinity,
+                height: 260,
+                fit: BoxFit.contain,
+                thumbWidth: 1200,
+              ),
+            ),
+          ),
+          if ((block.caption ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF282012) : AppColors.primarySoft,
+                borderRadius: BorderRadius.circular(AppRadii.xs),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.image_outlined, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      block.caption!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFFFFA055) : AppColors.primaryDark,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFigureCaptionBlock(BuildContext context, String text, bool isDark) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4, bottom: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: 8),
+            child: Icon(
+              Icons.collections_bookmark_rounded,
+              size: 16,
+              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: _fontSize - 1.5,
+                fontWeight: FontWeight.w600,
+                fontStyle: FontStyle.italic,
+                height: 1.5,
+                color: isDark ? const Color(0xFFBAE6FD) : const Color(0xFF0369A1),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBlockWidget(BuildContext context, _ReaderBlock block, bool isDark) {
     switch (block.type) {
       case _ReaderBlockType.h1:
@@ -1870,6 +2085,10 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
         return _buildBulletBlock(context, block.text, isDark);
       case _ReaderBlockType.paragraph:
         return _buildParagraphBlock(context, block.text, isDark);
+      case _ReaderBlockType.image:
+        return _buildImageBlock(context, block, isDark);
+      case _ReaderBlockType.figureCaption:
+        return _buildFigureCaptionBlock(context, block.text, isDark);
     }
   }
 
@@ -2045,7 +2264,7 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
 
                       // Chapter Title Banner
                       Text(
-                        widget.chapterTitle,
+                        cleanChapterTitle(widget.chapterTitle),
                         style: TextStyle(
                           fontSize: _fontSize + 4,
                           fontWeight: FontWeight.w800,

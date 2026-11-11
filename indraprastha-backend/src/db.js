@@ -241,6 +241,18 @@ async function ensureDatabaseSchema() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_highlight_questions_chapter_id ON chapter_highlight_questions(chapter_id);
+
+    CREATE TABLE IF NOT EXISTS chapter_images (
+      id SERIAL PRIMARY KEY,
+      chapter_id INTEGER NOT NULL REFERENCES book_chapters(id) ON DELETE CASCADE,
+      image_index INTEGER NOT NULL,
+      figure_label TEXT,
+      mime_type TEXT DEFAULT 'image/jpeg',
+      image_data BYTEA,
+      drive_file_id TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_chapter_images_ch_idx ON chapter_images(chapter_id, image_index);
   `);
 
   await pool.query(`
