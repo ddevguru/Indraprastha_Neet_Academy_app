@@ -1711,16 +1711,6 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
 
     return blocks;
   }
-        if (buffer.isNotEmpty) {
-          buffer.write(' ');
-        }
-        buffer.write(line);
-      }
-    }
-    flushParagraph();
-
-    return blocks;
-  }
 
   Widget _buildH1Block(BuildContext context, String text, bool isDark) {
     return Container(

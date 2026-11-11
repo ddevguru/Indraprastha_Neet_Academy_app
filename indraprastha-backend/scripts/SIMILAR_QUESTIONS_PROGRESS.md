@@ -128,6 +128,24 @@ Correct: C
 19. **Test 114:** Aromatic Compounds (45 Qs)
 20. **Test 147–152:** Practice Papers & Full Syllabus Tests (180 Qs each)
 
+## 4. Biology Practice Sets Status (Topic-wise MCQs)
+
+| Set ID | Chapter Name | Class | Total Questions | Completed & Live | Status |
+| :---: | :--- | :---: | :---: | :---: | :---: |
+| **31** | **Diversity of Living Organisms** | Class 11 | 9 | 9 | **100% COMPLETE & LIVE** |
+| **32** | **Biological Classification** | Class 11 | 151 | 151 | **100% COMPLETE & LIVE** |
+| **45** | **Breathing & Exchange of Gases** | Class 11 | 2 | 2 | **100% COMPLETE & LIVE** |
+| **47** | **Excretory Products & Elimination** | Class 11 | 15 | 15 | **100% COMPLETE & LIVE** |
+| **48** | **Locomotion & Movement** | Class 11 | 11 | 11 | **100% COMPLETE & LIVE** |
+| **50** | **Chemical Coordination & Integration** | Class 11 | 2 | 2 | **100% COMPLETE & LIVE** |
+| **81** | **Reproduction In Organisms** | Class 12 | 1 | 1 | **100% COMPLETE & LIVE** |
+| **83** | **Human Reproduction** | Class 12 | 12 | 12 | **100% COMPLETE & LIVE** |
+| **84** | **Reproductive Health** | Class 12 | 15 | 15 | **100% COMPLETE & LIVE** |
+| **92** | **Biotechnology & its Applications** | Class 12 | 13 | 13 | **100% COMPLETE & LIVE** |
+| **94** | **Ecosystem** | Class 12 | 10 | 10 | **100% COMPLETE & LIVE** |
+
+**BIOLOGY PRACTICE COMPLETED TOTAL: 241 / 241 (100% COMPLETE & LIVE)**
+
 ---
 
 ## 5. Technical Credentials & Script Infrastructure

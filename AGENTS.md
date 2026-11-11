@@ -151,6 +151,7 @@
 | Set ID | Chapter Name | Class | Total Questions | Completed & Live | Status |
 | :---: | :--- | :---: | :---: | :---: | :---: |
 | **31** | **Diversity of Living Organisms** | Class 11 | 9 | 9 | **100% COMPLETE** |
+| **32** | **Biological Classification** | Class 11 | 151 | 151 | **100% COMPLETE** |
 | **45** | **Breathing & Exchange of Gases** | Class 11 | 2 | 2 | **100% COMPLETE** |
 | **47** | **Excretory Products & Elimination** | Class 11 | 15 | 15 | **100% COMPLETE** |
 | **48** | **Locomotion & Movement** | Class 11 | 11 | 11 | **100% COMPLETE** |
@@ -161,7 +162,7 @@
 | **92** | **Biotechnology & its Applications** | Class 12 | 13 | 13 | **100% COMPLETE** |
 | **94** | **Ecosystem** | Class 12 | 10 | 10 | **100% COMPLETE** |
 
-**ALL SHORT BIOLOGY PRACTICE CHAPTERS COMPLETED: 90 / 90 (100% COMPLETE & LIVE)**
+**BIOLOGY PRACTICE CHAPTERS COMPLETED: 241 / 241 (100% COMPLETE & LIVE)**
 
 ### G. Class 12 Biology PYQs (Chapter-wise PYQs Section):
 | Chapter ID | Book Title | Chapter Label | Total PYQs in PDF | Added Live | Status |
@@ -200,7 +201,6 @@
 
 ## 5. Next In Queue When Resuming
 - **Class 11 Biology Remaining Chapters:**
-  - Set 32: Biological Classification (151 Qs)
   - Set 33: Plant Kingdom (140 Qs)
   - Set 38: Biomolecules (152 Qs)
   - Set 39: Cell Cycle & Cell Division (125 Qs)
