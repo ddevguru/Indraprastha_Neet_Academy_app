@@ -1994,7 +1994,7 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF282012) : AppColors.primarySoft,
-                borderRadius: BorderRadius.circular(AppRadii.xs),
+                borderRadius: BorderRadius.circular(AppRadii.sm),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
