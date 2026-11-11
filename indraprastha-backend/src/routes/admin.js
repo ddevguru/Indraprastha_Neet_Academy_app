@@ -1326,22 +1326,11 @@ router.post(
         ]
       );
 
-      let autoMatchedCount = 0;
-      if (extracted.noteSummary && extracted.noteSummary.length > 50) {
-        try {
-          const autoMatched = await autoMatchPyqsToChapterText(chapterId, extracted.noteSummary);
-          autoMatchedCount = autoMatched.length;
-        } catch (mErr) {
-          console.warn('Auto match PYQs notice:', mErr.message);
-        }
-      }
-
       return res.json({
         success: true,
         chapter: mapChapterLinks(updated.rows[0]),
         drive: uploaded,
         extractedTextLength: (extracted.noteSummary || '').length,
-        autoMatchedCount,
       });
     } catch (error) {
       logAdminRouteError('/chapters/:chapterId/highlight-pdf', error, { chapterId: req.params?.chapterId });
@@ -1419,22 +1408,11 @@ router.post(
         ]
       );
 
-      let autoMatchedCount = 0;
-      if (extracted.noteSummary && extracted.noteSummary.length > 50) {
-        try {
-          const autoMatched = await autoMatchPyqsToChapterText(chapterId, extracted.noteSummary);
-          autoMatchedCount = autoMatched.length;
-        } catch (mErr) {
-          console.warn('Auto match PYQs notice:', mErr.message);
-        }
-      }
-
       return res.json({
         success: true,
         chapter: mapChapterLinks(updated.rows[0]),
         drive: uploaded,
         extractedTextLength: (extracted.noteSummary || '').length,
-        autoMatchedCount,
       });
     } catch (error) {
       logAdminRouteError('/chapters/:chapterId/regular-pdf', error, { chapterId: req.params?.chapterId });

@@ -1582,7 +1582,6 @@ class _BooksPageState extends State<BooksPage> {
   String? _pickedHighlightFileName;
   int? _pickedHighlightFileSize;
   bool _uploadingHighlightPdf = false;
-  bool _autoMatchingPyqs = false;
 
   // Chapter Highlight Questions (Interactive Tap & Solve)
   final _hlText = TextEditingController();
@@ -1610,6 +1609,121 @@ class _BooksPageState extends State<BooksPage> {
       _hlExplanation.clear();
       _hlCorrect = 'A';
     });
+  }
+
+  void _showSentencePickerSheet(BuildContext context, String text) {
+    final cleanText = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final rawParts = cleanText.split('\n');
+    final sentences = <String>[];
+    for (final part in rawParts) {
+      final pTrim = part.trim();
+      if (pTrim.isEmpty) continue;
+      final subSentences = pTrim.split(RegExp(r'(?<=[.?!])\s+'));
+      for (final s in subSentences) {
+        final sTrim = s.trim().replaceAll(RegExp(r'\s+'), ' ');
+        if (sTrim.length >= 10) {
+          sentences.add(sTrim);
+        }
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        String query = '';
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final filtered = query.isEmpty
+                ? sentences
+                : sentences
+                    .where((s) => s.toLowerCase().contains(query.toLowerCase()))
+                    .toList();
+
+            return SafeArea(
+              child: FractionallySizedBox(
+                heightFactor: 0.85,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.touch_app_rounded, color: Colors.indigo),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Select Sentence from Chapter Text (${sentences.length})',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Tap any sentence below to fill it into the Highlighted Text field.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search sentences in chapter text...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onChanged: (v) => setSheetState(() => query = v.trim()),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: filtered.isEmpty
+                            ? const Center(
+                                child: Text('No matching sentences found in chapter text.'),
+                              )
+                            : ListView.separated(
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => const Divider(height: 1),
+                                itemBuilder: (ctx, idx) {
+                                  final sentence = filtered[idx];
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                    leading: CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: Colors.indigo.withValues(alpha: 0.15),
+                                      child: Text(
+                                        '${idx + 1}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.indigo,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Text(
+                                      sentence,
+                                      style: const TextStyle(fontSize: 13, height: 1.4),
+                                    ),
+                                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                                    onTap: () {
+                                      setState(() {
+                                        _hlText.text = sentence;
+                                      });
+                                      Navigator.pop(ctx);
+                                      _showActionSnackBar(context, 'Sentence selected for highlight question!');
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _pickRegularPdf() async {
@@ -2270,7 +2384,6 @@ class _BooksPageState extends State<BooksPage> {
                       final hasHighlightPdf = selectedChapterMap?['highlight_drive_link']?.toString().isNotEmpty ?? false;
                       final hlCount = selectedChapterMap?['linked_highlight_questions_count'] ?? 0;
                       final noteSummary = selectedChapterMap?['note_summary']?.toString() ?? '';
-                      final pyqCount = selectedChapterMap?['linked_pyq_count'] ?? 0;
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2724,154 +2837,6 @@ class _BooksPageState extends State<BooksPage> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 10),
-
-                                // 3. Interactive Digital Reader & Auto-PYQ Match
-                                Card(
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    side: BorderSide(
-                                      color: noteSummary.isNotEmpty
-                                          ? const Color(0xFFE53935).withValues(alpha: 0.6)
-                                          : Colors.grey.shade400,
-                                      width: 1.2,
-                                    ),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.bolt_rounded, size: 22, color: Color(0xFFE53935)),
-                                            const SizedBox(width: 8),
-                                            const Expanded(
-                                              child: Text(
-                                                'Digital Reader & PYQ Underlines',
-                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                                              ),
-                                            ),
-                                            if (noteSummary.isNotEmpty)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.green.withValues(alpha: 0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: Colors.green.shade400),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    const Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      '${noteSummary.length} chars text ready',
-                                                      style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
-                                                    ),
-                                                  ],
-                                                ),
-                                              )
-                                            else
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange.withValues(alpha: 0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: Colors.orange.shade400),
-                                                ),
-                                                child: const Text('No text extracted yet', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
-                                              ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'Textbook text renders cleanly in student app. Sentences matching NEET PYQs get Red Underlines and tap-to-solve [ ⚡ NEET PYQ ] badges.',
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                '📚 $pyqCount Total Chapter PYQs',
-                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFE53935).withValues(alpha: 0.12),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                '⚡ $hlCount Underlined & Linked',
-                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE53935)),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 10),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          height: 40,
-                                          child: ElevatedButton.icon(
-                                            icon: _autoMatchingPyqs
-                                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                                : const Icon(Icons.auto_fix_high_rounded, size: 18),
-                                            label: Text(
-                                              _autoMatchingPyqs
-                                                  ? 'Scanning sentences and linking PYQs...'
-                                                  : '⚡ Auto-Match PYQs to Text Underlines Now',
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                                            ),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFFE53935),
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            ),
-                                            onPressed: _autoMatchingPyqs
-                                                ? null
-                                                : () async {
-                                                    if (noteSummary.length < 50) {
-                                                      _showActionSnackBar(
-                                                        context,
-                                                        'Pehle eBook PDF upload karo ya chapter text add karo, taaki PYQs match ho sakein.',
-                                                        isError: true,
-                                                      );
-                                                      return;
-                                                    }
-                                                    setState(() => _autoMatchingPyqs = true);
-                                                    try {
-                                                      final res = await widget.api.autoMatchPyqs(_selectedChapterId!);
-                                                      await _loadChaptersForSelectedBook();
-                                                      if (context.mounted) {
-                                                        _showActionSnackBar(
-                                                          context,
-                                                          res['message']?.toString() ?? 'PYQs successfully matched and linked to text lines!',
-                                                        );
-                                                      }
-                                                    } catch (e) {
-                                                      if (context.mounted) {
-                                                        _showActionSnackBar(context, 'Auto-match error: $e', isError: true);
-                                                      }
-                                                    } finally {
-                                                      if (mounted) setState(() => _autoMatchingPyqs = false);
-                                                    }
-                                                  },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -2922,14 +2887,42 @@ class _BooksPageState extends State<BooksPage> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
+                                      if (noteSummary.isNotEmpty) ...[
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text(
+                                              'Highlighted Text from eBook *',
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                            ),
+                                            TextButton.icon(
+                                              icon: const Icon(Icons.touch_app_rounded, size: 15, color: Colors.indigo),
+                                              label: const Text(
+                                                'Select Sentence from Chapter Text',
+                                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
+                                              ),
+                                              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                              onPressed: () => _showSentencePickerSheet(context, noteSummary),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
                                       TextField(
                                         controller: _hlText,
                                         minLines: 2,
                                         maxLines: 3,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Highlighted Text from eBook *',
-                                          hintText: 'Paste exact sentence/quote highlighted in eBook',
-                                          prefixIcon: Icon(Icons.format_quote_rounded),
+                                        decoration: InputDecoration(
+                                          labelText: noteSummary.isEmpty ? 'Highlighted Text from eBook *' : null,
+                                          hintText: 'Paste exact sentence/quote or tap "Select Sentence" above',
+                                          prefixIcon: const Icon(Icons.format_quote_rounded),
+                                          suffixIcon: noteSummary.isNotEmpty
+                                              ? IconButton(
+                                                  icon: const Icon(Icons.touch_app_rounded, color: Colors.indigo),
+                                                  tooltip: 'Pick from chapter text',
+                                                  onPressed: () => _showSentencePickerSheet(context, noteSummary),
+                                                )
+                                              : null,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
