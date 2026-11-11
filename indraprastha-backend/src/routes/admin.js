@@ -254,6 +254,133 @@ async function extractPdfBasics(fileBuffer, fileName = 'document.pdf') {
   }
 }
 
+async function autoMatchPyqsToChapterText(chapterId, text) {
+  if (!text || text.trim().length < 50) return [];
+
+  try {
+    const pyqRes = await pool.query(
+      `SELECT id, question, option_a, option_b, option_c, option_d, correct_option, explanation, year_label
+       FROM pyqs
+       WHERE chapter_id = $1
+       ORDER BY id ASC`,
+      [chapterId]
+    );
+    if (pyqRes.rows.length === 0) return [];
+
+    const cleanFullText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const sentences = cleanFullText
+      .split(/(?<=[.?!])\s+(?=[A-Z0-9"'])/)
+      .map((s) => s.trim().replace(/\s+/g, ' '))
+      .filter((s) => s.length >= 20 && s.length <= 400);
+
+    if (sentences.length === 0) return [];
+
+    const matchedList = [];
+    const existingHl = await pool.query(
+      'SELECT question, highlight_text FROM chapter_highlight_questions WHERE chapter_id = $1',
+      [chapterId]
+    );
+    const existingQuestions = new Set(
+      existingHl.rows.map((r) => (r.question || '').trim().toLowerCase())
+    );
+    const existingHighlights = new Set(
+      existingHl.rows.map((r) => (r.highlight_text || '').trim().toLowerCase())
+    );
+
+    const stopWords = new Set([
+      'what', 'which', 'following', 'about', 'statement', 'correct', 'incorrect',
+      'true', 'false', 'explain', 'because', 'their', 'there', 'these', 'those',
+      'given', 'below', 'select', 'choose', 'option', 'answer', 'question',
+      'match', 'column', 'list', 'identify', 'respect', 'terms', 'represent',
+      'with', 'from', 'have', 'that', 'this', 'were', 'been', 'also', 'some'
+    ]);
+
+    const extractKeywords = (str) => {
+      return (str || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length >= 4 && !stopWords.has(w));
+    };
+
+    for (const pyq of pyqRes.rows) {
+      const rawQText = (pyq.question || '').trim();
+      if (!rawQText) continue;
+      if (existingQuestions.has(rawQText.toLowerCase())) continue;
+
+      const correctKey = (pyq.correct_option || 'A').trim().toUpperCase();
+      const correctOpt = (pyq[`option_${correctKey.toLowerCase()}`] || '').trim();
+      const explanation = (pyq.explanation || '').trim();
+
+      const qWords = extractKeywords(rawQText);
+      const ansWords = extractKeywords(correctOpt);
+      const expWords = extractKeywords(explanation);
+
+      const allKeyWords = [...new Set([...qWords, ...ansWords, ...expWords])];
+      if (allKeyWords.length === 0) continue;
+
+      let bestSentence = null;
+      let highestScore = 0;
+
+      for (const sentence of sentences) {
+        const sLower = sentence.toLowerCase();
+        if (existingHighlights.has(sentence.toLowerCase())) continue;
+
+        let score = 0;
+        if (correctOpt.length >= 4 && sLower.includes(correctOpt.toLowerCase())) {
+          score += 3;
+        }
+
+        for (const kw of allKeyWords) {
+          if (sLower.includes(kw)) {
+            score += 1;
+          }
+        }
+
+        if (score > highestScore && score >= 2) {
+          highestScore = score;
+          bestSentence = sentence;
+        }
+      }
+
+      if (bestSentence) {
+        const yearTag =
+          pyq.year_label && !rawQText.includes(pyq.year_label)
+            ? ` [${pyq.year_label}]`
+            : '';
+        const finalQuestion = `${rawQText}${yearTag}`;
+
+        const inserted = await pool.query(
+          `INSERT INTO chapter_highlight_questions (
+            chapter_id, highlight_text, page_number, question,
+            option_a, option_b, option_c, option_d, correct_option, explanation
+          ) VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, $9)
+          RETURNING *`,
+          [
+            chapterId,
+            bestSentence,
+            finalQuestion,
+            pyq.option_a,
+            pyq.option_b,
+            pyq.option_c,
+            pyq.option_d,
+            correctKey,
+            explanation,
+          ]
+        );
+        matchedList.push(inserted.rows[0]);
+        existingQuestions.add(rawQText.toLowerCase());
+        existingHighlights.add(bestSentence.toLowerCase());
+      }
+    }
+
+    return matchedList;
+  } catch (err) {
+    console.error('autoMatchPyqsToChapterText error:', err);
+    return [];
+  }
+}
+
 function sanitizeForPostgresText(value) {
   if (value == null) return '';
   const s = String(value);
@@ -1173,11 +1300,20 @@ router.post(
         folderId: resolvedFolderId,
       });
 
+      let extracted = { noteSummary: '', highlight: '' };
+      try {
+        extracted = await extractPdfBasics(req.file.buffer, req.file.originalname);
+      } catch (exErr) {
+        console.warn('PDF text extraction notice:', exErr.message);
+      }
+
       const updated = await pool.query(
         `UPDATE book_chapters
          SET highlight_drive_link = $1,
              highlight_drive_file_id = $2,
-             highlight_drive_folder_id = $3
+             highlight_drive_folder_id = $3,
+             note_summary = CASE WHEN COALESCE($5, '') <> '' THEN $5 ELSE note_summary END,
+             highlight = CASE WHEN COALESCE($6, '') <> '' THEN $6 ELSE highlight END
          WHERE id = $4
          RETURNING *`,
         [
@@ -1185,13 +1321,27 @@ router.post(
           uploaded.fileId || '',
           resolvedFolderId,
           chapterId,
+          extracted.noteSummary || '',
+          extracted.highlight || '',
         ]
       );
+
+      let autoMatchedCount = 0;
+      if (extracted.noteSummary && extracted.noteSummary.length > 50) {
+        try {
+          const autoMatched = await autoMatchPyqsToChapterText(chapterId, extracted.noteSummary);
+          autoMatchedCount = autoMatched.length;
+        } catch (mErr) {
+          console.warn('Auto match PYQs notice:', mErr.message);
+        }
+      }
 
       return res.json({
         success: true,
         chapter: mapChapterLinks(updated.rows[0]),
         drive: uploaded,
+        extractedTextLength: (extracted.noteSummary || '').length,
+        autoMatchedCount,
       });
     } catch (error) {
       logAdminRouteError('/chapters/:chapterId/highlight-pdf', error, { chapterId: req.params?.chapterId });
@@ -1242,12 +1392,21 @@ router.post(
         folderId: resolvedFolderId,
       });
 
+      let extracted = { noteSummary: '', highlight: '' };
+      try {
+        extracted = await extractPdfBasics(req.file.buffer, req.file.originalname);
+      } catch (exErr) {
+        console.warn('PDF text extraction notice:', exErr.message);
+      }
+
       const updated = await pool.query(
         `UPDATE book_chapters
          SET material_type = 'pdf',
              material_drive_link = $1,
              material_drive_file_id = $2,
-             material_drive_folder_id = $3
+             material_drive_folder_id = $3,
+             note_summary = CASE WHEN COALESCE($5, '') <> '' THEN $5 ELSE note_summary END,
+             highlight = CASE WHEN COALESCE($6, '') <> '' THEN $6 ELSE highlight END
          WHERE id = $4
          RETURNING *`,
         [
@@ -1255,13 +1414,27 @@ router.post(
           uploaded.fileId || '',
           resolvedFolderId,
           chapterId,
+          extracted.noteSummary || '',
+          extracted.highlight || '',
         ]
       );
+
+      let autoMatchedCount = 0;
+      if (extracted.noteSummary && extracted.noteSummary.length > 50) {
+        try {
+          const autoMatched = await autoMatchPyqsToChapterText(chapterId, extracted.noteSummary);
+          autoMatchedCount = autoMatched.length;
+        } catch (mErr) {
+          console.warn('Auto match PYQs notice:', mErr.message);
+        }
+      }
 
       return res.json({
         success: true,
         chapter: mapChapterLinks(updated.rows[0]),
         drive: uploaded,
+        extractedTextLength: (extracted.noteSummary || '').length,
+        autoMatchedCount,
       });
     } catch (error) {
       logAdminRouteError('/chapters/:chapterId/regular-pdf', error, { chapterId: req.params?.chapterId });
@@ -1269,6 +1442,74 @@ router.post(
     }
   }
 );
+
+// Auto-match PYQs to chapter text
+router.post('/chapters/:chapterId/auto-link-pyqs', adminAuth, async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const chapterRes = await pool.query(
+      'SELECT id, title, note_summary FROM book_chapters WHERE id = $1',
+      [chapterId]
+    );
+    if (chapterRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Chapter not found' });
+    }
+
+    const noteText = (chapterRes.rows[0].note_summary || '').toString().trim();
+    if (!noteText || noteText.length < 50) {
+      return res.status(400).json({
+        error: 'No chapter text available to match. Please upload chapter PDF or add text first.',
+      });
+    }
+
+    const matched = await autoMatchPyqsToChapterText(chapterId, noteText);
+    return res.json({
+      success: true,
+      count: matched.length,
+      matched,
+      message: `Successfully linked ${matched.length} PYQs to chapter lines!`,
+    });
+  } catch (err) {
+    logAdminRouteError('/chapters/:chapterId/auto-link-pyqs', err, { chapterId: req.params?.chapterId });
+    return res.status(500).json({ error: err.message || 'Auto-link failed' });
+  }
+});
+
+// Update notes / chapter text directly
+router.post('/chapters/:chapterId/notes-text', adminAuth, async (req, res) => {
+  try {
+    const { chapterId } = req.params;
+    const { text } = req.body;
+    if (!text || String(text).trim().length === 0) {
+      return res.status(400).json({ error: 'Text content is required' });
+    }
+
+    const updated = await pool.query(
+      `UPDATE book_chapters
+       SET note_summary = $1
+       WHERE id = $2
+       RETURNING *`,
+      [sanitizeForPostgresText(text.trim()), chapterId]
+    );
+
+    let autoMatchedCount = 0;
+    try {
+      const autoMatched = await autoMatchPyqsToChapterText(chapterId, text.trim());
+      autoMatchedCount = autoMatched.length;
+    } catch (mErr) {
+      console.warn('Auto match notice:', mErr.message);
+    }
+
+    return res.json({
+      success: true,
+      chapter: mapChapterLinks(updated.rows[0]),
+      autoMatchedCount,
+    });
+  } catch (err) {
+    logAdminRouteError('/chapters/:chapterId/notes-text', err, { chapterId: req.params?.chapterId });
+    return res.status(500).json({ error: err.message || 'Failed to update notes text' });
+  }
+});
 
 router.get('/chapters/:chapterId/highlight-questions', adminAuth, async (req, res) => {
   try {

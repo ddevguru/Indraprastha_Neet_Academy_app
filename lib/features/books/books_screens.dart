@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -1300,6 +1301,7 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
   String? _loadedFileId;
   bool _isLoading = false;
   bool _useDriveFallback = false;
+  bool _pdfViewMode = false;
 
   @override
   void initState() {
@@ -2021,6 +2023,32 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
     final theme = Theme.of(context);
     final chapterTitle = widget.chapter['title']?.toString() ?? 'Chapter eBook';
     final fileId = _extractFileId();
+    final noteSummary = _normalizeExtractedText(widget.chapter['note_summary']?.toString() ?? '');
+
+    // Default to MemoNeet-style Interactive Digital Text Reader
+    if (!_pdfViewMode && (noteSummary.isNotEmpty || questions.isNotEmpty || fileId.isEmpty)) {
+      return SizedBox.expand(
+        child: SurfaceCard(
+          padding: EdgeInsets.zero,
+          child: InteractiveHighlightReader(
+            chapterTitle: chapterTitle,
+            content: noteSummary,
+            highlightQuestions: questions,
+            solvedQuestionIds: _solvedQuestionIds,
+            onQuestionTap: (q) => _openQuestionPopup(context, q),
+            onViewAllQuestions: () => _showAllQuestionsSheet(context),
+            hasPdf: fileId.isNotEmpty,
+            isPdfViewMode: _pdfViewMode,
+            onTogglePdfMode: fileId.isNotEmpty
+                ? () {
+                    setState(() => _pdfViewMode = true);
+                    if (_webViewController == null) _loadPdf();
+                  }
+                : null,
+          ),
+        ),
+      );
+    }
 
     return SizedBox.expand(
       child: SurfaceCard(
@@ -2040,14 +2068,14 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.auto_stories_rounded, color: Colors.white, size: 20),
+                  const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          chapterTitle,
+                          '$chapterTitle (PDF View)',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
@@ -2058,13 +2086,26 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
                         ),
                         Text(
                           questions.isEmpty
-                              ? 'Tap highlighted text in PDF to solve related questions'
-                              : '${questions.length} Highlight Questions • Tap text on page to solve',
+                              ? 'Viewing PDF document'
+                              : '${questions.length} Highlight Questions on page',
                           style: const TextStyle(color: Colors.white70, fontSize: 11),
                         ),
                       ],
                     ),
                   ),
+                  FilledButton.tonalIcon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.28),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: const Icon(Icons.menu_book_rounded, size: 14),
+                    label: const Text('Text Reader', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    onPressed: () => setState(() => _pdfViewMode = false),
+                  ),
+                  const SizedBox(width: 4),
                   if (questions.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
@@ -2207,6 +2248,384 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
       ),
     );
   }
+}
+
+// ── MemoNeet-Style Interactive Digital Text Reader with Tap-to-Solve Underlines ──
+
+class InteractiveHighlightReader extends StatefulWidget {
+  const InteractiveHighlightReader({
+    super.key,
+    required this.chapterTitle,
+    required this.content,
+    required this.highlightQuestions,
+    required this.solvedQuestionIds,
+    required this.onQuestionTap,
+    this.onViewAllQuestions,
+    this.hasPdf = false,
+    this.isPdfViewMode = false,
+    this.onTogglePdfMode,
+  });
+
+  final String chapterTitle;
+  final String content;
+  final List<Map<String, dynamic>> highlightQuestions;
+  final Set<int> solvedQuestionIds;
+  final void Function(Map<String, dynamic> question) onQuestionTap;
+  final VoidCallback? onViewAllQuestions;
+  final bool hasPdf;
+  final bool isPdfViewMode;
+  final VoidCallback? onTogglePdfMode;
+
+  @override
+  State<InteractiveHighlightReader> createState() => _InteractiveHighlightReaderState();
+}
+
+class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader> {
+  double _fontSize = 15.5;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final questions = widget.highlightQuestions;
+
+    final rawContent = widget.content.trim();
+    final paragraphs = rawContent.isNotEmpty
+        ? rawContent
+            .split(RegExp(r'\r?\n\s*\r?\n'))
+            .map((p) => p.trim())
+            .where((p) => p.isNotEmpty)
+            .toList()
+        : <String>[];
+
+    return Column(
+      children: [
+        // ── Reader Top Bar ─────────────────────────────────────────
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E2D) : const Color(0xFFFFF7ED),
+            border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.15))),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFFE53935), Color(0xFFFF5722)]),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt_rounded, size: 14, color: Colors.white),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${questions.length} PYQ Highlights',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${widget.solvedQuestionIds.length}/${questions.length} Solved',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669),
+                ),
+              ),
+              const Spacer(),
+              // Font size controls
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Text('A-', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                tooltip: 'Decrease font size',
+                onPressed: _fontSize > 13 ? () => setState(() => _fontSize -= 1.0) : null,
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Text('A+', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                tooltip: 'Increase font size',
+                onPressed: _fontSize < 24 ? () => setState(() => _fontSize += 1.0) : null,
+              ),
+              if (widget.onViewAllQuestions != null && questions.isNotEmpty)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
+                  tooltip: 'View All Questions List',
+                  onPressed: widget.onViewAllQuestions,
+                ),
+              if (widget.hasPdf && widget.onTogglePdfMode != null)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.picture_as_pdf_rounded, size: 19),
+                  tooltip: 'View Original PDF',
+                  onPressed: widget.onTogglePdfMode,
+                ),
+            ],
+          ),
+        ),
+
+        // ── Main Reading Content ───────────────────────────────────
+        Expanded(
+          child: paragraphs.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.auto_stories_rounded, size: 48, color: Colors.amber),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          'Interactive Digital Notes',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Upload chapter PDF in the Admin Panel to automatically generate this chapter\'s text with clickable PYQ underlines.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                        ),
+                        if (questions.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.lg),
+                          FilledButton.icon(
+                            icon: const Icon(Icons.bolt_rounded),
+                            label: Text('Solve ${questions.length} Linked PYQs Now'),
+                            onPressed: widget.onViewAllQuestions,
+                          ),
+                        ],
+                        if (widget.hasPdf && widget.onTogglePdfMode != null) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.picture_as_pdf_rounded),
+                            label: const Text('View Original PDF on Drive'),
+                            onPressed: widget.onTogglePdfMode,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.xxl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Interactive instruction pill
+                      Container(
+                        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2D1515) : const Color(0xFFFFF1F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECDD3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.touch_app_rounded, color: Color(0xFFE53935), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Tap any red-underlined sentence to solve its NEET PYQ on the spot!',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Chapter Title Banner
+                      Text(
+                        widget.chapterTitle,
+                        style: TextStyle(
+                          fontSize: _fontSize + 4,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+
+                      // Formatted Text Paragraphs with Clickable Underlines
+                      for (final p in paragraphs) ...[
+                        SelectableText.rich(
+                          TextSpan(
+                            children: _buildParagraphSpans(context, p, isDark),
+                          ),
+                          style: TextStyle(
+                            fontSize: _fontSize,
+                            height: 1.72,
+                            color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                    ],
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  List<InlineSpan> _buildParagraphSpans(BuildContext context, String paragraph, bool isDark) {
+    if (widget.highlightQuestions.isEmpty) {
+      return [TextSpan(text: paragraph)];
+    }
+
+    final normPara = paragraph.toLowerCase();
+    final matches = <_HighlightMatch>[];
+
+    for (final q in widget.highlightQuestions) {
+      final hlText = (q['highlight_text']?.toString() ?? '').trim();
+      if (hlText.length < 5) continue;
+
+      final normHl = hlText.toLowerCase();
+      int startIdx = normPara.indexOf(normHl);
+
+      // Fuzzy sub-phrase matching if exact sentence has minor whitespace differences
+      if (startIdx == -1 && normHl.length > 25) {
+        final sub = normHl.substring(0, 25);
+        startIdx = normPara.indexOf(sub);
+      }
+
+      if (startIdx != -1) {
+        final matchLen = math.min(hlText.length, paragraph.length - startIdx);
+        matches.add(_HighlightMatch(
+          start: startIdx,
+          end: startIdx + matchLen,
+          question: q,
+        ));
+      }
+    }
+
+    if (matches.isEmpty) {
+      return [TextSpan(text: paragraph)];
+    }
+
+    matches.sort((a, b) => a.start.compareTo(b.start));
+
+    // Remove overlapping regions
+    final cleanMatches = <_HighlightMatch>[];
+    int lastEnd = 0;
+    for (final m in matches) {
+      if (m.start >= lastEnd) {
+        cleanMatches.add(m);
+        lastEnd = m.end;
+      }
+    }
+
+    final spans = <InlineSpan>[];
+    int cursor = 0;
+
+    for (final m in cleanMatches) {
+      if (m.start > cursor) {
+        spans.add(TextSpan(text: paragraph.substring(cursor, m.start)));
+      }
+
+      final matchedText = paragraph.substring(m.start, m.end);
+      final qId = int.tryParse(m.question['id']?.toString() ?? '');
+      final isSolved = qId != null && widget.solvedQuestionIds.contains(qId);
+
+      // Clickable red-underlined sentence
+      spans.add(
+        TextSpan(
+          text: matchedText,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.underline,
+            decorationColor: isSolved ? const Color(0xFF10B981) : const Color(0xFFE53935),
+            decorationThickness: 2.5,
+            decorationStyle: TextDecorationStyle.solid,
+            color: isSolved
+                ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46))
+                : (isDark ? const Color(0xFFFFB74D) : const Color(0xFF9A3412)),
+            backgroundColor: isSolved
+                ? (isDark ? Colors.green.withValues(alpha: 0.15) : const Color(0xFFECFDF5))
+                : (isDark ? Colors.red.withValues(alpha: 0.12) : const Color(0xFFFFF1F2)),
+          ),
+          recognizer: TapGestureRecognizer()..onTap = () => widget.onQuestionTap(m.question),
+        ),
+      );
+
+      // Inline Pill Badge right after the underlined line
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: GestureDetector(
+            onTap: () => widget.onQuestionTap(m.question),
+            child: Container(
+              margin: const EdgeInsets.only(left: 4, right: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSolved ? const Color(0xFF10B981) : const Color(0xFFE53935),
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isSolved ? Colors.green : Colors.red).withValues(alpha: 0.3),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isSolved ? Icons.check_circle_rounded : Icons.bolt_rounded,
+                    size: 10,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    isSolved ? 'SOLVED' : 'PYQ',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      cursor = m.end;
+    }
+
+    if (cursor < paragraph.length) {
+      spans.add(TextSpan(text: paragraph.substring(cursor)));
+    }
+
+    return spans;
+  }
+}
+
+class _HighlightMatch {
+  _HighlightMatch({required this.start, required this.end, required this.question});
+  final int start;
+  final int end;
+  final Map<String, dynamic> question;
 }
 
 // ── Interactive Question Solve Dialog / Popup ────────────────────────────────
