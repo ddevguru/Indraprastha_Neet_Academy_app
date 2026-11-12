@@ -1747,6 +1747,16 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
         continue;
       }
 
+      // If line is sub-figure labels like "(c) Scorpion (d) Prawn", or "(a) Locust (b) Butterfly"
+      if (RegExp(r'^\([a-d]\)\s+[A-Za-z]', caseSensitive: false).hasMatch(line)) {
+        // If the previous block was an image or figureCaption, skip it because the diagram already has the labels
+        if (blocks.isNotEmpty &&
+            (blocks.last.type == _ReaderBlockType.image ||
+             blocks.last.type == _ReaderBlockType.figureCaption)) {
+          continue;
+        }
+      }
+
       if (_isBlockHeadingOrSpecial(line)) {
         flushParagraph();
         blocks.add(_classifyBlock(line));
@@ -1995,12 +2005,22 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     );
   }
 
+  void _openDiagramPopup(BuildContext context, String imageUrl, String caption) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.92),
+      builder: (ctx) => _DiagramZoomDialog(imageUrl: imageUrl, caption: caption),
+    );
+  }
+
   Widget _buildImageBlock(BuildContext context, _ReaderBlock block, bool isDark) {
     var rawUrl = block.imageUrl?.trim() ?? '';
     if (rawUrl.isEmpty) return const SizedBox.shrink();
     if (rawUrl.startsWith('/')) {
       rawUrl = '$baseUrl$rawUrl';
     }
+
+    final captionText = block.caption ?? '';
 
     return Container(
       width: double.infinity,
@@ -2024,54 +2044,93 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          ClipRRect(
+          // Fixed size diagram card with tap-to-zoom
+          InkWell(
+            onTap: () => _openDiagramPopup(context, rawUrl, captionText),
             borderRadius: BorderRadius.circular(AppRadii.sm),
-            child: InteractiveViewer(
-              minScale: 1.0,
-              maxScale: 4.0,
-              child: Image.network(
-                rawUrl,
-                width: double.infinity,
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Container(
-                    height: 220,
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                  child: Container(
+                    height: 230,
                     width: double.infinity,
-                    color: isDark ? const Color(0xFF161622) : const Color(0xFFF8FAFC),
+                    color: isDark ? const Color(0xFF14141E) : const Color(0xFFF8FAFC),
                     alignment: Alignment.center,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Image.network(
+                      rawUrl,
+                      width: double.infinity,
+                      height: 230,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          height: 230,
+                          width: double.infinity,
+                          color: isDark ? const Color(0xFF14141E) : const Color(0xFFF8FAFC),
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Loading diagram...',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return FastNetworkImage(
+                          url: rawUrl,
+                          width: double.infinity,
+                          height: 230,
+                          fit: BoxFit.contain,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                // Tap to zoom hint pill
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(
-                          width: 26,
-                          height: 26,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        const SizedBox(height: 8),
+                        Icon(Icons.zoom_in_rounded, size: 13, color: Colors.white),
+                        SizedBox(width: 4),
                         Text(
-                          'Loading diagram...',
+                          'Tap to zoom',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                            color: Colors.white,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return FastNetworkImage(
-                    url: rawUrl,
-                    width: double.infinity,
-                    height: 240,
-                    fit: BoxFit.contain,
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
           ),
-          if ((block.caption ?? '').isNotEmpty) ...[
+          if (captionText.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -2086,7 +2145,7 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      block.caption!,
+                      captionText,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -3162,4 +3221,165 @@ String _formatReadableContent(String raw) {
       .replaceAll(RegExp(r'(\d+\.)\s+'), r'\n$1 ')
       .replaceAll(RegExp(r'([:;])\s+'), r'$1\n');
   return text.trim();
+}
+
+class _DiagramZoomDialog extends StatefulWidget {
+  const _DiagramZoomDialog({required this.imageUrl, required this.caption});
+  final String imageUrl;
+  final String caption;
+
+  @override
+  State<_DiagramZoomDialog> createState() => _DiagramZoomDialogState();
+}
+
+class _DiagramZoomDialogState extends State<_DiagramZoomDialog> {
+  final TransformationController _controller = TransformationController();
+  double _currentScale = 1.0;
+
+  void _zoomBy(double factor) {
+    setState(() {
+      _currentScale = (_currentScale * factor).clamp(1.0, 6.0);
+      _controller.value = Matrix4.identity()..scale(_currentScale);
+    });
+  }
+
+  void _resetZoom() {
+    setState(() {
+      _currentScale = 1.0;
+      _controller.value = Matrix4.identity();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F17),
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          border: Border.all(color: const Color(0xFF2A2A3C)),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1A1A26),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.lg)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.image_outlined, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.caption.isNotEmpty ? widget.caption : 'Diagram View',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: 'Close',
+                  ),
+                ],
+              ),
+            ),
+            // Image Canvas with InteractiveViewer
+            Expanded(
+              child: GestureDetector(
+                onDoubleTap: () {
+                  if (_currentScale > 1.2) {
+                    _resetZoom();
+                  } else {
+                    _zoomBy(2.0);
+                  }
+                },
+                child: Center(
+                  child: InteractiveViewer(
+                    transformationController: _controller,
+                    minScale: 1.0,
+                    maxScale: 6.0,
+                    clipBehavior: Clip.none,
+                    onInteractionUpdate: (_) {
+                      _currentScale = _controller.value.getMaxScaleOnAxis();
+                    },
+                    child: Image.network(
+                      widget.imageUrl,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const Center(
+                          child: CircularProgressIndicator(color: AppColors.primary),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return FastNetworkImage(
+                          url: widget.imageUrl,
+                          fit: BoxFit.contain,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Bottom Zoom Controls Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1A1A26),
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(AppRadii.lg)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Pinch or double-tap to zoom (${_currentScale.toStringAsFixed(1)}x)',
+                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.zoom_out_rounded, color: Colors.white),
+                        onPressed: () => _zoomBy(0.75),
+                        tooltip: 'Zoom Out',
+                      ),
+                      TextButton(
+                        onPressed: _resetZoom,
+                        child: const Text('Reset', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.zoom_in_rounded, color: Colors.white),
+                        onPressed: () => _zoomBy(1.33),
+                        tooltip: 'Zoom In',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

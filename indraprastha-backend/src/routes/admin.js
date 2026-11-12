@@ -1618,6 +1618,35 @@ router.post('/chapters/:chapterId/re-extract-pdf', adminAuth, async (req, res) =
   }
 });
 
+// Upload or replace high-res diagram images for a chapter
+router.post('/chapters/:chapterId/images', adminAuth, async (req, res) => {
+  try {
+    const chapterId = parseInt(req.params.chapterId, 10);
+    const { images } = req.body;
+    if (!Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: 'images array required' });
+    }
+    let inserted = 0;
+    for (const img of images) {
+      const buf = Buffer.from(img.base64, 'base64');
+      const idx = parseInt(img.index, 10);
+      await pool.query(
+        'DELETE FROM chapter_images WHERE chapter_id = $1 AND image_index = $2',
+        [chapterId, idx]
+      );
+      await pool.query(
+        `INSERT INTO chapter_images (chapter_id, image_index, figure_label, mime_type, image_data)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [chapterId, idx, img.label || `Figure ${idx}`, img.mimeType || 'image/jpeg', buf]
+      );
+      inserted++;
+    }
+    return res.json({ success: true, count: inserted });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to save chapter images' });
+  }
+});
+
 // Auto-match PYQs to chapter text
 router.post('/chapters/:chapterId/auto-link-pyqs', adminAuth, async (req, res) => {
   try {
