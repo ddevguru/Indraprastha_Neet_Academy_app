@@ -3742,6 +3742,28 @@ router.patch('/users/:id/block', adminAuth, async (req, res) => {
   }
 });
 
+router.patch('/users/:id/password', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id, full_name, phone',
+      [hash, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    return res.json({ success: true, user: result.rows[0], message: 'Password updated successfully' });
+  } catch (err) {
+    logAdminRouteError('/users/:id/password', err);
+    return res.status(500).json({ error: err.message || 'Server error' });
+  }
+});
+
 router.delete('/users/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
