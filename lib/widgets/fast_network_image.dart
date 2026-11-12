@@ -34,7 +34,7 @@ class FastNetworkImage extends StatefulWidget {
 class _FastNetworkImageState extends State<FastNetworkImage> {
   static final Map<String, Uint8List> _memoryCache = {};
 
-  late SharedPreferences _prefs;
+  SharedPreferences? _prefs;
   int _fallbackStep = 0;
   Uint8List? _bytes;
   bool _loading = true;
@@ -44,11 +44,6 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
   @override
   void initState() {
     super.initState();
-    _initPrefs();
-  }
-
-  Future<void> _initPrefs() async {
-    _prefs = await SharedPreferences.getInstance();
     _load();
   }
 
@@ -86,10 +81,16 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
     }
 
     try {
-      final token = _prefs.getString('auth_token');
       final headers = <String, String>{};
-      if (token != null && token.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
+      if (!isChapterImageUrl(resolved)) {
+        try {
+          final prefs = _prefs ?? await SharedPreferences.getInstance();
+          _prefs = prefs;
+          final token = prefs.getString('auth_token');
+          if (token != null && token.isNotEmpty) {
+            headers['Authorization'] = 'Bearer $token';
+          }
+        } catch (_) {}
       }
 
       final response = await http

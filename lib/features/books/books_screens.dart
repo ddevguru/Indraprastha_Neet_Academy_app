@@ -445,109 +445,118 @@ class ChapterDetailScreen extends ConsumerWidget {
         final chapterIdString = chapter['id']?.toString() ?? '$chapterId';
         final isSaved =
             ref.watch(appUiControllerProvider).savedChapterIds.contains(chapterIdString);
-        return DefaultTabController(
-          length: 2,
-          child: Scaffold(
-            appBar: AppBar(
-              title: Text(cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString())),
-              actions: [
+        final driveLink = _resolveMaterialLink(chapter);
+        final hasDrivePdf = driveLink.isNotEmpty;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString())),
+            actions: [
+              if (hasDrivePdf)
                 IconButton(
-                  onPressed: () => ref
-                      .read(appUiControllerProvider.notifier)
-                      .toggleSavedChapter(chapterIdString),
-                  icon: Icon(
-                    isSaved
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                  ),
-                ),
-              ],
-              bottom: const TabBar(
-                tabs: [
-                  Tab(text: 'Book & Notes'),
-                  Tab(text: 'Highlights'),
-                ],
-              ),
-            ),
-            body: Column(
-              children: [
-                // ── Chapter info header ─────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.sm),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString()),
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      if ((chapter['overview']?.toString() ?? '').isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(chapter['overview']?.toString() ?? ''),
-                      ],
-                      const SizedBox(height: AppSpacing.xs),
-                      Row(
-                        children: [
-                          Text(
-                            'Linked PYQs: ${chapter['linked_pyq_count'] ?? pyqs.length}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                  tooltip: 'View Original PDF',
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  onPressed: () {
+                    final previewUrl = _toDrivePreviewUrl(driveLink);
+                    if (previewUrl != null) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(
+                              title: Text(cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString())),
+                            ),
+                            body: _PdfOrNotesPanel(chapter: chapter),
                           ),
-                          const Spacer(),
-                          if (pyqs.isNotEmpty)
-                            InkWell(
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => PracticeAttemptScreen(
-                                    setId: 0,
-                                    chapterName: cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString()),
-                                    chapterQuestions: pyqs,
-                                  ),
-                                ),
-                              ),
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  gradient: AppGradients.primary,
-                                  borderRadius: BorderRadius.circular(AppRadii.md),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Practice PYQs',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
+                        ),
+                      );
+                    }
+                  },
+                ),
+              IconButton(
+                onPressed: () => ref
+                    .read(appUiControllerProvider.notifier)
+                    .toggleSavedChapter(chapterIdString),
+                icon: Icon(
+                  isSaved
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                ),
+              ),
+            ],
+          ),
+          body: Column(
+            children: [
+              // ── Chapter info header ─────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString()),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    if ((chapter['overview']?.toString() ?? '').isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(chapter['overview']?.toString() ?? ''),
+                    ],
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      children: [
+                        Text(
+                          'Linked PYQs: ${chapter['linked_pyq_count'] ?? pyqs.length}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const Spacer(),
+                        if (pyqs.isNotEmpty)
+                          InkWell(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PracticeAttemptScreen(
+                                  setId: 0,
+                                  chapterName: cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString()),
+                                  chapterQuestions: pyqs,
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                    ],
-                  ),
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                gradient: AppGradients.primary,
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Practice PYQs',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-                const Divider(height: 1),
-                Expanded(
-                  child: TabBarView(
-                    children: [
-                      _PdfOrNotesPanel(chapter: chapter),
-                      _HighlightEbookPanel(
-                        chapter: chapter,
-                        highlightQuestions: highlightQuestions,
-                      ),
-                    ],
-                  ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: _HighlightEbookPanel(
+                  chapter: chapter,
+                  highlightQuestions: highlightQuestions,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -1520,6 +1529,7 @@ enum _ReaderBlockType {
   paragraph,
   image,
   figureCaption,
+  table,
 }
 
 class _ReaderBlock {
@@ -1572,6 +1582,8 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     if (trimmed.startsWith('•') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) return true;
     if (RegExp(r'^\([a-z0-9]\)\s+').hasMatch(trimmed)) return true;
     if (RegExp(r'^(Kingdom|Phylum|Subphylum|Division|Class|Order|Family|Genus)\s+[–\-:]?\s*[A-Z]', caseSensitive: false).hasMatch(trimmed)) return true;
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) return true;
+    if (RegExp(r'^(Table|TABLE)\s*\d+[\s.:]', caseSensitive: false).hasMatch(trimmed)) return true;
     return false;
   }
 
@@ -1667,10 +1679,34 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
         continue;
       }
 
+      // Handle Markdown tables: lines starting and ending with '|'
+      if (line.startsWith('|') && line.endsWith('|')) {
+        flushParagraph();
+        final tableBuffer = StringBuffer();
+        tableBuffer.writeln(line);
+        while (i + 1 < lines.length && lines[i + 1].trim().startsWith('|') && lines[i + 1].trim().endsWith('|')) {
+          i++;
+          tableBuffer.writeln(lines[i].trim());
+        }
+        blocks.add(_ReaderBlock(
+          type: _ReaderBlockType.table,
+          text: tableBuffer.toString().trim(),
+        ));
+        continue;
+      }
+
       // Handle standalone image tag
       if (line.startsWith('[IMAGE:')) {
         flushParagraph();
         blocks.add(_classifyBlock(line));
+
+        // Skip next line if it is a duplicate of the image caption
+        if (i + 1 < lines.length) {
+          final nextLine = lines[i + 1].trim();
+          if (RegExp(r'^(figure|fig\.)\s*\d+', caseSensitive: false).hasMatch(nextLine)) {
+            i++;
+          }
+        }
         continue;
       }
 
@@ -1961,13 +1997,46 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
             borderRadius: BorderRadius.circular(AppRadii.sm),
             child: InteractiveViewer(
               minScale: 1.0,
-              maxScale: 3.5,
-              child: FastNetworkImage(
-                url: rawUrl,
+              maxScale: 4.0,
+              child: Image.network(
+                rawUrl,
                 width: double.infinity,
-                height: 260,
                 fit: BoxFit.contain,
-                thumbWidth: 1200,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Container(
+                    height: 220,
+                    width: double.infinity,
+                    color: isDark ? const Color(0xFF161622) : const Color(0xFFF8FAFC),
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Loading diagram...',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return FastNetworkImage(
+                    url: rawUrl,
+                    width: double.infinity,
+                    height: 240,
+                    fit: BoxFit.contain,
+                  );
+                },
               ),
             ),
           ),
@@ -1999,6 +2068,160 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTableBlock(BuildContext context, String tableText, bool isDark) {
+    final rawLines = tableText
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.startsWith('|') && l.endsWith('|'))
+        .toList();
+    if (rawLines.length < 2) return const SizedBox.shrink();
+
+    final headerCells = rawLines[0]
+        .split('|')
+        .map((c) => c.trim())
+        .where((c) => c.isNotEmpty)
+        .toList();
+
+    int dataStartIndex = 1;
+    if (rawLines.length > 1 && RegExp(r'^[|\s\-:]+$').hasMatch(rawLines[1])) {
+      dataStartIndex = 2;
+    }
+
+    final dataRows = <List<String>>[];
+    for (var r = dataStartIndex; r < rawLines.length; r++) {
+      final cells = rawLines[r]
+          .split('|')
+          .map((c) => c.trim())
+          .where((c) => c.isNotEmpty)
+          .toList();
+      if (cells.isNotEmpty) {
+        dataRows.add(cells);
+      }
+    }
+
+    if (headerCells.isEmpty || dataRows.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A27) : Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E2E3E) : AppColors.border,
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2B170E) : AppColors.primarySoft,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.md - 1)),
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? const Color(0xFF3E2718) : AppColors.border,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.table_chart_rounded, size: 16, color: AppColors.primary),
+                const SizedBox(width: 8),
+                const Text(
+                  'HIGH-YIELD COMPARISON TABLE',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: AppColors.primaryDark,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '↔ Swipe horizontally',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowHeight: 44,
+              dataRowMinHeight: 40,
+              dataRowMaxHeight: double.infinity,
+              horizontalMargin: 12,
+              columnSpacing: 16,
+              headingRowColor: WidgetStateProperty.all(
+                isDark ? const Color(0xFF241C16) : const Color(0xFFFFF7ED),
+              ),
+              dataRowColor: WidgetStateProperty.resolveWith((states) {
+                return isDark ? const Color(0xFF1A1A27) : Colors.white;
+              }),
+              columns: headerCells.map((h) {
+                return DataColumn(
+                  label: Text(
+                    h.replaceAll('**', ''),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                      color: isDark ? const Color(0xFFFFA055) : AppColors.primaryDark,
+                    ),
+                  ),
+                );
+              }).toList(),
+              rows: dataRows.asMap().entries.map((entry) {
+                final rowIndex = entry.key;
+                final row = entry.value;
+                final isEven = rowIndex % 2 == 0;
+                return DataRow(
+                  color: WidgetStateProperty.all(
+                    isEven
+                        ? (isDark ? const Color(0xFF1E1E2D) : const Color(0xFFFAFAFA))
+                        : (isDark ? const Color(0xFF171722) : Colors.white),
+                  ),
+                  cells: List.generate(headerCells.length, (colIndex) {
+                    final cellText = colIndex < row.length ? row[colIndex] : '';
+                    return DataCell(
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 220),
+                          child: Text(
+                            cellText.replaceAll('**', ''),
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.45,
+                              color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ),
     );
@@ -2062,6 +2285,8 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
         return _buildImageBlock(context, block, isDark);
       case _ReaderBlockType.figureCaption:
         return _buildFigureCaptionBlock(context, block.text, isDark);
+      case _ReaderBlockType.table:
+        return _buildTableBlock(context, block.text, isDark);
     }
   }
 
