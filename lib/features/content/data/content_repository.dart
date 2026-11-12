@@ -238,7 +238,7 @@ class ContentRepository {
   }
 
   Future<Map<String, dynamic>> fetchChapterDetail(int chapterId) =>
-      _get('/content/chapters/$chapterId');
+      _get('/content/chapters/$chapterId', bypassCache: true);
 
   Future<List<Map<String, dynamic>>> fetchHighlightQuestions(int chapterId) async {
     try {

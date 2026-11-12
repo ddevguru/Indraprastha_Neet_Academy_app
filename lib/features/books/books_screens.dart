@@ -1501,11 +1501,13 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
     final questions = widget.highlightQuestions;
     final chapterTitle = cleanChapterTitle(widget.chapter['title']?.toString(), widget.chapter['topic']?.toString());
     final noteSummary = _normalizeExtractedText(widget.chapter['note_summary']?.toString() ?? '');
+    final chapterId = widget.chapter['id'] as int?;
 
     return SizedBox.expand(
       child: SurfaceCard(
         padding: EdgeInsets.zero,
         child: InteractiveHighlightReader(
+          chapterId: chapterId,
           chapterTitle: chapterTitle,
           content: noteSummary,
           highlightQuestions: questions,
@@ -1548,6 +1550,7 @@ class _ReaderBlock {
 class InteractiveHighlightReader extends StatefulWidget {
   const InteractiveHighlightReader({
     super.key,
+    this.chapterId,
     required this.chapterTitle,
     required this.content,
     required this.highlightQuestions,
@@ -1556,6 +1559,7 @@ class InteractiveHighlightReader extends StatefulWidget {
     this.onViewAllQuestions,
   });
 
+  final int? chapterId;
   final String chapterTitle;
   final String content;
   final List<Map<String, dynamic>> highlightQuestions;
@@ -1619,6 +1623,9 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
       return _ReaderBlock(type: _ReaderBlockType.bullet, text: t.replaceFirst(RegExp(r'^[•\-\*]\s*'), ''));
     }
     if (RegExp(r'^\([a-z0-9]\)\s+').hasMatch(t)) {
+      if (RegExp(r'^\([a-d]\)\s+[A-Za-z0-9\s-]+\([b-d]\)', caseSensitive: false).hasMatch(t)) {
+        return _ReaderBlock(type: _ReaderBlockType.paragraph, text: t);
+      }
       return _ReaderBlock(type: _ReaderBlockType.bullet, text: t);
     }
     if (RegExp(r'^(Section|Topic)\s+\d+', caseSensitive: false).hasMatch(t)) {
@@ -1700,13 +1707,37 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
         flushParagraph();
         blocks.add(_classifyBlock(line));
 
-        // Skip next line if it is a duplicate of the image caption
-        if (i + 1 < lines.length) {
+        // Skip subsequent duplicate figure caption lines and sub-figure labels
+        while (i + 1 < lines.length) {
           final nextLine = lines[i + 1].trim();
-          if (RegExp(r'^(figure|fig\.)\s*\d+', caseSensitive: false).hasMatch(nextLine)) {
+          if (RegExp(r'^(figure|fig\.)\s*\d+', caseSensitive: false).hasMatch(nextLine) ||
+              RegExp(r'^\([a-d]\)\s+[A-Za-z]', caseSensitive: false).hasMatch(nextLine) ||
+              RegExp(r'^\([a-z]\)$', caseSensitive: false).hasMatch(nextLine) ||
+              RegExp(r'^[a-dA-D]$').hasMatch(nextLine)) {
             i++;
+          } else {
+            break;
           }
         }
+        continue;
+      }
+
+      // Handle standalone Figure caption if not preceded by [IMAGE:]
+      if (RegExp(r'^(figure|fig\.)\s*\d+', caseSensitive: false).hasMatch(line)) {
+        flushParagraph();
+        var fullCaption = line;
+        while (i + 1 < lines.length) {
+          final nextLine = lines[i + 1].trim();
+          if (RegExp(r'^\([a-d]\)\s+[A-Za-z]', caseSensitive: false).hasMatch(nextLine) ||
+              RegExp(r'^\([a-z]\)$', caseSensitive: false).hasMatch(nextLine) ||
+              RegExp(r'^[a-dA-D]$').hasMatch(nextLine)) {
+            fullCaption += ' $nextLine';
+            i++;
+          } else {
+            break;
+          }
+        }
+        blocks.add(_classifyBlock(fullCaption));
         continue;
       }
 
@@ -2227,7 +2258,68 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     );
   }
 
+  String? _resolveFigureImageUrl(int? chapterId, String caption) {
+    if (chapterId == null) return null;
+    final match = RegExp(r'^(?:Figure|Fig\.)\s*(\d+)(?:\.(\d+))?', caseSensitive: false).firstMatch(caption.trim());
+    if (match == null) return null;
+
+    // Animal Kingdom mapping (Chapters 37 & 124)
+    if (chapterId == 37 || chapterId == 124) {
+      final sub = match.group(2) ?? '';
+      final lowerCap = caption.toLowerCase();
+      if (sub == '1') {
+        if (lowerCap.contains('(a)')) return '/content/chapters/$chapterId/images/3';
+        if (lowerCap.contains('(b)')) return '/content/chapters/$chapterId/images/2';
+        return '/content/chapters/$chapterId/images/2';
+      }
+      if (sub == '2') return '/content/chapters/$chapterId/images/1';
+      if (sub == '3') return '/content/chapters/$chapterId/images/4';
+      if (sub == '4') return '/content/chapters/$chapterId/images/5';
+      if (sub == '5') return '/content/chapters/$chapterId/images/6';
+      if (sub == '6') return '/content/chapters/$chapterId/images/7';
+      if (sub == '7') return '/content/chapters/$chapterId/images/8';
+      if (sub == '8') return '/content/chapters/$chapterId/images/9';
+      if (sub == '9') return '/content/chapters/$chapterId/images/10';
+      if (sub == '10') return '/content/chapters/$chapterId/images/12';
+      if (sub == '11') return '/content/chapters/$chapterId/images/11';
+      if (sub == '12') return '/content/chapters/$chapterId/images/13';
+      if (sub == '13') return '/content/chapters/$chapterId/images/14';
+      if (sub == '14') return '/content/chapters/$chapterId/images/15';
+      if (sub == '15') return '/content/chapters/$chapterId/images/16';
+      if (sub == '16') return '/content/chapters/$chapterId/images/17';
+      if (sub == '17') return '/content/chapters/$chapterId/images/18';
+      if (sub == '18') return '/content/chapters/$chapterId/images/19';
+      if (sub == '19') return '/content/chapters/$chapterId/images/20';
+      if (sub == '20') return '/content/chapters/$chapterId/images/22';
+      if (sub == '21') return '/content/chapters/$chapterId/images/21';
+      if (sub == '22') return '/content/chapters/$chapterId/images/23';
+      if (sub == '23') return '/content/chapters/$chapterId/images/24';
+      if (sub == '24') return '/content/chapters/$chapterId/images/25';
+    }
+
+    final numStr = match.group(2) ?? match.group(1);
+    final idx = int.tryParse(numStr ?? '');
+    if (idx != null && idx > 0) {
+      return '/content/chapters/$chapterId/images/$idx';
+    }
+    return null;
+  }
+
   Widget _buildFigureCaptionBlock(BuildContext context, String text, bool isDark) {
+    final resolvedUrl = _resolveFigureImageUrl(widget.chapterId, text);
+    if (resolvedUrl != null) {
+      return _buildImageBlock(
+        context,
+        _ReaderBlock(
+          type: _ReaderBlockType.image,
+          text: text,
+          imageUrl: resolvedUrl,
+          caption: text,
+        ),
+        isDark,
+      );
+    }
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 4, bottom: AppSpacing.md),

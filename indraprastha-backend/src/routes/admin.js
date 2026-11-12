@@ -1590,7 +1590,7 @@ router.post('/chapters/:chapterId/re-extract-pdf', adminAuth, async (req, res) =
       return res.status(400).json({ error: 'No PDF file on Drive for this chapter' });
     }
 
-    const buffer = await downloadDriveFileBuffer({ fileId });
+    const buffer = await downloadDriveFileBuffer(fileId);
     if (!buffer || buffer.length === 0) {
       return res.status(400).json({ error: 'Failed to download PDF from Drive' });
     }
