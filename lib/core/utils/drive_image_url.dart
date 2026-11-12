@@ -1,8 +1,10 @@
 import '../constants/api_constants.dart';
+export '../constants/api_constants.dart';
 
 String? extractDriveFileId(String raw) {
   final value = raw.trim();
   if (value.isEmpty) return null;
+  if (value.contains('/chapters/')) return null; // Ignore chapter-served images
   final uri = Uri.tryParse(value);
   if (uri == null) return null;
 
@@ -10,7 +12,7 @@ String? extractDriveFileId(String raw) {
     final idx = uri.pathSegments.indexOf('images');
     if (idx >= 0 && idx + 1 < uri.pathSegments.length) {
       final id = uri.pathSegments[idx + 1];
-      if (id.isNotEmpty) return id;
+      if (id.isNotEmpty && id.length > 5) return id;
     }
   }
 
@@ -25,6 +27,8 @@ String? extractDriveFileId(String raw) {
   if (id == null || id.isEmpty) return null;
   return id;
 }
+
+bool isChapterImageUrl(String raw) => raw.trim().contains('/content/chapters/');
 
 bool isApiImageUrl(String raw) {
   final v = raw.trim();

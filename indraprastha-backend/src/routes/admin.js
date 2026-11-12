@@ -17,6 +17,7 @@ const {
   uploadBufferToDrive,
   uploadFilePathToDrive,
   extractPdfTextWithDriveOcr,
+  downloadDriveFileBuffer,
   normalizeDriveLink,
   extractDriveFileId,
   buildDrivePublicLinks,
@@ -212,7 +213,7 @@ function hierarchyFromBody(body = {}) {
 function extractImagesFromPdf(pdfBuffer) {
   const str = pdfBuffer.toString('latin1');
   const images = [];
-  const regex = /<<([^>]*\/Subtype\s*\/Image[^>]*)>>\s*stream\r?\n/g;
+  const regex = /<<([^>]*\/Subtype\s*\/Image[^>]*)>>\s*stream(\r?\n|\r)/g;
   let match;
 
   while ((match = regex.exec(str)) !== null) {
@@ -222,17 +223,19 @@ function extractImagesFromPdf(pdfBuffer) {
     const lenMatch = dict.match(/\/Length\s+(\d+)/);
     const widthMatch = dict.match(/\/Width\s+(\d+)/);
     const heightMatch = dict.match(/\/Height\s+(\d+)/);
-    const filterMatch = dict.match(/\/Filter\s*\/([A-Za-z0-9]+)/);
 
     const width = widthMatch ? parseInt(widthMatch[1], 10) : 0;
     const height = heightMatch ? parseInt(heightMatch[1], 10) : 0;
-    const filter = filterMatch ? filterMatch[1] : '';
 
     // Ignore tiny icons / masks (< 60px)
     if (width < 60 || height < 60) continue;
 
-    let length = lenMatch ? parseInt(lenMatch[1], 10) : 0;
-    if (!length) {
+    let length = 0;
+    const isIndirectLength = /\/Length\s+\d+\s+0\s+R/i.test(dict);
+    if (!isIndirectLength && lenMatch) {
+      length = parseInt(lenMatch[1], 10);
+    }
+    if (!length || length <= 0) {
       const endStreamIdx = str.indexOf('endstream', streamStart);
       if (endStreamIdx !== -1) {
         length = endStreamIdx - streamStart;
@@ -242,14 +245,26 @@ function extractImagesFromPdf(pdfBuffer) {
     if (length <= 0) continue;
 
     const rawData = pdfBuffer.subarray(streamStart, streamStart + length);
+    const isJpeg = /DCTDecode/i.test(dict) || (rawData[0] === 0xFF && rawData[1] === 0xD8 && rawData[2] === 0xFF);
 
-    if (filter === 'DCTDecode' || filter === 'JBIG2Decode') {
+    if (isJpeg) {
+      let imgBuffer = rawData;
+      const startIdx = rawData.indexOf(Buffer.from([0xFF, 0xD8, 0xFF]));
+      if (startIdx !== -1) {
+        const endIdx = rawData.lastIndexOf(Buffer.from([0xFF, 0xD9]));
+        if (endIdx !== -1 && endIdx > startIdx) {
+          imgBuffer = rawData.subarray(startIdx, endIdx + 2);
+        } else if (startIdx > 0) {
+          imgBuffer = rawData.subarray(startIdx);
+        }
+      }
+
       images.push({
         type: 'jpg',
         mimeType: 'image/jpeg',
         width,
         height,
-        buffer: rawData,
+        buffer: imgBuffer,
       });
     }
   }
@@ -284,6 +299,10 @@ function cleanPdfText(rawText) {
 
     // Filter out standard textbook headers when alone on a line
     if (/^(biology|physics|chemistry)$/i.test(line)) continue;
+
+    // Filter out isolated sub-figure labels e.g. "(a)", "(b)", "(c)", "(d)", "(i)", "(ii)" or standalone single letters "a", "b"
+    if (/^\(([a-z]|\d+|[ivx]+)\)$/i.test(line)) continue;
+    if (/^[a-dA-D]$/.test(line)) continue;
 
     cleanedLines.push(line);
   }

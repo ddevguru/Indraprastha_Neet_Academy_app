@@ -1571,17 +1571,7 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     if (RegExp(r'^(NOTE|IMPORTANT|KEY CONCEPT|DEFINITION|FORMULA|TIP|REMEMBER|SUMMARY|POINTS TO PONDER|NCERT HIGHLIGHT)[\s:]', caseSensitive: false).hasMatch(trimmed)) return true;
     if (trimmed.startsWith('•') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) return true;
     if (RegExp(r'^\([a-z0-9]\)\s+').hasMatch(trimmed)) return true;
-    if (trimmed.length >= 3 && trimmed.length <= 70 && !trimmed.endsWith('.') && RegExp(r'^[A-Z0-9\s:,\-\–\(\)]+$').hasMatch(trimmed) && trimmed.contains(RegExp(r'[A-Z]'))) {
-      if (!RegExp(r'^(Chapter|Unit)\s*\d+$', caseSensitive: false).hasMatch(trimmed)) {
-        return true;
-      }
-    }
-    if (trimmed.length <= 50 && !trimmed.endsWith('.') && !trimmed.endsWith(',') && !trimmed.contains(';') && RegExp(r'^[A-Z][a-zA-Z0-9\s\-\–:]+$').hasMatch(trimmed)) {
-      final words = trimmed.split(RegExp(r'\s+'));
-      if (words.length <= 6 && !RegExp(r'^(Chapter|Unit)\s*\d+$', caseSensitive: false).hasMatch(trimmed)) {
-        return true;
-      }
-    }
+    if (RegExp(r'^(Kingdom|Phylum|Subphylum|Division|Class|Order|Family|Genus)\s+[–\-:]?\s*[A-Z]', caseSensitive: false).hasMatch(trimmed)) return true;
     return false;
   }
 
@@ -1628,16 +1618,8 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     if (RegExp(r'^\d+\.\d+\s+').hasMatch(t)) {
       return _ReaderBlock(type: _ReaderBlockType.h2, text: t);
     }
-    if (t.length >= 3 && t.length <= 70 && !t.endsWith('.') && RegExp(r'^[A-Z0-9\s:,\-\–\(\)]+$').hasMatch(t) && t.contains(RegExp(r'[A-Z]'))) {
-      if (!RegExp(r'^(Chapter|Unit)\s*\d+$', caseSensitive: false).hasMatch(t)) {
-        return _ReaderBlock(type: _ReaderBlockType.h1, text: t);
-      }
-    }
-    if (t.length <= 50 && !t.endsWith('.') && !t.endsWith(',') && !t.contains(';') && RegExp(r'^[A-Z][a-zA-Z0-9\s\-\–:]+$').hasMatch(t)) {
-      final words = t.split(RegExp(r'\s+'));
-      if (words.length <= 6 && !RegExp(r'^(Chapter|Unit)\s*\d+$', caseSensitive: false).hasMatch(t)) {
-        return _ReaderBlock(type: _ReaderBlockType.h2, text: t);
-      }
+    if (RegExp(r'^(Kingdom|Phylum|Subphylum|Division|Class|Order|Family|Genus)\s+[–\-:]?\s*[A-Z]', caseSensitive: false).hasMatch(t)) {
+      return _ReaderBlock(type: _ReaderBlockType.h2, text: t);
     }
     return _ReaderBlock(type: _ReaderBlockType.paragraph, text: t);
   }
@@ -1692,8 +1674,9 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
         continue;
       }
 
-      // Handle orphaned sub-labels like "(a)", "(b)", "(c)", "(d)"
-      if (RegExp(r'^\([a-d]\)$', caseSensitive: false).hasMatch(line)) {
+      // Handle orphaned sub-labels like "(a)", "(b)", "(c)", "(d)", "(i)", "(ii)" or standalone single letters "a", "b"
+      if (RegExp(r'^\(([a-z]|\d+|[ivx]+)\)$', caseSensitive: false).hasMatch(line) ||
+          RegExp(r'^[a-dA-D]$').hasMatch(line)) {
         continue;
       }
 

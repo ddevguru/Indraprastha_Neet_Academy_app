@@ -147,8 +147,12 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
   String _resolvedUrl() {
     final raw = widget.url.trim();
     if (raw.isEmpty) return raw;
+    if (isChapterImageUrl(raw)) {
+      return raw.startsWith('/') ? '$baseUrl$raw' : raw;
+    }
     final id = extractDriveFileId(raw);
     if (id == null || id.isEmpty) {
+      if (raw.startsWith('/')) return '$baseUrl$raw';
       return isApiImageUrl(raw) ? raw : resolveDriveImageUrl(raw, thumbWidth: widget.thumbWidth);
     }
     return switch (_fallbackStep) {
