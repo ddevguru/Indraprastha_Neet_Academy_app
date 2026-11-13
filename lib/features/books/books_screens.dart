@@ -442,47 +442,9 @@ class ChapterDetailScreen extends ConsumerWidget {
         final highlightQuestions = List<Map<String, dynamic>>.from(
           snapshot.data?['highlightQuestions'] as List<dynamic>? ?? const [],
         );
-        final chapterIdString = chapter['id']?.toString() ?? '$chapterId';
-        final isSaved =
-            ref.watch(appUiControllerProvider).savedChapterIds.contains(chapterIdString);
-        final driveLink = _resolveMaterialLink(chapter);
-        final hasDrivePdf = driveLink.isNotEmpty;
-
         return Scaffold(
           appBar: AppBar(
             title: Text(cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString())),
-            actions: [
-              if (hasDrivePdf)
-                IconButton(
-                  tooltip: 'View Original PDF',
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
-                  onPressed: () {
-                    final previewUrl = _toDrivePreviewUrl(driveLink);
-                    if (previewUrl != null) {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => Scaffold(
-                            appBar: AppBar(
-                              title: Text(cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString())),
-                            ),
-                            body: _PdfOrNotesPanel(chapter: chapter),
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                ),
-              IconButton(
-                onPressed: () => ref
-                    .read(appUiControllerProvider.notifier)
-                    .toggleSavedChapter(chapterIdString),
-                icon: Icon(
-                  isSaved
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                ),
-              ),
-            ],
           ),
           body: _HighlightEbookPanel(
             chapter: chapter,
