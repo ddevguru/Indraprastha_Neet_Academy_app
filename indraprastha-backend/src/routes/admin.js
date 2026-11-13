@@ -399,6 +399,154 @@ async function extractPdfBasics(fileBuffer, fileName = 'document.pdf', chapterId
   }
 }
 
+function extractPdfHighlightAnnotations(pdfBuffer) {
+  const highlights = [];
+  try {
+    const raw = Buffer.isBuffer(pdfBuffer) ? pdfBuffer.toString('latin1') : String(pdfBuffer);
+    const annotRegex = /<<[^>]*\/Subtype\s*\/Highlight[^>]*>>/g;
+    let match;
+    while ((match = annotRegex.exec(raw)) !== null) {
+      const annotDict = match[0];
+      const contentsMatch = annotDict.match(/\/Contents\s*\(([^)]+)\)/);
+      if (contentsMatch && contentsMatch[1]) {
+        const text = contentsMatch[1].trim();
+        if (text.length > 5 && !highlights.includes(text)) {
+          highlights.push(text);
+        }
+      }
+    }
+  } catch (_) {}
+  return highlights;
+}
+
+function mergeDualPdfBlanksAndHighlights(baseText, highlightText, annotations = []) {
+  let blanksCount = 0;
+  const detectedHighlights = [...annotations];
+
+  if (!baseText || baseText.trim().length === 0) {
+    let fallback = highlightText || '';
+    const tagMatches = fallback.match(/\[BLANK:\s*[^\]]+\]/gi);
+    if (tagMatches) blanksCount += tagMatches.length;
+    return {
+      mergedText: fallback,
+      blanksCount,
+      highlightsCount: detectedHighlights.length,
+    };
+  }
+
+  let result = baseText;
+
+  // 1. If highlightText has explicit [BLANK: answer] tags, merge them into result
+  if (highlightText && /\[BLANK:\s*[^\]]+\]/i.test(highlightText)) {
+    const hlSentences = highlightText.split(/(?<=[.?!])\s+/);
+    for (const hls of hlSentences) {
+      if (/\[BLANK:\s*[^\]]+\]/i.test(hls)) {
+        const cleanSearch = hls.replace(/\[BLANK:\s*([^\]]+)\]/gi, '$1').trim();
+        if (cleanSearch.length > 15) {
+          const idx = result.indexOf(cleanSearch);
+          if (idx !== -1) {
+            result = result.substring(0, idx) + hls.trim() + result.substring(idx + cleanSearch.length);
+            const matches = hls.match(/\[BLANK:\s*[^\]]+\]/gi);
+            if (matches) blanksCount += matches.length;
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Detect blanks indicated by underscores (____), dots (....), or word-diff between base and highlight text
+  if (highlightText && highlightText.trim().length > 50) {
+    const baseLines = result.split('\n');
+    const hlLines = highlightText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    const newLines = [];
+
+    for (let line of baseLines) {
+      const trimmed = line.trim();
+      // Skip markdown structures, images, headings, and tables
+      if (
+        trimmed.startsWith('#') ||
+        trimmed.startsWith('|') ||
+        trimmed.startsWith('[IMAGE:') ||
+        trimmed.length < 20 ||
+        /\[BLANK:\s*[^\]]+\]/i.test(trimmed)
+      ) {
+        newLines.push(line);
+        continue;
+      }
+
+      // Check if any line in hlLines matches this base line
+      const baseWords = trimmed.split(/\s+/);
+      let bestHlMatch = null;
+      let maxOverlap = 0;
+
+      for (const hl of hlLines) {
+        const hTrim = hl.trim();
+        if (hTrim.length < 15) continue;
+        let overlap = 0;
+        for (const bw of baseWords) {
+          const cleanBw = bw.replace(/[^a-zA-Z0-9]/g, '');
+          if (cleanBw.length >= 4 && hTrim.toLowerCase().includes(cleanBw.toLowerCase())) {
+            overlap++;
+          }
+        }
+        if (overlap > maxOverlap && overlap >= Math.min(3, Math.floor(baseWords.length * 0.35))) {
+          maxOverlap = overlap;
+          bestHlMatch = hTrim;
+        }
+      }
+
+      if (bestHlMatch) {
+        let modifiedLine = trimmed;
+        // Case A: bestHlMatch has explicit underscores / dots: ____ or .....
+        if (/_{2,}|\.{3,}|\[\s*_{2,}\s*\]/.test(bestHlMatch)) {
+          for (const bw of baseWords) {
+            const cleanBw = bw.replace(/[^a-zA-Z0-9-]/g, '');
+            const stopWords = new Set(['that', 'this', 'with', 'from', 'have', 'were', 'which', 'their', 'there', 'they', 'been', 'these', 'about']);
+            if (cleanBw.length >= 4 && !stopWords.has(cleanBw.toLowerCase())) {
+              const inHl = new RegExp('\\b' + cleanBw + '\\b', 'i').test(bestHlMatch);
+              if (!inHl) {
+                const wordRegex = new RegExp('\\b' + cleanBw + '\\b');
+                if (wordRegex.test(modifiedLine) && !modifiedLine.includes(`[BLANK: ${cleanBw}]`)) {
+                  modifiedLine = modifiedLine.replace(wordRegex, `[BLANK: ${cleanBw}]`);
+                  blanksCount++;
+                }
+              }
+            }
+          }
+        }
+
+        // Case B: bestHlMatch has words wrapped in **word** or _word_ or ==word==
+        const markedWordMatch = bestHlMatch.match(/(\*\*|_|==)([a-zA-Z0-9-]+)\1/g);
+        if (markedWordMatch) {
+          for (const mw of markedWordMatch) {
+            const cleanMw = mw.replace(/[\*_=]/g, '').trim();
+            if (cleanMw.length >= 3) {
+              const wordRegex = new RegExp('\\b' + cleanMw + '\\b');
+              if (wordRegex.test(modifiedLine) && !modifiedLine.includes(`[BLANK: ${cleanMw}]`)) {
+                modifiedLine = modifiedLine.replace(wordRegex, `[BLANK: ${cleanMw}]`);
+                blanksCount++;
+              }
+            }
+          }
+        }
+
+        newLines.push(modifiedLine);
+      } else {
+        newLines.push(line);
+      }
+    }
+    result = newLines.join('\n');
+  }
+
+  const totalBlanks = (result.match(/\[BLANK:\s*[^\]]+\]/gi) || []).length;
+
+  return {
+    mergedText: result,
+    blanksCount: totalBlanks,
+    highlightsCount: detectedHighlights.length,
+  };
+}
+
 async function autoMatchPyqsToChapterText(chapterId, text) {
   if (!text || text.trim().length < 50) return [];
 
@@ -1615,6 +1763,101 @@ router.post('/chapters/:chapterId/re-extract-pdf', adminAuth, async (req, res) =
     });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Re-extraction failed' });
+  }
+});
+
+// Sync Dual PDFs: Auto-detect blanks and highlights between Base PDF and Highlight PDF
+router.post('/chapters/:chapterId/sync-blanks-highlights', adminAuth, async (req, res) => {
+  try {
+    const chapterId = parseInt(req.params.chapterId, 10);
+    const chapterRes = await pool.query(
+      `SELECT id, title, highlight_drive_file_id, material_drive_file_id, 
+              highlight_drive_link, material_drive_link, highlight_drive_folder_id, note_summary 
+       FROM book_chapters WHERE id = $1`,
+      [chapterId]
+    );
+    if (chapterRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Chapter not found' });
+    }
+
+    const ch = chapterRes.rows[0];
+    const regularFileId =
+      ch.material_drive_file_id ||
+      extractDriveFileId(ch.material_drive_link);
+    const highlightFileId =
+      ch.highlight_drive_file_id ||
+      extractDriveFileId(ch.highlight_drive_link);
+
+    if (!regularFileId && !highlightFileId) {
+      return res.status(400).json({ error: 'No PDF files uploaded for this chapter yet' });
+    }
+
+    let baseText = ch.note_summary || '';
+    let imagesCount = 0;
+    let highlightText = '';
+    let annotations = [];
+
+    // 1. Download & process Base PDF (PDF 1) if available
+    if (regularFileId) {
+      try {
+        const baseBuffer = await downloadDriveFileBuffer(regularFileId);
+        if (baseBuffer && baseBuffer.length > 0) {
+          const extracted = await extractPdfBasics(
+            baseBuffer,
+            `${ch.title || 'Chapter'}_Base.pdf`,
+            chapterId,
+            ch.highlight_drive_folder_id
+          );
+          if (extracted.noteSummary) {
+            baseText = extracted.noteSummary;
+          }
+          imagesCount = extracted.imagesCount || 0;
+        }
+      } catch (baseErr) {
+        console.warn('Base PDF download/extract notice:', baseErr.message);
+      }
+    }
+
+    // 2. Download & process Highlight & Blanks PDF (PDF 2) if available
+    if (highlightFileId) {
+      try {
+        const hlBuffer = await downloadDriveFileBuffer(highlightFileId);
+        if (hlBuffer && hlBuffer.length > 0) {
+          annotations = extractPdfHighlightAnnotations(hlBuffer);
+          const parsed = await pdfParse(Buffer.from(hlBuffer));
+          highlightText = parsed.text || '';
+          if (!highlightText || highlightText.trim().length < 200) {
+            const ocr = await extractPdfTextWithDriveOcr({
+              fileBuffer: hlBuffer,
+              fileName: `${ch.title || 'Chapter'}_Highlights.pdf`,
+            });
+            if (ocr) highlightText = ocr;
+          }
+        }
+      } catch (hlErr) {
+        console.warn('Highlight PDF download/extract notice:', hlErr.message);
+      }
+    }
+
+    // 3. Merge blanks and highlights
+    const merged = mergeDualPdfBlanksAndHighlights(baseText, highlightText, annotations);
+
+    // 4. Save to database
+    await pool.query(
+      'UPDATE book_chapters SET note_summary = $1 WHERE id = $2',
+      [merged.mergedText, chapterId]
+    );
+
+    return res.json({
+      success: true,
+      chapterId,
+      blanksCount: merged.blanksCount,
+      highlightsCount: merged.highlightsCount,
+      imagesCount,
+      noteSummaryLength: merged.mergedText.length,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Dual PDF sync failed' });
   }
 });
 

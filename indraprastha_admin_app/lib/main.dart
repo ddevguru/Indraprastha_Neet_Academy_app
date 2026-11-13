@@ -1582,6 +1582,7 @@ class _BooksPageState extends State<BooksPage> {
   String? _pickedHighlightFileName;
   int? _pickedHighlightFileSize;
   bool _uploadingHighlightPdf = false;
+  bool _syncingBlanksAndHighlights = false;
 
   // Chapter Highlight Questions (Interactive Tap & Solve)
   final _hlText = TextEditingController();
@@ -2402,24 +2403,41 @@ class _BooksPageState extends State<BooksPage> {
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.menu_book_rounded, color: Colors.indigo, size: 20),
+                                    const Icon(Icons.auto_stories_rounded, color: Colors.indigo, size: 22),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        'Chapter eBooks: ${selectedChapterMap?['title'] ?? 'Chapter'}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                        'Dual Chapter eBooks: ${selectedChapterMap?['title'] ?? 'Chapter'}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Upload regular eBook PDF and highlighted eBook PDF. Both cover this chapter, with highlights marked in the highlight version.',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.indigo.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.indigo.withValues(alpha: 0.25)),
+                                  ),
+                                  child: const Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(Icons.info_outline_rounded, size: 16, color: Colors.indigo),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Dual PDF System: Upload (1) Base Textbook PDF with complete reading text & diagrams, and (2) Highlights & Blanks PDF. The system automatically compares both to detect where blanks [BLANK: word] and tap-to-solve highlights appear in the student app.',
+                                          style: TextStyle(fontSize: 11.5, color: Colors.indigo, height: 1.4),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 12),
 
-                                // 1. Regular eBook (PDF)
+                                // 1. Base Textbook eBook (PDF 1)
                                 Card(
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
@@ -2436,12 +2454,21 @@ class _BooksPageState extends State<BooksPage> {
                                       children: [
                                         Row(
                                           children: [
-                                            const Icon(Icons.picture_as_pdf_rounded, size: 20, color: Colors.indigo),
+                                            const Icon(Icons.menu_book_rounded, size: 20, color: Colors.indigo),
                                             const SizedBox(width: 8),
                                             const Expanded(
-                                              child: Text(
-                                                'Regular eBook (PDF)',
-                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'PDF 1: Base Textbook & Diagrams (Clean Content)',
+                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                                  ),
+                                                  Text(
+                                                    'Original textbook reading text, formulas, tables & diagrams',
+                                                    style: TextStyle(fontSize: 10.5, color: Colors.grey),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                             if (hasRegularPdf)
@@ -2567,7 +2594,7 @@ class _BooksPageState extends State<BooksPage> {
                                                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                                         : const Icon(Icons.cloud_upload_rounded, size: 20),
                                                     label: Text(
-                                                      _uploadingRegularPdf ? 'Uploading to Google Drive...' : 'Upload Regular eBook Now',
+                                                      _uploadingRegularPdf ? 'Uploading Base PDF to Drive...' : 'Upload Base Textbook PDF Now',
                                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                                     ),
                                                     style: ElevatedButton.styleFrom(
@@ -2591,7 +2618,7 @@ class _BooksPageState extends State<BooksPage> {
                                                               });
                                                               await _loadChaptersForSelectedBook();
                                                               if (context.mounted) {
-                                                                _showActionSnackBar(context, 'Regular eBook PDF uploaded successfully to Google Drive!');
+                                                                _showActionSnackBar(context, 'Base eBook PDF uploaded successfully to Google Drive!');
                                                               }
                                                             } catch (e) {
                                                               if (context.mounted) {
@@ -2615,7 +2642,7 @@ class _BooksPageState extends State<BooksPage> {
                                               OutlinedButton.icon(
                                                 icon: const Icon(Icons.upload_file_rounded, size: 18, color: Colors.indigo),
                                                 label: Text(
-                                                  hasRegularPdf ? 'Replace Regular eBook PDF' : 'Select Regular eBook PDF (Pick PDF)',
+                                                  hasRegularPdf ? 'Replace Base Textbook PDF' : 'Select Base Textbook PDF (Pick PDF)',
                                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                                 ),
                                                 style: OutlinedButton.styleFrom(
@@ -2630,7 +2657,7 @@ class _BooksPageState extends State<BooksPage> {
                                                 OutlinedButton.icon(
                                                   icon: const Icon(Icons.bolt_rounded, size: 18, color: Colors.indigo),
                                                   label: const Text(
-                                                    '⚡ Re-extract Diagrams & Clean Text',
+                                                    '⚡ Re-extract Base Text & Diagrams',
                                                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                                   ),
                                                   style: OutlinedButton.styleFrom(
@@ -2641,7 +2668,7 @@ class _BooksPageState extends State<BooksPage> {
                                                   ),
                                                   onPressed: () async {
                                                     try {
-                                                      _showActionSnackBar(context, 'Re-extracting diagrams and text from PDF...');
+                                                      _showActionSnackBar(context, 'Re-extracting diagrams and text from Base PDF...');
                                                       final res = await widget.api.reExtractChapterPdf(_selectedChapterId!);
                                                       await _loadChaptersForSelectedBook();
                                                       if (context.mounted) {
@@ -2663,7 +2690,7 @@ class _BooksPageState extends State<BooksPage> {
                                 ),
                                 const SizedBox(height: 8),
 
-                                // 2. Highlighted eBook (PDF)
+                                // 2. Active Recall eBook (PDF 2: Highlights & Fill-in-the-Blanks)
                                 Card(
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
@@ -2680,12 +2707,21 @@ class _BooksPageState extends State<BooksPage> {
                                       children: [
                                         Row(
                                           children: [
-                                            const Icon(Icons.highlight_rounded, size: 20, color: Colors.amber),
+                                            Icon(Icons.edit_note_rounded, size: 22, color: Colors.amber.shade800),
                                             const SizedBox(width: 8),
                                             const Expanded(
-                                              child: Text(
-                                                'Highlighted eBook (PDF)',
-                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'PDF 2: Highlights & Fill-in-the-Blanks eBook (Active Recall)',
+                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                                  ),
+                                                  Text(
+                                                    'Marked PDF with blanks and highlighted lines for active recall',
+                                                    style: TextStyle(fontSize: 10.5, color: Colors.grey),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                             if (hasHighlightPdf)
@@ -2811,7 +2847,7 @@ class _BooksPageState extends State<BooksPage> {
                                                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                                         : const Icon(Icons.cloud_upload_rounded, size: 20),
                                                     label: Text(
-                                                      _uploadingHighlightPdf ? 'Uploading to Google Drive...' : 'Upload Highlighted eBook Now',
+                                                      _uploadingHighlightPdf ? 'Uploading Highlights PDF to Drive...' : 'Upload Highlights & Blanks eBook Now',
                                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                                     ),
                                                     style: ElevatedButton.styleFrom(
@@ -2835,7 +2871,7 @@ class _BooksPageState extends State<BooksPage> {
                                                               });
                                                               await _loadChaptersForSelectedBook();
                                                               if (context.mounted) {
-                                                                _showActionSnackBar(context, 'Highlighted eBook PDF uploaded successfully to Google Drive!');
+                                                                _showActionSnackBar(context, 'Highlights & Blanks eBook uploaded successfully! Blanks auto-mapped.');
                                                               }
                                                             } catch (e) {
                                                               if (context.mounted) {
@@ -2859,7 +2895,7 @@ class _BooksPageState extends State<BooksPage> {
                                               OutlinedButton.icon(
                                                 icon: const Icon(Icons.upload_file_rounded, size: 18, color: Colors.amber),
                                                 label: Text(
-                                                  hasHighlightPdf ? 'Replace Highlighted eBook PDF' : 'Select Highlighted eBook PDF (Pick PDF)',
+                                                  hasHighlightPdf ? 'Replace Highlights & Blanks PDF' : 'Select Highlights & Blanks PDF (Pick PDF)',
                                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                                 ),
                                                 style: OutlinedButton.styleFrom(
@@ -2870,39 +2906,104 @@ class _BooksPageState extends State<BooksPage> {
                                                 ),
                                                 onPressed: _pickHighlightPdf,
                                               ),
-                                              if (hasHighlightPdf)
-                                                OutlinedButton.icon(
-                                                  icon: const Icon(Icons.bolt_rounded, size: 18, color: Colors.indigo),
-                                                  label: const Text(
-                                                    '⚡ Re-extract Diagrams & Clean Text',
-                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                                  ),
-                                                  style: OutlinedButton.styleFrom(
-                                                    foregroundColor: Colors.indigo,
-                                                    side: const BorderSide(color: Colors.indigo),
-                                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                                  ),
-                                                  onPressed: () async {
-                                                    try {
-                                                      _showActionSnackBar(context, 'Re-extracting diagrams and text from PDF...');
-                                                      final res = await widget.api.reExtractChapterPdf(_selectedChapterId!);
-                                                      await _loadChaptersForSelectedBook();
-                                                      if (context.mounted) {
-                                                        _showActionSnackBar(context, 'Extraction complete! Extracted ${res['imagesCount'] ?? 0} diagrams.');
-                                                      }
-                                                    } catch (err) {
-                                                      if (context.mounted) {
-                                                        _showActionSnackBar(context, 'Extraction error: $err', isError: true);
-                                                      }
-                                                    }
-                                                  },
-                                                ),
                                             ],
                                           ),
                                         ],
                                       ],
                                     ),
+                                  ),
+                                ),
+
+                                // 3. Dual PDF Sync Action Card (Auto-detect blanks and map to Student App)
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.indigo.withValues(alpha: 0.10),
+                                        Colors.amber.withValues(alpha: 0.12),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: Colors.amber.shade700.withValues(alpha: 0.45),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.amber.shade700,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.bolt_rounded, size: 16, color: Colors.white),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Expanded(
+                                            child: Text(
+                                              '⚡ Auto-Detect Blanks & Highlights for Student App',
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      const Text(
+                                        'Compares PDF 1 (Base Content) and PDF 2 (Marked PDF) to automatically detect fill-in-the-blanks [BLANK: word] and tap-to-solve highlights, then synchronizes the active recall reader directly into the student app.',
+                                        style: TextStyle(fontSize: 11, color: Colors.grey, height: 1.4),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        height: 40,
+                                        child: ElevatedButton.icon(
+                                          icon: _syncingBlanksAndHighlights
+                                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                              : const Icon(Icons.sync_alt_rounded, size: 18),
+                                          label: Text(
+                                            _syncingBlanksAndHighlights
+                                                ? 'Comparing PDFs & Detecting Blanks...'
+                                                : '⚡ Sync Both PDFs & Map to Student App',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.amber.shade800,
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          onPressed: _syncingBlanksAndHighlights
+                                              ? null
+                                              : () async {
+                                                  setState(() => _syncingBlanksAndHighlights = true);
+                                                  try {
+                                                    _showActionSnackBar(context, 'Comparing PDFs and detecting blanks & highlights...');
+                                                    final res = await widget.api.syncChapterBlanksAndHighlights(_selectedChapterId!);
+                                                    await _loadChaptersForSelectedBook();
+                                                    if (context.mounted) {
+                                                      _showActionSnackBar(
+                                                        context,
+                                                        'Sync complete! Detected ${res['blanksCount'] ?? 0} blanks, ${res['highlightsCount'] ?? 0} highlights, and ${res['imagesCount'] ?? 0} diagrams mapped to Student App.',
+                                                      );
+                                                    }
+                                                  } catch (err) {
+                                                    if (context.mounted) {
+                                                      _showActionSnackBar(context, 'Sync error: $err', isError: true);
+                                                    }
+                                                  } finally {
+                                                    if (mounted) setState(() => _syncingBlanksAndHighlights = false);
+                                                  }
+                                                },
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -13613,6 +13714,9 @@ class AdminApi {
 
   Future<Map<String, dynamic>> reExtractChapterPdf(int chapterId) async =>
       await _postMap('/admin/chapters/$chapterId/re-extract-pdf', {});
+
+  Future<Map<String, dynamic>> syncChapterBlanksAndHighlights(int chapterId) async =>
+      await _postMap('/admin/chapters/$chapterId/sync-blanks-highlights', {});
 
   Future<Map<String, dynamic>> updateChapterNotesText({
     required int chapterId,
