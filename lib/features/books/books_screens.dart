@@ -484,79 +484,9 @@ class ChapterDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-          body: Column(
-            children: [
-              // ── Chapter info header ─────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.sm),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString()),
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    if ((chapter['overview']?.toString() ?? '').isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(chapter['overview']?.toString() ?? ''),
-                    ],
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        Text(
-                          'Linked PYQs: ${chapter['linked_pyq_count'] ?? pyqs.length}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const Spacer(),
-                        if (pyqs.isNotEmpty)
-                          InkWell(
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => PracticeAttemptScreen(
-                                  setId: 0,
-                                  chapterName: cleanChapterTitle(chapter['title']?.toString(), chapter['topic']?.toString()),
-                                  chapterQuestions: pyqs,
-                                ),
-                              ),
-                            ),
-                            borderRadius: BorderRadius.circular(AppRadii.md),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                gradient: AppGradients.primary,
-                                borderRadius: BorderRadius.circular(AppRadii.md),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Practice PYQs',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: _HighlightEbookPanel(
-                  chapter: chapter,
-                  highlightQuestions: highlightQuestions,
-                ),
-              ),
-            ],
+          body: _HighlightEbookPanel(
+            chapter: chapter,
+            highlightQuestions: highlightQuestions,
           ),
         );
       },
@@ -1501,7 +1431,9 @@ class _HighlightEbookPanelState extends State<_HighlightEbookPanel> {
     final questions = widget.highlightQuestions;
     final chapterTitle = cleanChapterTitle(widget.chapter['title']?.toString(), widget.chapter['topic']?.toString());
     final noteSummary = _normalizeExtractedText(widget.chapter['note_summary']?.toString() ?? '');
-    final chapterId = widget.chapter['id'] as int?;
+    final chapterId = widget.chapter['id'] is int
+        ? widget.chapter['id'] as int
+        : int.tryParse(widget.chapter['id']?.toString() ?? '');
 
     return SizedBox.expand(
       child: SurfaceCard(
@@ -1573,6 +1505,102 @@ class InteractiveHighlightReader extends StatefulWidget {
 
 class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader> {
   double _fontSize = 15.5;
+  Map<String, String> _localNotes = {};
+  Set<String> _solvedBlanks = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocalNotesAndBlanks();
+  }
+
+  Future<void> _loadLocalNotesAndBlanks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final chId = widget.chapterId ?? 0;
+    final prefix = 'student_note_${chId}_';
+    final notes = <String, String>{};
+    for (final key in prefs.getKeys()) {
+      if (key.startsWith(prefix)) {
+        final val = prefs.getString(key);
+        if (val != null && val.isNotEmpty) {
+          notes[key.substring(prefix.length)] = val;
+        }
+      }
+    }
+    final blanksList = prefs.getStringList('chapter_blanks_$chId') ?? [];
+    if (mounted) {
+      setState(() {
+        _localNotes = notes;
+        _solvedBlanks = blanksList.toSet();
+      });
+    }
+  }
+
+  Future<void> _saveLocalNote(String sentenceKey, String note) async {
+    final prefs = await SharedPreferences.getInstance();
+    final chId = widget.chapterId ?? 0;
+    final key = 'student_note_${chId}_$sentenceKey';
+    if (note.trim().isEmpty) {
+      await prefs.remove(key);
+      if (mounted) {
+        setState(() => _localNotes.remove(sentenceKey));
+      }
+    } else {
+      await prefs.setString(key, note.trim());
+      if (mounted) {
+        setState(() => _localNotes[sentenceKey] = note.trim());
+      }
+    }
+  }
+
+  Future<void> _markBlankSolved(String blankKey) async {
+    final prefs = await SharedPreferences.getInstance();
+    final chId = widget.chapterId ?? 0;
+    _solvedBlanks.add(blankKey);
+    await prefs.setStringList('chapter_blanks_$chId', _solvedBlanks.toList());
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _resetBlank(String blankKey) async {
+    final prefs = await SharedPreferences.getInstance();
+    final chId = widget.chapterId ?? 0;
+    _solvedBlanks.remove(blankKey);
+    await prefs.setStringList('chapter_blanks_$chId', _solvedBlanks.toList());
+    if (mounted) setState(() {});
+  }
+
+  void _openWhiteCanvas(BuildContext context, String highlightText) {
+    final cleanKey = highlightText
+        .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
+        .toLowerCase();
+    final sentenceKey = cleanKey.length > 40 ? cleanKey.substring(0, 40) : cleanKey;
+    final initialNote = _localNotes[sentenceKey] ?? '';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => _WhiteCanvasNoteDialog(
+        highlightText: highlightText,
+        initialNote: initialNote,
+        onSave: (note) => _saveLocalNote(sentenceKey, note),
+      ),
+    );
+  }
+
+  void _openBlankSolveDialog(BuildContext context, String sentenceContext, String answer, String blankKey) {
+    final isAlreadySolved = _solvedBlanks.contains(blankKey);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _BlankSolveBottomSheet(
+        sentenceContext: sentenceContext,
+        correctAnswer: answer,
+        isSolved: isAlreadySolved,
+        onSolved: () => _markBlankSolved(blankKey),
+        onReset: () => _resetBlank(blankKey),
+      ),
+    );
+  }
 
   bool _isBlockHeadingOrSpecial(String line) {
     final trimmed = line.trim();
@@ -2057,46 +2085,11 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
                     width: double.infinity,
                     color: isDark ? const Color(0xFF14141E) : const Color(0xFFF8FAFC),
                     alignment: Alignment.center,
-                    child: Image.network(
-                      rawUrl,
+                    child: FastNetworkImage(
+                      url: rawUrl,
                       width: double.infinity,
                       height: 230,
                       fit: BoxFit.contain,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return Container(
-                          height: 230,
-                          width: double.infinity,
-                          color: isDark ? const Color(0xFF14141E) : const Color(0xFFF8FAFC),
-                          alignment: Alignment.center,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Loading diagram...',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return FastNetworkImage(
-                          url: rawUrl,
-                          width: double.infinity,
-                          height: 230,
-                          fit: BoxFit.contain,
-                        );
-                      },
                     ),
                   ),
                 ),
@@ -2450,75 +2443,33 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
 
     return Column(
       children: [
-        // ── Reader Top Bar ─────────────────────────────────────────
+        // ── Reader Top Bar (Clean font size controls only) ───────────
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E1E2D) : AppColors.primarySoft,
             border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.15))),
           ),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [AppColors.primaryDark, AppColors.primary]),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.bolt_rounded, size: 14, color: Colors.white),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${questions.length} PYQ Highlights',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF065F46) : const Color(0xFFD1FAE5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle_rounded,
-                      size: 13,
-                      color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${widget.solvedQuestionIds.length}/${questions.length} Solved',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              // Font size controls
               IconButton(
                 visualDensity: VisualDensity.compact,
                 icon: const Text('A-', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 tooltip: 'Decrease font size',
                 onPressed: _fontSize > 13 ? () => setState(() => _fontSize -= 1.0) : null,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.black26 : Colors.white.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${_fontSize.toStringAsFixed(1)} pt',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                ),
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
@@ -2526,13 +2477,6 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
                 tooltip: 'Increase font size',
                 onPressed: _fontSize < 24 ? () => setState(() => _fontSize += 1.0) : null,
               ),
-              if (widget.onViewAllQuestions != null && questions.isNotEmpty)
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.format_list_bulleted_rounded, size: 20),
-                  tooltip: 'View All Questions List',
-                  onPressed: widget.onViewAllQuestions,
-                ),
             ],
           ),
         ),
@@ -2561,69 +2505,20 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          'Upload chapter PDF in the Admin Panel to automatically generate this chapter\'s text with clickable PYQ underlines.',
+                          'Notes and textbook text will be displayed here.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
                         ),
-                        if (questions.isNotEmpty) ...[
-                          const SizedBox(height: AppSpacing.lg),
-                          FilledButton.icon(
-                            icon: const Icon(Icons.bolt_rounded),
-                            label: Text('Solve ${questions.length} Linked PYQs Now'),
-                            onPressed: widget.onViewAllQuestions,
-                          ),
-                        ],
                       ],
                     ),
                   ),
                 )
               : SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.xxl),
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xxl),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Interactive instruction pill
-                      Container(
-                        margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF2D1515) : const Color(0xFFFFF1F2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECDD3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.touch_app_rounded, color: Color(0xFFE53935), size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Tap any red-underlined sentence to solve its NEET PYQ on the spot!',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Chapter Title Banner
-                      Text(
-                        cleanChapterTitle(widget.chapterTitle),
-                        style: TextStyle(
-                          fontSize: _fontSize + 4,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Formatted Structured Blocks (H1, H2, H3, Callouts, Bullets, Paragraphs)
+                      // Formatted Structured Blocks (H1, H2, H3, Callouts, Bullets, Paragraphs, Images, Tables)
                       for (final block in blocks)
                         _buildBlockWidget(context, block, isDark),
                     ],
@@ -2635,131 +2530,254 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
   }
 
   List<InlineSpan> _buildParagraphSpans(BuildContext context, String paragraph, bool isDark) {
-    if (widget.highlightQuestions.isEmpty) {
-      return [TextSpan(text: paragraph)];
+    final spans = <InlineSpan>[];
+    if (paragraph.isEmpty) return spans;
+
+    // Phase 1: Collect [BLANK: answer] tokens
+    final blankRegex = RegExp(r'\[BLANK:\s*([^\]]+)\]', caseSensitive: false);
+    final blankMatches = blankRegex.allMatches(paragraph).toList();
+
+    // Phase 2: Collect highlight question tokens (if any)
+    final highlightMatches = <_HighlightMatch>[];
+    if (widget.highlightQuestions.isNotEmpty) {
+      final normPara = paragraph.toLowerCase();
+      for (final q in widget.highlightQuestions) {
+        final hlText = (q['highlight_text']?.toString() ?? '').trim();
+        if (hlText.length < 5) continue;
+        final normHl = hlText.toLowerCase();
+        int startIdx = normPara.indexOf(normHl);
+        if (startIdx == -1 && normHl.length > 25) {
+          final sub = normHl.substring(0, 25);
+          startIdx = normPara.indexOf(sub);
+        }
+        if (startIdx != -1) {
+          final matchLen = math.min(hlText.length, paragraph.length - startIdx);
+          highlightMatches.add(_HighlightMatch(
+            start: startIdx,
+            end: startIdx + matchLen,
+            question: q,
+          ));
+        }
+      }
     }
 
-    final normPara = paragraph.toLowerCase();
-    final matches = <_HighlightMatch>[];
+    // Combine all tokens
+    final allTokens = <_SpanTokenItem>[];
+    for (final bm in blankMatches) {
+      final ans = bm.group(1)?.trim() ?? '';
+      final bKey = 'blank_${widget.chapterId}_${ans.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '')}';
+      allTokens.add(_SpanTokenItem(
+        type: _SpanTokenType.blank,
+        start: bm.start,
+        end: bm.end,
+        text: bm.group(0)!,
+        blankAnswer: ans,
+        blankKey: bKey,
+      ));
+    }
 
-    for (final q in widget.highlightQuestions) {
-      final hlText = (q['highlight_text']?.toString() ?? '').trim();
-      if (hlText.length < 5) continue;
-
-      final normHl = hlText.toLowerCase();
-      int startIdx = normPara.indexOf(normHl);
-
-      // Fuzzy sub-phrase matching if exact sentence has minor whitespace differences
-      if (startIdx == -1 && normHl.length > 25) {
-        final sub = normHl.substring(0, 25);
-        startIdx = normPara.indexOf(sub);
-      }
-
-      if (startIdx != -1) {
-        final matchLen = math.min(hlText.length, paragraph.length - startIdx);
-        matches.add(_HighlightMatch(
-          start: startIdx,
-          end: startIdx + matchLen,
-          question: q,
+    for (final hm in highlightMatches) {
+      final overlaps = allTokens.any((t) => !(hm.end <= t.start || hm.start >= t.end));
+      if (!overlaps) {
+        allTokens.add(_SpanTokenItem(
+          type: _SpanTokenType.highlight,
+          start: hm.start,
+          end: hm.end,
+          text: paragraph.substring(hm.start, hm.end),
+          question: hm.question,
         ));
       }
     }
 
-    if (matches.isEmpty) {
+    if (allTokens.isEmpty) {
       return [TextSpan(text: paragraph)];
     }
 
-    matches.sort((a, b) => a.start.compareTo(b.start));
+    allTokens.sort((a, b) => a.start.compareTo(b.start));
 
-    // Remove overlapping regions
-    final cleanMatches = <_HighlightMatch>[];
+    // Filter overlapping tokens
+    final cleanTokens = <_SpanTokenItem>[];
     int lastEnd = 0;
-    for (final m in matches) {
-      if (m.start >= lastEnd) {
-        cleanMatches.add(m);
-        lastEnd = m.end;
+    for (final token in allTokens) {
+      if (token.start >= lastEnd) {
+        cleanTokens.add(token);
+        lastEnd = token.end;
       }
     }
 
-    final spans = <InlineSpan>[];
     int cursor = 0;
-
-    for (final m in cleanMatches) {
-      if (m.start > cursor) {
-        spans.add(TextSpan(text: paragraph.substring(cursor, m.start)));
+    for (final token in cleanTokens) {
+      if (token.start > cursor) {
+        spans.add(TextSpan(text: paragraph.substring(cursor, token.start)));
       }
 
-      final matchedText = paragraph.substring(m.start, m.end);
-      final qId = int.tryParse(m.question['id']?.toString() ?? '');
-      final isSolved = qId != null && widget.solvedQuestionIds.contains(qId);
+      if (token.type == _SpanTokenType.blank) {
+        final answer = token.blankAnswer ?? '';
+        final blankKey = token.blankKey ?? '';
+        final isSolved = _solvedBlanks.contains(blankKey);
 
-      // Clickable red-underlined sentence
-      spans.add(
-        TextSpan(
-          text: matchedText,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            decoration: TextDecoration.underline,
-            decorationColor: isSolved ? const Color(0xFF10B981) : const Color(0xFFE53935),
-            decorationThickness: 2.5,
-            decorationStyle: TextDecorationStyle.solid,
-            color: isSolved
-                ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46))
-                : (isDark ? const Color(0xFFFFB74D) : const Color(0xFF9A3412)),
-            backgroundColor: isSolved
-                ? (isDark ? Colors.green.withValues(alpha: 0.15) : const Color(0xFFECFDF5))
-                : (isDark ? Colors.red.withValues(alpha: 0.12) : const Color(0xFFFFF1F2)),
-          ),
-          recognizer: TapGestureRecognizer()..onTap = () => widget.onQuestionTap(m.question),
-        ),
-      );
-
-      // Inline Pill Badge right after the underlined line
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: GestureDetector(
-            onTap: () => widget.onQuestionTap(m.question),
-            child: Container(
-              margin: const EdgeInsets.only(left: 4, right: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSolved ? const Color(0xFF10B981) : const Color(0xFFE53935),
-                borderRadius: BorderRadius.circular(6),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isSolved ? Colors.green : Colors.red).withValues(alpha: 0.3),
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isSolved ? Icons.check_circle_rounded : Icons.bolt_rounded,
-                    size: 10,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    isSolved ? 'SOLVED' : 'PYQ',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.3,
+        if (isSolved) {
+          spans.add(
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: GestureDetector(
+                onTap: () => _openBlankSolveDialog(
+                  context,
+                  paragraph.replaceAll(RegExp(r'\[BLANK:[^\]]+\]'), '_______'),
+                  answer,
+                  blankKey,
+                ),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
+                      width: 1.2,
                     ),
                   ),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        answer,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: _fontSize - 0.5,
+                          color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        } else {
+          spans.add(
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: GestureDetector(
+                onTap: () => _openBlankSolveDialog(
+                  context,
+                  paragraph.replaceAll(RegExp(r'\[BLANK:[^\]]+\]'), '_______'),
+                  answer,
+                  blankKey,
+                ),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF282012) : const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFFF59E0B) : const Color(0xFFD97706),
+                      width: 1.4,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '[  _______ ?  ]',
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFFCD34D) : const Color(0xFF92400E),
+                          fontWeight: FontWeight.w800,
+                          fontSize: _fontSize - 1.0,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.edit_note_rounded,
+                        size: 13,
+                        color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      } else if (token.type == _SpanTokenType.highlight) {
+        final matchedText = token.text;
+        final cleanKey = matchedText
+            .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
+            .toLowerCase();
+        final sentenceKey = cleanKey.length > 40 ? cleanKey.substring(0, 40) : cleanKey;
+        final hasNote = _localNotes.containsKey(sentenceKey);
+
+        // Clickable underlined sentence -> Opens White Canvas Notepad
+        spans.add(
+          TextSpan(
+            text: matchedText,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.underline,
+              decorationColor: hasNote ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+              decorationThickness: 2.0,
+              decorationStyle: TextDecorationStyle.solid,
+              color: hasNote
+                  ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46))
+                  : (isDark ? const Color(0xFFFDE68A) : const Color(0xFF78350F)),
+              backgroundColor: hasNote
+                  ? (isDark ? Colors.green.withValues(alpha: 0.15) : const Color(0xFFECFDF5))
+                  : (isDark ? Colors.amber.withValues(alpha: 0.15) : const Color(0xFFFEF3C7)),
+            ),
+            recognizer: TapGestureRecognizer()..onTap = () => _openWhiteCanvas(context, matchedText),
+          ),
+        );
+
+        // Inline Note Badge
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: GestureDetector(
+              onTap: () => _openWhiteCanvas(context, matchedText),
+              child: Container(
+                margin: const EdgeInsets.only(left: 4, right: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: hasNote
+                      ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
+                      : (isDark ? const Color(0xFF282012) : const Color(0xFFFEF3C7)),
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(
+                    color: hasNote ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    width: 1.0,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      hasNote ? Icons.description_rounded : Icons.edit_note_rounded,
+                      size: 10,
+                      color: hasNote ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      hasNote ? 'Note' : 'Note',
+                      style: TextStyle(
+                        color: hasNote ? const Color(0xFF059669) : const Color(0xFFB45309),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
+      }
 
-      cursor = m.end;
+      cursor = token.end;
     }
 
     if (cursor < paragraph.length) {
@@ -2767,6 +2785,582 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     }
 
     return spans;
+  }
+}
+
+enum _SpanTokenType { blank, highlight }
+
+class _SpanTokenItem {
+  _SpanTokenItem({
+    required this.type,
+    required this.start,
+    required this.end,
+    required this.text,
+    this.blankAnswer,
+    this.blankKey,
+    this.question,
+  });
+
+  final _SpanTokenType type;
+  final int start;
+  final int end;
+  final String text;
+  final String? blankAnswer;
+  final String? blankKey;
+  final Map<String, dynamic>? question;
+}
+
+class _WhiteCanvasNoteDialog extends StatefulWidget {
+  const _WhiteCanvasNoteDialog({
+    required this.highlightText,
+    required this.initialNote,
+    required this.onSave,
+  });
+
+  final String highlightText;
+  final String initialNote;
+  final void Function(String note) onSave;
+
+  @override
+  State<_WhiteCanvasNoteDialog> createState() => _WhiteCanvasNoteDialogState();
+}
+
+class _WhiteCanvasNoteDialogState extends State<_WhiteCanvasNoteDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialNote);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleSave() {
+    widget.onSave(_controller.text);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Note saved to this device memory! (Offline & Private)'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Color(0xFF059669),
+      ),
+    );
+    Navigator.of(context).pop();
+  }
+
+  void _handleDelete() {
+    widget.onSave('');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Note removed from device memory.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(maxWidth: 520),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF181824) : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 10, 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF222234) : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.lg)),
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark ? const Color(0xFF2E2E44) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.draw_rounded, color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Study Notepad & Canvas',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Row(
+                          children: [
+                            const Icon(Icons.phonelink_lock_rounded, size: 11, color: Color(0xFF10B981)),
+                            const SizedBox(width: 3),
+                            Text(
+                              'Device Storage Only • Private & Offline',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Highlighted Reference Quote Box
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF282012) : const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.format_quote_rounded,
+                            size: 18,
+                            color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              widget.highlightText,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.45,
+                                fontStyle: FontStyle.italic,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? const Color(0xFFFEF3C7) : const Color(0xFF78350F),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // White Paper Canvas Writing Area
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF111119) : const Color(0xFFFAFAFA),
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF33334A) : const Color(0xFFCBD5E1),
+                          width: 1.2,
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: TextField(
+                        controller: _controller,
+                        minLines: 6,
+                        maxLines: 12,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.55,
+                          color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Type your personal notes, mnemonics, or revision points here...',
+                          hintStyle: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Bottom Buttons
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF222234) : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppRadii.lg)),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? const Color(0xFF2E2E44) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  if (widget.initialNote.trim().isNotEmpty) ...[
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFEF4444),
+                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                      label: const Text('Delete'),
+                      onPressed: _handleDelete,
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    ),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('Save Note'),
+                    onPressed: _handleSave,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BlankSolveBottomSheet extends StatefulWidget {
+  const _BlankSolveBottomSheet({
+    required this.sentenceContext,
+    required this.correctAnswer,
+    required this.isSolved,
+    required this.onSolved,
+    required this.onReset,
+  });
+
+  final String sentenceContext;
+  final String correctAnswer;
+  final bool isSolved;
+  final VoidCallback onSolved;
+  final VoidCallback onReset;
+
+  @override
+  State<_BlankSolveBottomSheet> createState() => _BlankSolveBottomSheetState();
+}
+
+class _BlankSolveBottomSheetState extends State<_BlankSolveBottomSheet> {
+  final TextEditingController _guessController = TextEditingController();
+  bool? _isCorrect;
+  bool _revealed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isSolved) {
+      _revealed = true;
+      _guessController.text = widget.correctAnswer;
+    }
+  }
+
+  @override
+  void dispose() {
+    _guessController.dispose();
+    super.dispose();
+  }
+
+  void _checkAnswer() {
+    final input = _guessController.text.trim().toLowerCase();
+    final target = widget.correctAnswer.trim().toLowerCase();
+    if (input.isEmpty) return;
+
+    if (input == target || target.contains(input)) {
+      setState(() {
+        _isCorrect = true;
+        _revealed = true;
+      });
+      widget.onSolved();
+    } else {
+      setState(() {
+        _isCorrect = false;
+      });
+    }
+  }
+
+  void _reveal() {
+    setState(() {
+      _revealed = true;
+      _guessController.text = widget.correctAnswer;
+    });
+    widget.onSolved();
+  }
+
+  void _reset() {
+    widget.onReset();
+    setState(() {
+      _isCorrect = null;
+      _revealed = false;
+      _guessController.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.xl)),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, -4)),
+        ],
+      ),
+      padding: EdgeInsets.only(
+        top: AppSpacing.md,
+        left: AppSpacing.md,
+        right: AppSpacing.md,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.xl,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.flash_on_rounded, color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Active Recall • Fill In The Blank',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        'Test your NCERT keyword memory on the spot',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Sentence context
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E2D) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(AppRadii.md),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF2E2E3E) : const Color(0xFFCBD5E1),
+                ),
+              ),
+              child: Text(
+                widget.sentenceContext,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Answer Input
+            TextField(
+              controller: _guessController,
+              autofocus: !widget.isSolved,
+              enabled: !_revealed,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _checkAnswer(),
+              decoration: InputDecoration(
+                labelText: 'Type the missing word / keyword',
+                hintText: 'e.g. ${widget.correctAnswer.length} letters...',
+                prefixIcon: const Icon(Icons.edit_rounded),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md)),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            // Result Feedback
+            if (_isCorrect == true || _revealed)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5),
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                  border: Border.all(color: const Color(0xFF10B981)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Correct Answer: "${widget.correctAnswer}"',
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (_isCorrect == false)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                  border: Border.all(color: const Color(0xFFEF4444)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Not quite right. Try again or tap Reveal Answer!',
+                        style: TextStyle(
+                          color: Color(0xFFB91C1C),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Buttons
+            Row(
+              children: [
+                if (!_revealed) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _reveal,
+                      child: const Text('Reveal Answer'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _checkAnswer,
+                      child: const Text('Submit Guess'),
+                    ),
+                  ),
+                ] else ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Reset Blank'),
+                      onPressed: _reset,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: FilledButton.tonal(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Done'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -3321,21 +3915,9 @@ class _DiagramZoomDialogState extends State<_DiagramZoomDialog> {
                     onInteractionUpdate: (_) {
                       _currentScale = _controller.value.getMaxScaleOnAxis();
                     },
-                    child: Image.network(
-                      widget.imageUrl,
+                    child: FastNetworkImage(
+                      url: widget.imageUrl,
                       fit: BoxFit.contain,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return const Center(
-                          child: CircularProgressIndicator(color: AppColors.primary),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return FastNetworkImage(
-                          url: widget.imageUrl,
-                          fit: BoxFit.contain,
-                        );
-                      },
                     ),
                   ),
                 ),
