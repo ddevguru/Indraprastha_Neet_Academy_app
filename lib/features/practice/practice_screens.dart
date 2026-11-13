@@ -1180,7 +1180,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                         if (allSimilar.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('No similar questions available for this practice set yet.'),
+                              content: Text('No Same Concept Q available for this practice set yet.'),
                             ),
                           );
                           return;
@@ -1189,7 +1189,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => SimilarQuestionsQuizScreen(
-                              title: '${_set['title'] ?? 'Practice'} - Similar Questions',
+                              title: '${_set['title'] ?? 'Practice'} - Same Concept Q',
                               questions: allSimilar,
                             ),
                           ),
@@ -1227,7 +1227,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                             const SizedBox(width: AppSpacing.md),
                             const Expanded(
                               child: Text(
-                                'Solve Similar Questions',
+                                'Same Concept Q',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -1768,7 +1768,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                       showSingleSimilarQuestionSheet(
                                         context,
                                         similarQuestion: simQ is Map ? Map<String, dynamic>.from(simQ) : null,
-                                        questionTitle: 'Question ${qIdx + 1} - Similar Practice',
+                                        questionTitle: 'Question ${qIdx + 1} - Same Concept Q',
                                       );
                                     },
                                     borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -1803,7 +1803,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                           const SizedBox(width: AppSpacing.md),
                                           const Expanded(
                                             child: Text(
-                                              'Solve Similar Questions',
+                                              'Same Concept Q',
                                               style: TextStyle(
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.bold,

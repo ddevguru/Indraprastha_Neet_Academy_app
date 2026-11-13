@@ -132,7 +132,7 @@ class _AmazonRelatedQuestionsViewState
           onTap: () => showSingleSimilarQuestionSheet(
             context,
             similarQuestion: sq,
-            questionTitle: 'Similar Question Practice',
+            questionTitle: 'Same Concept Q Practice',
           ),
           borderRadius: BorderRadius.circular(AppRadii.lg),
           child: Ink(
@@ -166,7 +166,7 @@ class _AmazonRelatedQuestionsViewState
                 const SizedBox(width: AppSpacing.md),
                 const Expanded(
                   child: Text(
-                    'Solve Similar Questions',
+                    'Same Concept Q',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -548,7 +548,7 @@ class _AmazonRelatedQuestionsViewState
                 explanation: widget.explanation,
               ),
               icon: const Icon(Icons.auto_awesome, size: 14),
-              label: const Text('Solve Similar Questions', style: TextStyle(fontSize: 11)),
+              label: const Text('Same Concept Q', style: TextStyle(fontSize: 11)),
             ),
           ),
         ],
@@ -582,7 +582,7 @@ class _AmazonRelatedQuestionsViewState
                 explanation: widget.explanation,
               ),
               icon: const Icon(Icons.auto_awesome, size: 16),
-              label: const Text('Solve Similar Questions', style: TextStyle(fontSize: 12)),
+              label: const Text('Same Concept Q', style: TextStyle(fontSize: 12)),
             ),
           ],
         ),

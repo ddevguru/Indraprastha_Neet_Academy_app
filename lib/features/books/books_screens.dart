@@ -939,7 +939,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                                     showSingleSimilarQuestionSheet(
                                       context,
                                       similarQuestion: simQMap,
-                                      questionTitle: 'PYQ ${_index + 1} - Similar Question',
+                                      questionTitle: 'PYQ ${_index + 1} - Same Concept Q',
                                     );
                                   },
                                   borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -967,7 +967,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                                         Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
                                         SizedBox(width: 8),
                                         Text(
-                                          'Solve Similar Question',
+                                          'Same Concept Q',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 14,
@@ -2529,259 +2529,328 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     );
   }
 
-  List<InlineSpan> _buildParagraphSpans(BuildContext context, String paragraph, bool isDark) {
-    final spans = <InlineSpan>[];
-    if (paragraph.isEmpty) return spans;
+  List<_HighlightMatch> _findHighlightMatches(String paragraph) {
+    final matches = <_HighlightMatch>[];
+    if (widget.highlightQuestions.isEmpty) return matches;
 
-    // Phase 1: Collect [BLANK: answer] tokens
-    final blankRegex = RegExp(r'\[BLANK:\s*([^\]]+)\]', caseSensitive: false);
-    final blankMatches = blankRegex.allMatches(paragraph).toList();
-
-    // Phase 2: Collect highlight question tokens (if any)
-    final highlightMatches = <_HighlightMatch>[];
-    if (widget.highlightQuestions.isNotEmpty) {
-      final normPara = paragraph.toLowerCase();
-      for (final q in widget.highlightQuestions) {
-        final hlText = (q['highlight_text']?.toString() ?? '').trim();
-        if (hlText.length < 5) continue;
-        final normHl = hlText.toLowerCase();
-        int startIdx = normPara.indexOf(normHl);
-        if (startIdx == -1 && normHl.length > 25) {
-          final sub = normHl.substring(0, 25);
-          startIdx = normPara.indexOf(sub);
-        }
-        if (startIdx != -1) {
-          final matchLen = math.min(hlText.length, paragraph.length - startIdx);
-          highlightMatches.add(_HighlightMatch(
-            start: startIdx,
-            end: startIdx + matchLen,
-            question: q,
-          ));
+    // Build clean version of paragraph (mapping clean character index -> raw index in paragraph)
+    // where [BLANK: answer] is replaced with answer
+    final rawIndexMap = <int>[];
+    final cleanParaBuffer = StringBuffer();
+    int i = 0;
+    while (i < paragraph.length) {
+      if (paragraph.substring(i).startsWith('[BLANK:')) {
+        final closeIdx = paragraph.indexOf(']', i);
+        if (closeIdx != -1) {
+          final inner = paragraph.substring(i + 7, closeIdx).trim();
+          for (int k = 0; k < inner.length; k++) {
+            rawIndexMap.add(i);
+          }
+          cleanParaBuffer.write(inner);
+          i = closeIdx + 1;
+          continue;
         }
       }
+      rawIndexMap.add(i);
+      cleanParaBuffer.write(paragraph[i]);
+      i++;
     }
+    rawIndexMap.add(paragraph.length);
+    final cleanPara = cleanParaBuffer.toString().toLowerCase();
 
-    // Combine all tokens
-    final allTokens = <_SpanTokenItem>[];
-    for (final bm in blankMatches) {
-      final ans = bm.group(1)?.trim() ?? '';
-      final bKey = 'blank_${widget.chapterId}_${ans.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '')}';
-      allTokens.add(_SpanTokenItem(
-        type: _SpanTokenType.blank,
-        start: bm.start,
-        end: bm.end,
-        text: bm.group(0)!,
-        blankAnswer: ans,
-        blankKey: bKey,
-      ));
-    }
+    for (final q in widget.highlightQuestions) {
+      final hlText = (q['highlight_text']?.toString() ?? '').trim();
+      if (hlText.length < 5) continue;
 
-    for (final hm in highlightMatches) {
-      final overlaps = allTokens.any((t) => !(hm.end <= t.start || hm.start >= t.end));
-      if (!overlaps) {
-        allTokens.add(_SpanTokenItem(
-          type: _SpanTokenType.highlight,
-          start: hm.start,
-          end: hm.end,
-          text: paragraph.substring(hm.start, hm.end),
-          question: hm.question,
+      final normPara = paragraph.toLowerCase();
+      final normHl = hlText.toLowerCase();
+      int startIdx = normPara.indexOf(normHl);
+      int endIdx = -1;
+
+      if (startIdx != -1) {
+        endIdx = startIdx + normHl.length;
+      } else {
+        // Strip [BLANK: ...] from hlText if present to match against cleanPara
+        final cleanHl = hlText
+            .replaceAll(RegExp(r'\[BLANK:\s*([^\]]+)\]', caseSensitive: false), r'$1')
+            .trim()
+            .toLowerCase();
+        int cIdx = cleanPara.indexOf(cleanHl);
+        int cLen = cleanHl.length;
+        if (cIdx == -1 && cleanHl.length > 25) {
+          final sub = cleanHl.substring(0, 25);
+          cIdx = cleanPara.indexOf(sub);
+          cLen = math.min(cleanHl.length, cleanPara.length - cIdx);
+        }
+        if (cIdx != -1 && cIdx < rawIndexMap.length) {
+          startIdx = rawIndexMap[cIdx];
+          final cEnd = math.min(cIdx + cLen, rawIndexMap.length - 1);
+          endIdx = rawIndexMap[cEnd];
+          if (endIdx <= startIdx) {
+            endIdx = math.min(paragraph.length, startIdx + cleanHl.length);
+          }
+        }
+      }
+
+      if (startIdx != -1 && endIdx > startIdx) {
+        final matchedSubstring = paragraph.substring(startIdx, endIdx);
+        matches.add(_HighlightMatch(
+          start: startIdx,
+          end: endIdx,
+          question: q,
+          matchedText: matchedSubstring,
         ));
       }
     }
 
-    if (allTokens.isEmpty) {
-      return [TextSpan(text: paragraph)];
-    }
-
-    allTokens.sort((a, b) => a.start.compareTo(b.start));
-
-    // Filter overlapping tokens
-    final cleanTokens = <_SpanTokenItem>[];
+    matches.sort((a, b) => a.start.compareTo(b.start));
+    final nonOverlapping = <_HighlightMatch>[];
     int lastEnd = 0;
-    for (final token in allTokens) {
-      if (token.start >= lastEnd) {
-        cleanTokens.add(token);
-        lastEnd = token.end;
+    for (final m in matches) {
+      if (m.start >= lastEnd) {
+        nonOverlapping.add(m);
+        lastEnd = m.end;
       }
     }
+    return nonOverlapping;
+  }
 
-    int cursor = 0;
-    for (final token in cleanTokens) {
-      if (token.start > cursor) {
-        spans.add(TextSpan(text: paragraph.substring(cursor, token.start)));
-      }
+  WidgetSpan _buildBlankWidgetSpan(BuildContext context, String paragraph, _BlankMatch blank, bool isDark) {
+    final answer = blank.answer;
+    final blankKey = blank.key;
+    final isSolved = _solvedBlanks.contains(blankKey);
 
-      if (token.type == _SpanTokenType.blank) {
-        final answer = token.blankAnswer ?? '';
-        final blankKey = token.blankKey ?? '';
-        final isSolved = _solvedBlanks.contains(blankKey);
-
-        if (isSolved) {
-          spans.add(
-            WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: GestureDetector(
-                onTap: () => _openBlankSolveDialog(
-                  context,
-                  paragraph.replaceAll(RegExp(r'\[BLANK:[^\]]+\]'), '_______'),
-                  answer,
-                  blankKey,
-                ),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        answer,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: _fontSize - 0.5,
-                          color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        } else {
-          spans.add(
-            WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: GestureDetector(
-                onTap: () => _openBlankSolveDialog(
-                  context,
-                  paragraph.replaceAll(RegExp(r'\[BLANK:[^\]]+\]'), '_______'),
-                  answer,
-                  blankKey,
-                ),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF282012) : const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFFF59E0B) : const Color(0xFFD97706),
-                      width: 1.4,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '[  _______ ?  ]',
-                        style: TextStyle(
-                          color: isDark ? const Color(0xFFFCD34D) : const Color(0xFF92400E),
-                          fontWeight: FontWeight.w800,
-                          fontSize: _fontSize - 1.0,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.edit_note_rounded,
-                        size: 13,
-                        color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-      } else if (token.type == _SpanTokenType.highlight) {
-        final matchedText = token.text;
-        final cleanKey = matchedText
-            .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
-            .toLowerCase();
-        final sentenceKey = cleanKey.length > 40 ? cleanKey.substring(0, 40) : cleanKey;
-        final hasNote = _localNotes.containsKey(sentenceKey);
-
-        // Clickable underlined sentence -> Opens White Canvas Notepad
-        spans.add(
-          TextSpan(
-            text: matchedText,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-              decorationColor: hasNote ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-              decorationThickness: 2.0,
-              decorationStyle: TextDecorationStyle.solid,
-              color: hasNote
-                  ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46))
-                  : (isDark ? const Color(0xFFFDE68A) : const Color(0xFF78350F)),
-              backgroundColor: hasNote
-                  ? (isDark ? Colors.green.withValues(alpha: 0.15) : const Color(0xFFECFDF5))
-                  : (isDark ? Colors.amber.withValues(alpha: 0.15) : const Color(0xFFFEF3C7)),
-            ),
-            recognizer: TapGestureRecognizer()..onTap = () => _openWhiteCanvas(context, matchedText),
-          ),
-        );
-
-        // Inline Note Badge
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: GestureDetector(
-              onTap: () => _openWhiteCanvas(context, matchedText),
-              child: Container(
-                margin: const EdgeInsets.only(left: 4, right: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+    return WidgetSpan(
+      alignment: PlaceholderAlignment.middle,
+      child: GestureDetector(
+        onTap: () => _openBlankSolveDialog(
+          context,
+          paragraph.replaceAll(RegExp(r'\[BLANK:[^\]]+\]'), '_______'),
+          answer,
+          blankKey,
+        ),
+        child: isSolved
+            ? Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: hasNote
-                      ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
-                      : (isDark ? const Color(0xFF282012) : const Color(0xFFFEF3C7)),
-                  borderRadius: BorderRadius.circular(5),
+                  color: isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5),
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: hasNote ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                    width: 1.0,
+                    color: isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
+                    width: 1.2,
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      hasNote ? Icons.description_rounded : Icons.edit_note_rounded,
-                      size: 10,
-                      color: hasNote ? const Color(0xFF10B981) : const Color(0xFFD97706),
-                    ),
-                    const SizedBox(width: 2),
                     Text(
-                      hasNote ? 'Note' : 'Note',
+                      answer,
                       style: TextStyle(
-                        color: hasNote ? const Color(0xFF059669) : const Color(0xFFB45309),
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
+                        fontSize: _fontSize - 0.5,
+                        color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
                       ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
+                  ],
+                ),
+              )
+            : Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF282012) : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFFF59E0B) : const Color(0xFFD97706),
+                    width: 1.4,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '[  _______ ?  ]',
+                      style: TextStyle(
+                        color: isDark ? const Color(0xFFFCD34D) : const Color(0xFF92400E),
+                        fontWeight: FontWeight.w800,
+                        fontSize: _fontSize - 1.0,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.edit_note_rounded,
+                      size: 13,
+                      color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
                     ),
                   ],
                 ),
               ),
+      ),
+    );
+  }
+
+  TextSpan _buildHighlightTextSpan(BuildContext context, String text, String fullSentence, bool isDark) {
+    final cleanKey = fullSentence.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    final sentenceKey = cleanKey.length > 40 ? cleanKey.substring(0, 40) : cleanKey;
+    final hasNote = _localNotes.containsKey(sentenceKey);
+
+    return TextSpan(
+      text: text,
+      style: TextStyle(
+        fontWeight: FontWeight.w600,
+        decoration: TextDecoration.underline,
+        decorationColor: hasNote ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+        decorationThickness: 2.0,
+        decorationStyle: TextDecorationStyle.solid,
+        color: hasNote
+            ? (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46))
+            : (isDark ? const Color(0xFFFDE68A) : const Color(0xFF78350F)),
+        backgroundColor: hasNote
+            ? (isDark ? Colors.green.withValues(alpha: 0.15) : const Color(0xFFECFDF5))
+            : (isDark ? Colors.amber.withValues(alpha: 0.15) : const Color(0xFFFEF3C7)),
+      ),
+      recognizer: TapGestureRecognizer()..onTap = () => _openWhiteCanvas(context, fullSentence),
+    );
+  }
+
+  WidgetSpan _buildNoteBadgeSpan(BuildContext context, _HighlightMatch hl, bool isDark) {
+    final cleanKey = hl.matchedText.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    final sentenceKey = cleanKey.length > 40 ? cleanKey.substring(0, 40) : cleanKey;
+    final hasNote = _localNotes.containsKey(sentenceKey);
+
+    return WidgetSpan(
+      alignment: PlaceholderAlignment.middle,
+      child: GestureDetector(
+        onTap: () => _openWhiteCanvas(context, hl.matchedText),
+        child: Container(
+          margin: const EdgeInsets.only(left: 4, right: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+          decoration: BoxDecoration(
+            color: hasNote
+                ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5))
+                : (isDark ? const Color(0xFF282012) : const Color(0xFFFEF3C7)),
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(
+              color: hasNote ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+              width: 1.0,
             ),
           ),
-        );
-      }
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                hasNote ? Icons.description_rounded : Icons.edit_note_rounded,
+                size: 10,
+                color: hasNote ? const Color(0xFF10B981) : const Color(0xFFD97706),
+              ),
+              const SizedBox(width: 2),
+              Text(
+                'Note',
+                style: TextStyle(
+                  color: hasNote ? const Color(0xFF059669) : const Color(0xFFB45309),
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-      cursor = token.end;
+  List<InlineSpan> _buildParagraphSpans(BuildContext context, String paragraph, bool isDark) {
+    final spans = <InlineSpan>[];
+    if (paragraph.isEmpty) return spans;
+
+    // 1. Collect all [BLANK: answer] occurrences
+    final blankRegex = RegExp(r'\[BLANK:\s*([^\]]+)\]', caseSensitive: false);
+    final blankMatches = blankRegex.allMatches(paragraph);
+    final blanks = <_BlankMatch>[];
+    for (final bm in blankMatches) {
+      final ans = bm.group(1)?.trim() ?? '';
+      final bKey = 'blank_${widget.chapterId}_${ans.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '')}';
+      blanks.add(_BlankMatch(start: bm.start, end: bm.end, answer: ans, key: bKey));
     }
 
-    if (cursor < paragraph.length) {
-      spans.add(TextSpan(text: paragraph.substring(cursor)));
+    // 2. Collect all highlight matches
+    final highlights = _findHighlightMatches(paragraph);
+
+    if (blanks.isEmpty && highlights.isEmpty) {
+      return [TextSpan(text: paragraph)];
+    }
+
+    // 3. Linearly traverse paragraph and build interleaved spans
+    int cursor = 0;
+    while (cursor < paragraph.length) {
+      // Check if cursor is at the start of a blank
+      _BlankMatch? currentBlank;
+      for (final b in blanks) {
+        if (b.start == cursor) {
+          currentBlank = b;
+          break;
+        }
+      }
+
+      if (currentBlank != null) {
+        spans.add(_buildBlankWidgetSpan(context, paragraph, currentBlank, isDark));
+        cursor = currentBlank.end;
+
+        // If a highlight ended exactly at the end of this blank
+        for (final h in highlights) {
+          if (h.end == cursor) {
+            spans.add(_buildNoteBadgeSpan(context, h, isDark));
+          }
+        }
+        continue;
+      }
+
+      // Check if cursor is inside a highlight
+      _HighlightMatch? currentHl;
+      for (final h in highlights) {
+        if (cursor >= h.start && cursor < h.end) {
+          currentHl = h;
+          break;
+        }
+      }
+
+      if (currentHl != null) {
+        int nextStop = currentHl.end;
+        for (final b in blanks) {
+          if (b.start > cursor && b.start < nextStop) {
+            nextStop = b.start;
+          }
+        }
+
+        final sub = paragraph.substring(cursor, nextStop);
+        spans.add(_buildHighlightTextSpan(context, sub, currentHl.matchedText, isDark));
+        cursor = nextStop;
+
+        if (cursor == currentHl.end) {
+          spans.add(_buildNoteBadgeSpan(context, currentHl, isDark));
+        }
+        continue;
+      }
+
+      // Normal text outside any blank or highlight
+      int nextStop = paragraph.length;
+      for (final b in blanks) {
+        if (b.start > cursor && b.start < nextStop) {
+          nextStop = b.start;
+        }
+      }
+      for (final h in highlights) {
+        if (h.start > cursor && h.start < nextStop) {
+          nextStop = h.start;
+        }
+      }
+
+      spans.add(TextSpan(text: paragraph.substring(cursor, nextStop)));
+      cursor = nextStop;
     }
 
     return spans;
@@ -3365,10 +3434,29 @@ class _BlankSolveBottomSheetState extends State<_BlankSolveBottomSheet> {
 }
 
 class _HighlightMatch {
-  _HighlightMatch({required this.start, required this.end, required this.question});
+  _HighlightMatch({
+    required this.start,
+    required this.end,
+    required this.question,
+    required this.matchedText,
+  });
   final int start;
   final int end;
   final Map<String, dynamic> question;
+  final String matchedText;
+}
+
+class _BlankMatch {
+  _BlankMatch({
+    required this.start,
+    required this.end,
+    required this.answer,
+    required this.key,
+  });
+  final int start;
+  final int end;
+  final String answer;
+  final String key;
 }
 
 class _HighlightQuestionSolvePopup extends StatefulWidget {

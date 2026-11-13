@@ -19,7 +19,7 @@ Future<void> showSingleSimilarQuestionSheet(
       (similarQuestion['question']?.toString().trim().isEmpty ?? true)) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('No similar question available for this question yet.'),
+        content: Text('No Same Concept Q available for this question yet.'),
         duration: Duration(seconds: 2),
       ),
     );
@@ -32,7 +32,7 @@ Future<void> showSingleSimilarQuestionSheet(
     backgroundColor: Colors.transparent,
     builder: (ctx) => SolveSingleSimilarQuestionSheet(
       similarQuestion: similarQuestion,
-      title: questionTitle ?? 'Solve Similar Question',
+      title: questionTitle ?? 'Same Concept Q',
     ),
   );
 }
@@ -56,12 +56,12 @@ Future<void> showSimilarQuestionsDialog(
     await showSingleSimilarQuestionSheet(
       context,
       similarQuestion: similarQuestion,
-      questionTitle: topic ?? 'Solve Similar Question',
+      questionTitle: topic ?? 'Same Concept Q',
     );
   } else {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('No similar question available for this question yet.'),
+        content: Text('No Same Concept Q available for this question yet.'),
         duration: Duration(seconds: 2),
       ),
     );
@@ -72,7 +72,7 @@ class SolveSingleSimilarQuestionSheet extends StatefulWidget {
   const SolveSingleSimilarQuestionSheet({
     super.key,
     required this.similarQuestion,
-    this.title = 'Solve Similar Question',
+    this.title = 'Same Concept Q',
   });
 
   final Map<String, dynamic> similarQuestion;
@@ -204,7 +204,7 @@ class _SolveSingleSimilarQuestionSheetState
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Text(
-                            'Similar Question',
+                            'Same Concept Q',
                             style: TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.bold,
@@ -599,7 +599,7 @@ class __SimilarQuestionsConfigSheetState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Solve Similar Questions',
+                      'Same Concept Q',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),

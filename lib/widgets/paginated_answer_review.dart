@@ -266,7 +266,7 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
                 if (allSimilar.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('No similar questions available for this review set yet.'),
+                      content: Text('No Same Concept Q available for this review set yet.'),
                     ),
                   );
                   return;
@@ -275,7 +275,7 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
                   context,
                   MaterialPageRoute(
                     builder: (_) => SimilarQuestionsQuizScreen(
-                      title: '${widget.title} - Similar Questions',
+                      title: '${widget.title} - Same Concept Q',
                       questions: allSimilar,
                     ),
                   ),
@@ -283,7 +283,7 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
               },
               icon: const Icon(Icons.psychology_alt_rounded, color: AppColors.success),
               label: const Text(
-                'Similar MCQs',
+                'Same Concept Q',
                 style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold),
               ),
             ),
@@ -860,7 +860,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                   onTap: () => showSingleSimilarQuestionSheet(
                     context,
                     similarQuestion: entry.similarQuestion,
-                    questionTitle: 'Question ${index + 1} - Similar Practice',
+                    questionTitle: 'Question ${index + 1} - Same Concept Q',
                   ),
                   borderRadius: BorderRadius.circular(AppRadii.lg),
                   child: Ink(
@@ -894,7 +894,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                         const SizedBox(width: AppSpacing.md),
                         const Expanded(
                           child: Text(
-                            'Solve Similar Questions',
+                            'Same Concept Q',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -922,7 +922,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                       if (allSimilar.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('No similar questions available for this review set yet.'),
+                            content: Text('No Same Concept Q available for this review set yet.'),
                           ),
                         );
                         return;
@@ -931,7 +931,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => SimilarQuestionsQuizScreen(
-                            title: 'Similar Questions Practice',
+                            title: 'Same Concept Q Practice',
                             questions: allSimilar,
                           ),
                         ),
@@ -969,7 +969,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                           const SizedBox(width: AppSpacing.md),
                           const Expanded(
                             child: Text(
-                              'Solve Similar Questions',
+                              'Same Concept Q',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
