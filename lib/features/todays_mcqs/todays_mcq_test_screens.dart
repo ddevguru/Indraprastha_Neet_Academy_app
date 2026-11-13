@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/providers/app_state.dart';
 import '../../core/services/completed_attempt_store.dart';
@@ -258,6 +259,25 @@ class _TodaysMcqTestAttemptScreenState
   int _wrongCount = 0;
   bool _finished = false;
   final List<_AttemptRecord> _history = [];
+  double _fontSize = 16.0;
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      final saved = prefs.getDouble('app_content_font_size');
+      if (saved != null && mounted) {
+        setState(() => _fontSize = saved);
+      }
+    });
+  }
+
+  void _updateFontSize(double val) {
+    setState(() => _fontSize = val);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setDouble('app_content_font_size', val);
+    });
+  }
 
   static const _fallbackOptions = _mcqFallbackOptions;
 
@@ -367,8 +387,15 @@ class _TodaysMcqTestAttemptScreenState
 
     return Scaffold(
       appBar: AppBar(title: const Text("Today's MCQ test")),
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
+      body: Column(
+        children: [
+          FontSizeAdjusterBar(
+            fontSize: _fontSize,
+            onChanged: _updateFontSize,
+          ),
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
         onHorizontalDragEnd: (details) {
           if (details.primaryVelocity == null) return;
           if (details.primaryVelocity! < -200) {
@@ -443,7 +470,9 @@ class _TodaysMcqTestAttemptScreenState
                       const SizedBox(height: AppSpacing.lg),
                       Text(
                         item.preview,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontSize: _fontSize + 2.0,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       ...List.generate(options.length, (i) {
@@ -510,7 +539,12 @@ class _TodaysMcqTestAttemptScreenState
                                     ),
                                   ),
                                   const SizedBox(width: AppSpacing.sm),
-                                  Expanded(child: Text(options[i])),
+                                  Expanded(
+                                    child: Text(
+                                      options[i],
+                                      style: TextStyle(fontSize: _fontSize),
+                                    ),
+                                  ),
                                   if (reveal)
                                     Icon(
                                       isCorr
@@ -574,6 +608,9 @@ class _TodaysMcqTestAttemptScreenState
           ),
         ),
       ),
+    ),
+  ],
+),
     );
   }
 }

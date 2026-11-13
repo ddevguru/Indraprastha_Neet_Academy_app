@@ -469,6 +469,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
   int _index = 0;
   final Map<int, String> _answers = {};
   bool _submitted = false;
+  double _fontSize = 15.5;
 
   dynamic get _pyqKey =>
       widget.pyqs.isNotEmpty ? (widget.pyqs.first['chapter_id'] ?? widget.pyqs.first['id'] ?? 'default_pyq') : 'default_pyq';
@@ -476,6 +477,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
   @override
   void initState() {
     super.initState();
+    _loadFontSize();
     _restoreCompletedState();
     unawaited(
       warmImageCacheUrls(
@@ -486,6 +488,20 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
         maxItems: 12,
       ),
     );
+  }
+
+  Future<void> _loadFontSize() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getDouble('app_content_font_size');
+    if (saved != null && mounted) {
+      setState(() => _fontSize = saved.clamp(12.0, 26.0));
+    }
+  }
+
+  Future<void> _updateFontSize(double next) async {
+    setState(() => _fontSize = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('app_content_font_size', next);
   }
 
   Future<void> _restoreCompletedState() async {
@@ -682,31 +698,38 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
     final correctOpt = readCorrectOption(q);
 
     return SizedBox.expand(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            StatCard(
-              title: 'Progress',
-              value: '${_index + 1}/${widget.pyqs.length}',
-              subtitle: 'Chapter PYQs',
-              icon: Icons.timelapse_rounded,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SurfaceCard(
+      child: Column(
+        children: [
+          FontSizeAdjusterBar(
+            fontSize: _fontSize,
+            onChanged: _updateFontSize,
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  buildQuestionTextBlock(
-                    context,
-                    q,
-                    style: questionContentTextStyle(
-                      context,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  StatCard(
+                    title: 'Progress',
+                    value: '${_index + 1}/${widget.pyqs.length}',
+                    subtitle: 'Chapter PYQs',
+                    icon: Icons.timelapse_rounded,
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  SurfaceCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        buildQuestionTextBlock(
+                          context,
+                          q,
+                          style: questionContentTextStyle(
+                            context,
+                            fontSize: _fontSize + 2.0,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                   if (hasQuestionImage(q)) ...[
                     const SizedBox(height: AppSpacing.sm),
                     _buildQuestionImage(questionImageRawUrl(q)),
@@ -771,7 +794,11 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                             children: [
                               Text(
                                 _optionLabel(e.key, e.value),
-                                style: questionContentTextStyle(context, color: textColor),
+                                style: questionContentTextStyle(
+                                  context,
+                                  color: textColor,
+                                  fontSize: _fontSize,
+                                ),
                               ),
                               if (optImg.isNotEmpty) ...[
                                 const SizedBox(height: 8),
@@ -850,7 +877,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                                         'Explanation',
                                         style: questionContentTextStyle(
                                           context,
-                                          fontSize: 16,
+                                          fontSize: _fontSize,
                                           fontWeight: FontWeight.w700,
                                           color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                                         ),
@@ -863,7 +890,7 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                                       expText,
                                       style: questionContentTextStyle(
                                         context,
-                                        fontSize: 15,
+                                        fontSize: _fontSize - 0.5,
                                         fontWeight: FontWeight.w400,
                                       ),
                                     ),
@@ -981,7 +1008,10 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
           ],
         ),
       ),
-    );
+    ),
+  ],
+),
+);
   }
 }
 
@@ -1490,12 +1520,22 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
       }
     }
     final blanksList = prefs.getStringList('chapter_blanks_$chId') ?? [];
+    final savedFont = prefs.getDouble('app_content_font_size');
     if (mounted) {
       setState(() {
+        if (savedFont != null) {
+          _fontSize = savedFont.clamp(12.0, 26.0);
+        }
         _localNotes = notes;
         _solvedBlanks = blanksList.toSet();
       });
     }
+  }
+
+  Future<void> _updateFontSize(double next) async {
+    setState(() => _fontSize = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('app_content_font_size', next);
   }
 
   Future<void> _saveLocalNote(String sentenceKey, String note) async {
@@ -2406,41 +2446,9 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
     return Column(
       children: [
         // ── Reader Top Bar (Clean font size controls only) ───────────
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E2D) : AppColors.primarySoft,
-            border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.15))),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Text('A-', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                tooltip: 'Decrease font size',
-                onPressed: _fontSize > 13 ? () => setState(() => _fontSize -= 1.0) : null,
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.black26 : Colors.white.withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '${_fontSize.toStringAsFixed(1)} pt',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                ),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Text('A+', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                tooltip: 'Increase font size',
-                onPressed: _fontSize < 24 ? () => setState(() => _fontSize += 1.0) : null,
-              ),
-            ],
-          ),
+        FontSizeAdjusterBar(
+          fontSize: _fontSize,
+          onChanged: _updateFontSize,
         ),
 
         // ── Main Reading Content ───────────────────────────────────

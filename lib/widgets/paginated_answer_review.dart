@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/services/incorrect_pdf_service.dart';
 import '../core/utils/drive_image_url.dart';
@@ -198,12 +199,28 @@ class PaginatedAnswerReviewScreen extends StatefulWidget {
 class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScreen> {
   late int _index;
   late final PageController _pageController;
+  double _fontSize = 15.5;
 
   @override
   void initState() {
     super.initState();
+    _loadFontSize();
     _index = widget.initialIndex.clamp(0, widget.items.length - 1);
     _pageController = PageController(initialPage: _index);
+  }
+
+  Future<void> _loadFontSize() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getDouble('app_content_font_size');
+    if (saved != null && mounted) {
+      setState(() => _fontSize = saved.clamp(12.0, 26.0));
+    }
+  }
+
+  Future<void> _updateFontSize(double next) async {
+    setState(() => _fontSize = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('app_content_font_size', next);
   }
 
   @override
@@ -302,6 +319,10 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
       ),
       body: Column(
         children: [
+          FontSizeAdjusterBar(
+            fontSize: _fontSize,
+            onChanged: _updateFontSize,
+          ),
           if (widget.score != null && widget.totalMarks != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -409,6 +430,7 @@ class _PaginatedAnswerReviewScreenState extends State<PaginatedAnswerReviewScree
               itemBuilder: (context, i) => _ReviewQuestionPage(
                 index: i,
                 entry: widget.items[i],
+                fontSize: _fontSize,
                 isLast: i == total - 1,
                 isAllCorrect: widget.items.isNotEmpty && widget.items.every((e) => e.isCorrect),
                 allItems: widget.items,
@@ -552,6 +574,7 @@ class _ReviewQuestionPage extends StatelessWidget {
   const _ReviewQuestionPage({
     required this.index,
     required this.entry,
+    this.fontSize = 15.5,
     this.isLast = false,
     this.isAllCorrect = false,
     this.allItems = const [],
@@ -559,6 +582,7 @@ class _ReviewQuestionPage extends StatelessWidget {
 
   final int index;
   final AnswerReviewEntry entry;
+  final double fontSize;
   final bool isLast;
   final bool isAllCorrect;
   final List<AnswerReviewEntry> allItems;
@@ -630,7 +654,9 @@ class _ReviewQuestionPage extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Text(
                 entry.questionText,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontSize: fontSize + 1.5,
+                    ),
               ),
               if (entry.questionImageUrl != null &&
                   entry.questionImageUrl!.isNotEmpty) ...[
@@ -667,6 +693,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                             '$prefix${entry.options[i]}',
                             style: TextStyle(
                               color: style.text,
+                              fontSize: fontSize,
                               fontWeight: isCorrect || isSelected
                                   ? FontWeight.w600
                                   : FontWeight.w400,
@@ -693,6 +720,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                     ? 'Your answer: Not attempted'
                     : 'Your answer: ${entry.optionPrefix && entry.selectedIndex! < _optionLetters.length ? _optionLetters[entry.selectedIndex!] : (entry.selectedIndex! < entry.options.length && entry.options[entry.selectedIndex!].isNotEmpty ? entry.options[entry.selectedIndex!] : "Selected")}  •  ${entry.isCorrect ? "Correct" : "Wrong"}',
                 style: TextStyle(
+                  fontSize: fontSize - 1.0,
                   fontWeight: FontWeight.w700,
                   color: entry.selectedIndex == null
                       ? AppColors.textSecondary
@@ -716,16 +744,17 @@ class _ReviewQuestionPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.lightbulb_rounded,
+                          const Icon(Icons.lightbulb_rounded,
                               color: Color(0xFFF59E0B), size: 16),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text(
                             'Explanation',
                             style: TextStyle(
+                              fontSize: fontSize,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFFF59E0B),
+                              color: const Color(0xFFF59E0B),
                             ),
                           ),
                         ],
@@ -736,6 +765,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                         Text(
                           entry.explanation!,
                           style: TextStyle(
+                            fontSize: fontSize - 0.5,
                             color: isDark
                                 ? Colors.white.withValues(alpha: 0.9)
                                 : AppColors.textPrimary,

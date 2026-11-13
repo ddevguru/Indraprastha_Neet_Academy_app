@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
@@ -551,6 +552,14 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
   late final Future<Map<String, dynamic>> _attemptFuture;
   Timer? _timer;
   late final PageController _pageController;
+  double _fontSize = 16.0;
+
+  void _updateFontSize(double val) {
+    setState(() => _fontSize = val);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setDouble('app_content_font_size', val);
+    });
+  }
 
   String? get _userId => ref.read(authBlocProvider).state.user?.mobileNumber;
 
@@ -771,6 +780,12 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
   @override
   void initState() {
     super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      final saved = prefs.getDouble('app_content_font_size');
+      if (saved != null && mounted) {
+        setState(() => _fontSize = saved);
+      }
+    });
     _pageController = PageController(initialPage: _index);
     final repo = ref.read(contentRepositoryProvider);
     _attemptFuture =
@@ -996,6 +1011,10 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
           ),
           body: Column(
             children: [
+              FontSizeAdjusterBar(
+                fontSize: _fontSize,
+                onChanged: _updateFontSize,
+              ),
               // ── Progress indicator ─────────────────────────────────────
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -1052,7 +1071,15 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: AppSpacing.md),
-                              buildQuestionTextBlock(context, qItem),
+                              buildQuestionTextBlock(
+                                context,
+                                qItem,
+                                style: questionContentTextStyle(
+                                  context,
+                                  fontSize: _fontSize + 2.0,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               if (hasQuestionImage(qItem)) ...[
                                 const SizedBox(height: AppSpacing.md),
                                 _buildQuestionImage(questionImageRawUrl(qItem)),
@@ -1098,6 +1125,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                                 e.value,
                                                 style: questionContentTextStyle(
                                                   context,
+                                                  fontSize: _fontSize,
                                                   fontWeight: selectedOpt == e.key
                                                       ? FontWeight.w700
                                                       : FontWeight.w500,

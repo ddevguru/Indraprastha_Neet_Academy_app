@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/access/content_access.dart';
 import '../../core/providers/app_state.dart';
@@ -624,6 +625,14 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   Map<String, dynamic> _set = {};
   List<Map<String, dynamic>> _questions = [];
   Map<int, Map<String, double>> _optionStats = {};
+  double _fontSize = 16.0;
+
+  void _updateFontSize(double val) {
+    setState(() => _fontSize = val);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setDouble('app_content_font_size', val);
+    });
+  }
 
   late Timer _questionTimer;
   int _remainingSeconds = 0;
@@ -772,6 +781,12 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
   @override
   void initState() {
     super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      final saved = prefs.getDouble('app_content_font_size');
+      if (saved != null && mounted) {
+        setState(() => _fontSize = saved);
+      }
+    });
     _pageController = PageController(initialPage: _currentIndex);
     _loadAttempt();
     WidgetsBinding.instance.addPostFrameCallback((_) => _guardAccess());
@@ -1334,10 +1349,17 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
               ),
             ],
           ),
-          body: PageView.builder(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(),
-            itemCount: _questions.length,
+          body: Column(
+            children: [
+              FontSizeAdjusterBar(
+                fontSize: _fontSize,
+                onChanged: _updateFontSize,
+              ),
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _questions.length,
             onPageChanged: (pageIndex) {
               if (pageIndex == _currentIndex) return;
               _questionTimer.cancel();
@@ -1482,7 +1504,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                               qItem,
                               style: questionContentTextStyle(
                                 context,
-                                fontSize: 20,
+                                fontSize: _fontSize + 2.0,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -1557,6 +1579,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                             qOptions[index],
                                             style: questionContentTextStyle(
                                               context,
+                                              fontSize: _fontSize,
                                               fontWeight: selected || revealState
                                                   ? FontWeight.w600
                                                   : FontWeight.w400,
@@ -1633,7 +1656,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                               'Explanation',
                                               style: questionContentTextStyle(
                                                 context,
-                                                fontSize: 16,
+                                                fontSize: _fontSize + 1.0,
                                                 fontWeight: FontWeight.w700,
                                                 color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                                               ),
@@ -1646,7 +1669,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                             expText,
                                             style: questionContentTextStyle(
                                               context,
-                                              fontSize: 15,
+                                              fontSize: _fontSize - 0.5,
                                               fontWeight: FontWeight.w400,
                                             ),
                                           ),
@@ -1883,8 +1906,11 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
               );
             },
           ),
-        );
-  }
+        ),
+      ],
+    ),
+  );
+}
 }
 
 class _PracticeSetCard extends StatelessWidget {

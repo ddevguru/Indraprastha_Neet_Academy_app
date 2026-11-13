@@ -1092,3 +1092,76 @@ class _TrendPainter extends CustomPainter {
     return !listEquals(values, oldDelegate.values);
   }
 }
+
+/// A clean font size adjuster toolbar with A- / [XX.X pt] / A+ buttons
+class FontSizeAdjusterBar extends StatelessWidget {
+  const FontSizeAdjusterBar({
+    super.key,
+    required this.fontSize,
+    required this.onChanged,
+    this.minFontSize = 12.0,
+    this.maxFontSize = 26.0,
+    this.leading,
+    this.trailing,
+  });
+
+  final double fontSize;
+  final ValueChanged<double> onChanged;
+  final double minFontSize;
+  final double maxFontSize;
+  final Widget? leading;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2D) : AppColors.primarySoft,
+        border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.15))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          if (leading != null) ...[
+            leading!,
+            const Spacer(),
+          ],
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Text('A-', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            tooltip: 'Decrease font size',
+            onPressed: fontSize > minFontSize
+                ? () => onChanged((fontSize - 1.0).clamp(minFontSize, maxFontSize))
+                : null,
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black26 : Colors.white.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '${fontSize.toStringAsFixed(1)} pt',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Text('A+', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            tooltip: 'Increase font size',
+            onPressed: fontSize < maxFontSize
+                ? () => onChanged((fontSize + 1.0).clamp(minFontSize, maxFontSize))
+                : null,
+          ),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+}
+
