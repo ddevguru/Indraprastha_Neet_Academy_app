@@ -164,12 +164,20 @@
 
 **BIOLOGY PRACTICE CHAPTERS COMPLETED: 241 / 241 (100% COMPLETE & LIVE)**
 
-### G. Class 12 Biology PYQs (Chapter-wise PYQs Section):
-| Chapter ID | Book Title | Chapter Label | Total PYQs in PDF | Added Live | Status |
-| :---: | :--- | :---: | :---: | :---: | :---: |
-| **87** | **Evolution** | **Chapter 66** | 42 | 42 | **100% COMPLETE & VERIFIED** |
+### G. Chapter-wise PYQs Section (Completed with "Same Concept Q" & Derivations):
+| Chapter ID | Subject | Class | Chapter Title | Total PYQs | Completed & Live | Status |
+| :---: | :--- | :---: | :--- | :---: | :---: | :---: |
+| **32** | Biology | Class 11 | Living World | 5 | 5 | **100% COMPLETE** |
+| **33** | Biology | Class 11 | Biological Classification | 6 | 6 | **100% COMPLETE** |
+| **34** | Biology | Class 11 | Plant Kingdom | 9 | 9 | **100% COMPLETE** |
+| **87** | Biology | Class 12 | Evolution | 42 | 42 | **100% COMPLETE** |
+| **58** | Chemistry | Class 11 | Redox Reactions | 22 | 22 | **100% COMPLETE** |
+| **105** | Chemistry | Class 12 | Haloalkanes & Haloalkenes | 37 | 37 | **100% COMPLETE** |
+| **115** | Physics | Class 12 | Electromagnetic Induction | 31 | 31 | **100% COMPLETE** |
 
-*(All 42 PYQs are strictly aligned 1-to-1 with the PDF Answer Key from Q1 to Q42. Each question includes complete text, options, verified answer key, detailed step-by-step NCERT explanation, and a high-quality similar conceptual question with 4 options and complete explanation).*
+**PYQs CHAPTERS COMPLETED: 152 / 152 across 7 chapters (100% COMPLETE & VERIFIED LIVE)**
+
+*(All PYQs are formatted with clean scientific Unicode symbols only (no LaTeX, no $), step-by-step explanations ending with "Therefore, Option (...) is the correct answer.", and high-yield "Same Concept Q" with 4 options and complete explanations).*
 
 ---
 
