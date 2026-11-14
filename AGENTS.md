@@ -172,11 +172,12 @@
 | **34** | Biology | Class 11 | Plant Kingdom | 9 | 9 | **100% COMPLETE** |
 | **87** | Biology | Class 12 | Evolution | 42 | 42 | **100% COMPLETE** |
 | **58** | Chemistry | Class 11 | Redox Reactions | 22 | 22 | **100% COMPLETE** |
+| **57** | Chemistry | Class 11 | Chemical Equilibrium | 40 | 40 | **100% COMPLETE** |
 | **105** | Chemistry | Class 12 | Haloalkanes & Haloalkenes | 37 | 37 | **100% COMPLETE** |
 | **115** | Physics | Class 12 | Electromagnetic Induction | 31 | 31 | **100% COMPLETE** |
 | **118** | Physics | Class 12 | Electromagnetic Waves | 39 | 39 | **100% COMPLETE** |
 
-**PYQs CHAPTERS COMPLETED: 191 / 191 across 8 chapters (100% COMPLETE & VERIFIED LIVE)**
+**PYQs CHAPTERS COMPLETED: 231 / 231 across 9 chapters (100% COMPLETE & VERIFIED LIVE)**
 
 *(All PYQs are formatted with clean scientific Unicode symbols only (no LaTeX, no $), step-by-step explanations ending with "Therefore, Option (...) is the correct answer.", and high-yield "Same Concept Q" with 4 options and complete explanations).*
 
