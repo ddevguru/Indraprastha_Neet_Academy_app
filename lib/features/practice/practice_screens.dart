@@ -719,12 +719,26 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
     final accuracy = total > 0 ? (_correctCount / total) * 100 : 0.0;
     try {
       if (widget.setId > 0) {
+        final answersList = _questions.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final q = entry.value;
+          final chosenKey = _answers[idx] ?? '';
+          final correctKey = (q['correct_option'] ?? '').toString().toUpperCase();
+          final isCorr = chosenKey.isNotEmpty && chosenKey.toUpperCase() == correctKey;
+          return {
+            'question_id': q['id'],
+            'selected_option': chosenKey,
+            'is_correct': isCorr,
+          };
+        }).toList();
+
         await ref.read(contentRepositoryProvider).submitPracticeAttempt(
               setId: widget.setId,
               score: _correctCount,
               accuracy: accuracy,
               correctCount: _correctCount,
               wrongCount: _wrongCount,
+              answers: answersList,
             );
 
         // Log activity to Streaks

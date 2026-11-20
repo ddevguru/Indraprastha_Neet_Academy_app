@@ -99,6 +99,10 @@ class TopicLearningItem {
   final bool isNeedsRevision;
   final int totalQuestionsAttempted;
   final int totalQuestionsCorrect;
+  final int marksObtained;
+  final int maxMarks;
+  final int negativeMarks;
+  final double marksPercentage;
   final double accuracyPercentage;
   final int repeatedMistakeCount;
   final double retentionEstimate;
@@ -122,6 +126,10 @@ class TopicLearningItem {
     required this.isNeedsRevision,
     required this.totalQuestionsAttempted,
     required this.totalQuestionsCorrect,
+    this.marksObtained = 0,
+    this.maxMarks = 0,
+    this.negativeMarks = 0,
+    this.marksPercentage = 0.0,
     required this.accuracyPercentage,
     required this.repeatedMistakeCount,
     required this.retentionEstimate,
@@ -131,6 +139,14 @@ class TopicLearningItem {
   });
 
   factory TopicLearningItem.fromJson(Map<String, dynamic> json) {
+    final attempted = json['total_questions_attempted'] is int ? json['total_questions_attempted'] as int : int.tryParse(json['total_questions_attempted']?.toString() ?? '0') ?? 0;
+    final correct = json['total_questions_correct'] is int ? json['total_questions_correct'] as int : int.tryParse(json['total_questions_correct']?.toString() ?? '0') ?? 0;
+    final incorrect = attempted - correct;
+    final fallbackMarks = (correct * 4) - (incorrect * 1);
+    final fallbackMax = attempted * 4;
+    final fallbackNeg = incorrect * 1;
+    final fallbackPct = fallbackMax > 0 ? (fallbackMarks / fallbackMax) * 100.0 : 0.0;
+
     return TopicLearningItem(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       subject: json['subject']?.toString() ?? '',
@@ -145,8 +161,12 @@ class TopicLearningItem {
       isPoorlyUnderstood: json['is_poorly_understood'] == true,
       isRepeatedlyIncorrect: json['is_repeatedly_incorrect'] == true,
       isNeedsRevision: json['is_needs_revision'] == true,
-      totalQuestionsAttempted: json['total_questions_attempted'] is int ? json['total_questions_attempted'] as int : int.tryParse(json['total_questions_attempted']?.toString() ?? '0') ?? 0,
-      totalQuestionsCorrect: json['total_questions_correct'] is int ? json['total_questions_correct'] as int : int.tryParse(json['total_questions_correct']?.toString() ?? '0') ?? 0,
+      totalQuestionsAttempted: attempted,
+      totalQuestionsCorrect: correct,
+      marksObtained: json['marks_obtained'] is int ? json['marks_obtained'] as int : int.tryParse(json['marks_obtained']?.toString() ?? '$fallbackMarks') ?? fallbackMarks,
+      maxMarks: json['max_marks'] is int ? json['max_marks'] as int : int.tryParse(json['max_marks']?.toString() ?? '$fallbackMax') ?? fallbackMax,
+      negativeMarks: json['negative_marks'] is int ? json['negative_marks'] as int : int.tryParse(json['negative_marks']?.toString() ?? '$fallbackNeg') ?? fallbackNeg,
+      marksPercentage: (json['marks_percentage'] is num) ? (json['marks_percentage'] as num).toDouble() : double.tryParse(json['marks_percentage']?.toString() ?? '$fallbackPct') ?? fallbackPct,
       accuracyPercentage: (json['accuracy_percentage'] is num) ? (json['accuracy_percentage'] as num).toDouble() : double.tryParse(json['accuracy_percentage']?.toString() ?? '0') ?? 0.0,
       repeatedMistakeCount: json['repeated_mistake_count'] is int ? json['repeated_mistake_count'] as int : int.tryParse(json['repeated_mistake_count']?.toString() ?? '0') ?? 0,
       retentionEstimate: (json['retention_estimate'] is num) ? (json['retention_estimate'] as num).toDouble() : double.tryParse(json['retention_estimate']?.toString() ?? '100') ?? 100.0,
@@ -176,6 +196,10 @@ class TopicDetailData extends TopicLearningItem {
     required super.isNeedsRevision,
     required super.totalQuestionsAttempted,
     required super.totalQuestionsCorrect,
+    super.marksObtained = 0,
+    super.maxMarks = 0,
+    super.negativeMarks = 0,
+    super.marksPercentage = 0.0,
     required super.accuracyPercentage,
     required super.repeatedMistakeCount,
     required super.retentionEstimate,
@@ -205,6 +229,10 @@ class TopicDetailData extends TopicLearningItem {
       isNeedsRevision: base.isNeedsRevision,
       totalQuestionsAttempted: base.totalQuestionsAttempted,
       totalQuestionsCorrect: base.totalQuestionsCorrect,
+      marksObtained: base.marksObtained,
+      maxMarks: base.maxMarks,
+      negativeMarks: base.negativeMarks,
+      marksPercentage: base.marksPercentage,
       accuracyPercentage: base.accuracyPercentage,
       repeatedMistakeCount: base.repeatedMistakeCount,
       retentionEstimate: base.retentionEstimate,

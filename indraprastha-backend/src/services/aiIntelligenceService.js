@@ -86,15 +86,31 @@ class AiIntelligenceService {
     const uid = Number(userId);
     if (!uid) throw new Error('Invalid userId');
 
-    // 1. Gather all student interactions across content, tests, and practice
+    // 1. Gather all student interactions across content, tests, and practice (Test Series, Topic Practice, PYQs)
     const [viewsRes, answersRes, attemptsRes, repeatedRes] = await Promise.all([
       db.query(`SELECT content_name, COUNT(*) as view_count, MAX(viewed_at) as last_viewed FROM user_content_views WHERE user_id = $1 GROUP BY content_name`, [uid]),
       db.query(`
-        SELECT ua.question_id, ua.is_correct, ua.answered_at,
-               tq.subject, COALESCE(tq.topic, tq.chapter, '') as topic_name,
-               COALESCE(tq.chapter, '') as chapter_name
+        SELECT ua.question_id, ua.option_key as student_option, ua.is_correct, ua.answered_at,
+               COALESCE(tq.subject, ps.subject, b.subject, 'Physics') as subject,
+               COALESCE(tq.chapter, ps.title, bc.title, 'General') as chapter,
+               COALESCE(tq.topic, ps.topic, ps.title, bc.title, 'General') as topic_name,
+               COALESCE(tq.chapter, ps.title, bc.title, '') as chapter_name,
+               CASE
+                 WHEN ua.test_id IS NOT NULL OR tq.id IS NOT NULL THEN 'Test Series'
+                 WHEN ua.practice_set_id IS NOT NULL OR pq.id IS NOT NULL THEN 'Topic Practice'
+                 WHEN pyq.id IS NOT NULL THEN 'PYQ'
+                 ELSE 'Practice'
+               END as source_type,
+               COALESCE(tq.question, pq.question, pyq.question, 'Question #' || ua.question_id) as question_text,
+               COALESCE(tq.correct_option, pq.correct_option, pyq.correct_option, '') as correct_option,
+               COALESCE(tq.explanation, pq.explanation, pyq.explanation, '') as explanation
         FROM user_answers ua
-        JOIN test_questions tq ON ua.question_id = tq.id
+        LEFT JOIN test_questions tq ON ua.question_id = tq.id
+        LEFT JOIN practice_questions pq ON ua.question_id = pq.id
+        LEFT JOIN practice_sets ps ON (ua.practice_set_id = ps.id OR pq.practice_set_id = ps.id)
+        LEFT JOIN pyqs pyq ON ua.question_id = pyq.id
+        LEFT JOIN book_chapters bc ON pyq.chapter_id = bc.id
+        LEFT JOIN books b ON bc.book_id = b.id
         WHERE ua.user_id = $1
         ORDER BY ua.answered_at ASC
       `, [uid]),
@@ -140,6 +156,13 @@ class AiIntelligenceService {
       const correctCount = answers.filter(a => a.is_correct).length;
       const accuracy = totalAttempts > 0 ? (correctCount / totalAttempts) : 0.0;
 
+      // NEET standard scoring (+4 for correct, -1 for incorrect)
+      const incorrectCount = totalAttempts - correctCount;
+      const marksObtained = (correctCount * 4) - (incorrectCount * 1);
+      const maxMarks = totalAttempts * 4;
+      const negativeMarks = incorrectCount * 1;
+      const marksPercentage = maxMarks > 0 ? parseFloat(((marksObtained / maxMarks) * 100).toFixed(1)) : 0.0;
+
       // Recent vs previous accuracy (last 10 vs prior)
       let recentAccuracy = accuracy;
       let previousAccuracy = accuracy;
@@ -181,6 +204,10 @@ class AiIntelligenceService {
         content_views: contentViews,
         total_attempts: totalAttempts,
         correct_count: correctCount,
+        marks_obtained: marksObtained,
+        max_marks: maxMarks,
+        negative_marks: negativeMarks,
+        marks_percentage: marksPercentage,
         accuracy: accuracy,
         recent_accuracy: recentAccuracy,
         previous_accuracy: previousAccuracy,
@@ -193,11 +220,46 @@ class AiIntelligenceService {
       });
     }
 
+    // 2b. Aggregate question-level mistakes across all sources (Tests, Practice Sets, PYQs)
+    const questionAttemptsMap = new Map();
+    answersRes.rows.forEach(r => {
+      if (!questionAttemptsMap.has(r.question_id)) {
+        questionAttemptsMap.set(r.question_id, []);
+      }
+      questionAttemptsMap.get(r.question_id).push(r);
+    });
+
+    const mistakeRecords = [];
+    for (const [qid, qAnswers] of questionAttemptsMap.entries()) {
+      const wrongList = qAnswers.filter(a => !a.is_correct);
+      if (wrongList.length > 0) {
+        const lastAnswer = qAnswers[qAnswers.length - 1];
+        const isResolved = lastAnswer.is_correct === true;
+        const lastWrong = wrongList[wrongList.length - 1];
+        mistakeRecords.push({
+          question_id: qid,
+          subject: lastWrong.subject || 'Physics',
+          chapter: lastWrong.chapter || 'General',
+          topic: lastWrong.topic_name || lastWrong.chapter || 'General',
+          concept: lastWrong.topic_name || 'Concept',
+          source_type: lastWrong.source_type || 'Test Series',
+          wrong_attempt_count: wrongList.length,
+          last_wrong_answer: lastWrong.student_option || '',
+          correct_answer: lastWrong.correct_option || '',
+          question_text: lastWrong.question_text || '',
+          explanation: lastWrong.explanation || '',
+          is_resolved: isResolved,
+          first_occurred_at: wrongList[0].answered_at,
+          last_occurred_at: lastWrong.answered_at
+        });
+      }
+    }
+
     // 3. Run Inference via Python ML Engine (or Mathematical fallback)
     const predictions = await this._runMLInference(topicFeatures);
 
-    // 4. Persist to student_topic_learning_state & generate recommendations
-    await this._persistAnalysisResults(uid, topicFeatures, predictions);
+    // 4. Persist to student_topic_learning_state, student_repeated_mistakes & generate recommendations
+    await this._persistAnalysisResults(uid, topicFeatures, predictions, mistakeRecords);
 
     return {
       success: true,
@@ -273,20 +335,21 @@ class AiIntelligenceService {
     else if (f.accuracy_delta < -0.08) trend = 'DECLINING';
 
     let explanation = '';
+    const incorrectCount = f.total_attempts - f.correct_count;
     if (isUnstudied) {
       explanation = `You haven't studied the chapter notes or attempted questions for ${f.topic} yet. We recommend reading the foundational NCERT notes first.`;
     } else if (isPoorlyUnderstood && isRepeatedlyIncorrect) {
-      explanation = `Your accuracy in ${f.topic} is ${(f.accuracy * 100).toFixed(1)}% across ${f.total_attempts} questions. You have made ${f.repeated_mistakes} recurring conceptual mistakes on key questions. Targeted review of weak concepts is recommended.`;
+      explanation = `Score: ${f.marks_obtained}/${f.max_marks} Marks (${f.marks_percentage.toFixed(1)}%). You attempted ${f.total_attempts} questions and lost ${f.negative_marks} marks due to negative marking (-1 for each of ${incorrectCount} wrong answers). You also have ${f.repeated_mistakes} recurring conceptual mistakes across tests and practice. Immediate remediation required.`;
     } else if (isPoorlyUnderstood) {
-      explanation = `Your accuracy in ${f.topic} stands at ${(f.accuracy * 100).toFixed(1)}%, which is below the target mastery benchmark of 65%. Additional guided practice will strengthen your foundation.`;
+      explanation = `Score: ${f.marks_obtained}/${f.max_marks} Marks (${f.marks_percentage.toFixed(1)}%). You attempted ${f.total_attempts} questions and lost ${f.negative_marks} marks due to negative marking (-1 for each of ${incorrectCount} wrong answers). Your accuracy is ${(f.accuracy * 100).toFixed(1)}%, which is below the target mastery benchmark of 65%. Focused MCQ practice will eliminate negative marking.`;
     } else if (isRepeatedlyIncorrect) {
-      explanation = `You have answered ${f.repeated_mistakes} questions incorrectly multiple times in ${f.topic}. These recurring mistakes indicate a specific concept gap that needs focused correction.`;
+      explanation = `You have answered ${f.repeated_mistakes} questions incorrectly multiple times in ${f.topic}. These recurring mistakes indicate a specific concept gap across tests and practice that needs focused correction.`;
     } else if (isNeedsRevision) {
       explanation = `It has been ${f.days_since_practice} days since you last practiced ${f.topic}. Your calculated memory retention has declined to ${retention.toFixed(1)}%. A quick spaced-repetition revision session is recommended to prevent further forgetting.`;
     } else if (masteryScore >= 75.0) {
-      explanation = `Strong grasp demonstrated in ${f.topic} with ${(f.accuracy * 100).toFixed(1)}% accuracy and steady retention (${retention.toFixed(1)}%). Maintain this mastery level with periodic test challenges.`;
+      explanation = `Strong grasp demonstrated in ${f.topic} with Score ${f.marks_obtained}/${f.max_marks} Marks (${(f.accuracy * 100).toFixed(1)}% accuracy) and steady retention (${retention.toFixed(1)}%). Maintain this mastery level with periodic test challenges.`;
     } else {
-      explanation = `Progressing steadily in ${f.topic} with ${(f.accuracy * 100).toFixed(1)}% accuracy across ${f.total_attempts} questions.`;
+      explanation = `Progressing steadily in ${f.topic} with Score ${f.marks_obtained}/${f.max_marks} Marks (${(f.accuracy * 100).toFixed(1)}% accuracy) across ${f.total_attempts} questions attempted.`;
     }
 
     return {
@@ -313,9 +376,9 @@ class AiIntelligenceService {
   }
 
   /**
-   * Persists results into student_topic_learning_state and generates real personalized recommendations.
+   * Persists results into student_topic_learning_state, student_repeated_mistakes and generates real personalized recommendations.
    */
-  async _persistAnalysisResults(userId, features, predictions) {
+  async _persistAnalysisResults(userId, features, predictions, mistakeRecords = []) {
     const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
@@ -333,13 +396,15 @@ class AiIntelligenceService {
         else if (p.is_repeatedly_incorrect) recAction = 'Solve remedial similar questions to correct persistent errors.';
         else if (p.is_needs_revision) recAction = 'Complete spaced-repetition revision test.';
 
-        // Upsert student_topic_learning_state
+        // Upsert student_topic_learning_state with NEET marks fields
         await client.query(`
           INSERT INTO student_topic_learning_state (
             user_id, subject, chapter, topic, study_status,
             mastery_score, mastery_category, prediction_confidence, performance_trend,
             is_not_studied, is_poorly_understood, is_repeatedly_incorrect, is_needs_revision,
-            total_questions_attempted, total_questions_correct, accuracy_percentage,
+            total_questions_attempted, total_questions_correct,
+            marks_obtained, max_marks, negative_marks, marks_percentage,
+            accuracy_percentage,
             recent_accuracy, previous_accuracy, repeated_mistake_count, avg_time_seconds,
             content_views_count, revision_count, retention_estimate, revision_priority,
             ai_explanation, recommended_action, last_evaluated_at
@@ -347,10 +412,12 @@ class AiIntelligenceService {
             $1, $2, $3, $4, $5,
             $6, $7, $8, $9,
             $10, $11, $12, $13,
-            $14, $15, $16,
-            $17, $18, $19, $20,
+            $14, $15,
+            $16, $17, $18, $19,
+            $20,
             $21, $22, $23, $24,
-            $25, $26, CURRENT_TIMESTAMP
+            $25, $26, $27, $28,
+            $29, $30, CURRENT_TIMESTAMP
           )
           ON CONFLICT (user_id, subject, chapter, topic) DO UPDATE SET
             study_status = EXCLUDED.study_status,
@@ -364,6 +431,10 @@ class AiIntelligenceService {
             is_needs_revision = EXCLUDED.is_needs_revision,
             total_questions_attempted = EXCLUDED.total_questions_attempted,
             total_questions_correct = EXCLUDED.total_questions_correct,
+            marks_obtained = EXCLUDED.marks_obtained,
+            max_marks = EXCLUDED.max_marks,
+            negative_marks = EXCLUDED.negative_marks,
+            marks_percentage = EXCLUDED.marks_percentage,
             accuracy_percentage = EXCLUDED.accuracy_percentage,
             recent_accuracy = EXCLUDED.recent_accuracy,
             previous_accuracy = EXCLUDED.previous_accuracy,
@@ -380,7 +451,9 @@ class AiIntelligenceService {
           userId, f.subject, f.chapter, f.topic, studyStatus,
           p.mastery_score, p.mastery_category, p.prediction_confidence, p.performance_trend,
           p.is_not_studied, p.is_poorly_understood, p.is_repeatedly_incorrect, p.is_needs_revision,
-          f.total_attempts, f.correct_count, (f.accuracy * 100),
+          f.total_attempts, f.correct_count,
+          f.marks_obtained, f.max_marks, f.negative_marks, f.marks_percentage,
+          (f.accuracy * 100),
           (f.recent_accuracy * 100), (f.previous_accuracy * 100), f.repeated_mistakes, f.avg_time_seconds,
           f.content_views, f.revision_count, p.retention_estimate, p.revision_priority,
           p.ai_explanation, recAction
@@ -446,6 +519,38 @@ class AiIntelligenceService {
             estimated_minutes: 25
           });
         }
+      }
+
+      // Upsert question mistakes across all sources (Tests, Practice Sets, PYQs)
+      for (const m of mistakeRecords) {
+        await client.query(`
+          INSERT INTO student_repeated_mistakes (
+            user_id, subject, chapter, topic, concept, question_id, source_type,
+            wrong_attempt_count, last_wrong_answer, correct_answer, question_text,
+            explanation, is_resolved, first_occurred_at, last_occurred_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7,
+            $8, $9, $10, $11,
+            $12, $13, $14, $15
+          )
+          ON CONFLICT (user_id, question_id) DO UPDATE SET
+            subject = EXCLUDED.subject,
+            chapter = EXCLUDED.chapter,
+            topic = EXCLUDED.topic,
+            concept = EXCLUDED.concept,
+            source_type = EXCLUDED.source_type,
+            wrong_attempt_count = EXCLUDED.wrong_attempt_count,
+            last_wrong_answer = EXCLUDED.last_wrong_answer,
+            correct_answer = EXCLUDED.correct_answer,
+            question_text = EXCLUDED.question_text,
+            explanation = EXCLUDED.explanation,
+            is_resolved = EXCLUDED.is_resolved,
+            last_occurred_at = EXCLUDED.last_occurred_at
+        `, [
+          userId, m.subject, m.chapter, m.topic, m.concept, m.question_id, m.source_type,
+          m.wrong_attempt_count, m.last_wrong_answer, m.correct_answer, m.question_text,
+          m.explanation, m.is_resolved, m.first_occurred_at, m.last_occurred_at
+        ]);
       }
 
       // Upsert top recommendations (keep existing uncompleted ones clean)
@@ -594,7 +699,9 @@ class AiIntelligenceService {
         id, subject, chapter, topic, study_status,
         mastery_score, mastery_category, prediction_confidence, performance_trend,
         is_not_studied, is_poorly_understood, is_repeatedly_incorrect, is_needs_revision,
-        total_questions_attempted, total_questions_correct, accuracy_percentage,
+        total_questions_attempted, total_questions_correct,
+        marks_obtained, max_marks, negative_marks, marks_percentage,
+        accuracy_percentage,
         repeated_mistake_count, retention_estimate, revision_priority,
         ai_explanation, recommended_action
       FROM student_topic_learning_state
@@ -619,7 +726,15 @@ class AiIntelligenceService {
   async getTopicDetail(userId, subject, topic) {
     const uid = Number(userId);
     const res = await db.query(`
-      SELECT *
+      SELECT
+        id, subject, chapter, topic, study_status,
+        mastery_score, mastery_category, prediction_confidence, performance_trend,
+        is_not_studied, is_poorly_understood, is_repeatedly_incorrect, is_needs_revision,
+        total_questions_attempted, total_questions_correct,
+        marks_obtained, max_marks, negative_marks, marks_percentage,
+        accuracy_percentage,
+        repeated_mistake_count, retention_estimate, revision_priority,
+        ai_explanation, recommended_action
       FROM student_topic_learning_state
       WHERE user_id = $1 AND LOWER(subject) = LOWER($2) AND LOWER(topic) = LOWER($3)
       LIMIT 1
@@ -641,6 +756,10 @@ class AiIntelligenceService {
         mastery_category: 'NOVICE',
         accuracy_percentage: 0.0,
         total_questions_attempted: 0,
+        marks_obtained: 0,
+        max_marks: 0,
+        negative_marks: 0,
+        marks_percentage: 0.0,
         ai_explanation: `No learning records found for ${topic} yet. Read the chapter notes to begin.`,
         recommended_action: 'Read chapter notes.'
       };
@@ -648,12 +767,12 @@ class AiIntelligenceService {
 
     const state = res.rows[0];
 
-    // Fetch repeated mistake details for this topic
+    // Fetch repeated mistake details for this topic across Tests, Practice sets and PYQs
     const mistakesRes = await db.query(`
       SELECT id, concept, question_id, source_type, wrong_attempt_count, last_wrong_answer, correct_answer, question_text, explanation, is_resolved
       FROM student_repeated_mistakes
       WHERE user_id = $1 AND LOWER(subject) = LOWER($2) AND LOWER(topic) = LOWER($3)
-      ORDER BY wrong_attempt_count DESC
+      ORDER BY wrong_attempt_count DESC, id DESC
     `, [uid, subject, topic]);
 
     return {

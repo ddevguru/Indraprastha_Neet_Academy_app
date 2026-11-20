@@ -70,23 +70,39 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final subtextColor = isDark ? const Color(0xFFB0B7C3) : AppColors.textSecondary;
+    final tabBg = isDark ? const Color(0xFF171A22) : Colors.white;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        title: const Text('Personalized Study Plan', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
-        backgroundColor: AppColors.surface,
+        title: Text(
+          'Personalized Study Plan',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: textColor),
+        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-          tabs: const [
-            Tab(text: 'Pending Tasks'),
-            Tab(text: 'Completed Tasks'),
-          ],
+        iconTheme: IconThemeData(color: textColor),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            color: tabBg,
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: AppColors.primary,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: subtextColor,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+              tabs: const [
+                Tab(text: 'Pending Tasks'),
+                Tab(text: 'Completed Tasks'),
+              ],
+            ),
+          ),
         ),
       ),
       body: FutureBuilder<StudyPlanData>(
@@ -105,9 +121,20 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
                   children: [
                     const Icon(Icons.error_outline, size: 48, color: AppColors.danger),
                     const SizedBox(height: 12),
-                    Text('Failed to load study plan: ${snapshot.error}', textAlign: TextAlign.center),
+                    Text(
+                      'Failed to load study plan: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: textColor),
+                    ),
                     const SizedBox(height: 16),
-                    ElevatedButton(onPressed: _loadPlan, child: const Text('Retry')),
+                    ElevatedButton(
+                      onPressed: _loadPlan,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Retry'),
+                    ),
                   ],
                 ),
               ),
@@ -117,13 +144,13 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
           final plan = snapshot.data!;
           return Column(
             children: [
-              _buildSummaryHeader(plan),
+              _buildSummaryHeader(plan, isDark, subtextColor),
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildTasksList(plan.pendingTasks, isPending: true),
-                    _buildTasksList(plan.completedTasks, isPending: false),
+                    _buildTasksList(plan.pendingTasks, isPending: true, isDark: isDark, textColor: textColor, subtextColor: subtextColor),
+                    _buildTasksList(plan.completedTasks, isPending: false, isDark: isDark, textColor: textColor, subtextColor: subtextColor),
                   ],
                 ),
               ),
@@ -134,32 +161,44 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
     );
   }
 
-  Widget _buildSummaryHeader(StudyPlanData plan) {
+  Widget _buildSummaryHeader(StudyPlanData plan, bool isDark, Color subtextColor) {
+    final barBg = isDark ? const Color(0xFF171A22) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF2E3440) : AppColors.border;
+
     return Container(
-      color: AppColors.surface,
+      color: barBg,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildSummaryItem('Pending', '${plan.pendingCount}', AppColors.primary),
-          _buildSummaryItem('Completed', '${plan.completedCount}', AppColors.success),
-          _buildSummaryItem('Est. Time', '${plan.totalEstimatedMinutes}m', const Color(0xFF7C3AED)),
+          _buildSummaryItem('Pending Tasks', '${plan.pendingCount}', AppColors.primary, subtextColor),
+          _buildSummaryItem('Completed', '${plan.completedCount}', AppColors.success, subtextColor),
+          _buildSummaryItem('Est. Time', '${plan.totalEstimatedMinutes}m', const Color(0xFF7C3AED), subtextColor),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, Color color) {
+  Widget _buildSummaryItem(String label, String value, Color color, Color subtextColor) {
     return Column(
       children: [
         Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color)),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+        Text(label, style: TextStyle(fontSize: 11, color: subtextColor, fontWeight: FontWeight.w500)),
       ],
     );
   }
 
-  Widget _buildTasksList(List<StudyPlanItem> tasks, {required bool isPending}) {
+  Widget _buildTasksList(
+    List<StudyPlanItem> tasks, {
+    required bool isPending,
+    required bool isDark,
+    required Color textColor,
+    required Color subtextColor,
+  }) {
     if (tasks.isEmpty) {
       return Center(
         child: Padding(
@@ -170,19 +209,23 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
               Icon(
                 isPending ? Icons.task_alt_rounded : Icons.history_rounded,
                 size: 56,
-                color: isPending ? AppColors.success : AppColors.textSecondary,
+                color: isPending ? AppColors.success : subtextColor,
               ),
               const SizedBox(height: 16),
               Text(
                 isPending ? 'All tasks complete! You are fully on track.' : 'No completed tasks recorded yet.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textColor),
               ),
             ],
           ),
         ),
       );
     }
+
+    final cardBg = isDark ? const Color(0xFF171A22) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF2E3440) : AppColors.border;
+    final tagBg = isDark ? const Color(0xFF1F242E) : const Color(0xFFFFF8F2);
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -194,16 +237,10 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: cardBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: cardBorder, width: 1.2),
+            boxShadow: isDark ? null : AppShadows.soft,
           ),
           child: Padding(
             padding: const EdgeInsets.all(14),
@@ -214,7 +251,7 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
                   Padding(
                     padding: const EdgeInsets.only(top: 2, right: 10),
                     child: IconButton(
-                      icon: const Icon(Icons.circle_outlined, color: AppColors.textSecondary, size: 24),
+                      icon: Icon(Icons.circle_outlined, color: subtextColor, size: 24),
                       onPressed: () => _completeTask(item),
                       tooltip: 'Mark Complete',
                     ),
@@ -234,7 +271,7 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: catColor.withOpacity(0.12),
+                              color: catColor.withValues(alpha: isDark ? 0.22 : 0.12),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -244,7 +281,7 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
                           ),
                           Text(
                             '${item.estimatedMinutes} min',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: subtextColor),
                           ),
                         ],
                       ),
@@ -254,27 +291,28 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          color: isPending ? AppColors.textPrimary : AppColors.textSecondary,
+                          color: isPending ? textColor : subtextColor,
                           decoration: isPending ? null : TextDecoration.lineThrough,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         item.description,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3),
+                        style: TextStyle(fontSize: 12, color: subtextColor, height: 1.3),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppColors.backgroundAlt,
-                              borderRadius: BorderRadius.circular(4),
+                              color: tagBg,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: cardBorder, width: 0.8),
                             ),
                             child: Text(
                               '${item.subject} • ${item.chapter}',
-                              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                              style: TextStyle(fontSize: 10, color: subtextColor, fontWeight: FontWeight.w600),
                             ),
                           ),
                           const Spacer(),
@@ -284,7 +322,7 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
                                 context.push('/ai-learning/topic?subject=${Uri.encodeComponent(item.subject)}&topic=${Uri.encodeComponent(item.topic)}');
                               },
                               icon: const Icon(Icons.arrow_forward, size: 14),
-                              label: const Text('Start', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                              label: const Text('Start', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.primary,
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -303,4 +341,3 @@ class _StudyPlanScreenState extends ConsumerState<StudyPlanScreen> with SingleTi
     );
   }
 }
-

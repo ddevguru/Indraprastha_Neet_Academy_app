@@ -609,6 +609,8 @@ router.post('/practice-sets/:setId/submit', userAuth, async (req, res) => {
       accuracy = 0,
       correctCount = 0,
       wrongCount = 0,
+      answers = [],
+      userAnswers = [],
     } = req.body || {};
 
     const attempt = await pool.query(
@@ -617,6 +619,24 @@ router.post('/practice-sets/:setId/submit', userAuth, async (req, res) => {
        RETURNING *`,
       [req.user.id, setId, score, accuracy, correctCount, wrongCount]
     );
+
+    // Record question-level answers into user_answers for AI intelligence tracking
+    const allAnswers = Array.isArray(userAnswers) && userAnswers.length > 0
+      ? userAnswers
+      : (Array.isArray(answers) ? answers : []);
+
+    for (const a of allAnswers) {
+      const qId = Number(a.questionId || a.question_id || a.id);
+      const selectedOpt = String(a.selectedOption || a.selected_option || a.optionKey || a.answer || '').toUpperCase();
+      const isCorr = Boolean(a.isCorrect ?? a.is_correct);
+      if (qId && selectedOpt) {
+        await pool.query(
+          `INSERT INTO user_answers (user_id, question_id, practice_set_id, option_key, is_correct, answered_at)
+           VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+          [req.user.id, qId, setId, selectedOpt, isCorr]
+        ).catch(() => {});
+      }
+    }
 
     recordUserStreakActivity(pool, req.user.id, {
       activityType: 'practice',

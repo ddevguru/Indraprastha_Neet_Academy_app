@@ -46,13 +46,26 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final subtextColor = isDark ? const Color(0xFFB0B7C3) : AppColors.textSecondary;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        title: const Text('Topic Intelligence', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
-        backgroundColor: AppColors.surface,
+        title: Text(
+          'Topic Intelligence',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: textColor,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
+        iconTheme: IconThemeData(color: textColor),
       ),
       body: FutureBuilder<TopicDetailData>(
         future: _detailFuture,
@@ -70,9 +83,20 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                   children: [
                     const Icon(Icons.error_outline, size: 48, color: AppColors.danger),
                     const SizedBox(height: 12),
-                    Text('Failed to load topic detail: ${snapshot.error}', textAlign: TextAlign.center),
+                    Text(
+                      'Failed to load topic detail: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: textColor),
+                    ),
                     const SizedBox(height: 16),
-                    ElevatedButton(onPressed: _loadDetail, child: const Text('Retry')),
+                    ElevatedButton(
+                      onPressed: _loadDetail,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Retry'),
+                    ),
                   ],
                 ),
               ),
@@ -81,21 +105,21 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
 
           final detail = snapshot.data!;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             children: [
-              _buildHeaderCard(detail),
+              _buildHeaderCard(detail, isDark, textColor, subtextColor),
               const SizedBox(height: 16),
-              _buildAiExplanationBanner(detail),
+              _buildAiExplanationBanner(detail, isDark),
               const SizedBox(height: 16),
-              _buildPerformanceMetricsGrid(detail),
+              _buildPerformanceMetricsGrid(detail, isDark, textColor, subtextColor),
               const SizedBox(height: 16),
-              _buildForgettingCurveCard(detail),
+              _buildForgettingCurveCard(detail, isDark, textColor, subtextColor),
               if (detail.repeatedMistakesList.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                _buildRepeatedMistakesSection(detail.repeatedMistakesList),
+                _buildRepeatedMistakesSection(detail.repeatedMistakesList, isDark, textColor, subtextColor),
               ],
               const SizedBox(height: 24),
-              _buildActionRecommendations(context, detail),
+              _buildActionRecommendations(context, detail, isDark, textColor),
               const SizedBox(height: 32),
             ],
           );
@@ -104,22 +128,31 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     );
   }
 
-  Widget _buildHeaderCard(TopicDetailData detail) {
+  Widget _buildHeaderCard(
+    TopicDetailData detail,
+    bool isDark,
+    Color textColor,
+    Color subtextColor,
+  ) {
     final masteryColor = _getMasteryColor(detail.masteryScore);
+    final cardBg = isDark ? const Color(0xFF171A22) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF2E3440) : AppColors.border;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cardBg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: cardBorder, width: 1.2),
+        boxShadow: isDark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : AppShadows.soft,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,24 +163,34 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
+                  color: isDark
+                      ? AppColors.primary.withValues(alpha: 0.22)
+                      : AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   detail.subject,
-                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: masteryColor.withOpacity(0.12),
+                  color: masteryColor.withValues(alpha: isDark ? 0.20 : 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: masteryColor.withOpacity(0.3)),
+                  border: Border.all(color: masteryColor.withValues(alpha: 0.4)),
                 ),
                 child: Text(
                   detail.masteryCategory,
-                  style: TextStyle(color: masteryColor, fontWeight: FontWeight.w800, fontSize: 11),
+                  style: TextStyle(
+                    color: masteryColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                  ),
                 ),
               ),
             ],
@@ -155,19 +198,27 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
           const SizedBox(height: 12),
           Text(
             detail.topic,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: textColor,
+              letterSpacing: -0.3,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             'Chapter: ${detail.chapter}',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 13, color: subtextColor),
           ),
           const SizedBox(height: 16),
           // Mastery Progress Bar
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Estimated Mastery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+              Text(
+                'Calculated Mastery Score',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: subtextColor),
+              ),
               Text(
                 '${detail.masteryScore.toStringAsFixed(1)}%',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: masteryColor),
@@ -180,7 +231,7 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
             child: LinearProgressIndicator(
               value: (detail.masteryScore / 100.0).clamp(0.0, 1.0),
               minHeight: 10,
-              backgroundColor: masteryColor.withOpacity(0.12),
+              backgroundColor: masteryColor.withValues(alpha: isDark ? 0.20 : 0.12),
               valueColor: AlwaysStoppedAnimation<Color>(masteryColor),
             ),
           ),
@@ -189,17 +240,18 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     );
   }
 
-  Widget _buildAiExplanationBanner(TopicDetailData detail) {
+  Widget _buildAiExplanationBanner(TopicDetailData detail, bool isDark) {
+    final bannerBg = isDark ? const Color(0xFF2A1F10) : const Color(0xFFFFF8EE);
+    final borderColor = isDark ? const Color(0xFFB45309) : const Color(0xFFF59E0B);
+    final titleColor = isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E);
+    final descColor = isDark ? const Color(0xFFFEF3C7) : const Color(0xFF78350F);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: bannerBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+        border: Border.all(color: borderColor.withValues(alpha: 0.4), width: 1.2),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,16 +262,16 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'AI Diagnostic Analysis',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF92400E)),
+                Text(
+                  'AI Academic Diagnostic & Score Impact',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: titleColor),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 5),
                 Text(
                   detail.aiExplanation.isNotEmpty
                       ? detail.aiExplanation
-                      : 'Consistent study patterns detected. Continue regular testing to strengthen retention.',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF78350F), height: 1.4),
+                      : 'Continue regular testing to maintain mastery and prevent memory decay.',
+                  style: TextStyle(fontSize: 12, color: descColor, height: 1.45),
                 ),
               ],
             ),
@@ -229,20 +281,84 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     );
   }
 
-  Widget _buildPerformanceMetricsGrid(TopicDetailData detail) {
+  Widget _buildPerformanceMetricsGrid(
+    TopicDetailData detail,
+    bool isDark,
+    Color textColor,
+    Color subtextColor,
+  ) {
+    final cardBg = isDark ? const Color(0xFF171A22) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF2E3440) : AppColors.border;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cardBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: cardBorder, width: 1.2),
+        boxShadow: isDark ? null : AppShadows.soft,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Quantitative Performance',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textPrimary),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'NEET Marks & Performance',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: textColor),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: detail.marksObtained >= (detail.maxMarks * 0.75)
+                      ? AppColors.success.withValues(alpha: 0.15)
+                      : (detail.marksObtained >= (detail.maxMarks * 0.5)
+                          ? AppColors.warning.withValues(alpha: 0.15)
+                          : AppColors.danger.withValues(alpha: 0.15)),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${detail.marksPercentage.toStringAsFixed(0)}% Score',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: detail.marksObtained >= (detail.maxMarks * 0.75)
+                        ? AppColors.success
+                        : (detail.marksObtained >= (detail.maxMarks * 0.5)
+                            ? AppColors.warning
+                            : AppColors.danger),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 4 Metric Tiles in 2x2 grid
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricTile(
+                  'Net NEET Score',
+                  '${detail.marksObtained}/${detail.maxMarks}',
+                  Icons.stars_rounded,
+                  AppColors.primary,
+                  isDark,
+                  subtextColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMetricTile(
+                  'Negative Penalty',
+                  '-${detail.negativeMarks} Marks',
+                  Icons.remove_circle_outline,
+                  AppColors.danger,
+                  isDark,
+                  subtextColor,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
@@ -253,37 +369,19 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
                   '${detail.accuracyPercentage.toStringAsFixed(0)}%',
                   Icons.track_changes_rounded,
                   detail.accuracyPercentage >= 70 ? AppColors.success : AppColors.danger,
+                  isDark,
+                  subtextColor,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildMetricTile(
-                  'Questions Attempted',
-                  '${detail.totalQuestionsAttempted}',
+                  'Solved Questions',
+                  '${detail.totalQuestionsCorrect} / ${detail.totalQuestionsAttempted}',
                   Icons.quiz_outlined,
-                  AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildMetricTile(
-                  'Correct Answers',
-                  '${detail.totalQuestionsCorrect}',
-                  Icons.check_circle_outline,
-                  AppColors.success,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildMetricTile(
-                  'Repeated Mistakes',
-                  '${detail.repeatedMistakeCount}',
-                  Icons.replay_circle_filled_rounded,
-                  detail.repeatedMistakeCount > 0 ? AppColors.danger : AppColors.textSecondary,
+                  const Color(0xFF2563EB),
+                  isDark,
+                  subtextColor,
                 ),
               ),
             ],
@@ -293,36 +391,65 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
     );
   }
 
-  Widget _buildMetricTile(String label, String value, IconData icon, Color color) {
+  Widget _buildMetricTile(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    bool isDark,
+    Color subtextColor,
+  ) {
+    final tileBg = isDark ? const Color(0xFF1F242E) : const Color(0xFFFFF8F2);
+    final tileBorder = isDark ? const Color(0xFF2E3440) : AppColors.border;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.backgroundAlt,
+        color: tileBg,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: tileBorder, width: 1),
       ),
       child: Row(
         children: [
           Icon(icon, color: color, size: 22),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
-              Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: color),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 10, color: subtextColor, fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildForgettingCurveCard(TopicDetailData detail) {
+  Widget _buildForgettingCurveCard(
+    TopicDetailData detail,
+    bool isDark,
+    Color textColor,
+    Color subtextColor,
+  ) {
+    final cardBg = isDark ? const Color(0xFF1E172E) : const Color(0xFFF9F7FF);
+    final cardBorder = isDark ? const Color(0xFF4C2A85) : const Color(0xFFDDD6FE);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F3FF),
+        color: cardBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.25)),
+        border: Border.all(color: cardBorder, width: 1.2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,13 +457,17 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.history_toggle_off_rounded, color: Color(0xFF7C3AED), size: 20),
-                  SizedBox(width: 8),
+                  const Icon(Icons.history_toggle_off_rounded, color: Color(0xFF7C3AED), size: 20),
+                  const SizedBox(width: 8),
                   Text(
                     'Memory Retention (Forgetting Curve)',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF5B21B6)),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: isDark ? const Color(0xFFDDD6FE) : const Color(0xFF5B21B6),
+                    ),
                   ),
                 ],
               ),
@@ -359,10 +490,17 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Calculated Retention', style: TextStyle(fontSize: 12, color: Color(0xFF6D28D9))),
+              Text(
+                'Calculated Retention',
+                style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFCACFDA) : const Color(0xFF6D28D9)),
+              ),
               Text(
                 '${detail.retentionEstimate.toStringAsFixed(0)}%',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF5B21B6)),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? Colors.white : const Color(0xFF5B21B6),
+                ),
               ),
             ],
           ),
@@ -372,93 +510,191 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
             child: LinearProgressIndicator(
               value: (detail.retentionEstimate / 100.0).clamp(0.0, 1.0),
               minHeight: 8,
-              backgroundColor: const Color(0xFF7C3AED).withOpacity(0.15),
+              backgroundColor: const Color(0xFF7C3AED).withValues(alpha: isDark ? 0.25 : 0.15),
               valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Based on Ebbinghaus spaced-repetition: review regularly to reinforce neural retention before it decays.',
-            style: TextStyle(fontSize: 11, color: Color(0xFF6D28D9)),
+          Text(
+            'Based on Ebbinghaus spaced-repetition: review regularly to reinforce neural retention before forgetting accelerates.',
+            style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFB0B7C3) : const Color(0xFF6D28D9)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRepeatedMistakesSection(List<RepeatedMistakeItem> mistakes) {
+  Widget _buildRepeatedMistakesSection(
+    List<RepeatedMistakeItem> mistakes,
+    bool isDark,
+    Color textColor,
+    Color subtextColor,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Icon(Icons.warning_amber_rounded, size: 20, color: AppColors.danger),
-            const SizedBox(width: 8),
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, size: 20, color: AppColors.danger),
+                const SizedBox(width: 8),
+                Text(
+                  'Recurring Mistakes (${mistakes.length})',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: textColor),
+                ),
+              ],
+            ),
             Text(
-              'Recurring Conceptual Mistakes (${mistakes.length})',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary),
+              'Tests, Practice & MCQs',
+              style: TextStyle(fontSize: 11, color: subtextColor, fontWeight: FontWeight.w600),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        ...mistakes.map((m) => Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.danger.withOpacity(0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Failed ${m.wrongAttemptCount} times',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.danger),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.danger.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Concept: ${m.concept.isNotEmpty ? m.concept : "Core MCQ"}',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.danger),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (m.questionText.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(m.questionText, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  ],
-                  if (m.explanation.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text('Remedy: ${m.explanation}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                  ],
-                ],
-              ),
-            )),
+        ...mistakes.map((m) => _buildMistakeCard(m, isDark, textColor, subtextColor)),
       ],
     );
   }
 
-  Widget _buildActionRecommendations(BuildContext context, TopicDetailData detail) {
+  Widget _buildMistakeCard(
+    RepeatedMistakeItem m,
+    bool isDark,
+    Color textColor,
+    Color subtextColor,
+  ) {
+    final cardBg = isDark ? const Color(0xFF1E1719) : const Color(0xFFFFF5F5);
+    final cardBorder = isDark ? const Color(0xFF4C1D1D) : const Color(0xFFFECACA);
+
+    Color sourceColor = const Color(0xFF2563EB); // Test Series
+    if (m.sourceType.toLowerCase().contains('practice')) {
+      sourceColor = const Color(0xFF0D9488); // Topic Practice
+    } else if (m.sourceType.toLowerCase().contains('pyq')) {
+      sourceColor = const Color(0xFF7C3AED); // PYQ
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cardBorder, width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: sourceColor.withValues(alpha: isDark ? 0.25 : 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      m.sourceType,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: sourceColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Wrong ${m.wrongAttemptCount} times',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: AppColors.danger),
+                  ),
+                ],
+              ),
+              if (m.isResolved)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    '✓ Resolved',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.success),
+                  ),
+                ),
+            ],
+          ),
+          if (m.questionText.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              m.questionText,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textColor),
+            ),
+          ],
+          if (m.lastWrongAnswer.isNotEmpty || m.correctAnswer.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (m.lastWrongAnswer.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withValues(alpha: isDark ? 0.20 : 0.10),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      'Your Answer: Option ${m.lastWrongAnswer} ✗',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.danger),
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                if (m.correctAnswer.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: isDark ? 0.20 : 0.10),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      'Correct: Option ${m.correctAnswer} ✓',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.success),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (m.explanation.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Explanation: ${m.explanation}',
+              style: TextStyle(fontSize: 11, color: subtextColor, height: 1.35),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionRecommendations(
+    BuildContext context,
+    TopicDetailData detail,
+    bool isDark,
+    Color textColor,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Recommended Next Steps',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary),
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: textColor),
         ),
         const SizedBox(height: 12),
         ElevatedButton.icon(
           onPressed: () {
-            // Navigate to practice home with this topic or practice sets
             context.push('/dashboard/2'); // Practice tab
           },
           icon: const Icon(Icons.play_circle_fill_rounded),
@@ -475,14 +711,13 @@ class _TopicDetailScreenState extends ConsumerState<TopicDetailScreen> {
         const SizedBox(height: 10),
         OutlinedButton.icon(
           onPressed: () {
-            // Navigate to Books & Notes tab
             context.push('/dashboard/1'); // Notes tab
           },
           icon: const Icon(Icons.menu_book_rounded),
           label: Text('Read NCERT Chapter: ${detail.chapter}'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.textPrimary,
-            side: const BorderSide(color: AppColors.borderStrong),
+            foregroundColor: textColor,
+            side: BorderSide(color: isDark ? const Color(0xFF343B49) : AppColors.borderStrong),
             minimumSize: const Size.fromHeight(48),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),

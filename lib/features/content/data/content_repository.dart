@@ -344,6 +344,7 @@ class ContentRepository {
     required double accuracy,
     required int correctCount,
     required int wrongCount,
+    List<Map<String, dynamic>>? answers,
   }) async {
     final token = await _token;
     if (token == null) {
@@ -360,6 +361,7 @@ class ContentRepository {
         'accuracy': accuracy,
         'correctCount': correctCount,
         'wrongCount': wrongCount,
+        'answers': answers ?? [],
       }),
     );
     final body = response.body.isEmpty

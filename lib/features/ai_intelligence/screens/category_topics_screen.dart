@@ -58,24 +58,35 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final textColor = isDark ? Colors.white : AppColors.textPrimary;
+    final subtextColor = isDark ? const Color(0xFFB0B7C3) : AppColors.textSecondary;
+    final dividerColor = isDark ? const Color(0xFF2E3440) : AppColors.border;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         title: Text(
           _currentCategoryTitle,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: textColor,
+          ),
         ),
-        backgroundColor: AppColors.surface,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
+        iconTheme: IconThemeData(color: textColor),
       ),
       body: Column(
         children: [
           // Category selector tabs
-          _buildCategoryPills(),
+          _buildCategoryPills(isDark, textColor),
           // Subject filter chips
-          _buildSubjectFilterRow(),
-          const Divider(height: 1, thickness: 1, color: AppColors.border),
+          _buildSubjectFilterRow(isDark, textColor, subtextColor),
+          Divider(height: 1, thickness: 1, color: dividerColor),
           // Topics list
           Expanded(
             child: FutureBuilder<List<TopicLearningItem>>(
@@ -94,9 +105,20 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
                         children: [
                           const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
                           const SizedBox(height: 12),
-                          Text('Failed to load topics: ${snapshot.error}', textAlign: TextAlign.center),
+                          Text(
+                            'Failed to load topics: ${snapshot.error}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: textColor),
+                          ),
                           const SizedBox(height: 16),
-                          ElevatedButton(onPressed: _loadTopics, child: const Text('Retry')),
+                          ElevatedButton(
+                            onPressed: _loadTopics,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Retry'),
+                          ),
                         ],
                       ),
                     ),
@@ -115,13 +137,17 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
                           const SizedBox(height: 16),
                           Text(
                             'No topics found in $_currentCategoryTitle!',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: textColor,
+                            ),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
-                            'Keep practicing tests to identify more targeted improvement areas.',
+                          Text(
+                            'Keep practicing tests and topic sets to identify personalized diagnostics.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                            style: TextStyle(color: subtextColor, fontSize: 13),
                           ),
                         ],
                       ),
@@ -134,7 +160,7 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
                   itemCount: topics.length,
                   itemBuilder: (context, index) {
                     final item = topics[index];
-                    return _buildTopicCard(context, item);
+                    return _buildTopicCard(context, item, isDark, textColor, subtextColor);
                   },
                 );
               },
@@ -145,9 +171,11 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
     );
   }
 
-  Widget _buildCategoryPills() {
+  Widget _buildCategoryPills(bool isDark, Color textColor) {
+    final barBg = isDark ? const Color(0xFF171A22) : Colors.white;
+
     return Container(
-      color: AppColors.surface,
+      color: barBg,
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -170,11 +198,15 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? Colors.white : AppColors.textPrimary,
+                    color: isSelected ? Colors.white : (isDark ? Colors.white70 : textColor),
                   ),
                 ),
                 selectedColor: color,
-                backgroundColor: color.withOpacity(0.08),
+                backgroundColor: color.withValues(alpha: isDark ? 0.15 : 0.08),
+                side: BorderSide(
+                  color: isSelected ? color : (isDark ? const Color(0xFF2E3440) : AppColors.border),
+                  width: 1.2,
+                ),
                 onSelected: (selected) {
                   if (selected) {
                     setState(() {
@@ -191,10 +223,12 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
     );
   }
 
-  Widget _buildSubjectFilterRow() {
+  Widget _buildSubjectFilterRow(bool isDark, Color textColor, Color subtextColor) {
     final subjects = ['All', 'Physics', 'Chemistry', 'Biology'];
+    final barBg = isDark ? const Color(0xFF171A22) : Colors.white;
+
     return Container(
-      color: AppColors.surface,
+      color: barBg,
       padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
       child: Row(
         children: subjects.map((sub) {
@@ -208,12 +242,24 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  color: isSelected
+                      ? (isDark ? Colors.white : AppColors.primary)
+                      : subtextColor,
                 ),
               ),
-              selectedColor: AppColors.primarySoft,
-              backgroundColor: AppColors.backgroundAlt,
-              checkmarkColor: AppColors.primary,
+              selectedColor: isDark
+                  ? AppColors.primary.withValues(alpha: 0.35)
+                  : AppColors.primarySoft,
+              backgroundColor: isDark
+                  ? const Color(0xFF1F242E)
+                  : AppColors.surfaceElevated,
+              side: BorderSide(
+                color: isSelected
+                    ? AppColors.primary
+                    : (isDark ? const Color(0xFF2E3440) : AppColors.border),
+                width: 1,
+              ),
+              checkmarkColor: isDark ? Colors.white : AppColors.primary,
               onSelected: (selected) {
                 setState(() {
                   _selectedSubject = sub;
@@ -227,22 +273,34 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
     );
   }
 
-  Widget _buildTopicCard(BuildContext context, TopicLearningItem item) {
+  Widget _buildTopicCard(
+    BuildContext context,
+    TopicLearningItem item,
+    bool isDark,
+    Color textColor,
+    Color subtextColor,
+  ) {
     Color badgeColor = _currentCategoryColor;
+    final cardBg = isDark ? const Color(0xFF171A22) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF2E3440) : AppColors.border;
+    final metricBg = isDark ? const Color(0xFF1F242E) : const Color(0xFFFFF8F2);
+    final metricBorder = isDark ? const Color(0xFF2E3440) : AppColors.border;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: cardBorder, width: 1.2),
+        boxShadow: isDark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : AppShadows.soft,
       ),
       child: Material(
         color: Colors.transparent,
@@ -262,7 +320,7 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: badgeColor.withOpacity(0.12),
+                        color: badgeColor.withValues(alpha: isDark ? 0.22 : 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -287,7 +345,7 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.textSecondary),
+                        Icon(Icons.arrow_forward_ios_rounded, size: 12, color: subtextColor),
                       ],
                     ),
                   ],
@@ -295,40 +353,115 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
                 const SizedBox(height: 8),
                 Text(
                   item.topic,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                    color: textColor,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Chapter: ${item.chapter}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 12, color: subtextColor),
                 ),
                 const SizedBox(height: 10),
-                // Metric row
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundAlt,
-                    borderRadius: BorderRadius.circular(10),
+
+                // MARKS & PERFORMANCE BREAKDOWN (Specially highlighted for Poorly Understood)
+                if (_selectedCategory == 'poorly_understood') ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF281C10) : const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFFD97706).withValues(alpha: isDark ? 0.40 : 0.35),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.stars_rounded, size: 16, color: Color(0xFFD97706)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'NEET Score: ${item.marksObtained} / ${item.maxMarks} Marks',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: isDark ? Colors.white : const Color(0xFF92400E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD97706),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${item.marksPercentage.toStringAsFixed(0)}%',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '• ${item.totalQuestionsCorrect} Correct (+${item.totalQuestionsCorrect * 4} Marks)',
+                                style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '• -${item.negativeMarks} Marks Lost (Negative)',
+                                style: const TextStyle(fontSize: 11, color: AppColors.danger, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildMiniMetric('Accuracy', '${item.accuracyPercentage.toStringAsFixed(0)}%'),
-                      _buildMiniMetric('Attempts', '${item.totalQuestionsAttempted} Qs'),
-                      if (_selectedCategory == 'repeated_mistakes')
-                        _buildMiniMetric('Repeated Errors', '${item.repeatedMistakeCount}', color: AppColors.danger)
-                      else if (_selectedCategory == 'needs_revision')
-                        _buildMiniMetric('Retention', '${item.retentionEstimate.toStringAsFixed(0)}%', color: const Color(0xFF7C3AED))
-                      else
-                        _buildMiniMetric('Status', item.studyStatus),
-                    ],
+                  const SizedBox(height: 8),
+                ] else ...[
+                  // Standard Metric Row
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: metricBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: metricBorder, width: 1),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildMiniMetric('Accuracy', '${item.accuracyPercentage.toStringAsFixed(0)}%', textColor, subtextColor),
+                        _buildMiniMetric('Attempts', '${item.totalQuestionsAttempted} Qs', textColor, subtextColor),
+                        if (_selectedCategory == 'repeated_mistakes')
+                          _buildMiniMetric('Repeated Errors', '${item.repeatedMistakeCount}', textColor, subtextColor, color: AppColors.danger)
+                        else if (_selectedCategory == 'needs_revision')
+                          _buildMiniMetric('Retention', '${item.retentionEstimate.toStringAsFixed(0)}%', textColor, subtextColor, color: const Color(0xFF7C3AED))
+                        else
+                          _buildMiniMetric('Score', '${item.marksObtained} Marks', textColor, subtextColor, color: AppColors.primary),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
+                  const SizedBox(height: 10),
+                ],
+
                 // AI Explanation excerpt
                 if (item.aiExplanation.isNotEmpty)
                   Row(
@@ -339,7 +472,7 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
                       Expanded(
                         child: Text(
                           item.aiExplanation,
-                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3),
+                          style: TextStyle(fontSize: 12, color: subtextColor, height: 1.3),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -354,7 +487,13 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
     );
   }
 
-  Widget _buildMiniMetric(String label, String value, {Color? color}) {
+  Widget _buildMiniMetric(
+    String label,
+    String value,
+    Color textColor,
+    Color subtextColor, {
+    Color? color,
+  }) {
     return Column(
       children: [
         Text(
@@ -362,16 +501,15 @@ class _CategoryTopicsScreenState extends ConsumerState<CategoryTopicsScreen> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
-            color: color ?? AppColors.textPrimary,
+            color: color ?? textColor,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 10, color: subtextColor),
         ),
       ],
     );
   }
 }
-

@@ -1363,6 +1363,10 @@ async function ensureCommunityAndDoubtsSchema() {
         is_needs_revision BOOLEAN DEFAULT FALSE,
         total_questions_attempted INTEGER DEFAULT 0,
         total_questions_correct INTEGER DEFAULT 0,
+        marks_obtained INTEGER DEFAULT 0,
+        max_marks INTEGER DEFAULT 0,
+        negative_marks INTEGER DEFAULT 0,
+        marks_percentage NUMERIC(5,2) DEFAULT 0.0,
         accuracy_percentage NUMERIC(5,2) DEFAULT 0.0,
         recent_accuracy NUMERIC(5,2) DEFAULT 0.0,
         previous_accuracy NUMERIC(5,2) DEFAULT 0.0,
@@ -1383,6 +1387,12 @@ async function ensureCommunityAndDoubtsSchema() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT uq_student_topic_learning_state UNIQUE (user_id, subject, chapter, topic)
       );
+
+      ALTER TABLE student_topic_learning_state
+      ADD COLUMN IF NOT EXISTS marks_obtained INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS max_marks INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS negative_marks INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS marks_percentage NUMERIC(5,2) DEFAULT 0.0;
 
       CREATE TABLE IF NOT EXISTS student_repeated_mistakes (
         id SERIAL PRIMARY KEY,

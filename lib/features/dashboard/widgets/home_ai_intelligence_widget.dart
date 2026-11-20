@@ -8,30 +8,36 @@ class HomeAiIntelligenceWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF171A22) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF2E3440) : AppColors.border;
+    final titleColor = isDark ? Colors.white : AppColors.textPrimary;
+    final subtextColor = isDark ? const Color(0xFFB0B7C3) : AppColors.textSecondary;
+    final bannerBg = isDark ? const Color(0xFF1F242E) : AppColors.surfaceElevated;
+    final bannerBorder = isDark ? const Color(0xFF2E3440) : AppColors.border;
 
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: cardBg,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: borderColor, width: 1.2),
+        boxShadow: isDark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : AppShadows.soft,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(AppRadii.lg),
           onTap: () => context.push('/ai-learning'),
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -41,69 +47,91 @@ class HomeAiIntelligenceWidget extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(9),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10),
+                            color: isDark
+                                ? AppColors.primary.withValues(alpha: 0.22)
+                                : AppColors.primarySoft,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.auto_awesome, color: AppColors.accentLight, size: 20),
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            color: AppColors.primary,
+                            size: 22,
+                          ),
                         ),
-                        const SizedBox(width: 10),
-                        const Column(
+                        const SizedBox(width: 12),
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'AI Learning Intelligence',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: titleColor,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 15,
+                                letterSpacing: -0.2,
                               ),
                             ),
+                            const SizedBox(height: 2),
                             Text(
-                              'Custom ML Mastery & Forgetting Curve',
+                              'Personalized Diagnostics & NEET Marks',
                               style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 11,
+                                color: subtextColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
                         ),
                       ],
                     ),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: subtextColor,
+                      size: 14,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
                 // 4 Category Quick Indicators
                 Row(
                   children: [
-                    _buildPill('Not Studied', const Color(0xFF2563EB)),
+                    _buildPill('Not Studied', const Color(0xFF2563EB), isDark),
                     const SizedBox(width: 6),
-                    _buildPill('Weak Topics', const Color(0xFFD97706)),
+                    _buildPill('Weak Topics', const Color(0xFFD97706), isDark),
                     const SizedBox(width: 6),
-                    _buildPill('Mistakes', const Color(0xFFDC2626)),
+                    _buildPill('Mistakes', const Color(0xFFDC2626), isDark),
                     const SizedBox(width: 6),
-                    _buildPill('Revision', const Color(0xFF7C3AED)),
+                    _buildPill('Revision', const Color(0xFF7C3AED), isDark),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: bannerBg,
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: bannerBorder, width: 1),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'View personalized diagnostics & daily plan',
-                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                        'View personalized score & daily plan',
+                        style: TextStyle(
+                          color: titleColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      Text(
+                      const Text(
                         'Open →',
-                        style: TextStyle(color: AppColors.accentLight, fontSize: 12, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
@@ -116,22 +144,25 @@ class HomeAiIntelligenceWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildPill(String label, Color color) {
+  Widget _buildPill(String label, Color color, bool isDark) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color.withOpacity(0.4), width: 1),
+          color: color.withValues(alpha: isDark ? 0.18 : 0.10),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: color.withValues(alpha: isDark ? 0.40 : 0.28),
+            width: 1,
+          ),
         ),
         child: Center(
           child: Text(
             label,
             style: TextStyle(
-              color: color.withOpacity(0.95),
+              color: isDark ? color.withValues(alpha: 0.95) : color,
               fontWeight: FontWeight.w700,
-              fontSize: 10,
+              fontSize: 11,
             ),
           ),
         ),
