@@ -1217,6 +1217,7 @@ class PracticeExplanationScreen extends StatelessWidget {
                                 url: img.imageUrl,
                                 fit: BoxFit.cover,
                                 thumbWidth: 800,
+                                zoomTitle: 'Explanation Diagram',
                               ),
                             ),
                           ],

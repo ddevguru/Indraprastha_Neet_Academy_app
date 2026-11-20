@@ -754,6 +754,7 @@ class ExplanationDetailScreen extends StatelessWidget {
                         width: double.infinity,
                         fit: BoxFit.cover,
                         thumbWidth: 800,
+                        zoomTitle: 'Explanation Diagram',
                       ),
                     ),
                   ],

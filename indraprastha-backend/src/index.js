@@ -87,6 +87,8 @@ app.use('/api/community', require('./routes/community'));
 app.use('/api/doubts', require('./routes/doubts'));
 app.use('/api/teacher', require('./routes/teacher'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/ai-intelligence', require('./routes/aiIntelligenceRoutes'));
+app.use('/api/analytics/ai-intelligence', require('./routes/aiIntelligenceRoutes'));
 app.use('/api/streaks', require('./routes/streaks'));
 app.use('/api/leaderboard', require('./routes/leaderboard'));
 app.use('/api/payments', require('./routes/payments'));

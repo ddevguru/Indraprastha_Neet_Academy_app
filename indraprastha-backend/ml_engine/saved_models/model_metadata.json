@@ -1,0 +1,76 @@
+{
+  "version": "1.0.0",
+  "created_at": "2026-11-20T22:45:00Z",
+  "features": [
+    "difficulty",
+    "content_views",
+    "total_attempts",
+    "correct_count",
+    "accuracy",
+    "recent_accuracy",
+    "previous_accuracy",
+    "accuracy_delta",
+    "repeated_mistakes",
+    "avg_time_seconds",
+    "days_since_study",
+    "days_since_practice",
+    "revision_count"
+  ],
+  "mastery_model": {
+    "algorithm": "GradientBoostingRegressor",
+    "metrics": {
+      "r2": 0.9873,
+      "rmse": 2.648,
+      "mae": 1.759
+    },
+    "feature_importances": {
+      "difficulty": 0.0028,
+      "content_views": 0.0001,
+      "total_attempts": 0.0114,
+      "correct_count": 0.0122,
+      "accuracy": 0.838,
+      "recent_accuracy": 0.042,
+      "previous_accuracy": 0.0003,
+      "accuracy_delta": 0.0006,
+      "repeated_mistakes": 0.0155,
+      "avg_time_seconds": 0.0012,
+      "days_since_study": 0.0041,
+      "days_since_practice": 0.0493,
+      "revision_count": 0.0226
+    }
+  },
+  "pattern_classifier": {
+    "algorithm": "MultiOutputClassifier(RandomForestClassifier)",
+    "metrics": {
+      "macro_f1": 0.9984,
+      "micro_f1": 0.999,
+      "hamming_loss": 0.0005,
+      "per_category": {
+        "NOT_STUDIED": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1_score": 1.0,
+          "test_positive_samples": 989
+        },
+        "POORLY_UNDERSTOOD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1_score": 1.0,
+          "test_positive_samples": 733
+        },
+        "REPEATEDLY_INCORRECT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1_score": 1.0,
+          "test_positive_samples": 711
+        },
+        "NEEDS_REVISION": {
+          "precision": 0.9876,
+          "recall": 1.0,
+          "f1_score": 0.9937,
+          "test_positive_samples": 476
+        }
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ const { recordUserStreakActivity } = require('./streaks');
 const testAnalyticsService = require('../services/testAnalyticsService');
 const aiMentorService = require('../services/aiMentorService');
 const aiSimilarQuestionsService = require('../services/aiSimilarQuestionsService');
+const aiIntelligenceService = require('../services/aiIntelligenceService');
 const {
   normalizeDriveLink,
   extractDriveFileId,
@@ -624,6 +625,9 @@ router.post('/practice-sets/:setId/submit', userAuth, async (req, res) => {
       metadata: { practiceSetId: setId, correctCount, wrongCount, score }
     }).catch(e => console.error('[STREAK_LOG_PRACTICE_ERROR]', e.message));
 
+    // Update AI Learning Intelligence model predictions and recommendations
+    aiIntelligenceService.queueStudentAnalysis(req.user.id);
+
     return res.json({ success: true, attempt: attempt.rows[0] });
   } catch (e) {
     console.error('[CONTENT_PRACTICE_SUBMIT_ERROR]', {
@@ -818,6 +822,9 @@ router.post('/tests/:testId/submit', userAuth, async (req, res) => {
       durationMinutes: 30,
       metadata: { testId, correctCount, wrongCount, score }
     }).catch(e => console.error('[STREAK_LOG_TEST_ERROR]', e.message));
+
+    // Update AI Learning Intelligence model predictions and recommendations
+    aiIntelligenceService.queueStudentAnalysis(req.user.id);
 
     // Advanced Test Performance Analytics Engine (Top 100 benchmark, topic breakdown, priority areas, AI mentor)
     const answersPayload = Array.isArray(userAnswers) && userAnswers.length > 0 ? userAnswers : (Array.isArray(answers) ? answers : []);

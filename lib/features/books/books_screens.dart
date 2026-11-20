@@ -44,7 +44,7 @@ String cleanChapterTitle(String? rawTitle, [String? topic]) {
   return t.isNotEmpty ? t : (cleaned.isNotEmpty ? cleaned : r);
 }
 
-Widget _buildQuestionImage(String rawUrl) {
+Widget _buildQuestionImage(String rawUrl, {String title = 'Question Image'}) {
   return FastNetworkImage(
     url: rawUrl,
     width: double.infinity,
@@ -52,6 +52,9 @@ Widget _buildQuestionImage(String rawUrl) {
     fit: BoxFit.contain,
     thumbWidth: 900,
     borderRadius: BorderRadius.circular(AppRadii.md),
+    enableZoom: true,
+    showZoomBadge: true,
+    zoomTitle: title,
   );
 }
 
@@ -732,7 +735,10 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                         ),
                   if (hasQuestionImage(q)) ...[
                     const SizedBox(height: AppSpacing.sm),
-                    _buildQuestionImage(questionImageRawUrl(q)),
+                    _buildQuestionImage(
+                      questionImageRawUrl(q),
+                      title: 'Question Diagram',
+                    ),
                   ],
                   const SizedBox(height: AppSpacing.md),
                   ...options.entries.map((e) {
@@ -896,12 +902,15 @@ class _PyqSolvePanelState extends ConsumerState<_PyqSolvePanel> {
                                     ),
                                   if (hasExpImg) ...[
                                     if (hasExpText) const SizedBox(height: AppSpacing.sm),
-                                    _buildQuestionImage(expImgUrl),
+                                    _buildQuestionImage(expImgUrl, title: 'Explanation Diagram'),
                                   ],
                                   if (hasExpList) ...[
                                     for (final imgData in expImagesList) ...[
                                       const SizedBox(height: AppSpacing.sm),
-                                      _buildQuestionImage(explanationImageRawUrl(imgData)),
+                                      _buildQuestionImage(
+                                        explanationImageRawUrl(imgData),
+                                        title: 'Explanation Diagram',
+                                      ),
                                     ],
                                   ],
                                   if (!hasExpText && !hasExpImg && !hasExpList)

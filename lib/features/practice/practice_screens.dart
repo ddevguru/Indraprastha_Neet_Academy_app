@@ -81,7 +81,7 @@ Map<String, List<Map<String, dynamic>>> _groupQuestionsByChapter(
   return grouped;
 }
 
-Widget _buildQuestionImage(String rawUrl) {
+Widget _buildQuestionImage(String rawUrl, {String title = 'Question Image'}) {
   return FastNetworkImage(
     url: rawUrl,
     width: double.infinity,
@@ -89,6 +89,9 @@ Widget _buildQuestionImage(String rawUrl) {
     fit: BoxFit.contain,
     thumbWidth: 900,
     borderRadius: BorderRadius.circular(AppRadii.md),
+    enableZoom: true,
+    showZoomBadge: true,
+    zoomTitle: title,
   );
 }
 
@@ -1510,7 +1513,10 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                             ),
                             if (hasQuestionImage(qItem)) ...[
                               const SizedBox(height: AppSpacing.md),
-                              _buildQuestionImage(questionImageRawUrl(qItem)),
+                              _buildQuestionImage(
+                                questionImageRawUrl(qItem),
+                                title: 'Question Diagram',
+                              ),
                             ],
                             const SizedBox(height: AppSpacing.lg),
                             ...List.generate(qOptions.length, (index) {
@@ -1599,6 +1605,8 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                               fit: BoxFit.contain,
                                               borderRadius:
                                                   BorderRadius.circular(AppRadii.sm),
+                                              zoomTitle:
+                                                  'Option ${String.fromCharCode(65 + index)} Diagram',
                                             ),
                                           ),
                                         ],
@@ -1675,7 +1683,7 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                           ),
                                         if (hasExpImg) ...[
                                           if (hasExpText) const SizedBox(height: AppSpacing.sm),
-                                          _buildQuestionImage(expImgUrl),
+                                          _buildQuestionImage(expImgUrl, title: 'Explanation Diagram'),
                                         ],
                                         if ((qItem['explanation_video_link']?.toString().isNotEmpty ?? false) ||
                                             (qItem['explanation_video_url']?.toString().isNotEmpty ?? false)) ...[
@@ -1761,7 +1769,10 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                         if (hasExpList) ...[
                                           for (final imgData in expImagesList) ...[
                                             const SizedBox(height: AppSpacing.sm),
-                                            _buildQuestionImage(explanationImageRawUrl(imgData)),
+                                            _buildQuestionImage(
+                                              explanationImageRawUrl(imgData),
+                                              title: 'Explanation Diagram',
+                                            ),
                                           ],
                                         ],
                                         if (!hasExpText && !hasExpImg && !hasExpList)

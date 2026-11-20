@@ -7,8 +7,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/utils/drive_image_url.dart';
 import '../theme/app_tokens.dart';
+import 'zoomable_image_viewer.dart';
+
+export 'zoomable_image_viewer.dart' show showZoomableImagePopup, ZoomableImageViewerDialog;
 
 /// Loads images via authenticated API proxy (preferred) with Drive fallbacks.
+/// Features built-in tap-to-zoom popup viewer with pinch-to-zoom, pan, and on-screen controls.
 class FastNetworkImage extends StatefulWidget {
   const FastNetworkImage({
     super.key,
@@ -18,6 +22,9 @@ class FastNetworkImage extends StatefulWidget {
     this.fit = BoxFit.contain,
     this.borderRadius,
     this.thumbWidth = 900,
+    this.enableZoom = true,
+    this.showZoomBadge = true,
+    this.zoomTitle,
   });
 
   final String url;
@@ -26,6 +33,9 @@ class FastNetworkImage extends StatefulWidget {
   final BoxFit fit;
   final BorderRadius? borderRadius;
   final int thumbWidth;
+  final bool enableZoom;
+  final bool showZoomBadge;
+  final String? zoomTitle;
 
   @override
   State<FastNetworkImage> createState() => _FastNetworkImageState();
@@ -142,7 +152,88 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
     if (widget.borderRadius != null) {
       image = ClipRRect(borderRadius: widget.borderRadius!, child: image);
     }
-    return image;
+
+    if (!widget.enableZoom) {
+      return image;
+    }
+
+    final isCompact = widget.height != null && widget.height! < 80;
+
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            showZoomableImagePopup(
+              context,
+              imageBytes: _bytes,
+              imageUrl: _resolvedUrl(),
+              title: widget.zoomTitle ?? 'Question Image',
+            );
+          },
+          child: image,
+        ),
+        if (widget.showZoomBadge)
+          Positioned(
+            right: 8,
+            bottom: 8,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                showZoomableImagePopup(
+                  context,
+                  imageBytes: _bytes,
+                  imageUrl: _resolvedUrl(),
+                  title: widget.zoomTitle ?? 'Question Image',
+                );
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isCompact ? 6 : 8,
+                  vertical: isCompact ? 3 : 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    width: 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.zoom_in_rounded,
+                      size: isCompact ? 13 : 15,
+                      color: Colors.white,
+                    ),
+                    if (!isCompact) ...[
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Zoom',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   String _resolvedUrl() {
@@ -222,13 +313,16 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
   }
 }
 
-Widget buildFastReviewImage(String rawUrl) {
+Widget buildFastReviewImage(String rawUrl, {String? zoomTitle}) {
   return FastNetworkImage(
     url: rawUrl,
     width: double.infinity,
     fit: BoxFit.contain,
     thumbWidth: 1200,
     borderRadius: BorderRadius.circular(AppRadii.md),
+    enableZoom: true,
+    showZoomBadge: true,
+    zoomTitle: zoomTitle ?? 'Review Diagram',
   );
 }
 

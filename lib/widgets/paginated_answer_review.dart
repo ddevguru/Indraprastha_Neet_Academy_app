@@ -55,7 +55,8 @@ class _ReviewOptionStyle {
   }
 }
 
-Widget buildReviewImage(String rawUrl) => buildFastReviewImage(rawUrl);
+Widget buildReviewImage(String rawUrl, {String? zoomTitle}) =>
+    buildFastReviewImage(rawUrl, zoomTitle: zoomTitle);
 
 String resolveExplanationImageUrl(Map<String, dynamic> imgData) {
   final resolved = explanationImageRawUrl(imgData);
@@ -661,7 +662,7 @@ class _ReviewQuestionPage extends StatelessWidget {
               if (entry.questionImageUrl != null &&
                   entry.questionImageUrl!.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
-                buildReviewImage(entry.questionImageUrl!),
+                buildReviewImage(entry.questionImageUrl!, zoomTitle: 'Question Diagram'),
               ],
               const SizedBox(height: AppSpacing.lg),
               ...List.generate(entry.options.length, (i) {
@@ -706,7 +707,10 @@ class _ReviewQuestionPage extends StatelessWidget {
                             const SizedBox(height: 8),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(AppRadii.sm),
-                            child: buildReviewImage(entry.optionImages![i]),
+                            child: buildReviewImage(
+                              entry.optionImages![i],
+                              zoomTitle: 'Option ${String.fromCharCode(65 + i)} Diagram',
+                            ),
                           ),
                         ],
                       ],
@@ -775,7 +779,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                       if (entry.explanationImageUrl != null &&
                           entry.explanationImageUrl!.isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        buildReviewImage(entry.explanationImageUrl!),
+                        buildReviewImage(entry.explanationImageUrl!, zoomTitle: 'Explanation Diagram'),
                       ],
                       if (entry.explanationImagesList?.isNotEmpty ?? false)
                         ...entry.explanationImagesList!.map((imgData) {
@@ -797,7 +801,7 @@ class _ReviewQuestionPage extends StatelessWidget {
                                   const SizedBox(height: 6),
                                 ],
                                 if (imageUrl.isNotEmpty)
-                                  buildReviewImage(imageUrl),
+                                  buildReviewImage(imageUrl, zoomTitle: 'Explanation Diagram'),
                               ],
                             ),
                           );

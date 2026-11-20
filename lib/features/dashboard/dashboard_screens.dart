@@ -20,6 +20,7 @@ import '../community/screens/community_home_screen.dart';
 import 'widgets/home_image_slider.dart';
 import 'widgets/weekly_streak_widget.dart';
 import 'widgets/home_leaderboard_widget.dart';
+import 'widgets/home_ai_intelligence_widget.dart';
 
 String _greetingLine(String firstName) {
   final h = DateTime.now().hour;
@@ -301,6 +302,8 @@ class _DashboardHomeScreenState extends ConsumerState<DashboardHomeScreen> {
             ),
             const SizedBox(height: AppSpacing.lg),
             const WeeklyStreakWidget(),
+            const SizedBox(height: AppSpacing.md),
+            const HomeAiIntelligenceWidget(),
             const SizedBox(height: AppSpacing.md),
             const HomeLeaderboardWidget(),
             const SizedBox(height: AppSpacing.lg),

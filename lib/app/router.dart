@@ -22,6 +22,10 @@ import '../features/tests/tests_screens.dart';
 import '../features/support/help_center_screen.dart';
 import '../features/streaks/streaks_screen.dart';
 import '../features/leaderboard/leaderboard_screen.dart';
+import '../features/ai_intelligence/screens/ai_dashboard_screen.dart';
+import '../features/ai_intelligence/screens/category_topics_screen.dart';
+import '../features/ai_intelligence/screens/topic_detail_screen.dart';
+import '../features/ai_intelligence/screens/study_plan_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final authBloc = ref.read(authBlocProvider);
@@ -161,6 +165,29 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/analytics',
         builder: (context, state) => const AnalyticsScreen(),
+      ),
+      GoRoute(
+        path: '/ai-learning',
+        builder: (context, state) => const AiDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/ai-learning/category/:category',
+        builder: (context, state) {
+          final cat = state.pathParameters['category'] ?? 'not_studied';
+          return CategoryTopicsScreen(initialCategory: cat);
+        },
+      ),
+      GoRoute(
+        path: '/ai-learning/topic',
+        builder: (context, state) {
+          final subject = state.uri.queryParameters['subject'] ?? 'General';
+          final topic = state.uri.queryParameters['topic'] ?? 'Topic';
+          return TopicDetailScreen(subject: subject, topic: topic);
+        },
+      ),
+      GoRoute(
+        path: '/ai-learning/study-plan',
+        builder: (context, state) => const StudyPlanScreen(),
       ),
       GoRoute(
         path: '/streaks',

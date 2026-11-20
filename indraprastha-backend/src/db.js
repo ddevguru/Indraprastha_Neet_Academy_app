@@ -1344,6 +1344,97 @@ async function ensureCommunityAndDoubtsSchema() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_comm_notif_user ON community_notifications(user_id, user_role, is_read);
+
+      -- AI Learning Intelligence System Tables
+      CREATE TABLE IF NOT EXISTS student_topic_learning_state (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject VARCHAR(80) NOT NULL,
+        chapter VARCHAR(140) NOT NULL,
+        topic VARCHAR(140) NOT NULL,
+        study_status VARCHAR(40) DEFAULT 'UNKNOWN',
+        mastery_score NUMERIC(5,2) DEFAULT 0.0,
+        mastery_category VARCHAR(40) DEFAULT 'NOVICE',
+        prediction_confidence NUMERIC(5,2) DEFAULT 0.0,
+        performance_trend VARCHAR(20) DEFAULT 'STABLE',
+        is_not_studied BOOLEAN DEFAULT FALSE,
+        is_poorly_understood BOOLEAN DEFAULT FALSE,
+        is_repeatedly_incorrect BOOLEAN DEFAULT FALSE,
+        is_needs_revision BOOLEAN DEFAULT FALSE,
+        total_questions_attempted INTEGER DEFAULT 0,
+        total_questions_correct INTEGER DEFAULT 0,
+        accuracy_percentage NUMERIC(5,2) DEFAULT 0.0,
+        recent_accuracy NUMERIC(5,2) DEFAULT 0.0,
+        previous_accuracy NUMERIC(5,2) DEFAULT 0.0,
+        repeated_mistake_count INTEGER DEFAULT 0,
+        avg_time_seconds NUMERIC(6,2) DEFAULT 0.0,
+        content_views_count INTEGER DEFAULT 0,
+        last_studied_at TIMESTAMP,
+        last_practiced_at TIMESTAMP,
+        last_revised_at TIMESTAMP,
+        revision_count INTEGER DEFAULT 0,
+        retention_estimate NUMERIC(5,2) DEFAULT 100.0,
+        revision_priority VARCHAR(20) DEFAULT 'NONE',
+        ai_explanation TEXT DEFAULT '',
+        recommended_action TEXT DEFAULT '',
+        weak_concepts TEXT[] DEFAULT '{}',
+        last_evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_student_topic_learning_state UNIQUE (user_id, subject, chapter, topic)
+      );
+
+      CREATE TABLE IF NOT EXISTS student_repeated_mistakes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject VARCHAR(80) NOT NULL,
+        chapter VARCHAR(140) NOT NULL,
+        topic VARCHAR(140) NOT NULL,
+        concept VARCHAR(180) DEFAULT '',
+        question_id INTEGER,
+        source_type VARCHAR(40) DEFAULT 'test',
+        wrong_attempt_count INTEGER DEFAULT 1,
+        last_wrong_answer VARCHAR(10) DEFAULT '',
+        correct_answer VARCHAR(10) DEFAULT '',
+        question_text TEXT DEFAULT '',
+        explanation TEXT DEFAULT '',
+        is_resolved BOOLEAN DEFAULT FALSE,
+        first_occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        resolved_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS student_ai_recommendations (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        category VARCHAR(40) NOT NULL,
+        priority INTEGER DEFAULT 1,
+        subject VARCHAR(80) NOT NULL,
+        chapter VARCHAR(140) NOT NULL,
+        topic VARCHAR(140) NOT NULL,
+        action_type VARCHAR(60) NOT NULL,
+        title VARCHAR(220) NOT NULL,
+        description TEXT NOT NULL,
+        target_resource_type VARCHAR(40) DEFAULT 'practice_set',
+        target_resource_id INTEGER,
+        estimated_minutes INTEGER DEFAULT 15,
+        is_completed BOOLEAN DEFAULT FALSE,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS ai_model_registry (
+        id SERIAL PRIMARY KEY,
+        model_name VARCHAR(100) NOT NULL,
+        version VARCHAR(40) NOT NULL,
+        algorithm VARCHAR(100) NOT NULL,
+        task_type VARCHAR(40) NOT NULL,
+        metrics_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        artifacts_path VARCHAR(255) NOT NULL,
+        training_sample_count INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
   } catch (err) {
     console.error('[DB_COMMUNITY_INIT_WARNING] Failed to ensure community & doubt tables:', err.message);

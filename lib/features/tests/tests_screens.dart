@@ -177,7 +177,7 @@ double? _accuracyFromSubmitResponse(Map<String, dynamic>? response) {
   return null;
 }
 
-Widget _buildQuestionImage(String rawUrl) {
+Widget _buildQuestionImage(String rawUrl, {String title = 'Question Image'}) {
   return FastNetworkImage(
     url: rawUrl,
     width: double.infinity,
@@ -185,6 +185,9 @@ Widget _buildQuestionImage(String rawUrl) {
     fit: BoxFit.contain,
     thumbWidth: 900,
     borderRadius: BorderRadius.circular(AppRadii.md),
+    enableZoom: true,
+    showZoomBadge: true,
+    zoomTitle: title,
   );
 }
 
@@ -1082,7 +1085,10 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                               ),
                               if (hasQuestionImage(qItem)) ...[
                                 const SizedBox(height: AppSpacing.md),
-                                _buildQuestionImage(questionImageRawUrl(qItem)),
+                                _buildQuestionImage(
+                                  questionImageRawUrl(qItem),
+                                  title: 'Question Diagram',
+                                ),
                               ],
                               const SizedBox(height: AppSpacing.lg),
                               ...qOptions.entries.map(
@@ -1147,6 +1153,7 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                                   height: 160,
                                                   fit: BoxFit.contain,
                                                   borderRadius: BorderRadius.circular(AppRadii.sm),
+                                                  zoomTitle: 'Option ${e.key} Diagram',
                                                 ),
                                               ),
                                             ],
