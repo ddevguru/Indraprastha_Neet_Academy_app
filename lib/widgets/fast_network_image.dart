@@ -25,6 +25,11 @@ class FastNetworkImage extends StatefulWidget {
     this.enableZoom = true,
     this.showZoomBadge = true,
     this.zoomTitle,
+    this.zoomOnBadgeOnly = false,
+    this.onTap,
+    this.onSelectOption,
+    this.optionLabel,
+    this.isOptionSelected = false,
   });
 
   final String url;
@@ -36,6 +41,11 @@ class FastNetworkImage extends StatefulWidget {
   final bool enableZoom;
   final bool showZoomBadge;
   final String? zoomTitle;
+  final bool zoomOnBadgeOnly;
+  final VoidCallback? onTap;
+  final VoidCallback? onSelectOption;
+  final String? optionLabel;
+  final bool isOptionSelected;
 
   @override
   State<FastNetworkImage> createState() => _FastNetworkImageState();
@@ -154,54 +164,83 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
     }
 
     if (!widget.enableZoom) {
+      if (widget.onTap != null) {
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: image,
+        );
+      }
       return image;
     }
 
     final isCompact = widget.height != null && widget.height! < 80;
 
+    void openZoom() {
+      showZoomableImagePopup(
+        context,
+        imageBytes: _bytes,
+        imageUrl: _resolvedUrl(),
+        title: widget.zoomTitle ??
+            (widget.optionLabel != null
+                ? '${widget.optionLabel} Diagram'
+                : 'Question Image'),
+        onSelectOption: widget.onSelectOption,
+        optionLabel: widget.optionLabel,
+        isOptionSelected: widget.isOptionSelected,
+      );
+    }
+
+    Widget mainImage;
+    if (widget.zoomOnBadgeOnly) {
+      if (widget.onTap != null) {
+        mainImage = GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          onDoubleTap: openZoom,
+          child: image,
+        );
+      } else {
+        mainImage = GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onDoubleTap: openZoom,
+          child: image,
+        );
+      }
+    } else {
+      mainImage = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: openZoom,
+        onDoubleTap: openZoom,
+        child: image,
+      );
+    }
+
     return Stack(
       children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            showZoomableImagePopup(
-              context,
-              imageBytes: _bytes,
-              imageUrl: _resolvedUrl(),
-              title: widget.zoomTitle ?? 'Question Image',
-            );
-          },
-          child: image,
-        ),
+        mainImage,
         if (widget.showZoomBadge)
           Positioned(
             right: 8,
             bottom: 8,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () {
-                showZoomableImagePopup(
-                  context,
-                  imageBytes: _bytes,
-                  imageUrl: _resolvedUrl(),
-                  title: widget.zoomTitle ?? 'Question Image',
-                );
-              },
+              onTap: openZoom,
               child: Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isCompact ? 6 : 8,
-                  vertical: isCompact ? 3 : 4,
+                  horizontal: isCompact ? 6 : 9,
+                  vertical: isCompact ? 3 : 5,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.72),
+                  color: Colors.black.withValues(alpha: 0.78),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.35),
-                    width: 0.8,
+                    color: Colors.white.withValues(alpha: 0.4),
+                    width: 0.9,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
+                      color: Colors.black.withValues(alpha: 0.4),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -212,7 +251,7 @@ class _FastNetworkImageState extends State<FastNetworkImage> {
                   children: [
                     Icon(
                       Icons.zoom_in_rounded,
-                      size: isCompact ? 13 : 15,
+                      size: isCompact ? 13 : 16,
                       color: Colors.white,
                     ),
                     if (!isCompact) ...[

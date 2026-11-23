@@ -1154,6 +1154,21 @@ class _TestResultScreenState extends ConsumerState<TestResultScreen> {
                                                   fit: BoxFit.contain,
                                                   borderRadius: BorderRadius.circular(AppRadii.sm),
                                                   zoomTitle: 'Option ${e.key} Diagram',
+                                                  zoomOnBadgeOnly: true,
+                                                  optionLabel: 'Option ${e.key}',
+                                                  isOptionSelected: selectedOpt == e.key,
+                                                  onTap: _submitted
+                                                      ? null
+                                                      : () {
+                                                          setState(() => _answers[idx] = e.key);
+                                                          unawaited(_persistDraft());
+                                                        },
+                                                  onSelectOption: _submitted
+                                                      ? null
+                                                      : () {
+                                                          setState(() => _answers[idx] = e.key);
+                                                          unawaited(_persistDraft());
+                                                        },
                                                 ),
                                               ),
                                             ],

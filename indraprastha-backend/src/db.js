@@ -1445,6 +1445,10 @@ async function ensureCommunityAndDoubtsSchema() {
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Ensure unique indexes for AI tables
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_student_repeated_mistakes_idx ON student_repeated_mistakes (user_id, question_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_student_topic_learning_state_idx ON student_topic_learning_state (user_id, subject, chapter, topic);
     `);
   } catch (err) {
     console.error('[DB_COMMUNITY_INIT_WARNING] Failed to ensure community & doubt tables:', err.message);

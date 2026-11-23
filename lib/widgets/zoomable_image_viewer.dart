@@ -10,12 +10,18 @@ class ZoomableImageViewerDialog extends StatefulWidget {
     this.imageBytes,
     this.imageUrl,
     this.title = 'Question Image',
+    this.onSelectOption,
+    this.optionLabel,
+    this.isOptionSelected = false,
   }) : assert(imageBytes != null || imageUrl != null,
             'Either imageBytes or imageUrl must be provided');
 
   final Uint8List? imageBytes;
   final String? imageUrl;
   final String title;
+  final VoidCallback? onSelectOption;
+  final String? optionLabel;
+  final bool isOptionSelected;
 
   @override
   State<ZoomableImageViewerDialog> createState() =>
@@ -242,77 +248,182 @@ class _ZoomableImageViewerDialogState extends State<ZoomableImageViewerDialog>
                 ),
               ),
 
-              // 3. Floating Bottom Controls (Zoom In, Zoom Out, Reset)
+              // 3. Floating Bottom Controls & Option Selection
               Positioned(
                 bottom: 24,
-                left: 0,
-                right: 0,
+                left: 16,
+                right: 16,
                 child: Center(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B).withValues(alpha: 0.92),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _ControlButton(
-                          icon: Icons.remove_rounded,
-                          tooltip: 'Zoom Out',
-                          onPressed: _zoomOut,
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _resetZoom,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.refresh_rounded,
-                                  size: 14,
-                                  color: Colors.white70,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${(_currentScale * 100).toInt()}%',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.onSelectOption != null) ...[
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              widget.onSelectOption?.call();
+                              Navigator.of(context).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.check_circle_rounded,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        widget.optionLabel != null
+                                            ? '${widget.optionLabel} selected'
+                                            : 'Option selected',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  duration: const Duration(milliseconds: 1500),
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: const Color(0xFF16A34A),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
-                              ],
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(28),
+                            child: Ink(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: widget.isOptionSelected
+                                      ? [
+                                          const Color(0xFF16A34A),
+                                          const Color(0xFF15803D),
+                                        ]
+                                      : [
+                                          const Color(0xFF4F46E5),
+                                          const Color(0xFF4338CA),
+                                        ],
+                                ),
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (widget.isOptionSelected
+                                            ? const Color(0xFF16A34A)
+                                            : const Color(0xFF4F46E5))
+                                        .withValues(alpha: 0.5),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    widget.isOptionSelected
+                                        ? Icons.check_circle_rounded
+                                        : Icons.radio_button_checked_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    widget.isOptionSelected
+                                        ? '${widget.optionLabel ?? "Option"} Selected (Tap to re-select)'
+                                        : 'Select ${widget.optionLabel ?? "This Option"}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        _ControlButton(
-                          icon: Icons.add_rounded,
-                          tooltip: 'Zoom In',
-                          onPressed: _zoomIn,
-                        ),
+                        const SizedBox(height: 12),
                       ],
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B).withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _ControlButton(
+                              icon: Icons.remove_rounded,
+                              tooltip: 'Zoom Out',
+                              onPressed: _zoomOut,
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: _resetZoom,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.refresh_rounded,
+                                      size: 14,
+                                      color: Colors.white70,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${(_currentScale * 100).toInt()}%',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _ControlButton(
+                              icon: Icons.add_rounded,
+                              tooltip: 'Zoom In',
+                              onPressed: _zoomIn,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -357,6 +468,9 @@ void showZoomableImagePopup(
   Uint8List? imageBytes,
   String? imageUrl,
   String title = 'Question Image',
+  VoidCallback? onSelectOption,
+  String? optionLabel,
+  bool isOptionSelected = false,
 }) {
   showDialog(
     context: context,
@@ -366,6 +480,9 @@ void showZoomableImagePopup(
       imageBytes: imageBytes,
       imageUrl: imageUrl,
       title: title,
+      onSelectOption: onSelectOption,
+      optionLabel: optionLabel,
+      isOptionSelected: isOptionSelected,
     ),
   );
 }

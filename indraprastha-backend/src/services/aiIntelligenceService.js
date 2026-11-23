@@ -396,68 +396,90 @@ class AiIntelligenceService {
         else if (p.is_repeatedly_incorrect) recAction = 'Solve remedial similar questions to correct persistent errors.';
         else if (p.is_needs_revision) recAction = 'Complete spaced-repetition revision test.';
 
-        // Upsert student_topic_learning_state with NEET marks fields
-        await client.query(`
-          INSERT INTO student_topic_learning_state (
-            user_id, subject, chapter, topic, study_status,
-            mastery_score, mastery_category, prediction_confidence, performance_trend,
-            is_not_studied, is_poorly_understood, is_repeatedly_incorrect, is_needs_revision,
-            total_questions_attempted, total_questions_correct,
-            marks_obtained, max_marks, negative_marks, marks_percentage,
-            accuracy_percentage,
-            recent_accuracy, previous_accuracy, repeated_mistake_count, avg_time_seconds,
-            content_views_count, revision_count, retention_estimate, revision_priority,
-            ai_explanation, recommended_action, last_evaluated_at
-          ) VALUES (
-            $1, $2, $3, $4, $5,
-            $6, $7, $8, $9,
-            $10, $11, $12, $13,
-            $14, $15,
-            $16, $17, $18, $19,
-            $20,
-            $21, $22, $23, $24,
-            $25, $26, $27, $28,
-            $29, $30, CURRENT_TIMESTAMP
-          )
-          ON CONFLICT (user_id, subject, chapter, topic) DO UPDATE SET
-            study_status = EXCLUDED.study_status,
-            mastery_score = EXCLUDED.mastery_score,
-            mastery_category = EXCLUDED.mastery_category,
-            prediction_confidence = EXCLUDED.prediction_confidence,
-            performance_trend = EXCLUDED.performance_trend,
-            is_not_studied = EXCLUDED.is_not_studied,
-            is_poorly_understood = EXCLUDED.is_poorly_understood,
-            is_repeatedly_incorrect = EXCLUDED.is_repeatedly_incorrect,
-            is_needs_revision = EXCLUDED.is_needs_revision,
-            total_questions_attempted = EXCLUDED.total_questions_attempted,
-            total_questions_correct = EXCLUDED.total_questions_correct,
-            marks_obtained = EXCLUDED.marks_obtained,
-            max_marks = EXCLUDED.max_marks,
-            negative_marks = EXCLUDED.negative_marks,
-            marks_percentage = EXCLUDED.marks_percentage,
-            accuracy_percentage = EXCLUDED.accuracy_percentage,
-            recent_accuracy = EXCLUDED.recent_accuracy,
-            previous_accuracy = EXCLUDED.previous_accuracy,
-            repeated_mistake_count = EXCLUDED.repeated_mistake_count,
-            avg_time_seconds = EXCLUDED.avg_time_seconds,
-            content_views_count = EXCLUDED.content_views_count,
-            revision_count = EXCLUDED.revision_count,
-            retention_estimate = EXCLUDED.retention_estimate,
-            revision_priority = EXCLUDED.revision_priority,
-            ai_explanation = EXCLUDED.ai_explanation,
-            recommended_action = EXCLUDED.recommended_action,
-            last_evaluated_at = CURRENT_TIMESTAMP
-        `, [
-          userId, f.subject, f.chapter, f.topic, studyStatus,
-          p.mastery_score, p.mastery_category, p.prediction_confidence, p.performance_trend,
-          p.is_not_studied, p.is_poorly_understood, p.is_repeatedly_incorrect, p.is_needs_revision,
-          f.total_attempts, f.correct_count,
-          f.marks_obtained, f.max_marks, f.negative_marks, f.marks_percentage,
-          (f.accuracy * 100),
-          (f.recent_accuracy * 100), (f.previous_accuracy * 100), f.repeated_mistakes, f.avg_time_seconds,
-          f.content_views, f.revision_count, p.retention_estimate, p.revision_priority,
-          p.ai_explanation, recAction
-        ]);
+        // Check if existing record exists for this user and topic
+        const existingTopic = await client.query(
+          `SELECT id FROM student_topic_learning_state WHERE user_id = $1 AND subject = $2 AND chapter = $3 AND topic = $4 LIMIT 1`,
+          [userId, f.subject, f.chapter, f.topic]
+        );
+
+        if (existingTopic.rows.length > 0) {
+          await client.query(`
+            UPDATE student_topic_learning_state SET
+              study_status = $1,
+              mastery_score = $2,
+              mastery_category = $3,
+              prediction_confidence = $4,
+              performance_trend = $5,
+              is_not_studied = $6,
+              is_poorly_understood = $7,
+              is_repeatedly_incorrect = $8,
+              is_needs_revision = $9,
+              total_questions_attempted = $10,
+              total_questions_correct = $11,
+              marks_obtained = $12,
+              max_marks = $13,
+              negative_marks = $14,
+              marks_percentage = $15,
+              accuracy_percentage = $16,
+              recent_accuracy = $17,
+              previous_accuracy = $18,
+              repeated_mistake_count = $19,
+              avg_time_seconds = $20,
+              content_views_count = $21,
+              revision_count = $22,
+              retention_estimate = $23,
+              revision_priority = $24,
+              ai_explanation = $25,
+              recommended_action = $26,
+              last_evaluated_at = CURRENT_TIMESTAMP
+            WHERE id = $27
+          `, [
+            studyStatus,
+            p.mastery_score, p.mastery_category, p.prediction_confidence, p.performance_trend,
+            p.is_not_studied, p.is_poorly_understood, p.is_repeatedly_incorrect, p.is_needs_revision,
+            f.total_attempts, f.correct_count,
+            f.marks_obtained, f.max_marks, f.negative_marks, f.marks_percentage,
+            (f.accuracy * 100),
+            (f.recent_accuracy * 100), (f.previous_accuracy * 100), f.repeated_mistakes, f.avg_time_seconds,
+            f.content_views, f.revision_count, p.retention_estimate, p.revision_priority,
+            p.ai_explanation, recAction,
+            existingTopic.rows[0].id
+          ]);
+        } else {
+          await client.query(`
+            INSERT INTO student_topic_learning_state (
+              user_id, subject, chapter, topic, study_status,
+              mastery_score, mastery_category, prediction_confidence, performance_trend,
+              is_not_studied, is_poorly_understood, is_repeatedly_incorrect, is_needs_revision,
+              total_questions_attempted, total_questions_correct,
+              marks_obtained, max_marks, negative_marks, marks_percentage,
+              accuracy_percentage,
+              recent_accuracy, previous_accuracy, repeated_mistake_count, avg_time_seconds,
+              content_views_count, revision_count, retention_estimate, revision_priority,
+              ai_explanation, recommended_action, last_evaluated_at
+            ) VALUES (
+              $1, $2, $3, $4, $5,
+              $6, $7, $8, $9,
+              $10, $11, $12, $13,
+              $14, $15,
+              $16, $17, $18, $19,
+              $20,
+              $21, $22, $23, $24,
+              $25, $26, $27, $28,
+              $29, $30, CURRENT_TIMESTAMP
+            )
+          `, [
+            userId, f.subject, f.chapter, f.topic, studyStatus,
+            p.mastery_score, p.mastery_category, p.prediction_confidence, p.performance_trend,
+            p.is_not_studied, p.is_poorly_understood, p.is_repeatedly_incorrect, p.is_needs_revision,
+            f.total_attempts, f.correct_count,
+            f.marks_obtained, f.max_marks, f.negative_marks, f.marks_percentage,
+            (f.accuracy * 100),
+            (f.recent_accuracy * 100), (f.previous_accuracy * 100), f.repeated_mistakes, f.avg_time_seconds,
+            f.content_views, f.revision_count, p.retention_estimate, p.revision_priority,
+            p.ai_explanation, recAction
+          ]);
+        }
 
         // Build Recommendation items for high-priority needs
         if (p.is_repeatedly_incorrect) {
@@ -523,34 +545,51 @@ class AiIntelligenceService {
 
       // Upsert question mistakes across all sources (Tests, Practice Sets, PYQs)
       for (const m of mistakeRecords) {
-        await client.query(`
-          INSERT INTO student_repeated_mistakes (
-            user_id, subject, chapter, topic, concept, question_id, source_type,
-            wrong_attempt_count, last_wrong_answer, correct_answer, question_text,
-            explanation, is_resolved, first_occurred_at, last_occurred_at
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7,
-            $8, $9, $10, $11,
-            $12, $13, $14, $15
-          )
-          ON CONFLICT (user_id, question_id) DO UPDATE SET
-            subject = EXCLUDED.subject,
-            chapter = EXCLUDED.chapter,
-            topic = EXCLUDED.topic,
-            concept = EXCLUDED.concept,
-            source_type = EXCLUDED.source_type,
-            wrong_attempt_count = EXCLUDED.wrong_attempt_count,
-            last_wrong_answer = EXCLUDED.last_wrong_answer,
-            correct_answer = EXCLUDED.correct_answer,
-            question_text = EXCLUDED.question_text,
-            explanation = EXCLUDED.explanation,
-            is_resolved = EXCLUDED.is_resolved,
-            last_occurred_at = EXCLUDED.last_occurred_at
-        `, [
-          userId, m.subject, m.chapter, m.topic, m.concept, m.question_id, m.source_type,
-          m.wrong_attempt_count, m.last_wrong_answer, m.correct_answer, m.question_text,
-          m.explanation, m.is_resolved, m.first_occurred_at, m.last_occurred_at
-        ]);
+        if (!m.question_id) continue;
+        const existingMistake = await client.query(
+          `SELECT id FROM student_repeated_mistakes WHERE user_id = $1 AND question_id = $2 LIMIT 1`,
+          [userId, m.question_id]
+        );
+
+        if (existingMistake.rows.length > 0) {
+          await client.query(`
+            UPDATE student_repeated_mistakes SET
+              subject = $1,
+              chapter = $2,
+              topic = $3,
+              concept = $4,
+              source_type = $5,
+              wrong_attempt_count = $6,
+              last_wrong_answer = $7,
+              correct_answer = $8,
+              question_text = $9,
+              explanation = $10,
+              is_resolved = $11,
+              last_occurred_at = $12
+            WHERE id = $13
+          `, [
+            m.subject, m.chapter, m.topic, m.concept, m.source_type,
+            m.wrong_attempt_count, m.last_wrong_answer, m.correct_answer,
+            m.question_text, m.explanation, m.is_resolved, m.last_occurred_at,
+            existingMistake.rows[0].id
+          ]);
+        } else {
+          await client.query(`
+            INSERT INTO student_repeated_mistakes (
+              user_id, subject, chapter, topic, concept, question_id, source_type,
+              wrong_attempt_count, last_wrong_answer, correct_answer, question_text,
+              explanation, is_resolved, first_occurred_at, last_occurred_at
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7,
+              $8, $9, $10, $11,
+              $12, $13, $14, $15
+            )
+          `, [
+            userId, m.subject, m.chapter, m.topic, m.concept, m.question_id, m.source_type,
+            m.wrong_attempt_count, m.last_wrong_answer, m.correct_answer, m.question_text,
+            m.explanation, m.is_resolved, m.first_occurred_at, m.last_occurred_at
+          ]);
+        }
       }
 
       // Upsert top recommendations (keep existing uncompleted ones clean)

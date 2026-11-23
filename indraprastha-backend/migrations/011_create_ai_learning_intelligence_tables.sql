@@ -77,11 +77,13 @@ CREATE TABLE IF NOT EXISTS student_repeated_mistakes (
   is_resolved BOOLEAN DEFAULT FALSE,
   first_occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  resolved_at TIMESTAMP
+  resolved_at TIMESTAMP,
+  CONSTRAINT uq_student_repeated_mistakes UNIQUE (user_id, question_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_repeated_mistakes_user ON student_repeated_mistakes(user_id, is_resolved);
 CREATE INDEX IF NOT EXISTS idx_repeated_mistakes_topic ON student_repeated_mistakes(user_id, subject, topic);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_student_repeated_mistakes_idx ON student_repeated_mistakes(user_id, question_id);
 
 -- 3. Table: student_ai_recommendations
 -- Personalized actionable study and revision tasks linked to real content

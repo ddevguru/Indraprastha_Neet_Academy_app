@@ -1621,6 +1621,22 @@ class _PracticeAttemptScreenState extends ConsumerState<PracticeAttemptScreen> {
                                                   BorderRadius.circular(AppRadii.sm),
                                               zoomTitle:
                                                   'Option ${String.fromCharCode(65 + index)} Diagram',
+                                              zoomOnBadgeOnly: true,
+                                              optionLabel:
+                                                  'Option ${String.fromCharCode(65 + index)}',
+                                              isOptionSelected: selected,
+                                              onTap: _submitted
+                                                  ? null
+                                                  : () {
+                                                      setState(() => _selectedOption = index);
+                                                      _checkAnswer(qItem);
+                                                    },
+                                              onSelectOption: _submitted
+                                                  ? null
+                                                  : () {
+                                                      setState(() => _selectedOption = index);
+                                                      _checkAnswer(qItem);
+                                                    },
                                             ),
                                           ),
                                         ],
