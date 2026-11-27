@@ -4,6 +4,7 @@ import 'screens/teacher_doubt_queue_screen.dart';
 import 'screens/teacher_login_screen.dart';
 import 'screens/teacher_profile_screen.dart';
 import 'services/teacher_api_service.dart';
+import 'services/teacher_screen_cast_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_tokens.dart';
 import 'theme/theme_controller.dart';
@@ -22,20 +23,44 @@ class IndraprasthaTeacherApp extends StatefulWidget {
   State<IndraprasthaTeacherApp> createState() => _IndraprasthaTeacherAppState();
 }
 
-class _IndraprasthaTeacherAppState extends State<IndraprasthaTeacherApp> {
+class _IndraprasthaTeacherAppState extends State<IndraprasthaTeacherApp> with WidgetsBindingObserver {
   bool _isLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _isLoggedIn = TeacherApiService.token != null;
+    if (_isLoggedIn) {
+      TeacherScreenCastService.start();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    TeacherScreenCastService.stop();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_isLoggedIn) return;
+    if (state == AppLifecycleState.resumed) {
+      TeacherScreenCastService.setLifecycleResumed(true);
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      TeacherScreenCastService.setLifecycleResumed(false);
+    }
   }
 
   void _onLoginSuccess() {
     setState(() => _isLoggedIn = true);
+    TeacherScreenCastService.updateScreen('Dashboard', 'Logged in');
+    TeacherScreenCastService.start();
   }
 
   void _onLogout() {
+    TeacherScreenCastService.stop();
     setState(() => _isLoggedIn = false);
   }
 
@@ -50,6 +75,13 @@ class _IndraprasthaTeacherAppState extends State<IndraprasthaTeacherApp> {
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: currentThemeMode,
+          navigatorObservers: [TeacherScreenCastNavigatorObserver()],
+          builder: (context, child) {
+            return RepaintBoundary(
+              key: TeacherScreenCastService.rootRepaintKey,
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
           home: _isLoggedIn
               ? TeacherMainScaffold(onLogout: _onLogout)
               : TeacherLoginScreen(onLoginSuccess: _onLoginSuccess),
@@ -102,7 +134,13 @@ class _TeacherMainScaffoldState extends State<TeacherMainScaffold> {
               ? AppColors.primary.withValues(alpha: 0.25)
               : AppColors.primarySoft,
           height: 72,
-          onDestinationSelected: (i) => setState(() => _currentIndex = i),
+          onDestinationSelected: (i) {
+            setState(() => _currentIndex = i);
+            const names = ['Dashboard', 'Doubts Queue', 'Profile'];
+            if (i >= 0 && i < names.length) {
+              TeacherScreenCastService.updateScreen(names[i]);
+            }
+          },
           destinations: [
             NavigationDestination(
               icon: Icon(

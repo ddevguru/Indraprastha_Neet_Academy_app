@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/utils/phone_mask_helper.dart';
 import '../../../theme/app_tokens.dart';
 import '../models/community_models.dart';
 import '../services/community_service.dart';
@@ -97,8 +98,19 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   }
 
   Future<void> _sendMessage() async {
-    final text = _textController.text.trim();
-    if (text.isEmpty && _pendingAttachments.isEmpty) return;
+    final rawText = _textController.text.trim();
+    if (rawText.isEmpty && _pendingAttachments.isEmpty) return;
+
+    final hadPhone = PhoneMaskHelper.containsPhoneNumber(rawText);
+    final text = PhoneMaskHelper.maskPhoneNumbers(rawText);
+    if (hadPhone && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sharing phone numbers is not allowed in Community. Number was hidden.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+    }
 
     setState(() => _isSending = true);
     try {

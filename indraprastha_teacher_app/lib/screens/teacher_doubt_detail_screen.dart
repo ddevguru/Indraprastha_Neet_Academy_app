@@ -7,6 +7,7 @@ import '../models/teacher_models.dart';
 import '../services/teacher_api_service.dart';
 import '../theme/app_tokens.dart';
 import '../theme/theme_controller.dart';
+import '../utils/phone_mask_helper.dart';
 import '../widgets/teacher_whiteboard_canvas.dart';
 
 class TeacherDoubtDetailScreen extends StatefulWidget {
@@ -193,12 +194,23 @@ class _TeacherDoubtDetailScreenState extends State<TeacherDoubtDetailScreen> wit
   }
 
   Future<void> _submitAnswer() async {
-    final text = _answerCtrl.text.trim();
-    if (text.isEmpty && _answerAttachments.isEmpty) {
+    final rawText = _answerCtrl.text.trim();
+    if (rawText.isEmpty && _answerAttachments.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please write an answer or attach a file solution')),
       );
       return;
+    }
+
+    final hadPhone = PhoneMaskHelper.containsPhoneNumber(rawText);
+    final text = PhoneMaskHelper.maskPhoneNumbers(rawText);
+    if (hadPhone && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sharing phone numbers with students is not allowed. Number was hidden.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
     }
 
     setState(() => _submittingAnswer = true);

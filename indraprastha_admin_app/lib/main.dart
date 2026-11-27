@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'screens/error_logs_page.dart';
 import 'screens/teacher_management_page.dart';
+import 'screens/teacher_live_screens_page.dart';
 import 'screens/doubt_monitoring_page.dart';
 import 'services/admin_error_logger.dart';
 import 'utils/drive_image_url.dart';
@@ -447,6 +448,7 @@ class _AdminHomeState extends State<AdminHome> {
     'Notifications',
     'Slider Banners',
     'Teacher Management',
+    'Live Teacher Screens',
     'Doubt Monitoring',
   ];
   static const _navItems = [
@@ -463,6 +465,7 @@ class _AdminHomeState extends State<AdminHome> {
     (Icons.notifications_outlined, 'Notifications'),
     (Icons.view_carousel_outlined, 'Slider Banners'),
     (Icons.school_outlined, 'Teacher Management'),
+    (Icons.cast_connected_rounded, 'Live Teacher Screens'),
     (Icons.track_changes_outlined, 'Doubt Monitoring'),
   ];
 
@@ -531,6 +534,7 @@ class _AdminHomeState extends State<AdminHome> {
       NotificationsPage(api: _api),
       SliderBannersPage(api: _api),
       const TeacherManagementPage(),
+      const TeacherLiveScreensPage(),
       const DoubtMonitoringPage(),
     ];
     final isLoggedIn = _api.token != null;

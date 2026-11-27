@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -64,6 +65,29 @@ class _IndraprasthaAppState extends ConsumerState<IndraprasthaApp> {
           darkTheme: AppTheme.dark(),
           themeMode: uiState.themeMode,
           routerConfig: router,
+          builder: (context, child) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final overlayStyle = isDark
+                ? const SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: Brightness.light,
+                    statusBarBrightness: Brightness.dark,
+                    systemNavigationBarColor: Colors.transparent,
+                    systemNavigationBarIconBrightness: Brightness.light,
+                  )
+                : const SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: Brightness.dark,
+                    statusBarBrightness: Brightness.light,
+                    systemNavigationBarColor: Colors.transparent,
+                    systemNavigationBarIconBrightness: Brightness.dark,
+                  );
+
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: overlayStyle,
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
         ),
       ),
     );

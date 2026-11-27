@@ -2051,10 +2051,220 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
   }
 
   void _openDiagramPopup(BuildContext context, String imageUrl, String caption) {
+    final trimmed = caption.trim();
+    final match = RegExp(
+      r'^(Figure\s*[\d\.]+|Fig\.\s*[\d\.]+)[\s:\-–—]*(.*)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
+
+    String prefix = '';
+    String diagramName = trimmed;
+    if (match != null) {
+      prefix = match.group(1)?.trim() ?? '';
+      final rest = match.group(2)?.trim() ?? '';
+      if (rest.isNotEmpty) diagramName = rest;
+    }
+    if (diagramName.isEmpty) {
+      diagramName = trimmed;
+      prefix = '';
+    }
+
+    final cleanAns = diagramName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanPre = prefix.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final chId = widget.chapterId ?? 0;
+    final blankKey = 'diag_blank_${chId}_${cleanPre}_$cleanAns';
+    final isSolved = _solvedBlanks.contains(blankKey);
+
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.92),
-      builder: (ctx) => _DiagramZoomDialog(imageUrl: imageUrl, caption: caption),
+      builder: (ctx) => _DiagramZoomDialog(
+        imageUrl: imageUrl,
+        caption: caption,
+        prefix: prefix,
+        diagramName: diagramName,
+        isSolved: isSolved,
+        onTapBlank: diagramName.isNotEmpty
+            ? () {
+                _openBlankSolveDialog(
+                  context,
+                  prefix.isNotEmpty
+                      ? '$prefix: [ Identify Diagram ]'
+                      : 'Identify this NCERT Diagram:',
+                  diagramName,
+                  blankKey,
+                );
+              }
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildDiagramCaptionBlank({
+    required BuildContext context,
+    required String captionText,
+    required bool isDark,
+    String? imageUrl,
+  }) {
+    if (captionText.trim().isEmpty) return const SizedBox.shrink();
+
+    final trimmed = captionText.trim();
+
+    // Match Figure prefix e.g. "Figure 4.1", "Fig. 2.3", "Fig 1"
+    final match = RegExp(
+      r'^(Figure\s*[\d\.]+|Fig\.\s*[\d\.]+)[\s:\-–—]*(.*)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
+
+    String prefix = '';
+    String diagramName = trimmed;
+
+    if (match != null) {
+      prefix = match.group(1)?.trim() ?? '';
+      final rest = match.group(2)?.trim() ?? '';
+      if (rest.isNotEmpty) {
+        diagramName = rest;
+      }
+    }
+
+    if (diagramName.isEmpty) {
+      diagramName = trimmed;
+      prefix = '';
+    }
+
+    // Generate a stable unique key for this diagram blank
+    final cleanAns = diagramName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanPre = prefix.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final chId = widget.chapterId ?? 0;
+    final blankKey = 'diag_blank_${chId}_${cleanPre}_$cleanAns';
+    final isSolved = _solvedBlanks.contains(blankKey);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(
+          color: isSolved
+              ? (isDark ? const Color(0xFF059669) : const Color(0xFF10B981))
+              : (isDark ? const Color(0xFFD97706) : const Color(0xFFF59E0B)),
+          width: 1.2,
+        ),
+      ),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.center,
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.image_outlined,
+                size: 14,
+                color: isDark ? const Color(0xFFFFA055) : AppColors.primary,
+              ),
+              if (prefix.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Text(
+                  '$prefix: ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          InkWell(
+            onTap: () => _openBlankSolveDialog(
+              context,
+              prefix.isNotEmpty
+                  ? '$prefix: [ Identify Diagram ]'
+                  : 'Identify this NCERT Diagram:',
+              diagramName,
+              blankKey,
+            ),
+            borderRadius: BorderRadius.circular(6),
+            child: isSolved
+                ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
+                        width: 1.1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            diagramName,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                              color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          size: 13,
+                          color: Color(0xFF10B981),
+                        ),
+                      ],
+                    ),
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF282012) : const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFFF59E0B) : const Color(0xFFD97706),
+                        width: 1.3,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '[  _______ ?  ]',
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFFFCD34D) : const Color(0xFF92400E),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.edit_note_rounded,
+                          size: 14,
+                          color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Identify',
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2140,34 +2350,13 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
               ],
             ),
           ),
-          if (captionText.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF282012) : AppColors.primarySoft,
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.image_outlined, size: 14, color: AppColors.primary),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      captionText,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? const Color(0xFFFFA055) : AppColors.primaryDark,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
+          if (captionText.isNotEmpty)
+            _buildDiagramCaptionBlank(
+              context: context,
+              captionText: captionText,
+              isDark: isDark,
+              imageUrl: rawUrl,
             ),
-          ],
         ],
       ),
     );
@@ -2389,42 +2578,10 @@ class _InteractiveHighlightReaderState extends State<InteractiveHighlightReader>
       );
     }
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 4, bottom: AppSpacing.md),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(AppRadii.sm),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2, right: 8),
-            child: Icon(
-              Icons.collections_bookmark_rounded,
-              size: 16,
-              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: _fontSize - 1.5,
-                fontWeight: FontWeight.w600,
-                fontStyle: FontStyle.italic,
-                height: 1.5,
-                color: isDark ? const Color(0xFFBAE6FD) : const Color(0xFF0369A1),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return _buildDiagramCaptionBlank(
+      context: context,
+      captionText: text,
+      isDark: isDark,
     );
   }
 
@@ -3891,9 +4048,20 @@ String _formatReadableContent(String raw) {
 }
 
 class _DiagramZoomDialog extends StatefulWidget {
-  const _DiagramZoomDialog({required this.imageUrl, required this.caption});
+  const _DiagramZoomDialog({
+    required this.imageUrl,
+    required this.caption,
+    this.prefix = '',
+    this.diagramName = '',
+    this.isSolved = false,
+    this.onTapBlank,
+  });
   final String imageUrl;
   final String caption;
+  final String prefix;
+  final String diagramName;
+  final bool isSolved;
+  final VoidCallback? onTapBlank;
 
   @override
   State<_DiagramZoomDialog> createState() => _DiagramZoomDialogState();
@@ -3906,7 +4074,7 @@ class _DiagramZoomDialogState extends State<_DiagramZoomDialog> {
   void _zoomBy(double factor) {
     setState(() {
       _currentScale = (_currentScale * factor).clamp(1.0, 6.0);
-      _controller.value = Matrix4.identity()..scale(_currentScale);
+      _controller.value = Matrix4.diagonal3Values(_currentScale, _currentScale, 1.0);
     });
   }
 
@@ -3950,16 +4118,78 @@ class _DiagramZoomDialogState extends State<_DiagramZoomDialog> {
                   const Icon(Icons.image_outlined, color: AppColors.primary, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      widget.caption.isNotEmpty ? widget.caption : 'Diagram View',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    child: widget.diagramName.isNotEmpty
+                        ? InkWell(
+                            onTap: widget.onTapBlank,
+                            borderRadius: BorderRadius.circular(6),
+                            child: widget.isSolved
+                                ? Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          widget.prefix.isNotEmpty
+                                              ? '${widget.prefix}: ${widget.diagramName}'
+                                              : widget.diagramName,
+                                          style: const TextStyle(
+                                            color: Color(0xFF6EE7B7),
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Icon(Icons.check_circle_rounded, size: 15, color: Color(0xFF10B981)),
+                                    ],
+                                  )
+                                : Row(
+                                    children: [
+                                      if (widget.prefix.isNotEmpty)
+                                        Text(
+                                          '${widget.prefix}: ',
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF282012),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              '[  _______ ?  Identify  ]',
+                                              style: TextStyle(
+                                                color: Color(0xFFFCD34D),
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            SizedBox(width: 4),
+                                            Icon(Icons.edit_note_rounded, size: 13, color: Color(0xFFFCD34D)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          )
+                        : Text(
+                            widget.caption.isNotEmpty ? widget.caption : 'Diagram View',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),

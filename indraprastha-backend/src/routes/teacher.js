@@ -5,6 +5,8 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const { pool } = require('../db');
 const { uploadMediaToAdminDrive } = require('../services/communityDriveService');
+const { maskPhoneNumbers, maskWhiteboardJson } = require('../utils/phoneMaskHelper');
+const { setTeacherFrame, markTeacherOffline } = require('../utils/teacherScreenCastStore');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -300,7 +302,13 @@ router.get('/doubts', teacherAuth, async (req, res) => {
 
     const { rows } = await pool.query(queryText, params);
 
-    res.json({ success: true, doubts: rows });
+    const sanitizedDoubts = rows.map((d) => ({
+      ...d,
+      title: maskPhoneNumbers(d.title),
+      description: maskPhoneNumbers(d.description),
+    }));
+
+    res.json({ success: true, doubts: sanitizedDoubts });
   } catch (err) {
     console.error('[TEACHER_DOUBTS_ERROR]', err);
     res.status(500).json({ error: 'Failed to fetch doubts' });
@@ -397,11 +405,29 @@ router.get('/doubts/:doubtId', teacherAuth, async (req, res) => {
       success: true,
       doubt: {
         ...doubt,
+        title: maskPhoneNumbers(doubt.title),
+        description: maskPhoneNumbers(doubt.description),
         attachments: attRes.rows,
-        responses,
-        solutionWhiteboard: wbRes.rows[0] || null,
-        whiteboard: wbRes.rows[0] || null,
-        history: histRes.rows,
+        responses: responses.map((r) => ({
+          ...r,
+          response_text: maskPhoneNumbers(r.response_text),
+        })),
+        solutionWhiteboard: wbRes.rows[0]
+          ? {
+              ...wbRes.rows[0],
+              document_json: maskWhiteboardJson(wbRes.rows[0].document_json),
+            }
+          : null,
+        whiteboard: wbRes.rows[0]
+          ? {
+              ...wbRes.rows[0],
+              document_json: maskWhiteboardJson(wbRes.rows[0].document_json),
+            }
+          : null,
+        history: histRes.rows.map((h) => ({
+          ...h,
+          reason: maskPhoneNumbers(h.reason),
+        })),
       },
     });
   } catch (err) {
@@ -529,9 +555,10 @@ router.post('/doubts/:doubtId/responses', teacherAuth, async (req, res) => {
     const teacherId = req.teacher.id;
     const doubtId = parseInt(req.params.doubtId, 10);
     const text = req.body.responseText || req.body.response_text || '';
+    const safeText = maskPhoneNumbers(text.trim());
     const attachments = req.body.attachments || [];
 
-    if (!text || !text.trim()) {
+    if (!safeText) {
       return res.status(400).json({ error: 'Answer explanation text is required' });
     }
 
@@ -542,7 +569,7 @@ router.post('/doubts/:doubtId/responses', teacherAuth, async (req, res) => {
       `INSERT INTO doubt_responses (doubt_id, teacher_id, response_text, created_at, published_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING *`,
-      [doubtId, teacherId, text.trim()]
+      [doubtId, teacherId, safeText]
     );
     const response = respRes.rows[0];
 
@@ -748,7 +775,8 @@ router.post('/doubts/:doubtId/publish-solution', teacherAuth, async (req, res) =
     );
 
     if (documentJson) {
-      const docStr = typeof documentJson === 'string' ? documentJson : JSON.stringify(documentJson);
+      const rawDocStr = typeof documentJson === 'string' ? documentJson : JSON.stringify(documentJson);
+      const docStr = maskWhiteboardJson(rawDocStr);
       if (existing.rows.length === 0) {
         const ins = await client.query(
           `INSERT INTO teacher_solution_whiteboards (
@@ -919,6 +947,87 @@ router.post('/upload', teacherAuth, upload.single('file'), async (req, res) => {
   } catch (err) {
     console.error('[TEACHER_UPLOAD_ERROR]', err);
     res.status(500).json({ error: 'Failed to upload media to Google Drive' });
+  }
+});
+
+/**
+ * POST /api/teacher/screen-cast
+ * Receives live screen frame & activity from Teacher App for Admin monitoring
+ */
+router.post('/screen-cast', teacherAuth, async (req, res) => {
+  try {
+    const teacherId = req.teacher.id;
+    const {
+      currentScreen = 'Dashboard',
+      currentActivity = '',
+      frameBase64 = '',
+      frameWidth = 0,
+      frameHeight = 0,
+      appState = 'active',
+    } = req.body || {};
+
+    const cleanFrame = typeof frameBase64 === 'string' ? frameBase64 : '';
+    // Guard against huge payloads (> 2MB base64)
+    if (cleanFrame.length > 2 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Frame too large' });
+    }
+
+    const updated = setTeacherFrame(teacherId, {
+      currentScreen: String(currentScreen).slice(0, 120),
+      currentActivity: String(currentActivity).slice(0, 300),
+      frameBase64: cleanFrame,
+      frameWidth: parseInt(frameWidth, 10) || 0,
+      frameHeight: parseInt(frameHeight, 10) || 0,
+      appState: String(appState).slice(0, 40),
+    });
+
+    await pool.query(
+      `INSERT INTO teacher_live_screens (
+         teacher_id, current_screen, current_activity, frame_base64, frame_width, frame_height, app_state, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+       ON CONFLICT (teacher_id) DO UPDATE SET
+         current_screen = EXCLUDED.current_screen,
+         current_activity = EXCLUDED.current_activity,
+         frame_base64 = CASE WHEN EXCLUDED.frame_base64 <> '' THEN EXCLUDED.frame_base64 ELSE teacher_live_screens.frame_base64 END,
+         frame_width = CASE WHEN EXCLUDED.frame_width > 0 THEN EXCLUDED.frame_width ELSE teacher_live_screens.frame_width END,
+         frame_height = CASE WHEN EXCLUDED.frame_height > 0 THEN EXCLUDED.frame_height ELSE teacher_live_screens.frame_height END,
+         app_state = EXCLUDED.app_state,
+         updated_at = CURRENT_TIMESTAMP`,
+      [
+        teacherId,
+        updated.currentScreen,
+        updated.currentActivity,
+        cleanFrame,
+        updated.frameWidth,
+        updated.frameHeight,
+        updated.appState,
+      ]
+    );
+
+    res.json({ success: true, updatedAt: updated.updatedAt });
+  } catch (err) {
+    console.error('[TEACHER_SCREEN_CAST_ERROR]', err);
+    res.status(500).json({ error: 'Failed to update screen cast' });
+  }
+});
+
+/**
+ * POST /api/teacher/screen-cast/offline
+ * Marks teacher screen cast as background/offline
+ */
+router.post('/screen-cast/offline', teacherAuth, async (req, res) => {
+  try {
+    const teacherId = req.teacher.id;
+    const appState = (req.body?.appState || 'offline').toString().slice(0, 40);
+    markTeacherOffline(teacherId, appState);
+    await pool.query(
+      `UPDATE teacher_live_screens SET app_state = $1, updated_at = CURRENT_TIMESTAMP WHERE teacher_id = $2`,
+      [appState, teacherId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[TEACHER_SCREEN_CAST_OFFLINE_ERROR]', err);
+    res.status(500).json({ error: 'Failed to mark offline' });
   }
 });
 

@@ -187,4 +187,34 @@ class AdminCommunityService {
         .replace(queryParameters: query)
         .toString();
   }
+
+  // ---------------- Live Teacher Screen Casting ----------------
+
+  static Future<List<Map<String, dynamic>>> getTeacherLiveScreens() async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/admin/teachers/live-screens'),
+      headers: await _headers(),
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('Failed to load live screens: ${res.body}');
+    }
+    final data = jsonDecode(res.body);
+    final list = data['teachers'] as List? ?? [];
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  static Future<Map<String, dynamic>?> getTeacherLiveScreen(int teacherId) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/admin/teachers/$teacherId/live-screen'),
+      headers: await _headers(),
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('Failed to load teacher live screen: ${res.body}');
+    }
+    final data = jsonDecode(res.body);
+    if (data['teacher'] is Map) {
+      return Map<String, dynamic>.from(data['teacher'] as Map);
+    }
+    return null;
+  }
 }

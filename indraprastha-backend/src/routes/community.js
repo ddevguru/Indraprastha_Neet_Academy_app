@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
 const { uploadMediaToAdminDrive, LOCAL_FALLBACK_DIR } = require('../services/communityDriveService');
 const { findBestTeacherForDoubt } = require('../utils/autoAssignTeacher');
+const { maskPhoneNumbers } = require('../utils/phoneMaskHelper');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -253,11 +254,16 @@ router.get('/:communityId/messages', studentAuth, async (req, res) => {
 
     const { rows } = await pool.query(queryText, params);
 
+    const maskedMessages = rows.reverse().map((m) => ({
+      ...m,
+      text_content: maskPhoneNumbers(m.text_content),
+    }));
+
     // Return chronological order (oldest to newest) for smooth chat UI
     res.json({
       success: true,
       community: commRes.rows[0],
-      messages: rows.reverse(),
+      messages: maskedMessages,
     });
   } catch (err) {
     console.error('[GET_COMMUNITY_MESSAGES_ERROR]', err);
@@ -317,6 +323,7 @@ router.post('/:communityId/messages', studentAuth, async (req, res) => {
       attachments = [], // Array of attachment objects from /upload
       doubtId = null,
     } = req.body;
+    const safeTextContent = maskPhoneNumbers(textContent);
 
     // Verify ownership & get subject/class
     const commRes = await client.query(
@@ -334,7 +341,7 @@ router.post('/:communityId/messages', studentAuth, async (req, res) => {
     // If doubtId was not already provided by client, auto-create a doubt so it immediately shows up in 'My Doubts' and Teacher Queue
     let finalDoubtId = doubtId ? parseInt(doubtId, 10) : null;
     if (!finalDoubtId) {
-      const trimmedText = textContent.trim();
+      const trimmedText = safeTextContent.trim();
       const title = trimmedText.length > 60
         ? `${trimmedText.substring(0, 57)}...`
         : (trimmedText || (attachments.length > 0 ? `Question: ${attachments[0].originalFilename || 'Media'}` : 'New Question'));
@@ -437,7 +444,7 @@ router.post('/:communityId/messages', studentAuth, async (req, res) => {
       `INSERT INTO community_messages (community_id, student_id, message_type, text_content, doubt_id)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [communityId, studentId, messageType, textContent, finalDoubtId]
+      [communityId, studentId, messageType, safeTextContent, finalDoubtId]
     );
     const message = msgRes.rows[0];
 

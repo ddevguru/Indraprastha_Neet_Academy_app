@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../db');
+const { getTeacherFrame } = require('../utils/teacherScreenCastStore');
 
 // Admin Auth Middleware
 function adminAuth(req, res, next) {
@@ -640,6 +641,122 @@ router.get('/reports/doubts', async (req, res) => {
   } catch (err) {
     console.error('[EXPORT_DOUBTS_CSV_ERROR]', err);
     res.status(500).json({ error: 'Failed to export doubts report' });
+  }
+});
+
+/**
+ * GET /api/admin/teachers/live-screens
+ * List all teachers with their latest live screen frame & activity
+ */
+router.get('/teachers/live-screens', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        tp.id as teacher_id,
+        tp.teacher_code,
+        tp.display_name,
+        tp.email,
+        tp.is_active,
+        tls.current_screen,
+        tls.current_activity,
+        tls.frame_base64,
+        tls.frame_width,
+        tls.frame_height,
+        tls.app_state,
+        tls.updated_at
+      FROM teacher_profiles tp
+      LEFT JOIN teacher_live_screens tls ON tls.teacher_id = tp.id
+      ORDER BY tls.updated_at DESC NULLS LAST, tp.display_name ASC
+    `);
+
+    const nowMs = Date.now();
+    const teachers = rows.map((r) => {
+      const mem = getTeacherFrame(r.teacher_id);
+      const dbUpdatedMs = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+      const memUpdatedMs = mem?.updatedAt ? new Date(mem.updatedAt).getTime() : 0;
+      const useMem = mem && memUpdatedMs >= dbUpdatedMs;
+
+      const updatedAt = useMem ? mem.updatedAt : r.updated_at;
+      const appState = useMem ? mem.appState : (r.app_state || 'offline');
+      const ageSec = updatedAt ? (nowMs - new Date(updatedAt).getTime()) / 1000 : 999999;
+      const isLive = ageSec <= 15 && appState === 'active';
+
+      return {
+        teacherId: r.teacher_id,
+        teacherCode: r.teacher_code,
+        displayName: r.display_name,
+        email: r.email,
+        isAccountActive: r.is_active,
+        currentScreen: useMem ? mem.currentScreen : (r.current_screen || 'Not Started'),
+        currentActivity: useMem ? mem.currentActivity : (r.current_activity || ''),
+        frameBase64: useMem ? mem.frameBase64 : (r.frame_base64 || ''),
+        frameWidth: useMem ? mem.frameWidth : (r.frame_width || 0),
+        frameHeight: useMem ? mem.frameHeight : (r.frame_height || 0),
+        appState,
+        isLive,
+        secondsAgo: Math.max(0, Math.round(ageSec)),
+        updatedAt,
+      };
+    });
+
+    res.json({ success: true, teachers });
+  } catch (err) {
+    console.error('[ADMIN_LIVE_SCREENS_ERROR]', err);
+    res.status(500).json({ error: 'Failed to fetch live teacher screens' });
+  }
+});
+
+/**
+ * GET /api/admin/teachers/:teacherId/live-screen
+ * Single teacher live screen stream endpoint for full-screen watch
+ */
+router.get('/teachers/:teacherId/live-screen', async (req, res) => {
+  try {
+    const teacherId = parseInt(req.params.teacherId, 10);
+    const mem = getTeacherFrame(teacherId);
+    const { rows } = await pool.query(
+      `SELECT
+         tp.id as teacher_id, tp.teacher_code, tp.display_name, tp.email,
+         tls.current_screen, tls.current_activity, tls.frame_base64,
+         tls.frame_width, tls.frame_height, tls.app_state, tls.updated_at
+       FROM teacher_profiles tp
+       LEFT JOIN teacher_live_screens tls ON tls.teacher_id = tp.id
+       WHERE tp.id = $1`,
+      [teacherId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+    const r = rows[0];
+    const dbUpdatedMs = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+    const memUpdatedMs = mem?.updatedAt ? new Date(mem.updatedAt).getTime() : 0;
+    const useMem = mem && memUpdatedMs >= dbUpdatedMs;
+
+    const updatedAt = useMem ? mem.updatedAt : r.updated_at;
+    const appState = useMem ? mem.appState : (r.app_state || 'offline');
+    const ageSec = updatedAt ? (Date.now() - new Date(updatedAt).getTime()) / 1000 : 999999;
+
+    res.json({
+      success: true,
+      teacher: {
+        teacherId: r.teacher_id,
+        teacherCode: r.teacher_code,
+        displayName: r.display_name,
+        email: r.email,
+        currentScreen: useMem ? mem.currentScreen : (r.current_screen || 'Not Started'),
+        currentActivity: useMem ? mem.currentActivity : (r.current_activity || ''),
+        frameBase64: useMem ? mem.frameBase64 : (r.frame_base64 || ''),
+        frameWidth: useMem ? mem.frameWidth : (r.frame_width || 0),
+        frameHeight: useMem ? mem.frameHeight : (r.frame_height || 0),
+        appState,
+        isLive: ageSec <= 15 && appState === 'active',
+        secondsAgo: Math.max(0, Math.round(ageSec)),
+        updatedAt,
+      },
+    });
+  } catch (err) {
+    console.error('[ADMIN_SINGLE_LIVE_SCREEN_ERROR]', err);
+    res.status(500).json({ error: 'Failed to fetch teacher live screen' });
   }
 });
 

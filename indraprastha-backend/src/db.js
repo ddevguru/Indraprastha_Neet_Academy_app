@@ -1449,6 +1449,18 @@ async function ensureCommunityAndDoubtsSchema() {
       -- Ensure unique indexes for AI tables
       CREATE UNIQUE INDEX IF NOT EXISTS uq_student_repeated_mistakes_idx ON student_repeated_mistakes (user_id, question_id);
       CREATE UNIQUE INDEX IF NOT EXISTS uq_student_topic_learning_state_idx ON student_topic_learning_state (user_id, subject, chapter, topic);
+
+      -- Teacher Live Screen Casting table for Admin Panel monitoring
+      CREATE TABLE IF NOT EXISTS teacher_live_screens (
+        teacher_id INTEGER PRIMARY KEY REFERENCES teacher_profiles(id) ON DELETE CASCADE,
+        current_screen VARCHAR(120) DEFAULT 'Dashboard',
+        current_activity TEXT DEFAULT '',
+        frame_base64 TEXT DEFAULT '',
+        frame_width INTEGER DEFAULT 0,
+        frame_height INTEGER DEFAULT 0,
+        app_state VARCHAR(40) DEFAULT 'active',
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
   } catch (err) {
     console.error('[DB_COMMUNITY_INIT_WARNING] Failed to ensure community & doubt tables:', err.message);

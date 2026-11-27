@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
 const { findBestTeacherForDoubt } = require('../utils/autoAssignTeacher');
+const { maskPhoneNumbers, maskWhiteboardJson } = require('../utils/phoneMaskHelper');
 
 // Student Auth Middleware
 async function studentAuth(req, res, next) {
@@ -62,13 +63,16 @@ router.post('/', studentAuth, async (req, res) => {
     const initialStatus = autoTeacher ? 'Assigned' : 'Pending';
     const assignedTeacherId = autoTeacher ? autoTeacher.id : null;
 
+    const safeTitle = maskPhoneNumbers(title.trim());
+    const safeDescription = maskPhoneNumbers(description.trim());
+
     // 1. Create doubt record
     const doubtRes = await client.query(
       `INSERT INTO doubts (
          student_id, community_id, class_level, subject, title, description, status, assigned_teacher_id, version, created_at, updated_at
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING *`,
-      [studentId, communityId || null, classLevel, subject, title.trim(), description.trim(), initialStatus, assignedTeacherId]
+      [studentId, communityId || null, classLevel, subject, safeTitle, safeDescription, initialStatus, assignedTeacherId]
     );
     const doubt = doubtRes.rows[0];
 
@@ -272,7 +276,25 @@ router.get('/my', studentAuth, async (req, res) => {
 
     const { rows } = await pool.query(queryText, params);
 
-    res.json({ success: true, doubts: rows });
+    const sanitizedRows = rows.map((d) => ({
+      ...d,
+      title: maskPhoneNumbers(d.title),
+      description: maskPhoneNumbers(d.description),
+      responses: Array.isArray(d.responses)
+        ? d.responses.map((r) => ({
+            ...r,
+            responseText: maskPhoneNumbers(r.responseText),
+          }))
+        : d.responses,
+      published_solution_whiteboard: d.published_solution_whiteboard
+        ? {
+            ...d.published_solution_whiteboard,
+            documentJson: maskWhiteboardJson(d.published_solution_whiteboard.documentJson),
+          }
+        : null,
+    }));
+
+    res.json({ success: true, doubts: sanitizedRows });
   } catch (err) {
     console.error('[GET_MY_DOUBTS_ERROR]', err);
     res.status(500).json({ error: 'Failed to fetch student doubts' });
@@ -344,10 +366,23 @@ router.get('/:doubtId', studentAuth, async (req, res) => {
       success: true,
       doubt: {
         ...doubt,
+        title: maskPhoneNumbers(doubt.title),
+        description: maskPhoneNumbers(doubt.description),
         attachments: attRes.rows,
-        responses,
-        publishedSolutionWhiteboard: wbRes.rows[0] || null,
-        history: histRes.rows,
+        responses: responses.map((r) => ({
+          ...r,
+          response_text: maskPhoneNumbers(r.response_text),
+        })),
+        publishedSolutionWhiteboard: wbRes.rows[0]
+          ? {
+              ...wbRes.rows[0],
+              document_json: maskWhiteboardJson(wbRes.rows[0].document_json),
+            }
+          : null,
+        history: histRes.rows.map((h) => ({
+          ...h,
+          reason: maskPhoneNumbers(h.reason),
+        })),
       },
     });
   } catch (err) {
@@ -366,8 +401,9 @@ router.post('/:doubtId/reopen', studentAuth, async (req, res) => {
     const studentId = req.user.id;
     const doubtId = parseInt(req.params.doubtId, 10);
     const { clarificationText = '' } = req.body;
+    const safeClarification = maskPhoneNumbers(clarificationText.trim());
 
-    if (!clarificationText.trim()) {
+    if (!safeClarification) {
       return res.status(400).json({ error: 'Clarification explanation is required to reopen' });
     }
 
@@ -407,7 +443,7 @@ router.post('/:doubtId/reopen', studentAuth, async (req, res) => {
     await client.query(
       `INSERT INTO doubt_status_history (doubt_id, previous_status, new_status, changed_by_user_id, changed_by_role, reason)
        VALUES ($1, $2, $3, $4, 'student', $5)`,
-      [doubtId, prevStatus, newStatus, studentId, clarificationText]
+      [doubtId, prevStatus, newStatus, studentId, safeClarification]
     );
 
     // 3. Activity event
@@ -415,7 +451,7 @@ router.post('/:doubtId/reopen', studentAuth, async (req, res) => {
       `INSERT INTO doubt_activity_events (
          doubt_id, actor_id, actor_role, event_type, previous_status, new_status, metadata_json
        ) VALUES ($1, $2, 'student', 'DOUBT_REOPENED', $3, $4, $5)`,
-      [doubtId, studentId, prevStatus, newStatus, JSON.stringify({ clarificationText, targetTeacherId })]
+      [doubtId, studentId, prevStatus, newStatus, JSON.stringify({ clarificationText: safeClarification, targetTeacherId })]
     );
 
     // 4. Close previous cycle & create new resolution cycle

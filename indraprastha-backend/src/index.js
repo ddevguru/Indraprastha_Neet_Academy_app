@@ -53,6 +53,10 @@ app.use(
     max: rateLimitMax,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) =>
+      req.path.startsWith('/api/teacher/screen-cast') ||
+      req.path.startsWith('/api/admin/teachers/live-screens') ||
+      req.path.includes('/live-screen'),
   })
 );
 app.use(express.json({ limit: '50mb' }));
